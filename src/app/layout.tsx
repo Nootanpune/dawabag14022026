@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Next.js Template",
-  description: "A minimal Next.js starter template",
+  title: "Dawabag - Online Pharmacy | Genuine Medicines Delivered",
+  description: "Quick & reliable medicine delivery. Upload your prescription and get medicines delivered to your door.",
+  keywords: ["online pharmacy", "medicine delivery", "prescription", "healthcare", "pharma"],
 };
 
 export default function RootLayout({
