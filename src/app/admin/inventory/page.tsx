@@ -60,8 +60,8 @@ const mockInventory: Medicine[] = [
 ];
 
 const mockAlerts: InventoryAlert[] = [
-  { id: 'alert_001', medicineId: 'med_002', medicineName: 'Azithromycin 500mg', currentStock: 8, alertLevel: 'critical', message: 'Stock below reorder level!', isResolved: false, createdAt: '2026-02-14T10:00:00Z' },
-  { id: 'alert_002', medicineId: 'med_005', medicineName: 'Omeprazole 20mg', currentStock: 5, alertLevel: 'critical', message: 'Critical stock level!', isResolved: false, createdAt: '2026-02-14T11:00:00Z' },
+  { id: 'alert_001', medicineId: 'med_002', medicineName: 'Azithromycin 500mg', currentStock: 8, alertLevel: StockAlertLevel.CRITICAL, message: 'Stock below reorder level!', isResolved: false, createdAt: '2026-02-14T10:00:00Z' },
+  { id: 'alert_002', medicineId: 'med_005', medicineName: 'Omeprazole 20mg', currentStock: 5, alertLevel: StockAlertLevel.CRITICAL, message: 'Critical stock level!', isResolved: false, createdAt: '2026-02-14T11:00:00Z' },
 ];
 
 export default function AdminInventoryPage() {

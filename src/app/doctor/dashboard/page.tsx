@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
   Doctor, 
@@ -182,7 +182,7 @@ export default function DoctorDashboard() {
     }
   };
 
-  const tabs: { id: DoctorTab; label: string; icon: JSX.Element }[] = [
+  const tabs: { id: DoctorTab; label: string; icon: React.ReactNode }[] = [
     {
       id: 'dashboard',
       label: 'Dashboard',

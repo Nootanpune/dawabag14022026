@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
   Pharmacy, 
@@ -13,7 +13,10 @@ import {
   Medicine,
   VerificationStatus,
   PaymentTerms,
-  GSTType
+  GSTType,
+  OrderStatus,
+  PaymentStatus,
+  PaymentMethod
 } from '@/types';
 
 // Sample data
@@ -81,9 +84,9 @@ const sampleOrders: Order[] = [
     shippingCharges: 0,
     gstAmount: 2430,
     total: 15930,
-    paymentMethod: 'credit_card',
-    paymentStatus: 'completed',
-    orderStatus: 'delivered',
+    paymentMethod: PaymentMethod.CREDIT_CARD,
+    paymentStatus: PaymentStatus.COMPLETED,
+    orderStatus: OrderStatus.DELIVERED,
     isRefillOrder: false,
     pincode: '400001',
     pharmacyId: 'pharm_001',
@@ -124,9 +127,9 @@ const sampleOrders: Order[] = [
     shippingCharges: 0,
     gstAmount: 1378,
     total: 9028,
-    paymentMethod: 'net_banking',
-    paymentStatus: 'pending',
-    orderStatus: 'pending',
+    paymentMethod: PaymentMethod.NET_BANKING,
+    paymentStatus: PaymentStatus.PENDING,
+    orderStatus: OrderStatus.PENDING,
     isRefillOrder: false,
     pincode: '400001',
     pharmacyId: 'pharm_001',
@@ -231,7 +234,7 @@ export default function PharmacyDashboard() {
   const [activeTab, setActiveTab] = useState<PharmacyTab>('dashboard');
   const [isLoggedIn, setIsLoggedIn] = useState(true);
 
-  const tabs: { id: PharmacyTab; label: string; icon: JSX.Element }[] = [
+  const tabs: { id: PharmacyTab; label: string; icon: React.ReactNode }[] = [
     {
       id: 'dashboard',
       label: 'Dashboard',

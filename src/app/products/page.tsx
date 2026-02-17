@@ -270,7 +270,7 @@ export default function ProductsPage() {
       storageInstructions: 'Store in cool place',
       category: 'Digestive Health',
       dosageForm: 'syrup',
-      status: '60ml',
+      strength: '60ml',
       packSize: 1,
       unit: 'bottle',
       mrp: 120,

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
   Order, 
@@ -13,11 +13,15 @@ import {
   Vendor, 
   InventoryAlert,
   AdminStaff,
+  OrderStatus,
+  PaymentStatus,
+  PaymentMethod,
+  PrescriptionStatus,
+  StockAlertLevel,
+  UserRole,
   SalesReport,
   StockReport,
   GSTRReport,
-  UserRole,
-  OrderStatus,
   VerificationStatus
 } from '@/types';
 
@@ -58,10 +62,10 @@ const sampleOrders: Order[] = [
     shippingCharges: 49,
     gstAmount: 81,
     total: 580,
-    paymentMethod: 'upi',
-    paymentStatus: 'completed',
-    orderStatus: 'pending',
-    prescriptionStatus: 'pending',
+    paymentMethod: PaymentMethod.UPI,
+    paymentStatus: PaymentStatus.COMPLETED,
+    orderStatus: OrderStatus.PENDING,
+    prescriptionStatus: PrescriptionStatus.PENDING,
     isRefillOrder: false,
     pincode: '400001',
     createdAt: '2026-02-14T10:00:00Z',
@@ -101,10 +105,10 @@ const sampleOrders: Order[] = [
     shippingCharges: 0,
     gstAmount: 189,
     total: 1239,
-    paymentMethod: 'credit_card',
-    paymentStatus: 'completed',
-    orderStatus: 'prescription_verified',
-    prescriptionStatus: 'verified',
+    paymentMethod: PaymentMethod.CREDIT_CARD,
+    paymentStatus: PaymentStatus.COMPLETED,
+    orderStatus: OrderStatus.PRESCRIPTION_VERIFIED,
+    prescriptionStatus: PrescriptionStatus.VERIFIED,
     isRefillOrder: false,
     pincode: '110001',
     createdAt: '2026-02-14T11:00:00Z',
@@ -118,7 +122,7 @@ const sampleInventoryAlerts: InventoryAlert[] = [
     medicineId: 'med_001',
     medicineName: 'Dolo 650',
     currentStock: 5,
-    alertLevel: 'critical',
+    alertLevel: StockAlertLevel.CRITICAL,
     message: 'Stock below reorder level',
     isResolved: false,
     createdAt: '2026-02-14T09:00:00Z',
@@ -128,7 +132,7 @@ const sampleInventoryAlerts: InventoryAlert[] = [
     medicineId: 'med_002',
     medicineName: 'Azithromycin 500mg',
     currentStock: 12,
-    alertLevel: 'low',
+    alertLevel: StockAlertLevel.LOW,
     message: 'Stock approaching minimum level',
     isResolved: false,
     createdAt: '2026-02-14T08:00:00Z',
@@ -143,7 +147,7 @@ const sampleStaff: AdminStaff[] = [
     password: '',
     firstName: 'Super',
     lastName: 'Admin',
-    role: 'super_admin',
+    role: UserRole.SUPER_ADMIN,
     permissions: ['all'],
     isActive: true,
     isSuperAdmin: true,
@@ -157,7 +161,7 @@ const sampleStaff: AdminStaff[] = [
     password: '',
     firstName: 'Rajesh',
     lastName: 'Kumar',
-    role: 'pharmacist',
+    role: UserRole.PHARMACIST,
     permissions: ['verify_prescription', 'view_orders'],
     isActive: true,
     isSuperAdmin: false,
@@ -171,7 +175,7 @@ const sampleStaff: AdminStaff[] = [
     password: '',
     firstName: 'Priya',
     lastName: 'Sharma',
-    role: 'packing_staff',
+    role: UserRole.PACKING_STAFF,
     permissions: ['pack_orders', 'print_labels'],
     isActive: true,
     isSuperAdmin: false,
@@ -185,7 +189,7 @@ const sampleStaff: AdminStaff[] = [
     password: '',
     firstName: 'Amit',
     lastName: 'Patel',
-    role: 'delivery_staff',
+    role: UserRole.DELIVERY_STAFF,
     permissions: ['view_dispatched', 'update_delivery'],
     isActive: true,
     isSuperAdmin: false,
@@ -210,7 +214,7 @@ export default function AdminDashboard() {
     pendingPrescriptions: 12,
   };
 
-  const tabs: { id: DashboardTab; label: string; icon: JSX.Element }[] = [
+  const tabs: { id: DashboardTab; label: string; icon: React.ReactNode }[] = [
     {
       id: 'overview',
       label: 'Overview',

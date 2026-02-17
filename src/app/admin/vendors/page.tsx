@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import Button from '@/components/ui/Button';
-import { Vendor, PurchaseOrder } from '@/types';
+import { Vendor, PurchaseOrder, GSTType } from '@/types';
 import { generatePONumber } from '@/lib/utils';
 
 const mockVendors: Vendor[] = [
@@ -14,7 +14,7 @@ const mockVendors: Vendor[] = [
     id: 'vend_001', name: 'Micro Labs Ltd', email: 'orders@microlabs.com', mobile: '9876543210',
     address: 'Bangalore, Karnataka', city: 'Bangalore', state: 'Karnataka', pincode: '560001',
     drugLicenseNumber: 'KA1234567890', drugLicenseDocument: '', gstNumber: '29AABCI1234A1Z5',
-    gstType: 'regular', openingBalance: 0, balanceType: 'payable', productsSupplied: ['Dolo 650', 'Combiflam'],
+    gstType: GSTType.REGULAR, openingBalance: 0, balanceType: 'payable', productsSupplied: ['Dolo 650', 'Combiflam'],
     deliveryTime: 3, paymentTerms: 'Net 30', kycDocuments: [], isActive: true, rating: 4.5,
     createdAt: '2025-01-01T00:00:00Z', updatedAt: '2026-02-01T00:00:00Z',
   },
@@ -22,7 +22,7 @@ const mockVendors: Vendor[] = [
     id: 'vend_002', name: 'Alembic Ltd', email: 'sales@alembic.com', mobile: '9876543211',
     address: 'Vadodara, Gujarat', city: 'Vadodara', state: 'Gujarat', pincode: '390003',
     drugLicenseNumber: 'GJ9876543210', drugLicenseDocument: '', gstNumber: '24AABCI5678A1Z5',
-    gstType: 'regular', openingBalance: 50000, balanceType: 'payable', productsSupplied: ['Azithromycin'],
+    gstType: GSTType.REGULAR, openingBalance: 50000, balanceType: 'payable', productsSupplied: ['Azithromycin'],
     deliveryTime: 5, paymentTerms: 'Net 45', kycDocuments: [], isActive: true, rating: 4.2,
     createdAt: '2025-02-15T00:00:00Z', updatedAt: '2026-02-10T00:00:00Z',
   },
@@ -30,7 +30,7 @@ const mockVendors: Vendor[] = [
     id: 'vend_003', name: 'USV Ltd', email: 'contact@usvindia.com', mobile: '9876543212',
     address: 'Mumbai, Maharashtra', city: 'Mumbai', state: 'Maharashtra', pincode: '400001',
     drugLicenseNumber: 'MH1122334455', drugLicenseDocument: '', gstNumber: '27AABCU1234A1Z5',
-    gstType: 'regular', openingBalance: 0, balanceType: 'payable', productsSupplied: ['Metformin 500mg'],
+    gstType: GSTType.REGULAR, openingBalance: 0, balanceType: 'payable', productsSupplied: ['Metformin 500mg'],
     deliveryTime: 2, paymentTerms: 'Net 30', kycDocuments: [], isActive: true, rating: 4.8,
     createdAt: '2025-03-01T00:00:00Z', updatedAt: '2026-02-12T00:00:00Z',
   },
@@ -38,7 +38,7 @@ const mockVendors: Vendor[] = [
     id: 'vend_004', name: 'Glenmark Pharmaceuticals', email: 'orders@glenmarkpharma.com', mobile: '9876543213',
     address: 'Mumbai, Maharashtra', city: 'Mumbai', state: 'Maharashtra', pincode: '400093',
     drugLicenseNumber: 'MH5566778899', drugLicenseDocument: '', gstNumber: '27AABCG5678A1Z5',
-    gstType: 'regular', openingBalance: 75000, balanceType: 'payable', productsSupplied: ['Cetirizine', 'Omez'],
+    gstType: GSTType.REGULAR, openingBalance: 75000, balanceType: 'payable', productsSupplied: ['Cetirizine', 'Omez'],
     deliveryTime: 3, paymentTerms: 'Net 30', kycDocuments: [], isActive: true, rating: 4.0,
     createdAt: '2025-04-10T00:00:00Z', updatedAt: '2026-02-08T00:00:00Z',
   },
