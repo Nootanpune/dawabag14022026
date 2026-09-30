@@ -2,6 +2,7 @@
 // H1 register (C-09). The server enforces roles and every gate.
 import api from '../api';
 import { downloadFromApi } from '../download';
+import type { DispatchInput, HandoverInput } from './handover';
 import type { H1Entry, QueueShipment, QueueStage, RxQueueItem, StaffOrder, VerifyRxInput } from './types';
 
 export const fulfilmentKeys = {
@@ -53,13 +54,15 @@ export async function packShipment(shipmentId: string) {
   return data.data;
 }
 
-export async function dispatchOwnShipment(shipmentId: string, body: { courier_partner: string; awb_number: string }) {
+/** Seal number is required: every pack leaves tamper-evident (C-26). */
+export async function dispatchOwnShipment(shipmentId: string, body: DispatchInput) {
   const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/dispatch`, body);
   return data.data as { h1_register_rows?: number };
 }
 
-export async function markDelivered(shipmentId: string) {
-  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/delivered`);
+/** Handover: code + receiver for prescription shipments (C-26); admins may override with a reason. */
+export async function markDelivered(shipmentId: string, handover: HandoverInput = {}) {
+  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/delivered`, handover);
   return data.data;
 }
 

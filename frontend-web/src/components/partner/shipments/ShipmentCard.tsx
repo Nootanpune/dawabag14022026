@@ -49,7 +49,8 @@ export default function ShipmentCard({ shipment: s, onDispatch, onDelivered, bus
           <span className="font-semibold text-gray-800">Total {formatPrice(s.total_paise)}</span>
           {s.awb_number && (
             <p className="mt-0.5">
-              {s.courier_partner} · AWB {s.awb_number} · dispatched {formatDateTimeIST(s.dispatched_at)}
+              {s.courier_partner} · AWB {s.awb_number}
+              {s.seal_number ? ` · Seal ${s.seal_number}` : ''} · dispatched {formatDateTimeIST(s.dispatched_at)}
             </p>
           )}
           {s.delivered_at && <p className="mt-0.5">Delivered {formatDateTimeIST(s.delivered_at)}</p>}

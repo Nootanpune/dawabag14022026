@@ -65,3 +65,33 @@ String consentPurposeLabel(String purpose) {
       return s.isEmpty ? purpose : s[0].toUpperCase() + s.substring(1);
   }
 }
+
+/// A correction / erasure request from GET /privacy/requests (C-40..C-44).
+class DataRequest {
+  final String requestType;
+  final String status;
+  final String? outcome;
+  final String? createdAt;
+
+  const DataRequest({required this.requestType, required this.status, this.outcome, this.createdAt});
+
+  factory DataRequest.fromJson(Map<String, dynamic> json) => DataRequest(
+        requestType: asString(json['request_type']) ?? '',
+        status: asString(json['status']) ?? 'pending',
+        outcome: asString(json['outcome']),
+        createdAt: asString(json['created_at']),
+      );
+
+  static List<DataRequest> listFrom(Map<String, dynamic> data) =>
+      asMapList(data['requests']).map(DataRequest.fromJson).toList();
+
+  String get typeLabel => switch (requestType) {
+        'erasure' => 'Delete my data',
+        'correction' => 'Correct my data',
+        _ => requestType.replaceAll('_', ' '),
+      };
+
+  String get statusLabel => status.isEmpty
+      ? status
+      : status[0].toUpperCase() + status.substring(1).replaceAll('_', ' ');
+}

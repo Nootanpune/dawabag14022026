@@ -95,3 +95,11 @@ final privacyProvider = StateNotifierProvider<PrivacyNotifier, PrivacyState>((re
   );
   return notifier;
 });
+
+/// GET /privacy/requests — the buyer's correction / erasure requests and
+/// their outcome. Refetched whenever the privacy screen opens.
+final dataRequestsProvider = FutureProvider.autoDispose<List<DataRequest>>((ref) {
+  final signedIn = ref.watch(authProvider.select((s) => s.isAuthenticated));
+  if (!signedIn) return Future.value(const <DataRequest>[]);
+  return apiService.getDataRequests();
+});

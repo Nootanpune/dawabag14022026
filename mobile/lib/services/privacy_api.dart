@@ -28,4 +28,10 @@ extension PrivacyApi on ApiService {
     });
     return apiData(res);
   }
+
+  /// GET /privacy/requests → the buyer's own correction / erasure requests
+  Future<List<DataRequest>> getDataRequests() async {
+    final res = await dio.get('/privacy/requests');
+    return DataRequest.listFrom(apiData(res));
+  }
 }

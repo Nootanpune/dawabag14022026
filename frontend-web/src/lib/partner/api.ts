@@ -1,4 +1,5 @@
 import api from '../api';
+import type { DispatchInput, HandoverInput } from '../fulfilment/handover';
 import type { Settlement, SettlementDetail } from '../marketplace/settlement';
 import type {
   BatchInput,
@@ -51,13 +52,15 @@ export async function fetchShipments(status: ShipmentStatus): Promise<PartnerShi
   return data.data?.shipments ?? [];
 }
 
-export async function dispatchShipment(id: string, body: { courier_partner: string; awb_number: string }) {
+/** Seal number is required (C-26). */
+export async function dispatchShipment(id: string, body: DispatchInput) {
   const { data } = await api.post(`/partner/shipments/${id}/dispatch`, body);
   return data.data as { id: string; status: string };
 }
 
-export async function markShipmentDelivered(id: string) {
-  const { data } = await api.post(`/partner/shipments/${id}/delivered`);
+/** Code + receiver for prescription shipments (C-26). */
+export async function markShipmentDelivered(id: string, handover: HandoverInput = {}) {
+  const { data } = await api.post(`/partner/shipments/${id}/delivered`, handover);
   return data.data as { id: string; status: string };
 }
 

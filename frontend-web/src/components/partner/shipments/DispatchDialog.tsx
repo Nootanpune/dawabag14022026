@@ -4,18 +4,24 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { dispatchShipment, partnerKeys } from '@/lib/partner/api';
 import type { PartnerShipment } from '@/lib/partner/types';
+import { dispatchError } from '@/lib/fulfilment/handover';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '@/components/admin/Modal';
 import DialogActions from '@/components/admin/DialogActions';
+import SealNumberField from '@/components/delivery/SealNumberField';
+
+// Sealed, tamper-evident pack; the seal number is recorded at dispatch (C-26).
 
 export default function DispatchDialog({ shipment, onClose }: { shipment: PartnerShipment; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [courier, setCourier] = useState('');
   const [awb, setAwb] = useState('');
+  const [seal, setSeal] = useState('');
   const [error, setError] = useState('');
 
   const dispatch = useMutation({
-    mutationFn: () => dispatchShipment(shipment.id, { courier_partner: courier.trim(), awb_number: awb.trim() }),
+    mutationFn: () =>
+      dispatchShipment(shipment.id, { courier_partner: courier.trim(), awb_number: awb.trim(), seal_number: seal.trim() }),
     onSuccess: () => {
       toast.success(`${shipment.invoice_number ?? shipment.order_number} dispatched`);
       onClose();
@@ -25,7 +31,8 @@ export default function DispatchDialog({ shipment, onClose }: { shipment: Partne
   });
 
   const submit = () => {
-    if (!courier.trim() || !awb.trim()) return setError('Courier and AWB number are required');
+    const e = dispatchError({ courier_partner: courier, awb_number: awb, seal_number: seal });
+    if (e) return setError(e);
     setError('');
     dispatch.mutate();
   };
@@ -46,6 +53,7 @@ export default function DispatchDialog({ shipment, onClose }: { shipment: Partne
           <span className="block font-medium text-gray-700 mb-1">AWB / tracking number</span>
           <input value={awb} onChange={(e) => setAwb(e.target.value)} className="input" />
         </label>
+        <SealNumberField value={seal} onChange={setSeal} />
       </div>
       <DialogActions onCancel={onClose} onConfirm={submit} confirmLabel="Mark dispatched" pending={dispatch.isPending} error={error} />
     </Modal>

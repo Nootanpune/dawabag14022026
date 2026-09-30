@@ -3,9 +3,13 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { fetchShipmentQueue, fulfilmentKeys, markDelivered, packShipment } from '@/lib/fulfilment/api';
+import type { HandoverInput } from '@/lib/fulfilment/handover';
 import type { QueueShipment, QueueStage } from '@/lib/fulfilment/types';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import { hasRole, MANAGER_ROLES } from '@/lib/admin/roles';
+import { useAuthStore } from '@/store/authStore';
 import QueryState from '@/components/admin/QueryState';
+import HandoverDialog from '@/components/delivery/HandoverDialog';
 import StaffShipmentCard from './StaffShipmentCard';
 import StaffDispatchDialog from './StaffDispatchDialog';
 
@@ -20,28 +24,45 @@ const COPY: Record<ShipmentStage, { action: string; empty: string }> = {
 /**
  * Dawabag-own shipments at one stage. Pack and dispatch are refused by the
  * server while a prescription line is unverified (C-08) or a batch is
- * recalled (C-28); the message from the server is shown as-is.
+ * recalled (C-28); delivery needs the buyer's code for prescription packs
+ * (C-26). The message from the server is shown as-is.
  */
 export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
   const queryClient = useQueryClient();
+  const role = useAuthStore((s) => s.user?.role);
   const { data, isLoading, error } = useQuery({
     queryKey: fulfilmentKeys.queue(stage),
     queryFn: () => fetchShipmentQueue(stage),
     refetchInterval: 60000,
   });
   const [dispatching, setDispatching] = useState<QueueShipment | null>(null);
+  const [delivering, setDelivering] = useState<QueueShipment | null>(null);
+  const [deliverError, setDeliverError] = useState('');
 
-  const act = useMutation({
-    mutationFn: (s: QueueShipment) => (stage === 'pack' ? packShipment(s.shipment_id) : markDelivered(s.shipment_id)),
-    onSuccess: (_r, s) => toast.success(`${s.order_number} ${stage === 'pack' ? 'packed' : 'delivered'}`),
+  const pack = useMutation({
+    mutationFn: (s: QueueShipment) => packShipment(s.shipment_id),
+    onSuccess: (_r, s) => toast.success(`${s.order_number} packed`),
     onError: (err) => toast.error(getApiErrorMessage(err, 'Could not update the shipment')),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: fulfilmentKeys.all }),
+  });
+
+  const deliver = useMutation({
+    mutationFn: ({ s, h }: { s: QueueShipment; h: HandoverInput }) => markDelivered(s.shipment_id, h),
+    onSuccess: (_r, { s }) => {
+      toast.success(`${s.order_number} delivered`);
+      setDelivering(null);
+    },
+    onError: (err) => setDeliverError(getApiErrorMessage(err, 'Could not confirm delivery')),
     onSettled: () => queryClient.invalidateQueries({ queryKey: fulfilmentKeys.all }),
   });
 
   const onAction = (s: QueueShipment) => {
     if (stage === 'dispatch') return setDispatching(s);
-    if (stage === 'deliver' && !window.confirm(`Confirm ${s.order_number} was handed to the buyer?`)) return;
-    act.mutate(s);
+    if (stage === 'deliver') {
+      setDeliverError('');
+      return setDelivering(s);
+    }
+    pack.mutate(s);
   };
 
   return (
@@ -54,11 +75,22 @@ export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
             shipment={s}
             actionLabel={COPY[stage].action}
             onAction={() => onAction(s)}
-            busy={act.isPending && act.variables?.shipment_id === s.shipment_id}
+            busy={pack.isPending && pack.variables?.shipment_id === s.shipment_id}
           />
         ))}
       </div>
       {dispatching && <StaffDispatchDialog shipment={dispatching} onClose={() => setDispatching(null)} />}
+      {delivering && (
+        <HandoverDialog
+          title={`Deliver ${delivering.order_number}`}
+          codeRequired={delivering.handover_code_required}
+          allowOverride={hasRole(role, MANAGER_ROLES)}
+          pending={deliver.isPending}
+          error={deliverError}
+          onClose={() => setDelivering(null)}
+          onConfirm={(h) => deliver.mutate({ s: delivering, h })}
+        />
+      )}
     </div>
   );
 }

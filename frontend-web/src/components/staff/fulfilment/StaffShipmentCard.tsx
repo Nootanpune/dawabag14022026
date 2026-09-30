@@ -29,6 +29,7 @@ export default function StaffShipmentCard({ shipment: s, actionLabel, onAction, 
           {s.awb_number && (
             <p className="text-xs text-gray-500">
               {s.courier_partner} · AWB {s.awb_number}
+              {s.seal_number ? ` · Seal ${s.seal_number}` : ''}
             </p>
           )}
         </div>

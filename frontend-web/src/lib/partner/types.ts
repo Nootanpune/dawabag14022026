@@ -98,6 +98,9 @@ export interface PartnerShipment {
   cold_chain: boolean;
   courier_partner: string | null;
   awb_number: string | null;
+  /** sent by newer servers; absent means the server decides (C-26) */
+  seal_number?: string | null;
+  handover_code_required?: boolean;
   dispatched_at: string | null;
   delivered_at: string | null;
   created_at: string;

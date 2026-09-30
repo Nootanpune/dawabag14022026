@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../models/checkout_summary.dart';
 import 'api_service.dart';
 import 'api_utils.dart';
 
@@ -12,20 +13,34 @@ extension CheckoutApi on ApiService {
     return (res.data['data'] as List).where((p) => p['status'] == 'verified').toList();
   }
 
-  /// POST /orders { address_id, items, coupon_code?, pincode } → the `order`
-  /// object (id, order_number, total_paise, requires_prescription, shipments).
-  Future<Map<String, dynamic>> placeOrder({
+  /// Body shared by POST /orders/preview and POST /orders. Doctors and
+  /// hospitals send [practitionerDeclaration] true on every order (C-15).
+  static Map<String, dynamic> orderBody({
     required Object? addressId,
     required List<Map<String, dynamic>> items,
     String? couponCode,
     required String pincode,
-  }) async {
-    final res = await dio.post('/orders', data: {
-      'address_id': addressId,
-      'items': items,
-      if (couponCode != null) 'coupon_code': couponCode,
-      'pincode': pincode,
-    });
+    bool? practitionerDeclaration,
+  }) =>
+      {
+        'address_id': addressId,
+        'items': items,
+        if (couponCode != null) 'coupon_code': couponCode,
+        'pincode': pincode,
+        if (practitionerDeclaration != null) 'practitioner_declaration': practitionerDeclaration,
+      };
+
+  /// POST /orders/preview (same body as POST /orders) → the checkout summary
+  /// the buyer reviews before paying (C-35). The server rolls the order back.
+  Future<CheckoutSummary> previewOrder(Map<String, dynamic> body) async {
+    final res = await dio.post('/orders/preview', data: body);
+    return CheckoutSummary.fromJson(apiData(res));
+  }
+
+  /// POST /orders [body] → the `order` object (id, order_number,
+  /// total_paise, requires_prescription, shipments).
+  Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> body) async {
+    final res = await dio.post('/orders', data: body);
     final order = apiData(res)['order'];
     return order is Map ? Map<String, dynamic>.from(order) : <String, dynamic>{};
   }

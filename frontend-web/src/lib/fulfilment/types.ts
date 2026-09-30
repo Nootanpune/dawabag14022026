@@ -36,6 +36,9 @@ export interface QueueShipment {
   created_at: string;
   courier_partner: string | null;
   awb_number: string | null;
+  /** sent by newer servers; absent means "unknown" and the server decides (C-26) */
+  seal_number?: string | null;
+  handover_code_required?: boolean;
   order_id: string;
   order_number: string;
   order_status: string;

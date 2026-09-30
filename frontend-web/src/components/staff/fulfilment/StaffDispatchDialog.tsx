@@ -4,20 +4,25 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { dispatchOwnShipment, fulfilmentKeys } from '@/lib/fulfilment/api';
 import type { QueueShipment } from '@/lib/fulfilment/types';
+import { dispatchError } from '@/lib/fulfilment/handover';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '@/components/admin/Modal';
 import DialogActions from '@/components/admin/DialogActions';
+import SealNumberField from '@/components/delivery/SealNumberField';
 
 // Dispatch writes the H1 register rows for prescription lines (C-09); the server
 // refuses (409) if a line is not Rx-cleared or its batch is recalled (C-28).
+// Every pack leaves sealed; the seal number is recorded (C-26).
 export default function StaffDispatchDialog({ shipment, onClose }: { shipment: QueueShipment; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [courier, setCourier] = useState(shipment.courier_partner ?? '');
   const [awb, setAwb] = useState(shipment.awb_number ?? '');
+  const [seal, setSeal] = useState('');
   const [error, setError] = useState('');
 
   const dispatch = useMutation({
-    mutationFn: () => dispatchOwnShipment(shipment.shipment_id, { courier_partner: courier.trim(), awb_number: awb.trim() }),
+    mutationFn: () =>
+      dispatchOwnShipment(shipment.shipment_id, { courier_partner: courier.trim(), awb_number: awb.trim(), seal_number: seal.trim() }),
     onSuccess: (r) => {
       toast.success(`${shipment.order_number} dispatched${r?.h1_register_rows ? ` · ${r.h1_register_rows} H1 register row(s)` : ''}`);
       onClose();
@@ -27,8 +32,8 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
   });
 
   const submit = () => {
-    if (courier.trim().length < 2) return setError('Enter the courier name');
-    if (awb.trim().length < 3) return setError('Enter the AWB / tracking number');
+    const e = dispatchError({ courier_partner: courier, awb_number: awb, seal_number: seal });
+    if (e) return setError(e);
     setError('');
     dispatch.mutate();
   };
@@ -47,6 +52,7 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
           <span className="block font-medium text-gray-700 mb-1">AWB / tracking number</span>
           <input value={awb} onChange={(e) => setAwb(e.target.value)} maxLength={100} className="input" />
         </label>
+        <SealNumberField value={seal} onChange={setSeal} />
       </div>
       <DialogActions onCancel={onClose} onConfirm={submit} confirmLabel="Mark dispatched" pending={dispatch.isPending} error={error} />
     </Modal>
