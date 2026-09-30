@@ -1,3 +1,4 @@
+import { setPharmacistRegistration } from '../controllers/fulfilment.controller';
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { query, queryOne } from '../config/database';
@@ -5,7 +6,7 @@ import { AppError } from '../utils/AppError';
 import { listOpenCredit, setCreditLimit } from '../controllers/credit.controller';
 import { listJobs, runJobNow } from '../controllers/jobs.controller';
 import {
-  getSettings, getSettlementDetail, getSettlements, linkPartnerUser, postGenerateSettlements,
+  getSettings, getSettlementDetail, getSettlements, linkPartnerUser, listPartners, postGenerateSettlements,
   postSettlementPaid, postShipmentDelivered, putSetting, setCommission,
 } from '../controllers/marketplaceAdmin.controller';
 
@@ -90,6 +91,7 @@ router.post('/jobs/:name/run', authenticate, authorize('super_admin'), runJobNow
 
 // ─── Sprint 3: marketplace, settlements, settings ───────────────────────────
 const managers = authorize('admin', 'super_admin');
+router.get('/partners', authenticate, managers, listPartners);
 router.post('/partners/:vendorId/users', authenticate, managers, linkPartnerUser);
 router.put('/partners/:vendorId/commission', authenticate, managers, setCommission);
 router.post('/shipments/:id/delivered', authenticate, managers, postShipmentDelivered);
@@ -99,5 +101,6 @@ router.get('/settlements/:id', authenticate, managers, getSettlementDetail);
 router.post('/settlements/:id/pay', authenticate, managers, postSettlementPaid);
 router.get('/settings', authenticate, managers, getSettings);
 router.put('/settings/:key', authenticate, authorize('super_admin'), putSetting);
+router.patch('/users/:userId/pharmacist', authenticate, authorize('admin', 'super_admin'), setPharmacistRegistration);
 
 export default router;

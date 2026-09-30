@@ -5,6 +5,19 @@ import { query, queryOne } from '../config/database';
 import { listPartnerProducts, submitListing, upsertInventory } from '../services/partnerListing.service';
 import { dispatchShipment, listPartnerShipments, markShipmentDelivered } from '../services/partnerFulfilment.service';
 import { getSettlement, listSettlements } from '../services/settlement.service';
+import { rejectionLabel } from '../utils/rejectionCodes';
+
+// GET /partner/products/:id/inventory — the listing's current batches
+export async function getInventory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const rows = await query(
+      `SELECT pi.batch_number, pi.qty_available, pi.qty_reserved, pi.expiry_date, pi.manufactured_date,
+              pi.cold_chain_confirmed, pi.is_recalled
+       FROM partner_inventory pi JOIN partner_products pp ON pp.id = pi.partner_product_id
+       WHERE pp.id = $1 AND pp.partner_id = $2 ORDER BY pi.expiry_date`, [uuid.parse(req.params.id), req.partner!.vendorId]);
+    res.json({ success: true, data: { batches: rows } });
+  } catch (err) { next(err); }
+}
 
 const uuid = z.string().uuid();
 
@@ -55,7 +68,10 @@ export async function createListing(req: Request, res: Response, next: NextFunct
 
 export async function getListings(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json({ success: true, data: { products: await listPartnerProducts(req.partner!.vendorId) } });
+    const products = (await listPartnerProducts(req.partner!.vendorId)).map((p: any) => ({
+      ...p, rejection: rejectionLabel(p.rejection_reason_code),
+    }));
+    res.json({ success: true, data: { products } });
   } catch (err) { next(err); }
 }
 

@@ -8,6 +8,26 @@ import { approveListing, postLive, rejectListing, reviewQueue } from '../service
 import { markShipmentDelivered } from '../services/partnerFulfilment.service';
 import { generateSettlements, getSettlement, listSettlements, markSettlementPaid } from '../services/settlement.service';
 import { listSettings } from '../services/settings.service';
+import { REJECTION_CODES } from '../utils/rejectionCodes';
+
+export async function getRejectionCodes(_req: Request, res: Response) {
+  res.json({ success: true, data: { codes: Object.entries(REJECTION_CODES).map(([code, v]) => ({ code, ...v })) } });
+}
+
+// GET /admin/partners — approved marketplace partners with their commission terms
+export async function listPartners(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const rows = await query(
+      `SELECT v.id, v.name, v.pincode, v.city, v.invoice_prefix, v.vendor_rating, v.gst_number, v.drug_license_expiry,
+              COALESCE(r.commission_pct, 8) AS commission_pct, COALESCE(r.finding_fee_paise, 1500) AS finding_fee_paise,
+              (SELECT json_agg(json_build_object('user_id', vu.user_id, 'mobile', u.mobile)) FROM vendor_users vu
+                 JOIN users u ON u.id = vu.user_id WHERE vu.vendor_id = v.id) AS logins
+       FROM vendors v LEFT JOIN partner_commission_rates r ON r.partner_id = v.id
+       WHERE v.approval_status = 'approved' AND v.vendor_type IN ('marketplace_partner', 'both')
+       ORDER BY v.name`);
+    res.json({ success: true, data: { partners: rows } });
+  } catch (err) { next(err); }
+}
 
 const uuid = z.string().uuid();
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -66,7 +86,7 @@ export async function postApproveListing(req: Request, res: Response, next: Next
 }
 export async function postRejectListing(req: Request, res: Response, next: NextFunction) {
   try {
-    const d = z.object({ rejection_reason_code: z.string().regex(/^REJ-\d{2}$/), rejection_details: z.string().max(1000).optional() }).parse(req.body);
+    const d = z.object({ rejection_reason_code: z.enum(Object.keys(REJECTION_CODES) as [string, ...string[]]), rejection_details: z.string().max(1000).optional() }).parse(req.body);
     await rejectListing(uuid.parse(req.params.id), d.rejection_reason_code, d.rejection_details, req.user!.id);
     res.json({ success: true, data: { approval_status: 'rejected' } });
   } catch (err) { next(err); }

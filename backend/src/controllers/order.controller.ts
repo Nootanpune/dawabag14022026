@@ -104,7 +104,14 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
       [id]
     );
 
-    res.json({ success: true, data: { ...orderResult, items, e_invoice: einvoice||null } });
+    // Seller of record per shipment (C-05); partners shown by name
+    const shipments = await query(
+      `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.invoice_number, s.status,
+              s.total_paise, s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at
+       FROM order_shipments s LEFT JOIN vendors v ON v.id = s.partner_id
+       WHERE s.order_id = $1 ORDER BY s.seller_type, v.name`, [id]);
+
+    res.json({ success: true, data: { ...orderResult, items, shipments, e_invoice: einvoice||null } });
   } catch (err) { next(err); }
 }
 

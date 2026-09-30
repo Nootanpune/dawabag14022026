@@ -31,6 +31,8 @@ import kycRoutes from './routes/kyc.routes';
 import cartRoutes from './routes/cart.routes';
 import partnerRoutes from './routes/partner.routes';
 import refillRoutes from './routes/refill.routes';
+import fulfilmentRoutes from './routes/fulfilment.routes';
+import invoiceRoutes from './routes/invoice.routes';
 import eInvoiceRouter from './controllers/einvoice.controller';
 
 import { errorHandler } from './middleware/errorHandler';
@@ -118,6 +120,8 @@ app.use(`${api}/kyc`, kycRoutes);
 app.use(`${api}/cart`, cartRoutes);
 app.use(`${api}/partner`, partnerRoutes);
 app.use(`${api}/refills`, refillRoutes);
+app.use(`${api}/fulfilment`, fulfilmentRoutes);
+app.use(`${api}/invoices`, invoiceRoutes);
 app.use(`${api}/einvoice`, eInvoiceRouter);
 
 // ─── Error Handling ─────────────────────────────────────────────────────────

@@ -54,6 +54,16 @@ export function errorHandler(
     return fail(409, 'Duplicate entry. This record already exists.');
   }
 
+  // Business rules enforced by the database (e.g. price ≤ MRP, C-16)
+  if ((err as any).code === '23514') {
+    const constraint = (err as any).constraint as string | undefined;
+    const known: Record<string, string> = {
+      products_price_le_mrp: 'Selling prices cannot exceed the MRP',
+      products_mrp_le_ceiling: 'MRP cannot exceed the NPPA ceiling price',
+    };
+    return fail(400, (constraint && known[constraint]) || 'This change breaks a business rule');
+  }
+
   if ((err as any).code === '23503') {
     return fail(400, 'Referenced record not found.');
   }

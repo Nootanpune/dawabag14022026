@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { VendorApprovalService } from '../services/vendor.service';
 import { logger } from '../config/logger';
-import { getReviewQueue, postApproveListing, postListingLive, postRejectListing } from '../controllers/marketplaceAdmin.controller';
+import { getRejectionCodes, getReviewQueue, postApproveListing, postListingLive, postRejectListing } from '../controllers/marketplaceAdmin.controller';
 
 const router = Router();
 
@@ -82,6 +82,7 @@ router.get('/:id/performance', authenticate, authorize('admin','super_admin'), a
 // Partner listing review — controllers/marketplaceAdmin.controller.ts
 const reviewers = authorize('admin', 'super_admin', 'pharmacist_rx');
 router.get('/partner-products/pending', authenticate, reviewers, getReviewQueue);
+router.get('/partner-products/rejection-codes', authenticate, getRejectionCodes);
 router.post('/partner-products/:id/approve', authenticate, reviewers, postApproveListing);
 router.post('/partner-products/:id/reject', authenticate, reviewers, postRejectListing);
 router.post('/partner-products/:id/post-live', authenticate, authorize('admin', 'super_admin'), postListingLive);

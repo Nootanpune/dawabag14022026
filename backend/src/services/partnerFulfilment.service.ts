@@ -4,6 +4,8 @@
 import { query, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
+import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
+import { syncOrderStatus } from './fulfilment.service';
 
 export async function listPartnerShipments(vendorId: string, status?: string) {
   return query(
@@ -40,6 +42,7 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
     if (['pending_payment', 'payment_failed', 'rx_pending', 'rx_rejected', 'cancelled'].includes(s.order_status)) {
       throw new AppError(`Order is ${s.order_status.replace('_', ' ')}; it cannot be dispatched yet`, 409);
     }
+    await assertRxCleared(client, s.order_id, shipmentId);
     // Reserved → shipped: take the units out of the partner's batch
     await client.query(
       `UPDATE partner_inventory pi
@@ -51,9 +54,11 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
       `UPDATE partner_order_items SET dispatch_status = 'dispatched', dispatched_at = NOW(),
          dispatch_hours = ROUND(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600.0, 1)
        WHERE shipment_id = $1 AND dispatch_status = 'pending'`, [shipmentId]);
+    await recordH1Dispensing(client, shipmentId);
     await client.query(
       `UPDATE order_shipments SET status = 'dispatched', courier_partner = $2, awb_number = $3, dispatched_at = NOW()
        WHERE id = $1`, [shipmentId, courier, awb]);
+    await syncOrderStatus(client, s.order_id);
     await writeAuditTx(client, { userId, action: 'partner_shipment_dispatched', performedBy: userId,
       newValue: { shipment_id: shipmentId, order_id: s.order_id, courier, awb } });
     return { id: shipmentId, status: 'dispatched' };
@@ -74,10 +79,7 @@ export async function markShipmentDelivered(shipmentId: string, userId: string, 
       `UPDATE partner_order_items SET dispatch_status = 'delivered', delivered_at = NOW()
        WHERE shipment_id = $1 AND dispatch_status = 'dispatched'`, [shipmentId]);
     // The order is delivered once every shipment is
-    await client.query(
-      `UPDATE orders SET status = 'delivered', updated_at = NOW()
-       WHERE id = $1 AND NOT EXISTS (
-         SELECT 1 FROM order_shipments WHERE order_id = $1 AND status NOT IN ('delivered', 'cancelled'))`, [s.order_id]);
+    await syncOrderStatus(client, s.order_id);
     await writeAuditTx(client, { userId, action: 'shipment_delivered', performedBy: userId, newValue: { shipment_id: shipmentId } });
     return { id: shipmentId, status: 'delivered' };
   });

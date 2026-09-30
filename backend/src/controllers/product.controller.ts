@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { query, queryOne } from '../config/database';
 import { cacheGet, cacheSet } from '../config/redis';
 import { AppError } from '../utils/AppError';
+import { writeAudit } from '../utils/audit';
 
 // ─── Search Products ─────────────────────────────────────────────────────────
 export async function searchProducts(req: Request, res: Response, next: NextFunction) {
@@ -183,52 +184,74 @@ export async function getCategories(req: Request, res: Response, next: NextFunct
   }
 }
 
+// ─── Admin: catalogue fields ──────────────────────────────────────────────────
+// Catalogue fields admins may set. Every selling price must be ≤ MRP and MRP
+// ≤ the NPPA ceiling where one applies (C-16); the database enforces the same.
+const priceField = z.number().int().positive();
+const productFields = {
+  name: z.string().min(2).max(500),
+  generic_name: z.string().max(500).nullable().optional(),
+  category: z.string().min(2).max(100),
+  drug_schedule: z.enum(['OTC', 'Schedule G', 'Schedule H', 'Schedule H1', 'Schedule X', 'NDPS']),
+  hsn_code: z.string().regex(/^\d{4,8}$/, 'HSN must be 4–8 digits').nullable().optional(),
+  gst_rate: z.number().int().min(0).max(28),
+  marketed_by: z.string().max(255).nullable().optional(),
+  description: z.string().nullable().optional(),
+  composition: z.string().nullable().optional(),
+  storage_instructions: z.string().nullable().optional(),
+  cold_chain: z.boolean(),
+  mrp_paise: priceField,
+  offer_price_paise: priceField,
+  ptr_price_paise: priceField.nullable().optional(),
+  pts_price_paise: priceField.nullable().optional(),
+  institutional_price_paise: priceField.nullable().optional(),
+  nppa_ceiling_price_paise: priceField.nullable().optional(),
+  max_qty_per_order: z.number().int().min(1),
+  min_order_qty_retailer: z.number().int().min(1),
+  min_order_qty_wholesaler: z.number().int().min(1),
+  reorder_level_qty: z.number().int().min(0),
+  is_active: z.boolean(),
+};
+
+const createSchema = z.object({
+  ...productFields,
+  sku: z.string().min(3).max(100),
+  cold_chain: productFields.cold_chain.default(false),
+  max_qty_per_order: productFields.max_qty_per_order.default(3),
+  min_order_qty_retailer: productFields.min_order_qty_retailer.default(1),
+  min_order_qty_wholesaler: productFields.min_order_qty_wholesaler.default(10),
+  reorder_level_qty: productFields.reorder_level_qty.default(10),
+  is_active: productFields.is_active.default(true),
+});
+const updateSchema = z.object(productFields).partial().strict();
+
+const PRICE_KEYS = ['mrp_paise', 'offer_price_paise', 'ptr_price_paise', 'pts_price_paise',
+  'institutional_price_paise', 'nppa_ceiling_price_paise'] as const;
+
+function assertPrices(p: Record<string, any>) {
+  for (const k of ['offer_price_paise', 'ptr_price_paise', 'pts_price_paise', 'institutional_price_paise']) {
+    if (p[k] != null && p[k] > p.mrp_paise) throw new AppError(`${k.replace('_paise', '').replace(/_/g, ' ')} cannot exceed MRP`, 400);
+  }
+  if (p.nppa_ceiling_price_paise != null && p.mrp_paise > p.nppa_ceiling_price_paise) {
+    throw new AppError('MRP cannot exceed the NPPA ceiling price', 400);
+  }
+}
+
 // ─── Admin: Create Product ────────────────────────────────────────────────────
 export async function createProduct(req: Request, res: Response, next: NextFunction) {
   try {
-    const schema = z.object({
-      name: z.string().min(2).max(500),
-      generic_name: z.string().optional(),
-      sku: z.string().min(3).max(100),
-      category: z.string().min(2),
-      drug_schedule: z.enum(['OTC', 'Schedule G', 'Schedule H', 'Schedule H1', 'Schedule X', 'NDPS']),
-      hsn_code: z.string().optional(),
-      gst_rate: z.number().int().min(0).max(28),
-      marketed_by: z.string().optional(),
-      description: z.string().optional(),
-      composition: z.string().optional(),
-      storage_instructions: z.string().optional(),
-      cold_chain: z.boolean().default(false),
-      mrp_paise: z.number().int().positive(),
-      offer_price_paise: z.number().int().positive(),
-      max_qty_per_order: z.number().int().min(1).default(3),
-    });
-
-    const data = schema.parse(req.body);
-
-    if (data.offer_price_paise > data.mrp_paise) {
-      throw new AppError('Offer price cannot exceed MRP', 400);
-    }
+    const data = createSchema.parse(req.body);
+    assertPrices(data);
 
     const existing = await queryOne('SELECT id FROM products WHERE sku = $1', [data.sku]);
     if (existing) throw new AppError('SKU already exists', 409);
 
-    const product = await queryOne(
-      `INSERT INTO products (
-         name, generic_name, sku, category, drug_schedule, hsn_code,
-         gst_rate, marketed_by, description, composition, storage_instructions,
-         cold_chain, mrp_paise, offer_price_paise, max_qty_per_order
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       RETURNING id`,
-      [
-        data.name, data.generic_name || null, data.sku, data.category,
-        data.drug_schedule, data.hsn_code || null, data.gst_rate,
-        data.marketed_by || null, data.description || null,
-        data.composition || null, data.storage_instructions || null,
-        data.cold_chain, data.mrp_paise, data.offer_price_paise,
-        data.max_qty_per_order,
-      ]
-    );
+    const cols = Object.keys(data);
+    const product = await queryOne<{ id: string }>(
+      `INSERT INTO products (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING id`,
+      Object.values(data));
+    await writeAudit({ userId: null, action: 'product_created', performedBy: req.user!.id,
+      newValue: { product_id: product!.id, sku: data.sku, ...Object.fromEntries(PRICE_KEYS.map((k) => [k, (data as any)[k] ?? null])) } });
 
     res.status(201).json({ success: true, data: product });
   } catch (error) {
@@ -239,31 +262,27 @@ export async function createProduct(req: Request, res: Response, next: NextFunct
 // ─── Admin: Update Product ────────────────────────────────────────────────────
 export async function updateProduct(req: Request, res: Response, next: NextFunction) {
   try {
-    const { productId } = req.params;
-    const allowed = [
-      'name', 'generic_name', 'category', 'drug_schedule', 'hsn_code',
-      'gst_rate', 'marketed_by', 'description', 'composition',
-      'cold_chain', 'mrp_paise', 'offer_price_paise', 'max_qty_per_order',
-      'is_active', 'storage_instructions',
-    ];
+    const productId = z.string().uuid().parse(req.params.productId);
+    const updates = updateSchema.parse(req.body);
+    if (Object.keys(updates).length === 0) throw new AppError('No valid fields to update', 400);
 
-    const updates = Object.entries(req.body)
-      .filter(([key]) => allowed.includes(key))
-      .reduce((acc, [key, val]) => ({ ...acc, [key]: val }), {} as Record<string, any>);
+    const before = await queryOne<Record<string, any>>('SELECT * FROM products WHERE id = $1', [productId]);
+    if (!before) throw new AppError('Product not found', 404);
+    assertPrices({ ...before, ...updates });
 
-    if (Object.keys(updates).length === 0) {
-      throw new AppError('No valid fields to update', 400);
+    const keys = Object.keys(updates);
+    await query(
+      `UPDATE products SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = NOW() WHERE id = $1`,
+      [productId, ...Object.values(updates)]);
+
+    // Audit price and listing changes (C-46)
+    const changed = keys.filter((k) => before[k] !== (updates as any)[k]);
+    if (changed.length) {
+      await writeAudit({ userId: null, action: 'product_updated', performedBy: req.user!.id,
+        oldValue: Object.fromEntries(changed.map((k) => [k, before[k]])),
+        newValue: { product_id: productId, ...Object.fromEntries(changed.map((k) => [k, (updates as any)[k]])) } });
     }
 
-    const setClauses = Object.keys(updates).map((k, i) => `${k} = $${i + 2}`);
-    const values = [productId, ...Object.values(updates)];
-
-    await query(
-      `UPDATE products SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $1`,
-      values
-    );
-
-    // Invalidate cache
     const { cacheDel } = await import('../config/redis');
     await cacheDel(`product:${productId}`);
 

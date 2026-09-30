@@ -23,6 +23,7 @@ export interface PricedLine {
 export interface CreatedShipment {
   id: string;
   seller_type: 'dawabag' | 'partner';
+  seller_name: string;
   partner_id: string | null;
   invoice_number: string;
   total_paise: number;
@@ -31,6 +32,8 @@ export interface CreatedShipment {
 export async function createShipmentsAndLines(
   client: PoolClient, orderId: string, lines: PricedLine[], allocations: Allocation[]
 ): Promise<CreatedShipment[]> {
+  const buyerState = (await client.query(
+    `SELECT a.state FROM orders o JOIN addresses a ON a.id = o.address_id WHERE o.id = $1`, [orderId])).rows[0]?.state;
   const groups = new Map<string, { alloc: Allocation; lines: { line: PricedLine; alloc: Allocation }[] }>();
   lines.forEach((line, i) => {
     const alloc = allocations[i];
@@ -45,6 +48,7 @@ export async function createShipmentsAndLines(
   const ordered = [...groups.values()].sort((a, b) => isOwn(b) - isOwn(a));
   for (const group of ordered) {
     const invoice = await nextInvoiceNumber(client, group.alloc);
+    const interState = !sameState(await sellerState(client, group.alloc), buyerState);
     const subtotal = group.lines.reduce((s, l) => s + l.line.assessable_paise, 0);
     const gst = group.lines.reduce((s, l) => s + l.line.gst_amount_paise, 0);
     const shipment = (await client.query(
@@ -56,7 +60,9 @@ export async function createShipmentsAndLines(
     )).rows[0];
 
     for (const { line, alloc } of group.lines) {
-      const halfGst = Math.round(line.gst_amount_paise / 2);
+      // Intra-state: CGST + SGST halves; inter-state: IGST (place of supply = buyer's state)
+      const halfGst = interState ? 0 : Math.round(line.gst_amount_paise / 2);
+      const igst = interState ? line.gst_amount_paise : 0;
       const item = (await client.query(
         `INSERT INTO order_items (
            order_id, shipment_id, product_id, batch_id, product_name, sku,
@@ -65,7 +71,7 @@ export async function createShipmentsAndLines(
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
         [orderId, shipment.id, line.product_id, alloc.batch_id, line.product_name, line.sku,
          line.quantity, line.unit_price_paise, line.mrp_paise, line.gst_rate,
-         halfGst, line.gst_amount_paise - halfGst, 0, line.gst_amount_paise, line.line_total_paise]
+         halfGst, interState ? 0 : line.gst_amount_paise - halfGst, igst, line.gst_amount_paise, line.line_total_paise]
       )).rows[0];
 
       if (alloc.seller_type === 'partner') {
@@ -81,8 +87,10 @@ export async function createShipmentsAndLines(
       }
     }
 
+    const sellerName = group.alloc.seller_type === 'dawabag' ? 'Dawabag'
+      : (await client.query('SELECT name FROM vendors WHERE id = $1', [group.alloc.partner_id])).rows[0]?.name ?? 'Partner pharmacy';
     shipments.push({
-      id: shipment.id, seller_type: group.alloc.seller_type, partner_id: group.alloc.partner_id,
+      id: shipment.id, seller_type: group.alloc.seller_type, seller_name: sellerName, partner_id: group.alloc.partner_id,
       invoice_number: invoice, total_paise: subtotal + gst,
     });
   }
@@ -121,4 +129,22 @@ export async function releaseOrderReservations(client: PoolClient, orderId: stri
     `UPDATE order_shipments SET status = 'cancelled' WHERE order_id = $1 AND status IN ('pending', 'packed')`,
     [orderId]
   );
+}
+
+export async function sellerState(client: PoolClient, alloc: { seller_type: string; partner_id: string | null }): Promise<string | null> {
+  if (alloc.seller_type === 'partner') {
+    return (await client.query('SELECT state FROM vendors WHERE id = $1', [alloc.partner_id])).rows[0]?.state ?? null;
+  }
+  const entity = (await client.query(`SELECT value FROM app_settings WHERE key = 'legal.entity'`)).rows[0]?.value;
+  return entity?.state || 'Maharashtra';
+}
+
+// Unknown states are treated as intra-state (the common case here); the
+// invoice shows the states so an error is visible.
+export function sameState(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return true;
+  const norm = (x: string) => x.trim().toLowerCase().replace(/[^a-z]/g, '');
+  const aliases: Record<string, string> = { mh: 'maharashtra', ka: 'karnataka', gj: 'gujarat', dl: 'delhi', tn: 'tamilnadu' };
+  const n = (x: string) => aliases[norm(x)] ?? norm(x);
+  return n(a) === n(b);
 }

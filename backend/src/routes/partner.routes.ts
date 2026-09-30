@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { requirePartner } from '../middleware/partner.middleware';
 import {
-  createListing, getListings, getMe, getMySettlement, getMySettlements, getShipments,
+  createListing, getInventory, getListings, getMe, getMySettlement, getMySettlements, getShipments,
   postDelivered, postDispatch, putInventory, searchCatalogue,
 } from '../controllers/partner.controller';
 
@@ -14,6 +14,7 @@ router.get('/me', getMe);
 router.get('/catalogue', searchCatalogue);
 router.get('/products', getListings);
 router.post('/products', createListing);
+router.get('/products/:id/inventory', getInventory);
 router.put('/products/:id/inventory', putInventory);
 router.get('/shipments', getShipments);
 router.post('/shipments/:id/dispatch', postDispatch);

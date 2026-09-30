@@ -270,7 +270,7 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
 
     return {
       id: orderId, order_number: orderNumber, invoice_number: invoiceNumber,
-      shipments: shipments.map(({ id, seller_type, invoice_number, total_paise }) => ({ id, seller_type, invoice_number, total_paise })),
+      shipments: shipments.map(({ id, seller_type, seller_name, invoice_number, total_paise }) => ({ id, seller_type, seller_name, invoice_number, total_paise })),
       status: orderStatus, payment_terms: data.payment_terms,
       credit_due_date: creditDueDate, total_paise: totalPaise,
       has_schedule_h: hasScheduleH,
