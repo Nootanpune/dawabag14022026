@@ -59,3 +59,22 @@
   (`services/recall.service.ts`, `/recalls`; `is_recalled` batches are excluded from every
   stock query and block pack/dispatch), privacy rights (`services/privacy.service.ts`,
   `/privacy`: consents, on-the-fly export, erasure that keeps statutory records).
+- **After-sale (Sprint 5):** `services/cancellation.service.ts` (buyer until packing, staff
+  until dispatch; also used by `PATCH /orders/:id/status cancelled`), `services/return.service.ts`
+  (`/returns`), `services/creditNote.service.ts` (series `<invoice prefix>-CN`, gap-free via
+  `next_invoice_number`), `services/refund.service.ts` (ledger `refunds`: credit_adjustment →
+  gateway → wallet → manual; gateway legs sent after commit, pending without Razorpay keys;
+  webhook matches `gateway_refund_id`). Partner returns add `settlement_adjustments`, netted in
+  the next settlement (lines with status delivered *or* returned are settled). Never restock.
+- **Checkout preview:** `placeOrder(..., { preview: true })` runs the real placement and throws
+  `OrderPreview` (services/checkoutSummary.service.ts) so the transaction rolls back — no
+  reservation, coupon use, wallet/credit change or invoice number is kept.
+- **Handover:** `services/handover.service.ts` — seal number at dispatch; delivery code is an
+  HMAC of shipment id + dispatched_at (not stored), shown only to the buyer on `GET /orders/:id`.
+- **Product page:** `services/productDetail.service.ts` returns only whitelisted fields and the
+  caller's own price; description only when `content_status = 'approved'`
+  (`services/productContent.service.ts`, flags from `utils/claimsCheck.ts`).
+- **Other:** policies `services/policy.service.ts` (`/legal/policies`, versioned), side-effect
+  reports and licence register under `/compliance` (job `licence_register_alerts`), addresses in
+  `services/address.service.ts` (a used address is retired and copied on edit), signed 5-minute
+  document links `utils/signedLink.ts` (`/invoices/.../link`).
