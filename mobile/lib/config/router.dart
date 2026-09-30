@@ -14,6 +14,11 @@ import '../screens/orders/orders_screen.dart';
 import '../screens/orders/order_detail_screen.dart';
 import '../screens/account/account_screen.dart';
 import '../screens/account/refill_screen.dart';
+import '../screens/account/grievances/grievance_detail_screen.dart';
+import '../screens/account/grievances/grievance_list_screen.dart';
+import '../screens/account/grievances/new_grievance_screen.dart';
+import '../screens/account/legal/legal_screen.dart';
+import '../screens/account/privacy/privacy_screen.dart';
 import '../screens/doctor/doctor_list_screen.dart';
 import '../screens/doctor/doctor_portal_screen.dart';
 import '../screens/admin/admin_screen.dart';
@@ -74,6 +79,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['orderId']!),
       ),
       GoRoute(path: '/account/refills', builder: (c, s) => const RefillScreen()),
+      // Complaints (C-36). '/new' is listed before '/:id' so it is not taken as an id.
+      GoRoute(path: '/account/complaints', builder: (c, s) => const GrievanceListScreen()),
+      GoRoute(
+        path: '/account/complaints/new',
+        builder: (c, s) => NewGrievanceScreen(
+          orderId: s.uri.queryParameters['orderId'],
+          orderNumber: s.uri.queryParameters['orderNumber'],
+        ),
+      ),
+      GoRoute(
+        path: '/account/complaints/:id',
+        builder: (c, s) => GrievanceDetailScreen(grievanceId: s.pathParameters['id']!),
+      ),
+      // Consents and data rights (C-40..C-44)
+      GoRoute(path: '/account/privacy', builder: (c, s) => const PrivacyScreen()),
+      // Statutory disclosures — public, no sign-in needed (C-04)
+      GoRoute(path: '/legal', builder: (c, s) => const LegalScreen()),
       GoRoute(path: '/doctors', builder: (c, s) => const DoctorListScreen()),
       GoRoute(path: '/doctor/portal', builder: (c, s) => const DoctorPortalScreen()),
       GoRoute(path: '/admin', builder: (c, s) => const AdminScreen()),

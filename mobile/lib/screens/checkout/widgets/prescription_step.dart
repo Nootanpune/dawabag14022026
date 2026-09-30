@@ -24,6 +24,14 @@ Future<ImageSource?> showPrescriptionSourceSheet(BuildContext context) =>
       ),
     );
 
+/// Asks camera/gallery, then picks an image. The file is only uploaded to
+/// the server, never kept by the app (C-41). Null when cancelled.
+Future<XFile?> pickPrescriptionImage(BuildContext context) async {
+  final source = await showPrescriptionSourceSheet(context);
+  if (source == null) return null;
+  return ImagePicker().pickImage(source: source, imageQuality: 85);
+}
+
 // ── Prescription step ──────────────────────────────────────────────────────────
 class PrescriptionStep extends StatelessWidget {
   final XFile? prescriptionFile;

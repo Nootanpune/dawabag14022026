@@ -39,6 +39,12 @@ class AccountScreen extends ConsumerWidget {
                   child: const Text('Create account'),
                 ),
               ),
+              const SizedBox(height: 12),
+              // Statutory disclosures are public (C-04)
+              TextButton(
+                onPressed: () => context.push('/legal'),
+                child: const Text('About & legal'),
+              ),
             ],
           ),
         ),
@@ -149,6 +155,13 @@ class AccountScreen extends ConsumerWidget {
           _Section('Consultation', [
             _MenuItem(icon: Icons.video_call_outlined, label: 'Consult a doctor', onTap: () => context.push('/doctors')),
             _MenuItem(icon: Icons.history, label: 'My consultations', onTap: () {}),
+          ]),
+
+          _Section('Help & privacy', [
+            // C-36 complaints, C-40..C-44 consents/data rights, C-04 disclosures
+            _MenuItem(icon: Icons.support_agent, label: 'Complaints', onTap: () => context.push('/account/complaints')),
+            _MenuItem(icon: Icons.privacy_tip_outlined, label: 'Privacy', onTap: () => context.push('/account/privacy')),
+            _MenuItem(icon: Icons.gavel_outlined, label: 'About & legal', onTap: () => context.push('/legal')),
           ]),
 
           _Section('Account', [

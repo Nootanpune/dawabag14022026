@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,15 +7,13 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/api_service.dart';
-import '../../utils/formatters.dart';
-import '../orders/widgets/order_shipments_card.dart';
-import 'widgets/address_step.dart';
+import '../../services/checkout_api.dart';
+import 'checkout_flow.dart';
+import 'checkout_razorpay.dart';
+import 'widgets/checkout_bottom_button.dart';
 import 'widgets/checkout_step_bar.dart';
-import 'widgets/confirmed_step.dart';
-import 'widgets/payment_step.dart';
-import 'widgets/prescription_step.dart';
-
-enum CheckoutStep { address, prescription, payment, confirmed }
+import 'widgets/checkout_step_body.dart';
+import 'widgets/prescription_step.dart' show pickPrescriptionImage;
 
 /// Checkout: address → (prescription) → payment → confirmed.
 /// Items, coupon and prices come from the server cart; the order total comes
@@ -31,44 +28,36 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   CheckoutStep _step = CheckoutStep.address;
   String? _selectedAddressId;
-  String? _orderId;
-  String? _orderNumber;
-  int _orderTotalPaise = 0;
-  bool? _orderRequiresPrescription;
-  List<Map<String, dynamic>> _orderShipments = const [];
+  PlacedOrder? _order; // set once POST /orders succeeds
   XFile? _prescriptionFile;
   String? _savedPrescriptionId;
   List<dynamic> _savedPrescriptions = [];
   bool _isLoading = false;
-  late Razorpay _razorpay;
+  late final CheckoutRazorpay _razorpay;
 
   @override
   void initState() {
     super.initState();
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
+    _razorpay = CheckoutRazorpay(onSuccess: _onPaymentSuccess, onError: _onPaymentError);
     _loadPrescriptions();
   }
 
   @override
   void dispose() {
-    _razorpay.clear();
+    _razorpay.dispose();
     super.dispose();
   }
 
+  String? get _orderId => _order?.id;
+
   bool get _requiresPrescription =>
-      _orderRequiresPrescription ?? ref.read(cartProvider).view.requiresPrescription;
+      _order?.requiresPrescription ?? ref.read(cartProvider).view.requiresPrescription;
 
   Future<void> _loadPrescriptions() async {
     try {
-      final res = await apiService.dio.get('/prescriptions/my');
+      final verified = await apiService.getVerifiedPrescriptions();
       if (!mounted) return;
-      setState(() {
-        _savedPrescriptions = (res.data['data'] as List)
-            .where((p) => p['status'] == 'verified')
-            .toList();
-      });
+      setState(() => _savedPrescriptions = verified);
     } catch (_) {}
   }
 
@@ -86,8 +75,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       setState(() => _step = _requiresPrescription ? CheckoutStep.prescription : CheckoutStep.payment);
       return;
     }
-    final addresses = ref.read(addressesProvider).valueOrNull ?? const [];
-    final address = _selectedAddress(addresses);
+    final address = _selectedAddress(ref.read(addressesProvider).valueOrNull ?? const []);
     if (address == null) {
       _showError('Please select a delivery address');
       return;
@@ -101,27 +89,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final coupon = cart.coupon;
     setState(() => _isLoading = true);
     try {
-      final res = await apiService.dio.post('/orders', data: {
-        'address_id': address['id'],
-        'items': lines.map((l) => {'product_id': l.productId, 'quantity': l.quantity}).toList(),
-        if (coupon != null && coupon.valid) 'coupon_code': coupon.code,
-        'pincode': address['pincode']?.toString() ?? '',
-      });
-      final order = ApiService.dataOf(res)['order'];
-      final data = order is Map ? Map<String, dynamic>.from(order) : <String, dynamic>{};
+      final data = await apiService.placeOrder(
+        addressId: address['id'],
+        items: lines
+            .map((l) => <String, dynamic>{'product_id': l.productId, 'quantity': l.quantity})
+            .toList(),
+        couponCode: coupon != null && coupon.valid ? coupon.code : null,
+        pincode: address['pincode']?.toString() ?? '',
+      );
       if (!mounted) return;
       // The server removed the ordered lines from the cart.
       ref.read(cartProvider.notifier).load();
-      final total = data['total_paise'];
+      final order = PlacedOrder.fromJson(data);
       setState(() {
-        _orderId = data['id']?.toString();
-        _orderNumber = data['order_number']?.toString();
-        _orderTotalPaise = total is num ? total.round() : 0;
-        _orderRequiresPrescription = data['requires_prescription'] == true;
-        _orderShipments = OrderShipmentsCard.fromOrder(data);
-        _step = _orderRequiresPrescription == true
-            ? CheckoutStep.prescription
-            : CheckoutStep.payment;
+        _order = order;
+        _step = order.requiresPrescription ? CheckoutStep.prescription : CheckoutStep.payment;
       });
     } catch (e) {
       _showError(ApiService.errorMessage(e, fallback: 'Failed to create order'));
@@ -132,10 +114,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   // ── Step 2: Upload prescription ─────────────────────────────────────────────
   Future<void> _pickPrescription() async {
-    final picker = ImagePicker();
-    final source = await showPrescriptionSourceSheet(context);
-    if (source == null) return;
-    final file = await picker.pickImage(source: source, imageQuality: 85);
+    final file = await pickPrescriptionImage(context);
     if (file != null && mounted) {
       setState(() {
         _prescriptionFile = file;
@@ -154,11 +133,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (file != null && orderId != null) {
       setState(() => _isLoading = true);
       try {
-        final formData = FormData.fromMap({
-          'prescription': await MultipartFile.fromFile(file.path, filename: file.name),
-          'order_id': orderId,
-        });
-        await apiService.dio.post('/prescriptions/upload', data: formData);
+        await apiService.uploadOrderPrescription(
+            filePath: file.path, filename: file.name, orderId: orderId);
       } catch (e) {
         _showError(ApiService.errorMessage(e, fallback: 'Upload failed'));
         return;
@@ -174,18 +150,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (_orderId == null) return;
     setState(() => _isLoading = true);
     try {
-      final res = await apiService.dio.post('/payments/create-order', data: {'order_id': _orderId});
-      final data = res.data['data'];
-      _razorpay.open({
-        'key': data['razorpay_key_id'],
-        'amount': data['amount'],
-        'currency': 'INR',
-        'name': 'Dawabag',
-        'description': 'Order $_orderNumber',
-        'order_id': data['razorpay_order_id'],
-        'prefill': {'contact': '', 'email': ''},
-        'theme': {'color': '#1A8856'},
-      });
+      final data = await apiService.createPaymentOrder(_orderId!);
+      _razorpay.open(data, orderNumber: _order?.orderNumber);
     } catch (e) {
       _showError(ApiService.errorMessage(e, fallback: 'Payment error'));
     } finally {
@@ -195,12 +161,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   void _onPaymentSuccess(PaymentSuccessResponse response) async {
     try {
-      await apiService.dio.post('/payments/verify', data: {
-        'razorpay_order_id': response.orderId,
-        'razorpay_payment_id': response.paymentId,
-        'razorpay_signature': response.signature,
-        'order_id': _orderId,
-      });
+      await apiService.verifyPayment(
+        razorpayOrderId: response.orderId,
+        razorpayPaymentId: response.paymentId,
+        razorpaySignature: response.signature,
+        orderId: _orderId,
+      );
       if (!mounted) return;
       ref.read(cartProvider.notifier).load();
       setState(() => _step = CheckoutStep.confirmed);
@@ -251,40 +217,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         children: [
           if (_step != CheckoutStep.confirmed)
             CheckoutStepBar(
-              steps: hasRx ? const ['Address', 'Prescription', 'Payment'] : const ['Address', 'Payment'],
-              currentIndex: switch (_step) {
-                CheckoutStep.address => 0,
-                CheckoutStep.prescription => 1,
-                CheckoutStep.payment => hasRx ? 2 : 1,
-                CheckoutStep.confirmed => -1,
-              },
+              steps: checkoutBarLabels(hasRx),
+              currentIndex: _step.barIndex(hasRx),
             ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: switch (_step) {
-                CheckoutStep.address => AddressStep(
-                    addresses: addresses,
-                    selectedId: _selectedAddressId,
-                    onSelect: (id) => setState(() => _selectedAddressId = id),
-                  ),
-                CheckoutStep.prescription => PrescriptionStep(
-                    prescriptionFile: _prescriptionFile,
-                    savedPrescriptions: _savedPrescriptions,
-                    selectedSavedId: _savedPrescriptionId,
-                    onPickFile: _pickPrescription,
-                    onSelectSaved: (id) => setState(() {
-                      _savedPrescriptionId = id;
-                      _prescriptionFile = null;
-                    }),
-                  ),
-                CheckoutStep.payment => PaymentStep(
-                    orderNumber: _orderNumber ?? '',
-                    totalPaise: _orderTotalPaise,
-                  ),
-                CheckoutStep.confirmed =>
-                    ConfirmedStep(orderNumber: _orderNumber ?? '', shipments: _orderShipments),
-              },
+              child: CheckoutStepBody(
+                step: _step,
+                addresses: addresses,
+                selectedAddressId: _selectedAddressId,
+                onSelectAddress: (id) => setState(() => _selectedAddressId = id),
+                prescriptionFile: _prescriptionFile,
+                savedPrescriptions: _savedPrescriptions,
+                savedPrescriptionId: _savedPrescriptionId,
+                onPickFile: _pickPrescription,
+                onSelectSaved: (id) => setState(() {
+                  _savedPrescriptionId = id;
+                  _prescriptionFile = null;
+                }),
+                order: _order,
+              ),
             ),
           ),
           if (_step != CheckoutStep.confirmed) _bottomButton(),
@@ -300,25 +253,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       CheckoutStep.payment => _initiatePayment,
       CheckoutStep.confirmed => null,
     };
-    final label = switch (_step) {
-      CheckoutStep.address => 'Continue',
-      CheckoutStep.prescription => 'Continue to payment',
-      CheckoutStep.payment => 'Pay ${formatPrice(_orderTotalPaise)} securely',
-      CheckoutStep.confirmed => '',
-    };
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: ElevatedButton(
-          onPressed: _isLoading ? null : action,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : Text(label),
-        ),
-      ),
-    );
+    return CheckoutBottomButton(
+        label: _step.buttonLabel(_order?.totalPaise ?? 0), onPressed: action, isLoading: _isLoading);
   }
 }

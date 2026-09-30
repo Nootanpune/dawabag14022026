@@ -1,29 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/error_retry_view.dart';
 import 'widgets/order_shipments_card.dart';
+import 'widgets/order_timeline_card.dart';
 import 'widgets/refill_order_card.dart';
 
 final orderDetailProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, id) async {
   final res = await apiService.dio.get('/orders/$id');
   return res.data['data'] as Map<String, dynamic>;
 });
-
-const _timelineSteps = [
-  {'status': 'pending_payment', 'label': 'Order placed'},
-  {'status': 'rx_pending',      'label': 'Prescription submitted'},
-  {'status': 'rx_verified',     'label': 'Prescription verified'},
-  {'status': 'packed',          'label': 'Order packed'},
-  {'status': 'dispatched',      'label': 'Dispatched'},
-  {'status': 'delivered',       'label': 'Delivered'},
-];
-
-const _statusOrder = [
-  'pending_payment','rx_pending','rx_verified','packing','packed','dispatched','delivered'
-];
 
 class OrderDetailScreen extends ConsumerWidget {
   final String orderId;
@@ -45,10 +34,12 @@ class OrderDetailScreen extends ConsumerWidget {
       ),
       body: orderAsync.when(
         loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) => ErrorRetryView(
+          message: ApiService.errorMessage(e, fallback: 'Could not load this order'),
+          onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
+        ),
         data: (order) {
           final status = order['status'] as String? ?? '';
-          final currentIdx = _statusOrder.indexOf(status);
           return RefreshIndicator(
             color: AppTheme.brandGreen,
             onRefresh: () async => ref.invalidate(orderDetailProvider(orderId)),
@@ -82,100 +73,9 @@ class OrderDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Timeline
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Order timeline',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                        const SizedBox(height: 14),
-                        ...List.generate(_timelineSteps.length, (i) {
-                          final step = _timelineSteps[i];
-                          final stepIdx = _statusOrder.indexOf(step['status']!);
-                          final done = currentIdx >= stepIdx && status != 'rx_rejected';
-                          final active = _statusOrder[currentIdx] == step['status'];
-                          final isLast = i == _timelineSteps.length - 1;
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Column(
-                                children: [
-                                  Container(
-                                    width: 14, height: 14,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: done ? AppTheme.brandGreen : active ? Colors.white : Colors.grey.shade300,
-                                      border: Border.all(
-                                        color: done || active ? AppTheme.brandGreen : Colors.grey.shade300,
-                                        width: active ? 2.5 : 1.5,
-                                      ),
-                                    ),
-                                    child: done && !active
-                                        ? const Icon(Icons.check, size: 9, color: Colors.white)
-                                        : null,
-                                  ),
-                                  if (!isLast)
-                                    Container(
-                                      width: 2, height: 28,
-                                      color: done ? AppTheme.brandGreen100 : Colors.grey.shade200,
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(step['label']!,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: active ? FontWeight.w700 : FontWeight.normal,
-                                          color: done ? Colors.grey.shade800 : Colors.grey.shade400,
-                                        )),
-                                      if (step['status'] == 'rx_pending' && active)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 3),
-                                          child: Text('Pharmacist will call you shortly',
-                                            style: TextStyle(fontSize: 11, color: Colors.orange.shade700)),
-                                        ),
-                                      if (step['status'] == 'dispatched' && done && order['awb_number'] != null) ...[
-                                        const SizedBox(height: 4),
-                                        Text('${order['courier_partner']} · ${order['awb_number']}',
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                                        if (order['tracking_url'] != null)
-                                          GestureDetector(
-                                            onTap: () => launchUrl(Uri.parse(order['tracking_url'])),
-                                            child: const Text('Track shipment →',
-                                              style: TextStyle(fontSize: 11, color: AppTheme.brandGreen, fontWeight: FontWeight.w600)),
-                                          ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }),
-                        if (status == 'rx_rejected')
-                          Container(
-                            margin: const EdgeInsets.only(top: 10),
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text('Prescription rejected. Order cancelled, refund initiated.',
-                              style: TextStyle(fontSize: 12, color: Colors.red)),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+                // Timeline — handles every status, incl. rx_rejected,
+                // cancelled, returned, payment_failed, confirmed and unknown ones.
+                OrderTimelineCard(order: order),
                 const SizedBox(height: 12),
 
                 // Items
@@ -226,7 +126,11 @@ class OrderDetailScreen extends ConsumerWidget {
 
                 // Seller + invoice per shipment, only when the API sent them
                 if (OrderShipmentsCard.fromOrder(order).isNotEmpty) ...[
-                  OrderShipmentsCard(shipments: OrderShipmentsCard.fromOrder(order)),
+                  // Invoice number per seller + where to get the PDF (C-05, C-33)
+                  OrderShipmentsCard(
+                    shipments: OrderShipmentsCard.fromOrder(order),
+                    showInvoiceNote: true,
+                  ),
                   const SizedBox(height: 12),
                 ],
 
@@ -263,6 +167,19 @@ class OrderDetailScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   RefillOrderCard(orderId: order['id']?.toString() ?? orderId),
                 ],
+                const SizedBox(height: 12),
+                // Complaint linked to this order (C-36)
+                OutlinedButton.icon(
+                  onPressed: () => context.push(Uri(
+                    path: '/account/complaints/new',
+                    queryParameters: {
+                      'orderId': order['id']?.toString() ?? orderId,
+                      if (order['order_number'] != null) 'orderNumber': order['order_number'].toString(),
+                    },
+                  ).toString()),
+                  icon: const Icon(Icons.support_agent, size: 18),
+                  label: const Text('Report a problem with this order'),
+                ),
                 const SizedBox(height: 24),
               ],
             ),

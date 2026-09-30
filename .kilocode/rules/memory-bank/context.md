@@ -17,6 +17,10 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
   privacy consents/export/erasure (C-40, C-44), listing rejection codes REJ-01..14.
 - Tests: test/sprint4.smoke.mjs (63 checks) + Sprint 1–3 suites + 21 jest tests pass.
 - Web and mobile Sprint 4 screens: see the latest commits.
+- Mobile Sprint 4 (not compiled): complaints list/new/thread (/account/complaints),
+  privacy consents + erasure/correction requests (/account/privacy; export is web-only),
+  public About & legal (/legal), order timeline handles every status, invoice number +
+  "PDF on website" note (endpoint is Bearer-only, no file writes), checkout split.
 - Owner to fill in: legal.* settings (entity, licences, pharmacist-in-charge, grievance
   officer); appoint the pharmacist-in-charge and grievance officer.
 
@@ -48,6 +52,7 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 ## Known gaps
 - No address-management page (web /account/addresses, mobile add address).
 - Recall returns/refunds and settlement deductions for returns are manual.
+- Mobile cannot open invoice PDFs: needs a short-lived signed invoice URL from the API.
 - WhatsApp channel not wired; GSTR-8 filing manual; Razorpay mandates untested.
 
 ## Done in Sprint 1
