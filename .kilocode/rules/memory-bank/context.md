@@ -9,6 +9,17 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Done in Sprint 4 (beta readiness)
+- Migration 07. Pharmacist prescription gate with quantities and reuse (C-08), H1 register
+  + CSV export (C-09), Dawabag pack/dispatch/deliver with stock deduction, invoice PDF per
+  shipment (C-13), MRP/NPPA price checks (C-16), grievances with 48 h / 30 day deadlines
+  (C-36), legal footer data (C-04), batch recall (C-28), prescription-view audit (C-41),
+  privacy consents/export/erasure (C-40, C-44), listing rejection codes REJ-01..14.
+- Tests: test/sprint4.smoke.mjs (63 checks) + Sprint 1–3 suites + 21 jest tests pass.
+- Web and mobile Sprint 4 screens: see the latest commits.
+- Owner to fill in: legal.* settings (entity, licences, pharmacist-in-charge, grievance
+  officer); appoint the pharmacist-in-charge and grievance officer.
+
 ## Done in Sprint 3 (backend)
 - Owner decisions: allocation rule (> ₹10k + Dawabag ≤24 h → own stock first, else
   nearest seller), partners sell at catalogue price, refills with reminders +
@@ -35,8 +46,9 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
   keychain, register screen split into screens/auth/register/ (not compiled).
 
 ## Known gaps
-- No order-fulfilment screens (/admin/orders: pharmacist Rx check, packing).
 - No address-management page (web /account/addresses, mobile add address).
+- Recall returns/refunds and settlement deductions for returns are manual.
+- WhatsApp channel not wired; GSTR-8 filing manual; Razorpay mandates untested.
 
 ## Done in Sprint 1
 - Migrations fixed (02 view, 03 unique index) and 04 added (registration fields,
@@ -55,11 +67,9 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 - IRIS IRP sandbox e-invoice test; GSTIN/PAN KYC API sandbox tests.
 - Flutter build on a machine with the SDK (`flutter pub get`, run on device).
 
-## Next (from Compliance Rulebook, before beta)
-Pharmacist sign-off gate + H1 register (C-08, C-09), invoice PDF (pdf.service is a
-placeholder), B2B licence on invoices (column added, C-13), MRP/NPPA price checks
-(C-16), grievance module and legal footer (C-04, C-36), recall tool (C-28),
-prescription-view access log (C-41), address management page (web).
+## Next (before beta)
+Owner data and credentials (legal settings, API keys, S3, Razorpay, MSG91), lawyer/CA
+sign-off on the rulebook, address management page, returns and refunds flow, Flutter build.
 
 ## Session history
 | Date | Change |
@@ -69,3 +79,4 @@ prescription-view access log (C-41), address management page (web).
 | 2026-09-30 | v2 imported; compliance rulebook drafted; owner decisions logged; Sprint 1 registration/KYC built and tested |
 | 2026-09-30 | Standing rules (server SSOT, modular); Sprint 2 backend + web SSOT |
 | 2026-09-30 | Sprint 3 backend: marketplace, allocation, settlements, refills |
+| 2026-09-30 | Sprint 4: pharmacist gate, H1 register, invoices, price checks, grievances, recall, privacy |

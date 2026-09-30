@@ -43,3 +43,19 @@
   Razorpay client + webhook signature: `services/razorpay.client.ts` (raw-body HMAC).
 - **Settings:** `app_settings` via `services/settings.service.ts`; admin edits keys with
   validation in `controllers/marketplaceAdmin.controller.ts`.
+- **Fulfilment (Sprint 4):** `/api/v1/fulfilment/*`. Prescription gate in
+  `services/rxGate.service.ts` (`assertRxCleared` before pack/dispatch, `recordH1Dispensing`
+  on dispatch into the append-only `h1_register`). Pharmacist decisions in
+  `services/rxVerification.service.ts` (role pharmacist_rx + `users.pharmacist_reg_no`;
+  quantities in `prescription_items`, lines linked by `order_items.prescription_id`).
+  Own shipments: `services/fulfilment.service.ts`; partner shipments:
+  `services/partnerFulfilment.service.ts`; order status follows shipments (`syncOrderStatus`).
+- **Invoices:** `GET /api/v1/invoices/shipments/:id.pdf` built on demand by
+  `services/invoiceData.service.ts` + `services/invoicePdf.ts` (never stored).
+- **Prices:** `products_price_le_mrp` and `products_mrp_le_ceiling` CHECKs plus
+  `assertPrices` in the product controller (C-16).
+- **Compliance modules:** grievances (`services/grievance.service.ts`, `/grievances`),
+  public legal details from `legal.*` settings (`/legal/info`), batch recalls
+  (`services/recall.service.ts`, `/recalls`; `is_recalled` batches are excluded from every
+  stock query and block pack/dispatch), privacy rights (`services/privacy.service.ts`,
+  `/privacy`: consents, on-the-fly export, erasure that keeps statutory records).
