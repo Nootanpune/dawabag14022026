@@ -33,6 +33,10 @@ import partnerRoutes from './routes/partner.routes';
 import refillRoutes from './routes/refill.routes';
 import fulfilmentRoutes from './routes/fulfilment.routes';
 import invoiceRoutes from './routes/invoice.routes';
+import grievanceRoutes from './routes/grievance.routes';
+import legalRoutes from './routes/legal.routes';
+import privacyRoutes from './routes/privacy.routes';
+import recallRoutes from './routes/recall.routes';
 import eInvoiceRouter from './controllers/einvoice.controller';
 
 import { errorHandler } from './middleware/errorHandler';
@@ -122,6 +126,10 @@ app.use(`${api}/partner`, partnerRoutes);
 app.use(`${api}/refills`, refillRoutes);
 app.use(`${api}/fulfilment`, fulfilmentRoutes);
 app.use(`${api}/invoices`, invoiceRoutes);
+app.use(`${api}/grievances`, grievanceRoutes);
+app.use(`${api}/legal`, legalRoutes);
+app.use(`${api}/privacy`, privacyRoutes);
+app.use(`${api}/recalls`, recallRoutes);
 app.use(`${api}/einvoice`, eInvoiceRouter);
 
 // ─── Error Handling ─────────────────────────────────────────────────────────

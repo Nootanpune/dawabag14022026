@@ -195,7 +195,7 @@ reportRouter.get('/stock', authenticate, authorize('admin', 'super_admin'), asyn
               COALESCE(SUM(b.quantity_available - b.quantity_reserved),0) as available_qty,
               MIN(b.expiry_date) as nearest_expiry
        FROM products p
-       LEFT JOIN inventory_batches b ON b.product_id = p.id
+       LEFT JOIN inventory_batches b ON b.product_id = p.id AND b.is_recalled = FALSE
        WHERE p.is_active = TRUE AND p.deleted_at IS NULL
        GROUP BY p.id
        ORDER BY available_qty ASC`,

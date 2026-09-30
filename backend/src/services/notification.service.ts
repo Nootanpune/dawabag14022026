@@ -212,6 +212,23 @@ function buildMessage(payload: NotificationPayload) {
       sms: `Dawabag: We could not place your refill order (${payload.reason || 'item unavailable'}). Please order from the app.`,
       push: { title: 'Refill not placed', body: payload.reason || 'Please order from the app.' },
     },
+    // ── Sprint 4: complaints (C-36), recalls (C-28) ──
+    grievance_update: {
+      sms: `Dawabag: Update on complaint ${payload.ticketNo}${payload.status ? ` (${String(payload.status).replace('_', ' ')})` : ''}. See the app for details.`,
+      email: {
+        subject: `Complaint ${payload.ticketNo} updated`,
+        body: `There is an update on your complaint ${payload.ticketNo}. Open the Dawabag app or website to read it.`,
+      },
+      push: { title: 'Complaint update', body: `Ticket ${payload.ticketNo}` },
+    },
+    batch_recall: {
+      sms: `Dawabag: IMPORTANT. ${payload.productName} batch ${payload.batchNumber} (order ${on}) has been recalled. Please stop using it and contact us for a return and refund.`,
+      email: {
+        subject: `Recall notice: ${payload.productName} batch ${payload.batchNumber}`,
+        body: `${payload.productName} batch ${payload.batchNumber}, supplied in order ${on}, has been recalled (${payload.reason || 'quality alert'}). Please stop using it and contact Dawabag support for a return and full refund.`,
+      },
+      push: { title: 'Recall notice', body: `Stop using ${payload.productName} batch ${payload.batchNumber}` },
+    },
     low_stock_digest: {
       email: {
         subject: `Low stock: ${payload.count} product(s) at or below reorder level`,

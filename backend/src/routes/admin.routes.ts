@@ -19,7 +19,7 @@ router.get('/stats', authenticate, authorize('admin', 'super_admin'), async (_re
       queryOne<{ count: string }>(`SELECT COUNT(*) FROM orders WHERE DATE(created_at) = CURRENT_DATE AND deleted_at IS NULL`, []),
       queryOne<{ sum: string }>(`SELECT COALESCE(SUM(total_paise),0) as sum FROM orders WHERE DATE(created_at) = CURRENT_DATE AND status NOT IN ('pending_payment','payment_failed','cancelled')`, []),
       queryOne<{ count: string }>(`SELECT COUNT(*) FROM orders WHERE status = 'rx_pending'`, []),
-      queryOne<{ count: string }>(`SELECT COUNT(*) FROM products p WHERE is_active=TRUE AND (SELECT COALESCE(SUM(quantity_available-quantity_reserved),0) FROM inventory_batches WHERE product_id=p.id) < 20`, []),
+      queryOne<{ count: string }>(`SELECT COUNT(*) FROM products p WHERE is_active=TRUE AND (SELECT COALESCE(SUM(quantity_available-quantity_reserved),0) FROM inventory_batches WHERE product_id=p.id AND NOT is_recalled) < 20`, []),
       queryOne<{ count: string }>(`SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURRENT_DATE AND deleted_at IS NULL`, []),
     ]);
 

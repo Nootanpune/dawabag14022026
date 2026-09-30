@@ -134,6 +134,13 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'marketplace.tds_pct': z.number().min(0).max(5),
   'marketplace.fee_gst_pct': z.number().min(0).max(28),
   'refill.reminder_days_before': z.number().int().min(1).max(14),
+  // Sprint 4 — public legal details (C-03, C-04, C-36)
+  'legal.entity': z.object({ name: z.string().min(2).max(200), address: z.string().max(500), gstin: z.string().max(15), cin: z.string().max(21) }).strict(),
+  'legal.drug_licences': z.object({ retail_20: z.string().max(60), retail_21: z.string().max(60), wholesale_20b: z.string().max(60),
+    wholesale_21b: z.string().max(60), valid_upto: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/) }).strict(),
+  'legal.pharmacist_in_charge': z.object({ name: z.string().max(200), registration_no: z.string().max(60) }).strict(),
+  'legal.grievance_officer': z.object({ name: z.string().max(200), email: z.union([z.string().email(), z.literal('')]),
+    phone: z.string().max(20), address: z.string().max(500) }).strict(),
 };
 
 export async function getSettings(_req: Request, res: Response, next: NextFunction) {

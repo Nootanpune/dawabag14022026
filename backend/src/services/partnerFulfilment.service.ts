@@ -5,6 +5,7 @@ import { query, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
+import { assertNoRecalledLines } from './recall.service';
 import { syncOrderStatus } from './fulfilment.service';
 
 export async function listPartnerShipments(vendorId: string, status?: string) {
@@ -43,6 +44,7 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
       throw new AppError(`Order is ${s.order_status.replace('_', ' ')}; it cannot be dispatched yet`, 409);
     }
     await assertRxCleared(client, s.order_id, shipmentId);
+    await assertNoRecalledLines(client, shipmentId);
     // Reserved → shipped: take the units out of the partner's batch
     await client.query(
       `UPDATE partner_inventory pi

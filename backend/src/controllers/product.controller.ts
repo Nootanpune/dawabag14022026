@@ -87,7 +87,7 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
               COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0) AS stock_qty
        FROM products p
        LEFT JOIN inventory_batches b ON b.product_id = p.id
-         AND b.expiry_date > CURRENT_DATE + 30
+         AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE
        ${whereClause}
        GROUP BY p.id
        ${orderClause}
@@ -139,7 +139,7 @@ export async function getProductDetail(req: Request, res: Response, next: NextFu
               MIN(b.expiry_date) as nearest_expiry
        FROM products p
        LEFT JOIN inventory_batches b ON b.product_id = p.id
-         AND b.expiry_date > CURRENT_DATE + 30
+         AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE
        WHERE p.id = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL
        GROUP BY p.id`,
       [productId]

@@ -95,7 +95,7 @@ async function ownCandidate(
   if (line.cold_chain && !coldChainOk) return [];
   const batch = (await client.query(
     `SELECT id, expiry_date FROM inventory_batches
-     WHERE product_id = $1
+     WHERE product_id = $1 AND is_recalled = FALSE
        AND quantity_available - quantity_reserved >= $2
        AND expiry_date > CURRENT_DATE + ${MIN_SHELF_DAYS}
      ORDER BY expiry_date ASC LIMIT 1 FOR UPDATE SKIP LOCKED`,
@@ -120,7 +120,7 @@ async function partnerCandidates(client: PoolClient, line: AllocationLine, buyer
      JOIN partner_products pp ON pp.partner_id = v.id
        AND pp.product_id = $1 AND pp.approval_status = 'approved' AND pp.listing_status = 'live'
      JOIN partner_inventory pi ON pi.partner_product_id = pp.id
-       AND pi.qty_available - pi.qty_reserved >= $2
+       AND pi.qty_available - pi.qty_reserved >= $2 AND pi.is_recalled = FALSE
        AND pi.expiry_date > CURRENT_DATE + ${MIN_SHELF_DAYS}
        AND ($3::boolean = FALSE OR pi.cold_chain_confirmed = TRUE)
      LEFT JOIN pincode_serviceability ps ON ps.pincode = v.pincode

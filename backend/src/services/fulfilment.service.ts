@@ -7,6 +7,7 @@ import { query, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
+import { assertNoRecalledLines } from './recall.service';
 import { queueNotification } from './notification.service';
 
 // Orders ready for fulfilment: paid (packing), prescription-verified, or on credit (confirmed)
@@ -59,6 +60,7 @@ export async function packShipment(shipmentId: string, userId: string) {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'pending') throw new AppError(`Shipment is already ${s.status}`, 409);
     await assertRxCleared(client, s.order_id, shipmentId);
+    await assertNoRecalledLines(client, shipmentId);
     await client.query(`UPDATE order_shipments SET status = 'packed' WHERE id = $1`, [shipmentId]);
     await client.query(`UPDATE orders SET status = 'packed', pharmacist_pack_id = $2, packed_at = NOW(), updated_at = NOW()
                         WHERE id = $1 AND status IN ('packing', 'rx_verified', 'confirmed')`, [s.order_id, userId]);
@@ -72,6 +74,7 @@ export async function dispatchOwnShipment(shipmentId: string, courier: string, a
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'packed') throw new AppError('Pack the shipment before dispatch', 409);
     await assertRxCleared(client, s.order_id, shipmentId);
+    await assertNoRecalledLines(client, shipmentId);
     // Reserved → shipped
     await client.query(
       `UPDATE inventory_batches b

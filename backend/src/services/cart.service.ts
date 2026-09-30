@@ -46,7 +46,7 @@ async function productRows(productIds: string[]) {
             p.max_qty_per_order, p.min_order_qty_retailer, p.min_order_qty_wholesaler,
             p.max_qty_per_order_retailer, p.max_qty_per_order_wholesaler,
             COALESCE(SUM(b.quantity_available - b.quantity_reserved)
-              FILTER (WHERE b.expiry_date > CURRENT_DATE + 30), 0)::int AS stock_qty
+              FILTER (WHERE b.expiry_date > CURRENT_DATE + 30 AND NOT b.is_recalled), 0)::int AS stock_qty
      FROM products p
      LEFT JOIN inventory_batches b ON b.product_id = p.id
      WHERE p.id = ANY($1::uuid[])

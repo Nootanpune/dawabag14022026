@@ -374,7 +374,7 @@ export async function checkLowStockAndAlert(): Promise<{ flagged: number; newAle
             p.preferred_vendor_id
      FROM products p
      LEFT JOIN inventory_batches b ON b.product_id = p.id
-       AND b.expiry_date > CURRENT_DATE + 30
+       AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE
      WHERE p.is_active = TRUE AND p.deleted_at IS NULL
        AND p.reorder_level_qty > 0
      GROUP BY p.id
