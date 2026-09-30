@@ -42,7 +42,7 @@ const people = {
     gst_unregistered_declaration: true, ...consent,
   },
   doctor: {
-    customer_type: 'doc_hospital', full_name: 'Dr. S2', mobile: '9000000103', password: 'Passw0rd!',
+    customer_type: 'doc_hospital', practitioner_declaration: true, full_name: 'Dr. S2', mobile: '9000000103', password: 'Passw0rd!',
     pincode: '422003', nmc_reg_number: 'MMC-S2-01', nmc_council_state: 'Maharashtra Medical Council',
     speciality: 'General Physician', pan_number: 'ABCDE1234G', gst_unregistered_declaration: true, ...consent,
   },

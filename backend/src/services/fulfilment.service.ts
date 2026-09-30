@@ -8,6 +8,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
 import { assertNoRecalledLines } from './recall.service';
+import { handoverCode, prepareHandover } from './handover.service';
 import { queueNotification } from './notification.service';
 
 // Orders ready for fulfilment: paid (packing), prescription-verified, or on credit (confirmed)
@@ -69,7 +70,7 @@ export async function packShipment(shipmentId: string, userId: string) {
   });
 }
 
-export async function dispatchOwnShipment(shipmentId: string, courier: string, awb: string, userId: string) {
+export async function dispatchOwnShipment(shipmentId: string, courier: string, awb: string, userId: string, sealNumber: string) {
   return withTransaction(async (client) => {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'packed') throw new AppError('Pack the shipment before dispatch', 409);
@@ -85,11 +86,12 @@ export async function dispatchOwnShipment(shipmentId: string, courier: string, a
     await client.query(
       `UPDATE order_shipments SET status = 'dispatched', courier_partner = $2, awb_number = $3, dispatched_at = NOW() WHERE id = $1`,
       [shipmentId, courier, awb]);
+    const codeNeeded = await prepareHandover(client, shipmentId, s.order_id, sealNumber);
     await syncOrderStatus(client, s.order_id);
     await writeAuditTx(client, { userId: s.user_id, action: 'shipment_dispatched', performedBy: userId,
       newValue: { shipment_id: shipmentId, courier, awb, h1_register_rows: h1 } });
     await queueNotification({ userId: s.user_id, type: 'dispatched', orderId: s.order_id, orderNumber: s.order_number,
-      awbNumber: awb, courierPartner: courier });
+      awbNumber: awb, courierPartner: courier, handoverCode: codeNeeded ? await dispatchedCode(client, shipmentId) : undefined });
     return { id: shipmentId, status: 'dispatched', h1_register_rows: h1 };
   });
 }
@@ -107,4 +109,9 @@ export async function syncOrderStatus(client: PoolClient, orderId: string) {
   } else if (r.waiting === 0 && r.moving === 0 && r.done > 0) {
     await client.query(`UPDATE orders SET status = 'delivered', delivered_at = NOW(), updated_at = NOW() WHERE id = $1 AND status <> 'delivered'`, [orderId]);
   }
+}
+
+async function dispatchedCode(client: PoolClient, shipmentId: string) {
+  const r = (await client.query('SELECT dispatched_at FROM order_shipments WHERE id = $1', [shipmentId])).rows[0];
+  return handoverCode(shipmentId, r.dispatched_at);
 }

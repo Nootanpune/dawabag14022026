@@ -28,6 +28,10 @@ export async function cleanup(q) {
   await q('DELETE FROM grievances WHERE user_id = ANY($1)', [ids]);    // messages cascade
   await q('DELETE FROM batch_recalls WHERE product_id = ANY($1)', [productIds]);
   await q('DELETE FROM data_requests WHERE user_id = ANY($1)', [ids]);
+  await q('DELETE FROM settlement_adjustments WHERE return_id IN (SELECT id FROM return_requests WHERE order_id = ANY($1))', [orderIds]);
+  await q('DELETE FROM refunds WHERE order_id = ANY($1)', [orderIds]);
+  await q('DELETE FROM credit_notes WHERE order_id = ANY($1)', [orderIds]);
+  await q('DELETE FROM return_requests WHERE order_id = ANY($1)', [orderIds]);
   await q('DELETE FROM payments WHERE order_id = ANY($1)', [orderIds]);
   await q('DELETE FROM order_items WHERE order_id = ANY($1)', [orderIds]);
   await q('DELETE FROM order_shipments WHERE order_id = ANY($1)', [orderIds]);

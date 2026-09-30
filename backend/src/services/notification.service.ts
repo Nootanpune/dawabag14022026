@@ -128,7 +128,7 @@ function buildMessage(payload: NotificationPayload) {
       push: { title: 'Order packed', body: `Order ${on} is ready to ship.` },
     },
     dispatched: {
-      sms: `Dawabag: Order ${on} dispatched via ${payload.courierPartner || 'courier'}. Tracking: ${payload.trackingUrl || payload.awbNumber || 'N/A'}`,
+      sms: `Dawabag: Order ${on} dispatched via ${payload.courierPartner || 'courier'}. Tracking: ${payload.trackingUrl || payload.awbNumber || 'N/A'}${payload.handoverCode ? `. Delivery code ${payload.handoverCode}: give it only when you receive the sealed pack` : ''}`,
       email: {
         subject: `Order ${on} — Dispatched`,
         body: `Your order has been dispatched. Tracking ID: ${payload.awbNumber}. Track: ${payload.trackingUrl}`,
@@ -250,6 +250,14 @@ function buildMessage(payload: NotificationPayload) {
         body: `Your ${payload.requestType} request has been ${payload.status}. ${payload.reason || ''}`,
       },
       push: { title: 'Privacy request update', body: `Your ${payload.requestType} request: ${payload.status}` },
+    },
+    business_licence_expiring: {
+      email: { subject: 'Licence renewal due', body: payload.text || '' },
+      push: { title: 'Licence renewal due', body: payload.text || '' },
+    },
+    adr_serious: {
+      push: { title: 'Serious side-effect report', body: `${payload.reportNo}: ${payload.productName}. Review and forward to PvPI within 15 days.` },
+      email: { subject: `Serious side-effect report ${payload.reportNo}`, body: `A serious suspected reaction to ${payload.productName} was reported (${payload.reportNo}). Review it and forward it to PvPI within 15 days.` },
     },
     low_stock_digest: {
       email: {

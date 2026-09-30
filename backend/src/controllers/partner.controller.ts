@@ -1,4 +1,6 @@
 // src/controllers/partner.controller.ts — partner portal (role 'partner')
+import { getReturn, listReturns } from '../services/return.service';
+import { dispatchSchema, handoverSchema } from './fulfilment.controller';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { query, queryOne } from '../config/database';
@@ -102,17 +104,14 @@ export async function getShipments(req: Request, res: Response, next: NextFuncti
 
 export async function postDispatch(req: Request, res: Response, next: NextFunction) {
   try {
-    const { courier_partner, awb_number } = z.object({
-      courier_partner: z.string().trim().min(2).max(50),
-      awb_number: z.string().trim().min(3).max(100),
-    }).parse(req.body);
-    res.json({ success: true, data: await dispatchShipment(req.partner!.vendorId, uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id) });
+    const { courier_partner, awb_number, seal_number } = dispatchSchema.parse(req.body);
+    res.json({ success: true, data: await dispatchShipment(req.partner!.vendorId, uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, seal_number) });
   } catch (err) { next(err); }
 }
 
 export async function postDelivered(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json({ success: true, data: await markShipmentDelivered(uuid.parse(req.params.id), req.user!.id, req.partner!.vendorId) });
+    res.json({ success: true, data: await markShipmentDelivered(uuid.parse(req.params.id), req.user!, req.partner!.vendorId, handoverSchema.parse(req.body ?? {})) });
   } catch (err) { next(err); }
 }
 
@@ -126,4 +125,12 @@ export async function getMySettlement(req: Request, res: Response, next: NextFun
   try {
     res.json({ success: true, data: await getSettlement(uuid.parse(req.params.id), req.partner!.vendorId) });
   } catch (err) { next(err); }
+}
+
+// Returns on this partner's shipments; each approved one is deducted at settlement (C-37)
+export async function getMyReturns(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: { returns: await listReturns({ partnerId: req.partner!.vendorId }) } }); } catch (err) { next(err); }
+}
+export async function getMyReturn(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await getReturn(uuid.parse(req.params.id), { partnerId: req.partner!.vendorId }) }); } catch (err) { next(err); }
 }

@@ -55,7 +55,7 @@ const users = {
     ...consent,
   },
   doc_hospital: {
-    customer_type: 'doc_hospital', full_name: 'Dr. Smoke Test', mobile: '9000000004',
+    customer_type: 'doc_hospital', practitioner_declaration: true, full_name: 'Dr. Smoke Test', mobile: '9000000004',
     password: 'Passw0rd!', pincode: '422003', nmc_reg_number: 'MMC-2011-0042',
     nmc_council_state: 'Maharashtra Medical Council', speciality: 'General Physician',
     pan_number: 'ABCDE1234F', gst_unregistered_declaration: true, ...consent,

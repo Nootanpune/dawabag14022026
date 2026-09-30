@@ -57,6 +57,10 @@ async function cleanup() {
     await q('DELETE FROM payment_mandates WHERE user_id = ANY($1)', [ids]);
     await q('DELETE FROM partner_order_items WHERE order_id = ANY($1) OR partner_id = ANY($2)', [orderIds, vendorIds]);
     await q('DELETE FROM settlement_batches WHERE partner_id = ANY($1)', [vendorIds]);
+    await q('DELETE FROM settlement_adjustments WHERE return_id IN (SELECT id FROM return_requests WHERE order_id = ANY($1))', [orderIds]);
+    await q('DELETE FROM refunds WHERE order_id = ANY($1)', [orderIds]);
+    await q('DELETE FROM credit_notes WHERE order_id = ANY($1)', [orderIds]);
+    await q('DELETE FROM return_requests WHERE order_id = ANY($1)', [orderIds]);
     await q('DELETE FROM payments WHERE order_id = ANY($1)', [orderIds]);
     await q('DELETE FROM order_items WHERE order_id = ANY($1)', [orderIds]);
     await q('DELETE FROM order_shipments WHERE order_id = ANY($1)', [orderIds]);
@@ -243,10 +247,10 @@ async function main() {
   r = await call('GET', '/partner/shipments?status=pending', { token: pa });
   const queuedShip = r.json.data?.shipments?.find((s) => s.id === shipA);
   check('paid order appears with ship-to address and batch', queuedShip?.pincode === BUYER_PIN && queuedShip?.lines?.[0]?.batch_number === 'A1-1', queuedShip);
-  r = await call('POST', `/partner/shipments/${shipA}/dispatch`, { token: pb, body: { courier_partner: 'Delhivery', awb_number: 'AWB123456' } });
+  r = await call('POST', `/partner/shipments/${shipA}/dispatch`, { token: pb, body: { courier_partner: 'Delhivery', awb_number: 'AWB123456', seal_number: 'SEAL-S3-1' } });
   check('another partner cannot dispatch it', r.status === 404, r.json);
   const stockBefore = (await q(`SELECT qty_available, qty_reserved FROM partner_inventory WHERE partner_product_id = $1`, [A1]))[0];
-  r = await call('POST', `/partner/shipments/${shipA}/dispatch`, { token: pa, body: { courier_partner: 'Delhivery', awb_number: 'AWB123456' } });
+  r = await call('POST', `/partner/shipments/${shipA}/dispatch`, { token: pa, body: { courier_partner: 'Delhivery', awb_number: 'AWB123456', seal_number: 'SEAL-S3-1' } });
   const stockAfter = (await q(`SELECT qty_available, qty_reserved FROM partner_inventory WHERE partner_product_id = $1`, [A1]))[0];
   check('dispatch consumes reserved stock', r.status === 200 && stockAfter.qty_available === stockBefore.qty_available - 3
     && stockAfter.qty_reserved === stockBefore.qty_reserved - 3, { stockBefore, stockAfter, r: r.json });

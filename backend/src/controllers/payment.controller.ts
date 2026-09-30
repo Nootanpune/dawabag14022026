@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { getRazorpay, validWebhookSignature } from '../services/razorpay.client';
 import { handleRecurringCapture } from '../services/mandate.service';
 import { moveOrderToFulfilment } from '../services/paymentCapture.service';
+import { recordRefund, sendGatewayRefunds, settleGatewayLeg } from '../services/refund.service';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { queueNotification } from '../services/notification.service';
@@ -197,15 +198,14 @@ export async function handleWebhook(req: Request, res: Response, next: NextFunct
       }
     }
 
-    if (event === 'refund.created') {
+    // Refund legs we created are matched by refund id (refund.service); the
+    // payment total is rolled up from the ledger, never overwritten (C-37)
+    if (event === 'refund.processed' || event === 'refund.created') {
       const refundEntity = payload.refund?.entity;
-      if (refundEntity?.payment_id) {
-        await query(
-          `UPDATE payments SET status = 'refunded',
-           refund_amount_paise = $1, refund_id = $2, refunded_at = NOW()
-           WHERE gateway_payment_id = $3`,
-          [refundEntity.amount, refundEntity.id, refundEntity.payment_id]
-        );
+      if (refundEntity?.id && (event === 'refund.processed' || refundEntity.status === 'processed')) {
+        const leg = await queryOne<{ id: string }>(`SELECT id FROM refunds WHERE gateway_refund_id = $1`, [refundEntity.id]);
+        if (leg) await withTransaction((client) => settleGatewayLeg(client, leg.id));
+        else logger.warn(`Refund ${refundEntity.id} is not in the refund ledger (made outside Dawabag?)`);
       }
     }
 
@@ -215,41 +215,29 @@ export async function handleWebhook(req: Request, res: Response, next: NextFunct
   }
 }
 
-// ─── Initiate Refund ──────────────────────────────────────────────────────────
+// ─── Initiate Refund (admin goodwill/other) ───────────────────────────────────
+// Goes through the refund ledger like cancellations and returns.
 export async function initiateRefund(req: Request, res: Response, next: NextFunction) {
   try {
-    const { order_id, reason } = req.body;
-
-    const payment = await queryOne<{
-      gateway_payment_id: string; amount_paise: number; status: string; user_id: string;
-    }>(
-      `SELECT p.gateway_payment_id, p.amount_paise, p.status, o.user_id
-       FROM payments p JOIN orders o ON o.id = p.order_id
-       WHERE o.id = $1 AND p.status = 'captured'`,
-      [order_id]
-    );
-
-    if (!payment) throw new AppError('No captured payment found for this order', 404);
-
-    const refund = await getRazorpay().payments.refund(payment.gateway_payment_id, {
-      amount: payment.amount_paise,
-      speed: 'normal',
-      notes: { reason: reason || 'Customer request' },
+    const { order_id, reason, amount_paise } = req.body;
+    if (typeof order_id !== 'string') throw new AppError('order_id is required', 422);
+    const refund = await withTransaction(async (client) => {
+      const o = (await client.query(
+        `SELECT o.total_paise + o.wallet_used_paise - COALESCE((SELECT SUM(amount_paise) FROM refunds r
+           WHERE r.order_id = o.id AND r.status <> 'failed'), 0) AS left
+         FROM orders o WHERE o.id = $1`, [order_id])).rows[0];
+      if (!o) throw new AppError('Order not found', 404);
+      const amount = amount_paise === undefined ? Number(o.left) : Number(amount_paise);
+      if (!Number.isInteger(amount) || amount <= 0 || amount > Number(o.left)) {
+        throw new AppError(`Refund must be between 1 and ${o.left} paise`, 400);
+      }
+      const r = await recordRefund(client, { orderId: order_id, amountPaise: amount, source: 'admin', userId: req.user!.id });
+      await writeAuditTx(client, { userId: null, action: 'refund_initiated', performedBy: req.user!.id,
+        newValue: { order_id, amount_paise: amount }, notes: reason });
+      return r;
     });
-
-    await query(
-      `UPDATE payments SET status = 'refunded',
-       refund_amount_paise = $1, refund_id = $2, refunded_at = NOW()
-       WHERE gateway_payment_id = $3`,
-      [refund.amount, refund.id, payment.gateway_payment_id]
-    );
-
-    await writeAudit({
-      userId: payment.user_id, action: 'refund_initiated', performedBy: req.user!.id, ip: req.ip,
-      newValue: { order_id, refund_id: refund.id, amount_paise: refund.amount }, notes: reason,
-    });
-
-    res.json({ success: true, message: 'Refund initiated', data: { refund_id: refund.id } });
+    await sendGatewayRefunds(refund.gatewayRefundIds);
+    res.json({ success: true, message: 'Refund recorded', data: { refunds: refund.legs } });
   } catch (error) {
     next(error);
   }

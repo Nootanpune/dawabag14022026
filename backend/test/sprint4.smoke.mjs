@@ -56,7 +56,8 @@ async function main() {
   for (const [k, p] of Object.entries(people)) t[k] = await login(p);
 
   console.log('Price rules (C-16)');
-  const base = { name: 'S4 Test', category: 'Smoke', drug_schedule: 'OTC', gst_rate: 12, hsn_code: '3004' };
+  const base = { name: 'S4 Test', category: 'Smoke', drug_schedule: 'OTC', gst_rate: 12, hsn_code: '3004',
+    net_quantity: '10 tablets', manufacturer_name: 'S4 Pharma Ltd', manufacturer_address: 'Plot 1, MIDC, Nashik 422010' };
   let r = await call('POST', '/products', { token: t.admin, body: { ...base, sku: 'S4-BAD1', mrp_paise: 10000, offer_price_paise: 10500 } });
   check('offer price above MRP refused', r.status === 400, r.json);
   r = await call('POST', '/products', { token: t.admin, body: { ...base, sku: 'S4-BAD2', mrp_paise: 10000, offer_price_paise: 9000, nppa_ceiling_price_paise: 9500 } });
@@ -125,12 +126,12 @@ async function main() {
   console.log('Pack, dispatch, H1 register (C-09)');
   r = await call('GET', '/fulfilment/queue?stage=pack', { token: t.packer });
   check('pack queue shows the shipment with batch', r.json.data?.items?.find((i) => i.shipment_id === s1)?.lines?.some((l) => l.batch_number === 'H1-B1'), r.json);
-  r = await call('POST', `/fulfilment/shipments/${s1}/dispatch`, { token: t.packer, body: { courier_partner: 'Delhivery', awb_number: 'S4AWB1' } });
+  r = await call('POST', `/fulfilment/shipments/${s1}/dispatch`, { token: t.packer, body: { courier_partner: 'Delhivery', awb_number: 'S4AWB1', seal_number: 'SEAL-S4-1' } });
   check('dispatch before packing refused', r.status === 409, r.json);
   r = await call('POST', `/fulfilment/shipments/${s1}/pack`, { token: t.packer });
   check('packer packs the shipment', r.status === 200, r.json);
   const before = (await q(`SELECT quantity_available, quantity_reserved FROM inventory_batches WHERE batch_number = 'H1-B1'`))[0];
-  r = await call('POST', `/fulfilment/shipments/${s1}/dispatch`, { token: t.packer, body: { courier_partner: 'Delhivery', awb_number: 'S4AWB1' } });
+  r = await call('POST', `/fulfilment/shipments/${s1}/dispatch`, { token: t.packer, body: { courier_partner: 'Delhivery', awb_number: 'S4AWB1', seal_number: 'SEAL-S4-1' } });
   const after = (await q(`SELECT quantity_available, quantity_reserved FROM inventory_batches WHERE batch_number = 'H1-B1'`))[0];
   check('dispatch writes one H1 register row', r.status === 200 && r.json.data?.h1_register_rows === 1, r.json);
   check('dispatch deducts the reserved stock', after.quantity_available === before.quantity_available - 2
@@ -143,7 +144,16 @@ async function main() {
   check('H1 register CSV export', r.status === 200 && /csv/.test(r.type) && r.buf.toString().includes('S4 S4-H1'), { status: r.status, type: r.type });
   r = await call('GET', `/fulfilment/h1-register?from=${today}&to=${today}`, { token: t.buyer });
   check('buyer cannot read the H1 register', r.status === 403, r.json);
-  r = await call('POST', `/fulfilment/shipments/${s1}/delivered`, { token: t.admin });
+  // Prescription shipment: handed over only against the buyer's code (C-26)
+  r = await call('POST', `/fulfilment/shipments/${s1}/delivered`, { token: t.admin, body: { code: '000000' } });
+  check('delivery without naming the receiver refused', r.status === 400, r.json);
+  const code = (await call('GET', `/orders/${o1.id}`, { token: t.buyer })).json.data?.shipments?.[0]?.handover_code;
+  const staffView = (await call('GET', `/orders/${o1.id}`, { token: t.admin })).json.data?.shipments?.[0]?.handover_code;
+  check('buyer sees the delivery code; staff do not', /^\d{6}$/.test(code || '') && staffView === null, { code, staffView });
+  const handover = { received_by_name: 'S4 Buyer', received_by_relation: 'self' };
+  r = await call('POST', `/fulfilment/shipments/${s1}/delivered`, { token: t.admin, body: { ...handover, code: code === '000000' ? '111111' : '000000' } });
+  check('wrong delivery code refused', r.status === 400 && /code/i.test(r.json.message), r.json);
+  r = await call('POST', `/fulfilment/shipments/${s1}/delivered`, { token: t.admin, body: { ...handover, code } });
   const o1d = (await q(`SELECT status FROM orders WHERE id = $1`, [o1.id]))[0].status;
   check('delivery completes the order', r.status === 200 && o1d === 'delivered', { r: r.json, o1d });
 

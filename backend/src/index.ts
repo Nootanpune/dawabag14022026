@@ -37,6 +37,8 @@ import grievanceRoutes from './routes/grievance.routes';
 import legalRoutes from './routes/legal.routes';
 import privacyRoutes from './routes/privacy.routes';
 import recallRoutes from './routes/recall.routes';
+import returnRoutes from './routes/return.routes';
+import complianceRoutes from './routes/compliance.routes';
 import eInvoiceRouter from './controllers/einvoice.controller';
 
 import { errorHandler } from './middleware/errorHandler';
@@ -130,6 +132,8 @@ app.use(`${api}/grievances`, grievanceRoutes);
 app.use(`${api}/legal`, legalRoutes);
 app.use(`${api}/privacy`, privacyRoutes);
 app.use(`${api}/recalls`, recallRoutes);
+app.use(`${api}/returns`, returnRoutes);
+app.use(`${api}/compliance`, complianceRoutes);
 app.use(`${api}/einvoice`, eInvoiceRouter);
 
 // ─── Error Handling ─────────────────────────────────────────────────────────

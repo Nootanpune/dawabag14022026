@@ -6,6 +6,7 @@ import { AppError } from '../utils/AppError';
 import { writeAudit, writeAuditTx } from '../utils/audit';
 import { approveListing, postLive, rejectListing, reviewQueue } from '../services/partnerListing.service';
 import { markShipmentDelivered } from '../services/partnerFulfilment.service';
+import { handoverSchema } from './fulfilment.controller';
 import { generateSettlements, getSettlement, listSettlements, markSettlementPaid } from '../services/settlement.service';
 import { listSettings } from '../services/settings.service';
 import { REJECTION_CODES } from '../utils/rejectionCodes';
@@ -98,7 +99,7 @@ export async function postListingLive(req: Request, res: Response, next: NextFun
 
 // ── Shipments ──
 export async function postShipmentDelivered(req: Request, res: Response, next: NextFunction) {
-  try { res.json({ success: true, data: await markShipmentDelivered(uuid.parse(req.params.id), req.user!.id) }); }
+  try { res.json({ success: true, data: await markShipmentDelivered(uuid.parse(req.params.id), req.user!, undefined, handoverSchema.parse(req.body ?? {})) }); }
   catch (err) { next(err); }
 }
 

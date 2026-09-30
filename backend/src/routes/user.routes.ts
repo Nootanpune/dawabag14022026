@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { getAddresses, postAddress, postDefaultAddress, putAddress, removeAddress } from '../controllers/address.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
@@ -90,34 +91,12 @@ router.post('/me/patients', authenticate, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// GET /api/v1/users/me/addresses
-router.get('/me/addresses', authenticate, async (req, res, next) => {
-  try {
-    const addresses = await query(
-      'SELECT * FROM addresses WHERE user_id = $1 AND deleted_at IS NULL ORDER BY is_default DESC',
-      [req.user!.id]
-    );
-    res.json({ success: true, data: addresses });
-  } catch (e) { next(e); }
-});
-
-// POST /api/v1/users/me/addresses
-router.post('/me/addresses', authenticate, async (req, res, next) => {
-  try {
-    const { label, full_name, mobile, address_line1, address_line2, city, state, pincode, is_default } = req.body;
-    if (!address_line1 || !city || !pincode) throw new AppError('Address fields required', 400);
-
-    if (is_default) {
-      await query('UPDATE addresses SET is_default = FALSE WHERE user_id = $1', [req.user!.id]);
-    }
-    const addr = await queryOne(
-      `INSERT INTO addresses (user_id, label, full_name, mobile, address_line1, address_line2, city, state, pincode, is_default)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [req.user!.id, label || 'Home', full_name, mobile, address_line1, address_line2 || null, city, state || 'Maharashtra', pincode, is_default || false]
-    );
-    res.status(201).json({ success: true, data: addr });
-  } catch (e) { next(e); }
-});
+// Addresses — controllers/address.controller.ts
+router.get('/me/addresses', authenticate, getAddresses);
+router.post('/me/addresses', authenticate, postAddress);
+router.put('/me/addresses/:id', authenticate, putAddress);
+router.delete('/me/addresses/:id', authenticate, removeAddress);
+router.post('/me/addresses/:id/default', authenticate, postDefaultAddress);
 
 // GET /api/v1/users/me/wallet
 router.get('/me/wallet', authenticate, async (req, res, next) => {

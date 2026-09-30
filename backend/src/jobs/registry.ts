@@ -4,6 +4,7 @@ import { runCreditRemindersJob } from './creditReminders.job';
 import { runLowStockJob } from './lowStock.job';
 import { runSettlementJob } from './settlement.job';
 import { runRefillOrdersJob, runRefillRemindersJob } from './refill.job';
+import { runLicenceRegisterAlerts } from '../services/licence.service';
 
 export interface JobDefinition {
   name: string;
@@ -54,6 +55,12 @@ export const JOBS: JobDefinition[] = [
     description: 'Remind buyers before a refill (pre-debit notice for mandates)',
     cron: '0 8 * * *',                       // daily 08:00
     run: runRefillRemindersJob,
+  },
+  {
+    name: 'licence_register_alerts',
+    description: "Alert the renewal owner and admins 60, 30 and 7 days before Dawabag's own licences expire (C-07)",
+    cron: '15 9 * * *',                      // daily 09:15
+    run: runLicenceRegisterAlerts,
   },
 ];
 

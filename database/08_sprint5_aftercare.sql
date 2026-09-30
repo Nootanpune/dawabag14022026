@@ -160,12 +160,14 @@ ALTER TABLE products ADD CONSTRAINT products_content_status_check
 -- ── 6. Sealed dispatch and handover ──────────────────────────────────────────
 ALTER TABLE order_shipments
   ADD COLUMN IF NOT EXISTS seal_number          VARCHAR(50),
-  ADD COLUMN IF NOT EXISTS handover_code_hash   VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS handover_code_required BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS handover_attempts    INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS received_by_name     VARCHAR(100),
   ADD COLUMN IF NOT EXISTS received_by_relation VARCHAR(30),
   ADD COLUMN IF NOT EXISTS handover_override    TEXT,
   ADD COLUMN IF NOT EXISTS delivered_by         UUID REFERENCES users(id);
+-- The code is derived (HMAC of shipment + dispatch time), never stored
+ALTER TABLE order_shipments DROP COLUMN IF EXISTS handover_code_hash;
 
 -- ── 7. Side-effect (adverse drug reaction) reports ──────────────────────────
 CREATE SEQUENCE IF NOT EXISTS adr_report_seq;
@@ -215,6 +217,11 @@ CREATE TABLE IF NOT EXISTS business_licences (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (licence_type, licence_number)
 );
+
+-- Practitioner declaration is logged with the other sign-up consents (C-15)
+ALTER TABLE consent_records DROP CONSTRAINT IF EXISTS consent_records_purpose_check;
+ALTER TABLE consent_records ADD CONSTRAINT consent_records_purpose_check
+  CHECK (purpose IN ('privacy_notice', 'age_18_plus', 'marketing', 'practitioner_declaration'));
 
 -- ── Settings ─────────────────────────────────────────────────────────────────
 INSERT INTO app_settings (key, value, description) VALUES

@@ -7,6 +7,7 @@ import { AppError } from '../utils/AppError';
 import { queueNotification } from '../services/notification.service';
 import { logger } from '../config/logger';
 import { cancelOrder } from '../services/cancellation.service';
+import { handoverCode } from '../services/handover.service';
 import { effectiveCustomerType, requiresPrescription } from '../utils/customerType';
 
 const CANCELLABLE = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing'];
@@ -112,9 +113,16 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     // Seller of record per shipment (C-05); partners shown by name
     const shipments = await query<any>(
       `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.invoice_number, s.status,
-              s.total_paise, s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at
+              s.total_paise, s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at,
+              s.seal_number, s.handover_code_required, s.received_by_name, s.received_by_relation
        FROM order_shipments s LEFT JOIN vendors v ON v.id = s.partner_id
        WHERE s.order_id = $1 ORDER BY s.seller_type, v.name`, [id]);
+
+    // Only the buyer sees the delivery code, and only while the pack is on its way (C-26)
+    for (const s of shipments) {
+      s.handover_code = s.handover_code_required && s.status === 'dispatched' && orderResult.user_id === userId
+        ? handoverCode(s.id, s.dispatched_at) : null;
+    }
 
     const [creditNotes, refunds, returns] = await Promise.all([
       query(`SELECT id, credit_note_number, shipment_id, reason, total_paise, created_at FROM credit_notes WHERE order_id = $1 ORDER BY created_at`, [id]),

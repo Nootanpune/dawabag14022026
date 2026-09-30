@@ -84,6 +84,10 @@ const registerSchema = z.discriminatedUnion('customer_type', [
     gst_unregistered_declaration: z.literal(true, {
       errorMap: () => ({ message: 'Confirm you are not registered under GST' }),
     }),
+    // C-15: medicines only for dispensing to own patients; never Schedule X/NDPS; never for resale
+    practitioner_declaration: z.literal(true, {
+      errorMap: () => ({ message: 'Confirm you will buy only to treat your own patients, not for resale' }),
+    }),
   }),
 ]).superRefine((d, ctx) => {
   // Decision A: a retailer may be unregistered, but must say so explicitly
@@ -172,6 +176,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
         ['privacy_notice', true],
         ['age_18_plus', true],
         ['marketing', data.marketing_consent],
+        ...(data.customer_type === 'doc_hospital' ? [['practitioner_declaration', true] as const] : []),
       ] as const) {
         await client.query(
           `INSERT INTO consent_records (user_id, purpose, granted, policy_version, ip_address, user_agent)

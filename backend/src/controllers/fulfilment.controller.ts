@@ -9,6 +9,20 @@ import { markShipmentDelivered } from '../services/partnerFulfilment.service';
 import { applyPrescriptionToOrder, rejectPrescription, verifyPrescription } from '../services/rxVerification.service';
 
 const uuid = z.string().uuid();
+
+// Sealed, tamper-evident pack (C-26)
+export const dispatchSchema = z.object({
+  courier_partner: z.string().trim().min(2).max(50),
+  awb_number: z.string().trim().min(3).max(100),
+  seal_number: z.string().trim().min(3).max(50),
+});
+// Handover to the patient or an adult at the address (C-26)
+export const handoverSchema = z.object({
+  code: z.string().regex(/^\d{6}$/).optional(),
+  received_by_name: z.string().trim().min(2).max(100).optional(),
+  received_by_relation: z.enum(['self', 'family_adult', 'other_adult']).optional(),
+  override_reason: z.string().trim().min(10).max(500).optional(),
+});
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 // Which roles may see which stage
@@ -63,15 +77,15 @@ export async function postPack(req: Request, res: Response, next: NextFunction) 
 
 export async function postDispatch(req: Request, res: Response, next: NextFunction) {
   try {
-    const { courier_partner, awb_number } = z.object({
-      courier_partner: z.string().trim().min(2).max(50), awb_number: z.string().trim().min(3).max(100),
-    }).parse(req.body);
-    res.json({ success: true, data: await dispatchOwnShipment(uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id) });
+    const { courier_partner, awb_number, seal_number } = dispatchSchema.parse(req.body);
+    res.json({ success: true, data: await dispatchOwnShipment(uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, seal_number) });
   } catch (err) { next(err); }
 }
 
 export async function postDelivered(req: Request, res: Response, next: NextFunction) {
-  try { res.json({ success: true, data: await markShipmentDelivered(uuid.parse(req.params.id), req.user!.id) }); } catch (err) { next(err); }
+  try {
+    res.json({ success: true, data: await markShipmentDelivered(uuid.parse(req.params.id), req.user!, undefined, handoverSchema.parse(req.body ?? {})) });
+  } catch (err) { next(err); }
 }
 
 // GET /fulfilment/h1-register?from=&to=&format=csv — inspector export (C-09).
