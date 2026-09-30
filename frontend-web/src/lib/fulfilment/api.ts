@@ -1,0 +1,91 @@
+// Staff fulfilment API — Rx verification (C-03, C-08), pack / dispatch / deliver,
+// H1 register (C-09). The server enforces roles and every gate.
+import api from '../api';
+import { downloadFromApi } from '../download';
+import type { H1Entry, QueueShipment, QueueStage, RxQueueItem, StaffOrder, VerifyRxInput } from './types';
+
+export const fulfilmentKeys = {
+  all: ['fulfilment'] as const,
+  queue: (stage: QueueStage) => ['fulfilment', 'queue', stage] as const,
+  order: (id: string) => ['fulfilment', 'order', id] as const,
+  rxUrl: (id: string) => ['fulfilment', 'rx-url', id] as const,
+  h1: (from: string, to: string) => ['fulfilment', 'h1', from, to] as const,
+};
+
+export async function fetchRxQueue(): Promise<RxQueueItem[]> {
+  const { data } = await api.get('/fulfilment/queue', { params: { stage: 'rx' } });
+  return data.data?.items ?? [];
+}
+
+export async function fetchShipmentQueue(stage: Exclude<QueueStage, 'rx'>): Promise<QueueShipment[]> {
+  const { data } = await api.get('/fulfilment/queue', { params: { stage } });
+  return data.data?.items ?? [];
+}
+
+export async function fetchStaffOrder(orderId: string): Promise<StaffOrder> {
+  const { data } = await api.get(`/orders/${orderId}`);
+  return data.data;
+}
+
+/** Signed, short-lived view URL. Each call is audited on the server (C-41). */
+export async function fetchPrescriptionUrl(prescriptionId: string): Promise<string> {
+  const { data } = await api.get(`/prescriptions/${prescriptionId}/url`);
+  return data.data.url;
+}
+
+export async function verifyPrescription(prescriptionId: string, body: VerifyRxInput) {
+  const { data } = await api.post(`/fulfilment/prescriptions/${prescriptionId}/verify`, body);
+  return data.data as { prescription_id: string; order_id: string; lines_covered: number; valid_until: string };
+}
+
+export async function rejectPrescription(prescriptionId: string, reason: string) {
+  const { data } = await api.post(`/fulfilment/prescriptions/${prescriptionId}/reject`, { reason });
+  return data.data;
+}
+
+export async function applyPrescription(prescriptionId: string, orderId: string) {
+  const { data } = await api.post(`/fulfilment/prescriptions/${prescriptionId}/apply`, { order_id: orderId });
+  return data.data as { lines_covered: number };
+}
+
+export async function packShipment(shipmentId: string) {
+  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/pack`);
+  return data.data;
+}
+
+export async function dispatchOwnShipment(shipmentId: string, body: { courier_partner: string; awb_number: string }) {
+  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/dispatch`, body);
+  return data.data as { h1_register_rows?: number };
+}
+
+export async function markDelivered(shipmentId: string) {
+  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/delivered`);
+  return data.data;
+}
+
+export async function fetchH1Register(from: string, to: string): Promise<H1Entry[]> {
+  const { data } = await api.get('/fulfilment/h1-register', { params: { from, to } });
+  return data.data?.entries ?? [];
+}
+
+export function downloadH1Csv(from: string, to: string) {
+  return downloadFromApi('/fulfilment/h1-register', `h1-register-${from}-to-${to}.csv`, { from, to, format: 'csv' });
+}
+
+export async function setPharmacistRegNo(userId: string, pharmacistRegNo: string) {
+  const { data } = await api.patch(`/admin/users/${userId}/pharmacist`, { pharmacist_reg_no: pharmacistRegNo });
+  return data.data;
+}
+
+export interface StaffUser {
+  id: string;
+  full_name: string | null;
+  mobile: string;
+  role: string;
+}
+
+/** GET /admin/users?role= (admin) — used to pick a pharmacist login */
+export async function fetchUsersByRole(role: string): Promise<StaffUser[]> {
+  const { data } = await api.get('/admin/users', { params: { role } });
+  return Array.isArray(data.data) ? data.data : data.data?.users ?? [];
+}

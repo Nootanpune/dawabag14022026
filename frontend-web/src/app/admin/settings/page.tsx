@@ -8,6 +8,9 @@ import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import SettingValue from '@/components/admin/settings/SettingValue';
 import SettingEditor from '@/components/admin/settings/SettingEditor';
+import LegalSettingsSection from '@/components/admin/legal/LegalSettingsSection';
+import PharmacistRegistrationSection from '@/components/admin/legal/PharmacistRegistrationSection';
+import { isLegalKey } from '@/lib/admin/legalSettings';
 
 export default function AdminSettingsPage() {
   const isSuperAdmin = useAuthStore((s) => s.user?.role === 'super_admin');
@@ -17,6 +20,8 @@ export default function AdminSettingsPage() {
     queryFn: fetchSettings,
   });
   const meta = editing ? SETTING_KINDS[editing.key] : undefined;
+  // legal.* objects get their own forms below
+  const rules = data?.filter((s) => !isLegalKey(s.key));
 
   return (
     <div>
@@ -27,9 +32,9 @@ export default function AdminSettingsPage() {
         refreshing={isFetching}
       />
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText="No settings" />
-      {!!data?.length && (
+      {!!rules?.length && (
         <div className="card p-0 divide-y divide-gray-100">
-          {data.map((s) => {
+          {rules.map((s) => {
             const m = SETTING_KINDS[s.key];
             return (
               <div key={s.key} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -56,6 +61,8 @@ export default function AdminSettingsPage() {
           })}
         </div>
       )}
+      {!!data?.length && <LegalSettingsSection settings={data} canEdit={isSuperAdmin} />}
+      <PharmacistRegistrationSection />
       {editing && meta && (
         <SettingEditor setting={editing} kind={meta.kind} label={meta.label} unit={meta.unit} onClose={() => setEditing(null)} />
       )}

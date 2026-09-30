@@ -2,6 +2,7 @@
 import { Trash2, Plus, Minus, AlertTriangle, Snowflake } from 'lucide-react';
 import { formatPrice, cn } from '@/lib/utils';
 import type { CartLine } from '@/lib/cart';
+import { scheduleBadge } from '@/lib/drugSchedule';
 
 interface Props {
   line: CartLine;
@@ -23,7 +24,9 @@ export default function CartLineItem({ line, disabled, onQuantityChange }: Props
         <h3 className="font-medium text-sm line-clamp-2">{line.name}</h3>
         <p className="text-xs text-gray-400 mt-0.5">{line.sku}</p>
         <div className="flex flex-wrap items-center gap-2 mt-1">
-          <span className={isRx ? 'badge-schedule-h' : 'badge-otc'}>{line.drug_schedule}</span>
+          {scheduleBadge(line.drug_schedule) && (
+            <span className={isRx ? 'badge-schedule-h' : 'badge-otc'}>{scheduleBadge(line.drug_schedule)}</span>
+          )}
           {line.cold_chain && (
             <span className="badge-cold flex items-center gap-0.5">
               <Snowflake className="w-3 h-3" /> Cold chain

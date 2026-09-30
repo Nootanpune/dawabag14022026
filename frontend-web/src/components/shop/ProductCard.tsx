@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { ShoppingCart, Snowflake, Loader2 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
+import { scheduleBadge } from '@/lib/drugSchedule';
 
 interface Product {
   id: string; name: string; generic_name?: string; sku: string;
@@ -20,7 +21,6 @@ interface Props {
 }
 
 const scheduleColors: Record<string, string> = {
-  'OTC': 'badge-otc',
   'Schedule H': 'badge-schedule-h',
   'Schedule H1': 'badge-schedule-h',
   'Schedule G': 'text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium',
@@ -51,9 +51,12 @@ export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
 
         {/* Badges */}
         <div className="flex flex-wrap gap-1 mb-3">
-          <span className={scheduleColors[product.drug_schedule] || 'badge-otc'}>
-            {product.drug_schedule}
-          </span>
+          {/* Schedule badge only for scheduled drugs — none for OTC */}
+          {scheduleBadge(product.drug_schedule) && (
+            <span className={scheduleColors[product.drug_schedule] || 'badge-schedule-h'}>
+              {scheduleBadge(product.drug_schedule)}
+            </span>
+          )}
           {product.cold_chain && (
             <span className="badge-cold flex items-center gap-0.5">
               <Snowflake className="w-3 h-3" /> Cold chain

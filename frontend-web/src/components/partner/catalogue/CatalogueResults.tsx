@@ -1,6 +1,7 @@
 'use client';
 import type { CatalogueProduct } from '@/lib/partner/types';
 import { formatPrice } from '@/lib/utils';
+import { scheduleBadge } from '@/lib/drugSchedule';
 
 export default function CatalogueResults({
   products,
@@ -31,7 +32,7 @@ export default function CatalogueResults({
                   {p.cold_chain && <span className="badge-cold ml-2">Cold chain</span>}
                 </p>
               </td>
-              <td className="px-4 py-2.5 text-xs">{p.drug_schedule ?? 'OTC'}</td>
+              <td className="px-4 py-2.5 text-xs">{scheduleBadge(p.drug_schedule) ?? '—'}</td>
               <td className="px-4 py-2.5 text-right">{formatPrice(p.mrp_paise)}</td>
               <td className="px-4 py-2.5 text-right">
                 {p.offer_price_paise != null ? formatPrice(p.offer_price_paise) : '—'}

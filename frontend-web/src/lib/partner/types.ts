@@ -113,4 +113,5 @@ export interface PartnerShipment {
 }
 
 /** Drug schedule helpers — the server enforces the same rules. */
-export const isScheduleH1 = (s: string | null | undefined) => (s ?? '').toUpperCase() === 'H1';
+// DB values are 'Schedule H1' etc.; the old check compared against 'H1' and never matched.
+export { isScheduleH1 } from '../drugSchedule';

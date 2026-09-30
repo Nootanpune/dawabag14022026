@@ -3,6 +3,7 @@ import type { PartnerListing } from '@/lib/partner/types';
 import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { scheduleBadge } from '@/lib/drugSchedule';
 
 export default function ListingsTable({
   listings,
@@ -31,7 +32,7 @@ export default function ListingsTable({
                 <p className="font-medium">{l.medicine_name}</p>
                 <p className="text-xs text-gray-400">
                   {l.partner_sku ? `SKU ${l.partner_sku} · ` : ''}MRP {formatPrice(l.mrp_paise)}
-                  {l.drug_schedule ? ` · Sch ${l.drug_schedule}` : ''}
+                  {scheduleBadge(l.drug_schedule) ? ` · ${scheduleBadge(l.drug_schedule)}` : ''}
                   {l.cold_chain && <span className="badge-cold ml-2">Cold chain</span>}
                 </p>
                 <p className="text-xs text-gray-400">Submitted {formatDateIST(l.submission_date)}</p>

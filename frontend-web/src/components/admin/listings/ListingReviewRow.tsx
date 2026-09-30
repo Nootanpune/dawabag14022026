@@ -3,6 +3,7 @@ import type { ListingForReview } from '@/lib/admin/listings';
 import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '../StatusBadge';
+import { scheduleBadge } from '@/lib/drugSchedule';
 
 interface Props {
   l: ListingForReview;
@@ -22,7 +23,7 @@ export default function ListingReviewRow({ l, canPostLive, busy, onApprove, onRe
         <p className="font-medium">{l.medicine_name}</p>
         <p className="text-xs text-gray-400">
           MRP {formatPrice(l.mrp_paise)}
-          {l.drug_schedule ? ` · Sch ${l.drug_schedule}` : ''}
+          {scheduleBadge(l.drug_schedule) ? ` · ${scheduleBadge(l.drug_schedule)}` : ''}
           {l.partner_sku ? ` · SKU ${l.partner_sku}` : ''}
           {l.cold_chain && <span className="badge-cold ml-2">Cold chain</span>}
         </p>

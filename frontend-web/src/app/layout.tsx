@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { Toaster } from 'sonner';
+import SiteFooter from '@/components/legal/SiteFooter';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -23,6 +24,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.variable} font-sans antialiased bg-gray-50`}>
         <Providers>
           {children}
+          {/* Licences + grievance officer on every page, from the server (C-04, C-36) */}
+          <SiteFooter />
           <Toaster position="top-right" richColors />
         </Providers>
       </body>

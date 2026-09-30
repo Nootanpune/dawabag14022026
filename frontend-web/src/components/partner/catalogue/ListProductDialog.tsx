@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { createListing, partnerKeys } from '@/lib/partner/api';
+import { scheduleBadge } from '@/lib/drugSchedule';
 import { isScheduleH1, type CatalogueProduct, type NewListing } from '@/lib/partner/types';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '@/components/admin/Modal';
@@ -51,7 +52,7 @@ export default function ListProductDialog({ product, onClose }: { product: Catal
       <p className="font-medium">{product.name}</p>
       <p className="text-xs text-gray-500 mb-3">
         {product.generic_name ?? ''} · {product.sku}
-        {product.drug_schedule ? ` · Schedule ${product.drug_schedule}` : ''}
+        {scheduleBadge(product.drug_schedule) ? ` · ${scheduleBadge(product.drug_schedule)}` : ''}
         {product.cold_chain ? ' · Cold chain' : ''}
       </p>
       <CataloguePrices product={product} />
