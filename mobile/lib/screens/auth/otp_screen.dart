@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
-import '../../config/theme.dart';
+import '../../services/api_service.dart';
+import '../../widgets/otp_input.dart';
 
+/// Stand-alone OTP screen (used from login when the mobile is not yet
+/// verified). The registration flow embeds its own OTP step.
 class OTPScreen extends ConsumerStatefulWidget {
   final String mobile;
   const OTPScreen({super.key, required this.mobile});
@@ -13,40 +18,79 @@ class OTPScreen extends ConsumerStatefulWidget {
 }
 
 class _OTPScreenState extends ConsumerState<OTPScreen> {
-  final List<TextEditingController> _ctrls = List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _nodes = List.generate(6, (_) => FocusNode());
+  final _otpKey = GlobalKey<OtpInputState>();
+  String _otp = '';
   bool _isLoading = false;
+  bool _isResending = false;
+  int _resendIn = 30;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startResendTimer();
+  }
 
   @override
   void dispose() {
-    for (final c in _ctrls) c.dispose();
-    for (final n in _nodes) n.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
-  String get _otp => _ctrls.map((c) => c.text).join();
+  void _startResendTimer() {
+    _timer?.cancel();
+    _resendIn = 30; // callers rebuild (initState / setState in _resend)
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      if (_resendIn <= 1) {
+        t.cancel();
+        setState(() => _resendIn = 0);
+      } else {
+        setState(() => _resendIn--);
+      }
+    });
+  }
 
-  void _onChanged(int index, String val) {
-    if (val.length == 1 && index < 5) {
-      _nodes[index + 1].requestFocus();
-    } else if (val.isEmpty && index > 0) {
-      _nodes[index - 1].requestFocus();
+  Future<void> _resend() async {
+    setState(() => _isResending = true);
+    try {
+      await apiService.sendOtp(widget.mobile);
+      if (!mounted) return;
+      _startResendTimer();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('OTP sent to +91 ${widget.mobile}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ApiService.errorMessage(e, fallback: 'Could not resend OTP')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isResending = false);
     }
-    if (_otp.length == 6) _verify();
   }
 
   Future<void> _verify() async {
-    if (_otp.length != 6) return;
+    if (_otp.length != 6 || _isLoading) return;
     setState(() => _isLoading = true);
     final success = await ref.read(authProvider.notifier).verifyOTP(widget.mobile, _otp);
     if (!mounted) return;
     if (success) {
       context.go('/');
     } else {
-      for (final c in _ctrls) c.clear();
-      _nodes[0].requestFocus();
+      _otpKey.currentState?.clear();
+      final error = ref.read(authProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid OTP. Try again.'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(error ?? 'Invalid OTP. Try again.'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
     if (mounted) setState(() => _isLoading = false);
@@ -69,34 +113,21 @@ class _OTPScreenState extends ConsumerState<OTPScreen> {
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             const SizedBox(height: 36),
 
-            // OTP boxes
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(6, (i) => SizedBox(
-                width: 46,
-                height: 56,
-                child: TextFormField(
-                  controller: _ctrls[i],
-                  focusNode: _nodes[i],
-                  keyboardType: TextInputType.number,
-                  maxLength: 1,
-                  autofocus: i == 0,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    contentPadding: EdgeInsets.zero,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppTheme.brandGreen, width: 2),
-                    ),
-                  ),
-                  onChanged: (v) => _onChanged(i, v),
-                ),
-              )),
+            OtpInput(
+              key: _otpKey,
+              enabled: !_isLoading,
+              onChanged: (v) => setState(() => _otp = v),
+              onCompleted: (_) => _verify(),
             ),
-            const SizedBox(height: 36),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: (_resendIn > 0 || _isResending) ? null : _resend,
+                child: Text(_resendIn > 0 ? 'Resend OTP in ${_resendIn}s' : 'Resend OTP'),
+              ),
+            ),
+            const SizedBox(height: 20),
 
             ElevatedButton(
               onPressed: (_isLoading || _otp.length < 6) ? null : _verify,

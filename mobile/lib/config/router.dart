@@ -20,12 +20,21 @@ import '../screens/admin/admin_screen.dart';
 import '../widgets/main_scaffold.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  // Re-run redirects when the signed-in state flips, instead of rebuilding
+  // the whole GoRouter on every AuthState change (which reset navigation to
+  // '/' whenever isLoading toggled, e.g. in the middle of registration).
+  final authRefresh = ValueNotifier<int>(0);
+  ref.listen<AuthState>(authProvider, (previous, next) {
+    if (previous?.isAuthenticated != next.isAuthenticated) {
+      authRefresh.value++;
+    }
+  });
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: '/',
+    refreshListenable: authRefresh,
     redirect: (context, state) {
-      final isLoggedIn = authState.isAuthenticated;
+      final isLoggedIn = ref.read(authProvider).isAuthenticated;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
 
       // Protected routes
@@ -73,4 +82,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       body: Center(child: Text('Page not found: ${state.matchedLocation}')),
     ),
   );
+
+  ref.onDispose(() {
+    router.dispose();
+    authRefresh.dispose();
+  });
+  return router;
 });

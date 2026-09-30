@@ -27,6 +27,12 @@ class AuthState {
         user: user ?? this.user,
         error: error,
       );
+
+  /// 'customer' | 'b2b_retailer' | 'b2b_wholesaler' | 'doc_hospital'
+  String? get customerType => user?['customer_type'] as String?;
+
+  /// not_required | pending_otp | pending_kyc | approved | rejected | ...
+  String? get kycStatus => user?['kyc_status'] as String?;
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
@@ -62,15 +68,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'mobile': mobile,
         'password': password,
       });
-      final data = res.data['data'];
-      await apiService.saveTokens(data['access_token'], data['refresh_token']);
+      final data = ApiService.dataOf(res);
+      await apiService.saveTokens(
+        data['access_token'] as String,
+        data['refresh_token'] as String,
+      );
       state = state.copyWith(
         isAuthenticated: true,
         isLoading: false,
-        user: {'id': data['user_id'], 'role': data['role'], 'full_name': data['full_name']},
+        user: userFromAuthData(data),
       );
       return true;
-    } on Exception catch (e) {
+    } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
       return false;
     }
@@ -79,23 +88,42 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> verifyOTP(String mobile, String otp) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final res = await apiService.dio.post('/auth/verify-otp', data: {
-        'mobile': mobile,
-        'otp': otp,
-      });
-      final data = res.data['data'];
-      await apiService.saveTokens(data['access_token'], data['refresh_token']);
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        user: {'id': data['user_id'], 'role': data['role']},
-      );
+      final data = await verifyOTPAndSaveTokens(mobile, otp);
+      completeSignIn(data);
       return true;
-    } on Exception catch (e) {
+    } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
       return false;
     }
   }
+
+  /// Verifies the OTP and stores the tokens, but does NOT publish the session
+  /// to [state] yet. Used by the registration flow so the router does not
+  /// redirect away from the auth screens while KYC documents are uploaded.
+  /// Call [completeSignIn] with the returned map when done.
+  /// Throws (DioException) on failure; use [ApiService.errorMessage].
+  Future<Map<String, dynamic>> verifyOTPAndSaveTokens(String mobile, String otp) {
+    return apiService.verifyOtp(mobile, otp);
+  }
+
+  /// Publishes a signed-in session from a verify-otp / login response map.
+  void completeSignIn(Map<String, dynamic> authData) {
+    state = state.copyWith(
+      isAuthenticated: true,
+      isLoading: false,
+      user: userFromAuthData(authData),
+      error: null,
+    );
+  }
+
+  /// Builds the stored user map from a login / verify-otp response `data`.
+  static Map<String, dynamic> userFromAuthData(Map<String, dynamic> data) => {
+        'id': data['user_id'],
+        'role': data['role'],
+        'full_name': data['full_name'],
+        'customer_type': data['customer_type'],
+        'kyc_status': data['kyc_status'],
+      };
 
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
@@ -106,17 +134,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> fetchMe() async {
     try {
       final res = await apiService.dio.get('/users/me');
-      state = state.copyWith(user: res.data['data'] as Map<String, dynamic>);
+      final me = res.data['data'] as Map<String, dynamic>;
+      // Keep customer_type / kyc_status from login if /users/me omits them.
+      state = state.copyWith(user: {...?state.user, ...me});
     } catch (_) {}
   }
 
-  String _extractError(dynamic e) {
-    try {
-      return (e as dynamic).response?.data?['error'] ?? 'An error occurred';
-    } catch (_) {
-      return 'An error occurred';
-    }
-  }
+  String _extractError(Object e) =>
+      ApiService.errorMessage(e, fallback: 'An error occurred');
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
