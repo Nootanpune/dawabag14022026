@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:dio/dio.dart';
 
 import '../../services/api_service.dart';
+import '../../providers/address_provider.dart';
+import '../../providers/cart_actions.dart';
 import '../../providers/cart_provider.dart';
 import '../../config/theme.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/pincode_banner.dart';
+import '../../widgets/category_chip.dart';
 
-final productsProvider = FutureProvider.family<Map<String, dynamic>, Map<String, String>>(
-  (ref, params) async {
+/// Keyed by a query string: Map keys would compare by identity and create a
+/// new provider (and request) on every build.
+final productsProvider = FutureProvider.family<Map<String, dynamic>, String>(
+  (ref, query) async {
+    final params = Uri.splitQueryString(query);
     final queryParams = {
       if (params['q']?.isNotEmpty == true) 'q': params['q']!,
       if (params['category']?.isNotEmpty == true) 'category': params['category']!,
@@ -38,6 +43,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   String _category = '';
+  /// Typed per visit, memory only. Signed-in users default to the pincode
+  /// of their default address (server data).
   String _pincode = '';
 
   @override
@@ -56,15 +63,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  Map<String, String> get _queryParams => {
-    'q': _query,
-    'category': _category,
-    'pincode': _pincode,
-  };
+  String _queryKey(String pincode) => Uri(queryParameters: {
+        'q': _query,
+        'category': _category,
+        'pincode': pincode,
+      }).query;
 
   @override
   Widget build(BuildContext context) {
-    final products = ref.watch(productsProvider(_queryParams));
+    final pincode = _pincode.isNotEmpty ? _pincode : (ref.watch(defaultPincodeProvider) ?? '');
+    final queryKey = _queryKey(pincode);
+    final products = ref.watch(productsProvider(queryKey));
     final categories = ref.watch(categoriesProvider);
     final cartCount = ref.watch(cartProvider).itemCount;
 
@@ -110,7 +119,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       body: RefreshIndicator(
         color: AppTheme.brandGreen,
-        onRefresh: () async => ref.invalidate(productsProvider(_queryParams)),
+        onRefresh: () async => ref.invalidate(productsProvider(queryKey)),
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
@@ -120,7 +129,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     // Pin code banner
                     PinCodeBanner(
-                      pincode: _pincode,
+                      key: ValueKey('pin_$pincode'),
+                      pincode: pincode,
                       onPincodeChanged: (p) => setState(() => _pincode = p),
                     ),
                     const SizedBox(height: 12),
@@ -154,8 +164,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     children: [
-                      _CategoryChip(label: 'All', selected: _category.isEmpty, onTap: () => setState(() => _category = '')),
-                      ...cats.map((c) => _CategoryChip(
+                      CategoryChip(label: 'All', selected: _category.isEmpty, onTap: () => setState(() => _category = '')),
+                      ...cats.map((c) => CategoryChip(
                         label: c['category'],
                         selected: _category == c['category'],
                         onTap: () => setState(() => _category = c['category']),
@@ -196,7 +206,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, i) => ProductCard(
                         product: productList[i] as Map<String, dynamic>,
-                        onAddToCart: (product) => _addToCart(context, ref, product),
+                        onAddToCart: (product) => addProductToCart(context, ref, product),
                         onTap: () => context.push('/shop/${productList[i]['id']}'),
                       ),
                       childCount: productList.length,
@@ -233,74 +243,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _addToCart(BuildContext context, WidgetRef ref, Map<String, dynamic> product) {
-    final schedule = product['drug_schedule'] as String? ?? 'OTC';
-    if (['NDPS', 'Schedule X'].contains(schedule)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This medicine cannot be ordered online'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-    if (!(product['in_stock'] as bool? ?? false)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Out of stock')),
-      );
-      return;
-    }
-    ref.read(cartProvider.notifier).addItem(CartItem(
-      productId: product['id'],
-      name: product['name'],
-      sku: product['sku'],
-      quantity: 1,
-      unitPricePaise: product['offer_price_paise'],
-      mrpPaise: product['mrp_paise'],
-      drugSchedule: schedule,
-      maxQty: product['max_qty_per_order'] ?? 3,
-      coldChain: product['cold_chain'] ?? false,
-    ));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${product['name']} added to cart'),
-        backgroundColor: AppTheme.brandGreen,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _CategoryChip({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppTheme.brandGreen : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppTheme.brandGreen : Colors.grey.shade300,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.grey.shade700,
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-          ),
         ),
       ),
     );

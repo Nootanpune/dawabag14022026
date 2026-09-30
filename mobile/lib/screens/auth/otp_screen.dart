@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/registration_api.dart';
 import '../../widgets/otp_input.dart';
 
 /// Stand-alone OTP screen (used from login when the mobile is not yet

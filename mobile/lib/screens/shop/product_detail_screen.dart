@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart';
-import '../../providers/cart_provider.dart';
+import '../../providers/cart_actions.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
 
@@ -121,17 +121,9 @@ class ProductDetailScreen extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: ElevatedButton.icon(
-                onPressed: cannotOrder || !inStock ? null : () {
-                  ref.read(cartProvider.notifier).addItem(CartItem(
-                    productId: product['id'], name: product['name'], sku: product['sku'],
-                    quantity: 1, unitPricePaise: product['offer_price_paise'],
-                    mrpPaise: product['mrp_paise'], drugSchedule: product['drug_schedule'],
-                    maxQty: product['max_qty_per_order'] ?? 3, coldChain: product['cold_chain'] ?? false,
-                  ));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: const Text('Added to cart'), backgroundColor: AppTheme.brandGreen, duration: const Duration(seconds: 2)),
-                  );
-                  context.push('/cart');
+                onPressed: cannotOrder || !inStock ? null : () async {
+                  final added = await addProductToCart(context, ref, product);
+                  if (added && context.mounted) context.push('/cart');
                 },
                 icon: const Icon(Icons.shopping_cart),
                 label: Text(cannotOrder ? 'Not available online' : !inStock ? 'Out of stock' : 'Add to cart'),
