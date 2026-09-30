@@ -1,20 +1,33 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Loader2, Package, IndianRupee, ClipboardCheck, AlertTriangle, Users, RefreshCw } from 'lucide-react';
+import { useEffect } from 'react';
+import { Loader2, Package, IndianRupee, ClipboardCheck, AlertTriangle, Users } from 'lucide-react';
+import PageHeader from '@/components/admin/PageHeader';
+import { useAuthStore } from '@/store/authStore';
+import { hasRole, MANAGER_ROLES } from '@/lib/admin/roles';
 import api from '@/lib/api';
 import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils';
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const role = useAuthStore((s) => s.user?.role);
+  const isManager = hasRole(role, MANAGER_ROLES);
+
+  // KYC reviewers (pharmacist_rx) have no dashboard — send them to their queue.
+  useEffect(() => {
+    if (!isManager) router.replace('/admin/kyc');
+  }, [isManager, router]);
 
   const { data: stats, isLoading, refetch } = useQuery({
+    enabled: isManager,
     queryKey: ['admin-stats'],
     queryFn: async () => { const { data } = await api.get('/admin/stats'); return data.data; },
     refetchInterval: 60000,
   });
 
   const { data: queueData } = useQuery({
+    enabled: isManager,
     queryKey: ['order-queue'],
     queryFn: async () => { const { data } = await api.get('/orders/queue?limit=10'); return data.data; },
     refetchInterval: 30000,
@@ -38,23 +51,12 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">D</span>
-          </div>
-          <span className="text-xl font-bold text-brand-600">dawabag</span>
-          <span className="text-sm text-gray-400 hidden md:block">/ Admin</span>
-        </div>
-        <button onClick={() => refetch()} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
-          <RefreshCw className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <h1 className="text-xl font-semibold mb-6">Overview — {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
-
+    <div>
+      <PageHeader
+        title={`Overview — ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`}
+        onRefresh={() => refetch()}
+      />
+      <div>
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-gray-300" /></div>
         ) : (

@@ -7,6 +7,8 @@ interface Product {
   id: string; name: string; generic_name?: string; sku: string;
   marketed_by?: string; drug_schedule: string; mrp_paise: number;
   offer_price_paise: number; discount_pct: number; in_stock: boolean;
+  /** buyer-specific price from the server (offer / PTR / PTS / institutional) */
+  display_price_paise: number;
   cold_chain: boolean; s3_image_key?: string; max_qty_per_order: number;
 }
 
@@ -64,20 +66,18 @@ export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
           )}
         </div>
 
-        {/* Price */}
+        {/* Price — always the server's buyer-specific display price */}
         <div className="flex items-center gap-2 mb-3">
           <span className="text-base font-semibold text-brand-600">
-            {formatPrice(product.offer_price_paise)}
+            {formatPrice(product.display_price_paise)}
           </span>
-          {product.discount_pct > 0 && (
-            <>
-              <span className="text-xs text-gray-400 line-through">
-                {formatPrice(product.mrp_paise)}
-              </span>
-              <span className="text-xs font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
-                {product.discount_pct}% off
-              </span>
-            </>
+          {product.mrp_paise > product.display_price_paise && (
+            <span className="text-xs text-gray-400 line-through">{formatPrice(product.mrp_paise)}</span>
+          )}
+          {product.discount_pct > 0 && product.display_price_paise === product.offer_price_paise && (
+            <span className="text-xs font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+              {product.discount_pct}% off
+            </span>
           )}
         </div>
       </div>
