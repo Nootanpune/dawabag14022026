@@ -5,6 +5,8 @@ import { Loader2, ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils';
 import Header from '@/components/layout/Header';
+import SoldBySection from '@/components/orders/SoldBySection';
+import RefillSetupButton from '@/components/orders/RefillSetupButton';
 
 const TIMELINE_STEPS = [
   { status: 'pending_payment', label: 'Order placed' },
@@ -54,7 +56,10 @@ export default function OrderDetailPage() {
           </button>
           <div className="flex-1">
             <h1 className="text-lg font-semibold">{order?.order_number}</h1>
-            <p className="text-xs text-gray-400">{formatDate(order?.created_at)}</p>
+            <p className="text-xs text-gray-400">
+              {formatDate(order?.created_at)}
+              {order?.invoice_number ? ` · Invoice ${order.invoice_number}` : ''}
+            </p>
           </div>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusInfo.color}`}>
             {statusInfo.label}
@@ -135,6 +140,11 @@ export default function OrderDetailPage() {
             ))}
           </div>
         </div>
+
+        {/* Seller of record per shipment — only when the API returns shipments */}
+        <SoldBySection shipments={order?.shipments} />
+
+        {order?.status === 'delivered' && <RefillSetupButton orderId={order.id} />}
 
         {/* Bill */}
         <div className="card mb-4">

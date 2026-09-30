@@ -9,6 +9,7 @@ import QueryState from '@/components/admin/QueryState';
 import ReasonDialog from '@/components/admin/ReasonDialog';
 import PendingVendorsTable from '@/components/admin/vendors/PendingVendorsTable';
 import ApproveVendorDialog from '@/components/admin/vendors/ApproveVendorDialog';
+import PartnersSection from '@/components/admin/vendors/PartnersSection';
 
 export default function VendorsPage() {
   const queryClient = useQueryClient();
@@ -39,6 +40,8 @@ export default function VendorsPage() {
       />
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText="No vendors awaiting approval" />
       {!!data?.length && <PendingVendorsTable vendors={data} onApprove={setApproving} onReject={setRejecting} />}
+
+      <PartnersSection />
 
       {approving && <ApproveVendorDialog vendor={approving} onClose={() => setApproving(null)} />}
       {rejecting && (

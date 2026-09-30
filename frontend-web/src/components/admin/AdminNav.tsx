@@ -1,7 +1,17 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ShieldCheck, Truck, PackageX, IndianRupee, Timer } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ShieldCheck,
+  Truck,
+  PackageX,
+  IndianRupee,
+  Timer,
+  ListChecks,
+  Wallet,
+  Settings,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES, ADMIN_ROLES } from '@/lib/admin/roles';
@@ -10,9 +20,12 @@ const ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, roles: MANAGER_ROLES },
   { href: '/admin/kyc', label: 'KYC review', icon: ShieldCheck, roles: ADMIN_ROLES },
   { href: '/admin/vendors', label: 'Vendors', icon: Truck, roles: MANAGER_ROLES },
+  { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },
+  { href: '/admin/settlements', label: 'Settlements', icon: Wallet, roles: MANAGER_ROLES },
   { href: '/admin/stock', label: 'Low stock', icon: PackageX, roles: MANAGER_ROLES },
   { href: '/admin/credit', label: 'Credit', icon: IndianRupee, roles: MANAGER_ROLES },
   { href: '/admin/jobs', label: 'Jobs', icon: Timer, roles: MANAGER_ROLES },
+  { href: '/admin/settings', label: 'Settings', icon: Settings, roles: MANAGER_ROLES },
 ];
 
 export default function AdminNav() {

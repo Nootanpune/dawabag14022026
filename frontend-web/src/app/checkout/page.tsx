@@ -72,7 +72,7 @@ export default function CheckoutPage() {
   };
 
   const content = () => {
-    if (step === 'confirmed' && order) return <OrderConfirmed orderNumber={order.order_number} />;
+    if (step === 'confirmed' && order) return <OrderConfirmed orderNumber={order.order_number} shipments={order.shipments} />;
     if (step === 'prescription' && order) return <PrescriptionStep orderId={order.id} onDone={() => setStep('payment')} />;
     if (step === 'payment' && order) return <PaymentStep order={order} onPaid={() => setStep('confirmed')} />;
 

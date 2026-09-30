@@ -1,8 +1,9 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
+import SoldBySection, { type OrderShipment } from '@/components/orders/SoldBySection';
 
-export default function OrderConfirmed({ orderNumber }: { orderNumber: string }) {
+export default function OrderConfirmed({ orderNumber, shipments }: { orderNumber: string; shipments?: OrderShipment[] }) {
   const router = useRouter();
   return (
     <div className="card text-center py-10">
@@ -13,7 +14,8 @@ export default function OrderConfirmed({ orderNumber }: { orderNumber: string })
       <p className="text-gray-500 text-sm mb-1">
         Order ID: <strong>{orderNumber}</strong>
       </p>
-      <p className="text-gray-400 text-xs mb-8">You&apos;ll receive SMS and email updates at every step.</p>
+      <p className="text-gray-400 text-xs mb-6">You&apos;ll receive SMS and email updates at every step.</p>
+      <SoldBySection shipments={shipments} className="text-left max-w-sm mx-auto mb-6 border border-gray-100 rounded-lg p-3" />
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <button onClick={() => router.push('/orders')} className="btn-outline">
           Track my order

@@ -44,6 +44,8 @@ export default function LoginPage() {
       else if (role === 'doctor') router.push('/doctor/dashboard');
       // Order-fulfilment screens are not built yet; pharmacists work the KYC queue
       else if (role === 'pharmacist_rx') router.push('/admin/kyc');
+      // Marketplace partner logins work only in the partner portal
+      else if (role === 'partner') router.push('/partner');
       else router.push('/');
     } catch (err: any) {
       const msg = getApiErrorMessage(err, 'Login failed');
@@ -65,7 +67,7 @@ export default function LoginPage() {
       const res = await api.post('/auth/verify-otp', { mobile: mobileForOTP, otp: data.otp });
       login(res.data.data);
       toast.success('Mobile verified! Welcome to Dawabag.');
-      router.push('/');
+      router.push(res.data.data.role === 'partner' ? '/partner' : '/');
     } catch (err: any) {
       toast.error(getApiErrorMessage(err, 'Invalid OTP'));
     } finally {

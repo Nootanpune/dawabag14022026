@@ -22,6 +22,18 @@ export interface VendorApproval {
   drug_license_type: 'dl20' | 'dl21' | 'dl20b' | 'dl21b';
   drug_license_expiry: string;
   vendor_type: VendorType;
+  /** required for marketplace_partner / both: 2–10 A-Z/0-9 (DWB, DWS reserved) */
+  invoice_prefix?: string;
+}
+
+export const isPartnerType = (t: string | null | undefined) => t === 'marketplace_partner' || t === 'both';
+const RESERVED_PREFIXES = ['DWB', 'DWS'];
+
+/** Client-side mirror of the server's invoice_prefix rule; returns an error message or ''. */
+export function invoicePrefixError(prefix: string): string {
+  if (!/^[A-Z0-9]{2,10}$/.test(prefix)) return 'Invoice prefix must be 2–10 capital letters or digits';
+  if (RESERVED_PREFIXES.includes(prefix)) return `${prefix} is reserved for Dawabag`;
+  return '';
 }
 
 export const vendorKeys = { pending: ['admin', 'vendors', 'pending'] as const };

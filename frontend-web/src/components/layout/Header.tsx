@@ -44,6 +44,9 @@ export default function Header() {
           {user?.role === 'admin' || user?.role === 'super_admin' ? (
             <Link href="/admin" className="hover:text-brand-600">Admin</Link>
           ) : null}
+          {user?.role === 'partner' ? (
+            <Link href="/partner" className="hover:text-brand-600">Partner portal</Link>
+          ) : null}
           {user?.role === 'doctor' ? (
             <Link href="/doctor/dashboard" className="hover:text-brand-600">My Portal</Link>
           ) : null}

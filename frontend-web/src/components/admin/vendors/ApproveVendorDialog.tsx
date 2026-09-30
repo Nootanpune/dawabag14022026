@@ -3,7 +3,14 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { approveVendor, type PendingVendor, type VendorApproval, type VendorType } from '@/lib/admin/vendors';
+import {
+  approveVendor,
+  invoicePrefixError,
+  isPartnerType,
+  type PendingVendor,
+  type VendorApproval,
+  type VendorType,
+} from '@/lib/admin/vendors';
 import { DL_TYPE_LABELS } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '../Modal';
@@ -21,7 +28,9 @@ export default function ApproveVendorDialog({ vendor, onClose }: { vendor: Pendi
   const [vendorType, setVendorType] = useState<VendorType>(
     (VENDOR_TYPES.find((t) => t.value === vendor.vendor_type)?.value ?? 'supplier') as VendorType
   );
+  const [prefix, setPrefix] = useState('');
   const [error, setError] = useState('');
+  const partner = isPartnerType(vendorType);
 
   const approve = useMutation({
     mutationFn: (body: VendorApproval) => approveVendor(vendor.id, body),
@@ -35,8 +44,17 @@ export default function ApproveVendorDialog({ vendor, onClose }: { vendor: Pendi
 
   const submit = () => {
     if (!dlType || !expiry) return setError('Licence type and expiry date are required');
+    if (partner) {
+      const prefixError = invoicePrefixError(prefix);
+      if (prefixError) return setError(prefixError);
+    }
     setError('');
-    approve.mutate({ drug_license_type: dlType, drug_license_expiry: expiry, vendor_type: vendorType });
+    approve.mutate({
+      drug_license_type: dlType,
+      drug_license_expiry: expiry,
+      vendor_type: vendorType,
+      ...(partner && { invoice_prefix: prefix }),
+    });
   };
 
   return (
@@ -67,6 +85,21 @@ export default function ApproveVendorDialog({ vendor, onClose }: { vendor: Pendi
             ))}
           </select>
         </label>
+        {partner && (
+          <label className="block">
+            <span className="block font-medium text-gray-700 mb-1">Invoice prefix</span>
+            <input
+              value={prefix}
+              onChange={(e) => setPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+              maxLength={10}
+              placeholder="e.g. RAJMED"
+              className="input font-mono"
+            />
+            <span className="block text-xs text-gray-400 mt-1">
+              Starts this partner&apos;s own invoice numbers (2–10 letters/digits; DWB and DWS are reserved).
+            </span>
+          </label>
+        )}
       </div>
       {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
       <div className="flex justify-end gap-2 mt-4">
