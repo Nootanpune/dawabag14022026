@@ -10,7 +10,7 @@
     "db:migrate": "node dist/db/migrate.js",
     "lint": "eslint src/**/*.ts",
     "test": "jest",
-    "test:smoke": "node test/sprint1.smoke.mjs && node test/sprint2.smoke.mjs && node test/sprint3.smoke.mjs"
+    "test:smoke": "node test/sprint1.smoke.mjs && node test/sprint2.smoke.mjs && node test/sprint3.smoke.mjs && node test/sprint4.smoke.mjs"
   },
   "dependencies": {
     "aws-sdk": "^2.1490.0",

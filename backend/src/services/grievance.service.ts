@@ -86,9 +86,9 @@ export async function setStatus(id: string, staffId: string, status: 'in_progres
     if (!g) throw new AppError('Complaint not found', 404);
     if (status === 'resolved' && !resolution) throw new AppError('Describe the resolution', 400);
     await client.query(
-      `UPDATE grievances SET status = $2, assigned_to = COALESCE(assigned_to, $3),
+      `UPDATE grievances SET status = $2::varchar, assigned_to = COALESCE(assigned_to, $3),
          acknowledged_at = COALESCE(acknowledged_at, NOW()),
-         resolved_at = CASE WHEN $2 IN ('resolved', 'closed') THEN COALESCE(resolved_at, NOW()) ELSE NULL END,
+         resolved_at = CASE WHEN $2::varchar IN ('resolved', 'closed') THEN COALESCE(resolved_at, NOW()) ELSE NULL END,
          resolution = COALESCE($4, resolution), updated_at = NOW() WHERE id = $1`,
       [id, status, staffId, resolution || null]);
     await writeAuditTx(client, { userId: g.user_id, action: `grievance_${status}`, performedBy: staffId, newValue: { grievance_id: id }, notes: resolution });
