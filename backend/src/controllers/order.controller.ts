@@ -6,7 +6,10 @@ import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { queueNotification } from '../services/notification.service';
 import { logger } from '../config/logger';
-import { releaseOrderReservations } from '../services/shipment.service';
+import { cancelOrder } from '../services/cancellation.service';
+import { effectiveCustomerType, requiresPrescription } from '../utils/customerType';
+
+const CANCELLABLE = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing'];
 import { createOrderSchema, placeOrder } from '../services/orderPlacement.service';
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
@@ -32,6 +35,12 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     const validStatuses = ['confirmed','packed','dispatched','delivered','cancelled'];
     if (!validStatuses.includes(status)) throw new AppError(`Invalid status`, 400);
 
+    // Cancellation has its own rules: credit notes, refunds, prescription quantities (C-37)
+    if (status === 'cancelled') {
+      const reason = typeof req.body.reason === 'string' && req.body.reason.trim().length >= 3 ? req.body.reason.trim() : 'Cancelled by Dawabag';
+      return res.json({ success: true, data: await cancelOrder(id, { id: req.user!.id, staff: true }, reason) });
+    }
+
     const orderResult = await queryOne<any>(
       'SELECT id, order_number, status, user_id, buyer_gstin, e_invoice_status FROM orders WHERE id = $1', [id]
     );
@@ -43,10 +52,6 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
          courier_partner=COALESCE($3,courier_partner), updated_at=NOW() WHERE id=$4`,
         [status, awb_number||null, courier_partner||null, id]
       );
-      // Cancelling frees reserved stock (Dawabag and partner batches) exactly once
-      if (status === 'cancelled' && orderResult.status !== 'cancelled') {
-        await releaseOrderReservations(client, id);
-      }
     });
 
     // Trigger e-invoice when packed (for B2B orders with GSTIN)
@@ -83,7 +88,7 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     const orderResult = await queryOne<any>(
       `SELECT o.*, a.address_line1, a.city, a.state, a.pincode,
               a.full_name AS delivery_name, a.mobile AS delivery_mobile,
-              up.full_name AS customer_name, u.mobile AS customer_mobile, u.customer_type
+              up.full_name AS customer_name, u.mobile AS customer_mobile, u.customer_type, u.kyc_status AS buyer_kyc_status
        FROM orders o
        JOIN addresses a ON o.address_id = a.id
        JOIN users u ON o.user_id = u.id
@@ -105,13 +110,27 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     );
 
     // Seller of record per shipment (C-05); partners shown by name
-    const shipments = await query(
+    const shipments = await query<any>(
       `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.invoice_number, s.status,
               s.total_paise, s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at
        FROM order_shipments s LEFT JOIN vendors v ON v.id = s.partner_id
        WHERE s.order_id = $1 ORDER BY s.seller_type, v.name`, [id]);
 
-    res.json({ success: true, data: { ...orderResult, items, shipments, e_invoice: einvoice||null } });
+    const [creditNotes, refunds, returns] = await Promise.all([
+      query(`SELECT id, credit_note_number, shipment_id, reason, total_paise, created_at FROM credit_notes WHERE order_id = $1 ORDER BY created_at`, [id]),
+      query(`SELECT id, source, method, amount_paise, status, processed_at, created_at FROM refunds WHERE order_id = $1 ORDER BY created_at`, [id]),
+      query(`SELECT id, return_no, shipment_id, reason, status, refund_paise, created_at FROM return_requests WHERE order_id = $1 ORDER BY created_at`, [id]),
+    ]);
+    const buyerType = effectiveCustomerType(orderResult.customer_type, orderResult.buyer_kyc_status);
+    const needsRx = items.some((i: any) => requiresPrescription(buyerType, i.drug_schedule));
+    // Buyers may cancel until packing starts (C-37)
+    const canCancel = CANCELLABLE.includes(orderResult.status) && shipments.every((s: any) => ['pending', 'cancelled'].includes(s.status));
+
+    res.json({ success: true, data: {
+      ...orderResult, items, shipments, e_invoice: einvoice||null,
+      requires_prescription: needsRx, can_cancel: canCancel,
+      credit_notes: creditNotes, refunds, returns,
+    } });
   } catch (err) { next(err); }
 }
 

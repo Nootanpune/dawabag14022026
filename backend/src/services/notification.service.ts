@@ -229,6 +229,28 @@ function buildMessage(payload: NotificationPayload) {
       },
       push: { title: 'Recall notice', body: `Stop using ${payload.productName} batch ${payload.batchNumber}` },
     },
+    // ── Sprint 5: cancellation, returns, data requests ──
+    order_cancelled: {
+      sms: `Dawabag: Order ${on} is cancelled.${payload.amountPaise ? ` Refund of ${`₹${Math.round(payload.amountPaise / 100).toLocaleString('en-IN')}`} started.` : ''}`,
+      email: {
+        subject: `Order ${on} cancelled`,
+        body: `Your order ${on} has been cancelled (${payload.reason || 'on request'}).${payload.amountPaise ? ` A refund of ${`₹${Math.round(payload.amountPaise / 100).toLocaleString('en-IN')}`} has been started to your original payment method.` : ''}`,
+      },
+      push: { title: 'Order cancelled', body: `Order ${on}` },
+    },
+    return_update: {
+      sms: payload.status === 'approved'
+        ? `Dawabag: Return ${payload.returnNo} approved. Refund of ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} started.`
+        : `Dawabag: Return ${payload.returnNo} was not approved: ${payload.reason || 'see the app'}.`,
+      push: { title: 'Return update', body: `Return ${payload.returnNo}: ${payload.status}` },
+    },
+    data_request_update: {
+      email: {
+        subject: `Your ${payload.requestType} request`,
+        body: `Your ${payload.requestType} request has been ${payload.status}. ${payload.reason || ''}`,
+      },
+      push: { title: 'Privacy request update', body: `Your ${payload.requestType} request: ${payload.status}` },
+    },
     low_stock_digest: {
       email: {
         subject: `Low stock: ${payload.count} product(s) at or below reorder level`,

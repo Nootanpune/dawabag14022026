@@ -7,6 +7,7 @@ import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
+import { queueNotification } from './notification.service';
 
 export const PRIVACY_POLICY_VERSION = process.env.PRIVACY_POLICY_VERSION || '2026-10-v1';
 
@@ -69,6 +70,11 @@ export async function createDataRequest(userId: string, type: 'erasure' | 'corre
   });
 }
 
+export async function listMyDataRequests(userId: string) {
+  return query(`SELECT id, request_type, details, status, outcome, created_at, handled_at FROM data_requests
+                WHERE user_id = $1 ORDER BY created_at DESC`, [userId]);
+}
+
 export async function listDataRequests(status?: string) {
   return query(
     `SELECT d.*, up.full_name AS user_name, u.mobile FROM data_requests d
@@ -77,6 +83,16 @@ export async function listDataRequests(status?: string) {
 }
 
 export async function handleDataRequest(adminId: string, id: string, action: 'complete' | 'reject', outcome: string) {
+  const result = await handleDataRequestTx(adminId, id, action, outcome);
+  // An erased account has no contact details left, so only others are told
+  if (!(action === 'complete' && result.request_type === 'erasure')) {
+    await queueNotification({ userId: result.user_id, type: 'data_request_update', requestType: result.request_type,
+      status: result.status, reason: outcome });
+  }
+  return { id: result.id, status: result.status };
+}
+
+async function handleDataRequestTx(adminId: string, id: string, action: 'complete' | 'reject', outcome: string) {
   return withTransaction(async (client) => {
     const r = (await client.query(`SELECT * FROM data_requests WHERE id = $1 FOR UPDATE`, [id])).rows[0];
     if (!r) throw new AppError('Request not found', 404);
@@ -87,7 +103,7 @@ export async function handleDataRequest(adminId: string, id: string, action: 'co
       [id, action === 'complete' ? 'completed' : 'rejected', outcome, adminId]);
     await writeAuditTx(client, { userId: r.user_id, action: `data_${r.request_type}_${action}d`, performedBy: adminId,
       newValue: { request_id: id }, notes: outcome });
-    return { id, status: action === 'complete' ? 'completed' : 'rejected' };
+    return { id, status: action === 'complete' ? 'completed' : 'rejected', user_id: r.user_id as string, request_type: r.request_type as string };
   });
 }
 

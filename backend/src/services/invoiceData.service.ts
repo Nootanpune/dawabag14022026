@@ -9,6 +9,8 @@ import { sameState } from './shipment.service';
 const PAN_ON_INVOICE_ABOVE_PAISE = 2_00_000_00;   // ₹2,00,000 for unregistered buyers (URS v3.1)
 
 export interface InvoiceData {
+  title?: string;                 // 'TAX INVOICE' (default) or 'CREDIT NOTE'
+  againstInvoice?: string;        // credit note: the invoice it reverses
   invoiceNumber: string;
   invoiceDate: Date;
   orderNumber: string;
@@ -17,6 +19,7 @@ export interface InvoiceData {
   interState: boolean;
   irn: string | null;
   lines: {
+    orderItemId?: string;
     name: string; hsn: string | null; batch: string | null; expiry: string | null; manufacturer: string | null;
     qty: number; mrpPaise: number; ratePaise: number; taxablePaise: number; gstRate: number;
     cgstPaise: number; sgstPaise: number; igstPaise: number; totalPaise: number;
@@ -56,7 +59,7 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
       };
 
   const lines = (await query<any>(
-    `SELECT oi.product_name, p.hsn_code, p.marketed_by, oi.quantity, oi.mrp_paise, oi.unit_price_paise, oi.gst_rate,
+    `SELECT oi.id AS order_item_id, oi.product_name, p.hsn_code, COALESCE(p.manufacturer_name, p.marketed_by) AS marketed_by, oi.quantity, oi.mrp_paise, oi.unit_price_paise, oi.gst_rate,
             oi.cgst_paise, oi.sgst_paise, oi.igst_paise, oi.gst_amount_paise, oi.line_total_paise,
             COALESCE(ib.batch_number, pi.batch_number) AS batch, COALESCE(ib.expiry_date, pi.expiry_date) AS expiry
      FROM order_items oi
@@ -65,6 +68,7 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
      LEFT JOIN partner_order_items poi ON poi.order_item_id = oi.id
      LEFT JOIN partner_inventory pi ON pi.id = poi.partner_inv_id
      WHERE oi.shipment_id = $1 ORDER BY oi.product_name`, [shipmentId])).map((l) => ({
+    orderItemId: l.order_item_id as string,
     name: l.product_name, hsn: l.hsn_code, manufacturer: l.marketed_by, batch: l.batch,
     expiry: l.expiry ? new Date(l.expiry).toISOString().slice(0, 7) : null,
     qty: l.quantity, mrpPaise: l.mrp_paise, ratePaise: l.unit_price_paise,
@@ -94,5 +98,28 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
     interState: !sameState(seller.state, s.ship_state),
     irn: s.seller_type === 'dawabag' ? s.irn : null,
     lines, totals,
+  };
+}
+
+// A credit note shows the reversed quantities of the original invoice lines (C-30)
+export async function loadCreditNote(creditNoteId: string): Promise<InvoiceData> {
+  const cn = await queryOne<any>(`SELECT * FROM credit_notes WHERE id = $1`, [creditNoteId]);
+  if (!cn) throw new AppError('Credit note not found', 404);
+  const inv = await loadInvoice(cn.shipment_id);
+  const items = await query<any>(`SELECT order_item_id, quantity, taxable_paise, gst_paise FROM credit_note_items WHERE credit_note_id = $1`, [creditNoteId]);
+  const byItem = new Map(items.map((i) => [i.order_item_id, i]));
+  const lines = inv.lines.filter((l) => byItem.has(l.orderItemId)).map((l) => {
+    const c = byItem.get(l.orderItemId);
+    const gst = Number(c.gst_paise);
+    const half = inv.interState ? 0 : Math.round(gst / 2);
+    return { ...l, qty: c.quantity, taxablePaise: Number(c.taxable_paise), cgstPaise: half,
+      sgstPaise: inv.interState ? 0 : gst - half, igstPaise: inv.interState ? gst : 0,
+      totalPaise: Number(c.taxable_paise) + gst };
+  });
+  return {
+    ...inv, title: 'CREDIT NOTE', againstInvoice: inv.invoiceNumber,
+    invoiceNumber: cn.credit_note_number, invoiceDate: cn.created_at, lines,
+    totals: { taxablePaise: cn.taxable_paise, cgstPaise: cn.cgst_paise, sgstPaise: cn.sgst_paise,
+      igstPaise: cn.igst_paise, totalPaise: cn.total_paise },
   };
 }

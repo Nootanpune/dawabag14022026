@@ -12,10 +12,12 @@ export function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.font('Helvetica-Bold').fontSize(16).text('TAX INVOICE', { align: 'center' });
+    const isCredit = d.title === 'CREDIT NOTE';
+    doc.font('Helvetica-Bold').fontSize(16).text(d.title ?? 'TAX INVOICE', { align: 'center' });
     doc.moveDown(0.3).font('Helvetica').fontSize(9)
-      .text(`Invoice No: ${d.invoiceNumber}    Date: ${new Date(d.invoiceDate).toLocaleDateString('en-IN')}    Order: ${d.orderNumber}`, { align: 'center' });
-    if (d.irn) doc.text(`IRN: ${d.irn}`, { align: 'center' });
+      .text(`${isCredit ? 'Credit note' : 'Invoice'} No: ${d.invoiceNumber}    Date: ${new Date(d.invoiceDate).toLocaleDateString('en-IN')}    Order: ${d.orderNumber}`, { align: 'center' });
+    if (d.againstInvoice) doc.text(`Against tax invoice: ${d.againstInvoice}`, { align: 'center' });
+    if (d.irn && !isCredit) doc.text(`IRN: ${d.irn}`, { align: 'center' });
     doc.moveDown();
 
     const top = doc.y;
@@ -48,7 +50,7 @@ export function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
     doc.font('Helvetica-Bold').fontSize(9)
       .text(`Taxable value: ${rs(t.taxablePaise)}`, { align: 'right' })
       .text(d.interState ? `IGST: ${rs(t.igstPaise)}` : `CGST: ${rs(t.cgstPaise)}   SGST: ${rs(t.sgstPaise)}`, { align: 'right' })
-      .fontSize(11).text(`Invoice total: ${rs(t.totalPaise)}`, { align: 'right' });
+      .fontSize(11).text(`${isCredit ? 'Credit note' : 'Invoice'} total: ${rs(t.totalPaise)}`, { align: 'right' });
     doc.moveDown(2).font('Helvetica').fontSize(8).fillColor('#444')
       .text('Delivery charges, discounts and wallet use appear on the order summary. Goods once dispensed cannot be returned except as per the refund policy.')
       .text('This is a computer-generated invoice.');

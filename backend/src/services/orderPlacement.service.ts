@@ -12,6 +12,7 @@ import { TRADE_TYPES, BuyerType, allowsCreditTerms, isBuyerType, priceField, req
 import { evaluateCoupon } from './coupon.service';
 import { Allocation, allocateAndReserve } from './allocation.service';
 import { createShipmentsAndLines } from './shipment.service';
+import { OrderPreview, buildCheckoutSummary } from './checkoutSummary.service';
 
 export const createOrderSchema = z.object({
   patient_id:           z.string().uuid().optional(),
@@ -25,6 +26,8 @@ export const createOrderSchema = z.object({
   pincode:              z.string().length(6),
   payment_terms:        z.enum(['prepaid','cad','net_7','net_15','net_30','net_45','net_60','postpaid'])
                          .optional().default('prepaid'),
+  // Doctors/hospitals confirm on every order: own patients only, not for resale (C-15)
+  practitioner_declaration: z.boolean().optional(),
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
@@ -39,6 +42,7 @@ export interface OrderBuyer {
 export interface PlaceOrderOptions {
   ip?: string | null;
   refill?: { subscriptionId: string; forDate: string };
+  preview?: boolean;   // build the checkout summary, then roll back (C-35)
 }
 
 export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts: PlaceOrderOptions = {}) {
@@ -51,6 +55,10 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
   const registeredType = buyer.customer_type;
   if (isBuyerType(registeredType) && TRADE_TYPES.includes(registeredType) && buyer.kyc_status !== 'approved') {
     throw new AppError('Your business account is awaiting KYC approval. Orders open once our team verifies your documents.', 403);
+  }
+
+  if (registeredType === 'doc_hospital' && !opts.preview && !opts.refill && data.practitioner_declaration !== true) {
+    throw new AppError('Please confirm these medicines are for dispensing to your own patients and not for resale', 400);
   }
 
   // Validate payment terms against customer type
@@ -248,6 +256,13 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
       await client.query('UPDATE orders SET invoice_number = $1 WHERE id = $2', [invoiceNumber, orderId]);
     }
 
+    if (registeredType === 'doc_hospital') {
+      await client.query('UPDATE orders SET practitioner_declared_at = NOW() WHERE id = $1', [orderId]);
+    }
+    if (opts.preview) {
+      throw new OrderPreview(await buildCheckoutSummary(client, orderId, data.pincode, isB2B));
+    }
+
     // Audit log
     await client.query(
       `INSERT INTO audit_logs (user_id, action, new_value, ip_address)
@@ -302,4 +317,16 @@ async function recordLowStock(client: PoolClient, lines: any[], allocations: All
       );
     }
   }
+}
+
+// Checkout summary without placing: runs placement and rolls it back, so stock,
+// coupon uses, wallet, credit and invoice numbers are untouched (C-35)
+export async function previewOrder(buyer: OrderBuyer, data: CreateOrderInput) {
+  try {
+    await placeOrder(buyer, data, { preview: true });
+  } catch (e) {
+    if (e instanceof OrderPreview) return e.summary;
+    throw e;
+  }
+  throw new AppError('Preview failed', 500);
 }

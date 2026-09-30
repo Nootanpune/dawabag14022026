@@ -72,7 +72,8 @@ export async function listRecalls() {
 
 export async function getRecall(id: string) {
   const r = await queryOne<any>(
-    `SELECT r.*, p.name AS product_name FROM batch_recalls r JOIN products p ON p.id = r.product_id WHERE r.id = $1`, [id]);
+    `SELECT r.*, p.name AS product_name, up.full_name AS recalled_by_name FROM batch_recalls r
+     JOIN products p ON p.id = r.product_id LEFT JOIN user_profiles up ON up.user_id = r.recalled_by WHERE r.id = $1`, [id]);
   if (!r) throw new AppError('Recall not found', 404);
   const affected = await query(AFFECTED_SQL, [r.product_id, r.batch_number]);
   return { ...r, affected };

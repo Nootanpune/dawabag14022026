@@ -48,7 +48,8 @@ export async function listGrievances(filter: { userId?: string; status?: string;
 
 export async function getGrievance(id: string, userId?: string) {
   const g = await queryOne<any>(
-    `SELECT g.*, o.order_number, ${SLA_COLUMNS} FROM grievances g LEFT JOIN orders o ON o.id = g.order_id
+    `SELECT g.*, o.order_number, bp.full_name AS buyer_name, ${SLA_COLUMNS} FROM grievances g LEFT JOIN orders o ON o.id = g.order_id
+     LEFT JOIN user_profiles bp ON bp.user_id = g.user_id
      WHERE g.id = $1 ${userId ? 'AND g.user_id = $2' : ''}`, userId ? [id, userId] : [id]);
   if (!g) throw new AppError('Complaint not found', 404);
   const messages = await query(

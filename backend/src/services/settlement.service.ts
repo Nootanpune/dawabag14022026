@@ -18,20 +18,29 @@ export async function generateSettlements(periodFrom: string, periodTo: string, 
   const tdsPct = Number(await getSetting('marketplace.tds_pct', 0.1));
   const feeGstPct = Number(await getSetting('marketplace.fee_gst_pct', 18));
 
+  // Lines delivered in the period (a later return is netted by its adjustment),
+  // plus partners with open return adjustments (C-37)
   const partners = await query<{ partner_id: string }>(
-    `SELECT DISTINCT partner_id FROM partner_order_items
-     WHERE dispatch_status = 'delivered' AND settlement_batch_id IS NULL
-       AND delivered_at::date BETWEEN $1 AND $2`, [periodFrom, periodTo]);
+    `SELECT partner_id FROM partner_order_items
+     WHERE dispatch_status IN ('delivered', 'returned') AND settlement_batch_id IS NULL
+       AND delivered_at::date BETWEEN $1 AND $2
+     UNION
+     SELECT partner_id FROM settlement_adjustments WHERE settlement_batch_id IS NULL AND created_at::date <= $2`,
+    [periodFrom, periodTo]);
 
   const created: any[] = [];
   for (const { partner_id } of partners) {
     const batch = await withTransaction(async (client) => {
       const lines = (await client.query(
         `SELECT id, shipment_id, line_value_paise, line_gst_paise FROM partner_order_items
-         WHERE partner_id = $1 AND dispatch_status = 'delivered' AND settlement_batch_id IS NULL
+         WHERE partner_id = $1 AND dispatch_status IN ('delivered', 'returned') AND settlement_batch_id IS NULL
            AND delivered_at::date BETWEEN $2 AND $3
          FOR UPDATE`, [partner_id, periodFrom, periodTo])).rows;
-      if (!lines.length) return null;
+      const adjustments = (await client.query(
+        `SELECT id, taxable_paise, gst_paise FROM settlement_adjustments
+         WHERE partner_id = $1 AND settlement_batch_id IS NULL AND created_at::date <= $2 FOR UPDATE`,
+        [partner_id, periodTo])).rows;
+      if (!lines.length && !adjustments.length) return null;
 
       const rates = (await client.query(
         `SELECT commission_pct, finding_fee_paise FROM partner_commission_rates
@@ -39,8 +48,11 @@ export async function generateSettlements(periodFrom: string, periodTo: string, 
       const commissionPct = rates ? Number(rates.commission_pct) : DEFAULT_COMMISSION_PCT;
       const findingFee = rates ? Number(rates.finding_fee_paise) : DEFAULT_FINDING_FEE_PAISE;
 
-      const taxable = lines.reduce((s: number, l: any) => s + Number(l.line_value_paise || 0), 0);
-      const gst = lines.reduce((s: number, l: any) => s + Number(l.line_gst_paise || 0), 0);
+      const adjTaxable = adjustments.reduce((s: number, a: any) => s + Number(a.taxable_paise), 0);
+      const adjGst = adjustments.reduce((s: number, a: any) => s + Number(a.gst_paise), 0);
+      // Net sales after returns: commission and TCS/TDS are on net value (C-32)
+      const taxable = lines.reduce((s: number, l: any) => s + Number(l.line_value_paise || 0), 0) + adjTaxable;
+      const gst = lines.reduce((s: number, l: any) => s + Number(l.line_gst_paise || 0), 0) + adjGst;
       const shipments = new Set(lines.map((l: any) => l.shipment_id)).size;
       const r = computeSettlement({
         taxablePaise: taxable, gstCollectedPaise: gst, shipments,
@@ -57,12 +69,17 @@ export async function generateSettlements(periodFrom: string, periodTo: string, 
         `INSERT INTO settlement_batches
            (batch_ref, partner_id, period_from, period_to, total_orders, gross_sale_value_paise,
             taxable_value_paise, gst_collected_paise, commission_paise, finding_fee_paise, fee_gst_paise,
-            tcs_paise, tds_paise, tcs_pct, tds_pct, net_payable_paise, commission_invoice_no, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+            tcs_paise, tds_paise, tcs_pct, tds_pct, net_payable_paise, commission_invoice_no, created_by,
+            return_deductions_paise)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
          RETURNING id, batch_ref, net_payable_paise`,
         [batchRef, partner_id, periodFrom, periodTo, shipments, r.grossPaise, taxable, gst,
          r.commissionPaise, r.findingFeePaise, r.feeGstPaise, r.tcsPaise, r.tdsPaise, tcsPct, tdsPct,
-         r.netPayablePaise, commissionInvoice, createdBy])).rows[0];
+         r.netPayablePaise, commissionInvoice, createdBy, -(adjTaxable + adjGst)])).rows[0];
+      if (adjustments.length) {
+        await client.query(`UPDATE settlement_adjustments SET settlement_batch_id = $1 WHERE id = ANY($2::uuid[])`,
+          [b.id, adjustments.map((a: any) => a.id)]);
+      }
 
       // Per-line commission for the partner's statement
       await client.query(
@@ -106,7 +123,11 @@ export async function getSettlement(id: string, partnerId?: string) {
      JOIN order_items oi ON oi.id = poi.order_item_id
      LEFT JOIN order_shipments s ON s.id = poi.shipment_id
      WHERE poi.settlement_batch_id = $1 ORDER BY poi.delivered_at`, [id]);
-  return { ...batch, lines };
+  const adjustments = await query(
+    `SELECT a.id, a.taxable_paise, a.gst_paise, a.reason, a.created_at, cn.credit_note_number
+     FROM settlement_adjustments a LEFT JOIN credit_notes cn ON cn.id = a.credit_note_id
+     WHERE a.settlement_batch_id = $1 ORDER BY a.created_at`, [id]);
+  return { ...batch, lines, adjustments };
 }
 
 async function listSettlementsById(id: string, partnerId?: string) {

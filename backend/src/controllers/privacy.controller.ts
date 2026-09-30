@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import {
-  createDataRequest, exportUserData, getConsents, handleDataRequest, listDataRequests, setMarketingConsent,
+  createDataRequest, exportUserData, listMyDataRequests, getConsents, handleDataRequest, listDataRequests, setMarketingConsent,
 } from '../services/privacy.service';
 import { writeAudit } from '../utils/audit';
 
@@ -36,6 +36,10 @@ export async function postDataRequest(req: Request, res: Response, next: NextFun
     }).parse(req.body);
     res.status(201).json({ success: true, data: await createDataRequest(req.user!.id, d.request_type, d.details) });
   } catch (err) { next(err); }
+}
+
+export async function getMyDataRequests(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: { requests: await listMyDataRequests(req.user!.id) } }); } catch (err) { next(err); }
 }
 
 // Admin
