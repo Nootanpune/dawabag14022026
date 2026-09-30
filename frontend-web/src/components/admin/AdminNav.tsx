@@ -11,14 +11,23 @@ import {
   ListChecks,
   Wallet,
   Settings,
+  PackageCheck,
+  MessageSquareWarning,
+  ShieldAlert,
+  UserCog,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES, ADMIN_ROLES } from '@/lib/admin/roles';
+import { FULFILMENT_ROLES } from '@/lib/fulfilment/roles';
 
 const ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, roles: MANAGER_ROLES },
+  { href: '/staff/fulfilment', label: 'Fulfilment', icon: PackageCheck, roles: FULFILMENT_ROLES },
   { href: '/admin/kyc', label: 'KYC review', icon: ShieldCheck, roles: ADMIN_ROLES },
+  { href: '/admin/grievances', label: 'Complaints', icon: MessageSquareWarning, roles: ADMIN_ROLES },
+  { href: '/admin/recalls', label: 'Batch recalls', icon: ShieldAlert, roles: MANAGER_ROLES },
+  { href: '/admin/privacy', label: 'Data requests', icon: UserCog, roles: MANAGER_ROLES },
   { href: '/admin/vendors', label: 'Vendors', icon: Truck, roles: MANAGER_ROLES },
   { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },
   { href: '/admin/settlements', label: 'Settlements', icon: Wallet, roles: MANAGER_ROLES },

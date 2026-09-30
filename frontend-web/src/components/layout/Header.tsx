@@ -44,6 +44,9 @@ export default function Header() {
           {user?.role === 'admin' || user?.role === 'super_admin' ? (
             <Link href="/admin" className="hover:text-brand-600">Admin</Link>
           ) : null}
+          {['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(user?.role ?? '') ? (
+            <Link href="/staff/fulfilment" className="hover:text-brand-600">Fulfilment</Link>
+          ) : null}
           {user?.role === 'partner' ? (
             <Link href="/partner" className="hover:text-brand-600">Partner portal</Link>
           ) : null}

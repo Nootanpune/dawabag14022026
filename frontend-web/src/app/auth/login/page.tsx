@@ -42,8 +42,8 @@ export default function LoginPage() {
       const role = res.data.data.role;
       if (role === 'admin' || role === 'super_admin') router.push('/admin');
       else if (role === 'doctor') router.push('/doctor/dashboard');
-      // Order-fulfilment screens are not built yet; pharmacists work the KYC queue
-      else if (role === 'pharmacist_rx') router.push('/admin/kyc');
+      // Pharmacists and delivery staff work the fulfilment queues
+      else if (['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(role)) router.push('/staff/fulfilment');
       // Marketplace partner logins work only in the partner portal
       else if (role === 'partner') router.push('/partner');
       else router.push('/');
