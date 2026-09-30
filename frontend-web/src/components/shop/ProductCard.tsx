@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { ShoppingCart, Snowflake } from 'lucide-react';
+import { ShoppingCart, Snowflake, Loader2 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 
 interface Product {
@@ -13,6 +13,8 @@ interface Product {
 interface Props {
   product: Product;
   onAddToCart: (product: Product) => void;
+  /** true while this product's add-to-cart request is in flight */
+  isAdding?: boolean;
 }
 
 const scheduleColors: Record<string, string> = {
@@ -22,7 +24,7 @@ const scheduleColors: Record<string, string> = {
   'Schedule G': 'text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium',
 };
 
-export default function ProductCard({ product, onAddToCart }: Props) {
+export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
   const cannotOrder = ['NDPS', 'Schedule X'].includes(product.drug_schedule);
 
   return (
@@ -83,11 +85,11 @@ export default function ProductCard({ product, onAddToCart }: Props) {
       {/* CTA */}
       <button
         onClick={() => onAddToCart(product)}
-        disabled={!product.in_stock || cannotOrder}
+        disabled={!product.in_stock || cannotOrder || isAdding}
         className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2
                    disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
       >
-        <ShoppingCart className="w-4 h-4" />
+        {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
         {cannotOrder ? 'Not available online' : !product.in_stock ? 'Out of stock' : 'Add to cart'}
       </button>
     </div>

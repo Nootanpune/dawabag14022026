@@ -1,118 +1,121 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class CartItem {
-  final String productId;
-  final String name;
-  final String sku;
-  int quantity;
-  final int unitPricePaise;
-  final int mrpPaise;
-  final String drugSchedule;
-  final int maxQty;
-  final bool coldChain;
+import '../models/cart_view.dart';
+import '../services/api_service.dart';
+import '../services/cart_api.dart';
+import 'auth_provider.dart';
 
-  CartItem({
-    required this.productId,
-    required this.name,
-    required this.sku,
-    required this.quantity,
-    required this.unitPricePaise,
-    required this.mrpPaise,
-    required this.drugSchedule,
-    required this.maxQty,
-    this.coldChain = false,
-  });
-
-  CartItem copyWith({int? quantity}) => CartItem(
-        productId: productId,
-        name: name,
-        sku: sku,
-        quantity: quantity ?? this.quantity,
-        unitPricePaise: unitPricePaise,
-        mrpPaise: mrpPaise,
-        drugSchedule: drugSchedule,
-        maxQty: maxQty,
-        coldChain: coldChain,
-      );
-
-  int get lineTotalPaise => unitPricePaise * quantity;
-}
-
+/// In-memory mirror of the server cart. The server is the only authority:
+/// every change is a request, and the state is replaced by the returned
+/// CartView. There is no guest cart.
 class CartState {
-  final List<CartItem> items;
-  final String? couponCode;
-  final int couponDiscountPaise;
+  final CartView view;
+  final bool isLoading;
+  final bool isUpdating;
+  final String? error;
 
   const CartState({
-    this.items = const [],
-    this.couponCode,
-    this.couponDiscountPaise = 0,
+    this.view = CartView.empty,
+    this.isLoading = false,
+    this.isUpdating = false,
+    this.error,
   });
 
-  CartState copyWith({
-    List<CartItem>? items,
-    String? couponCode,
-    int? couponDiscountPaise,
-  }) =>
+  int get itemCount => view.itemCount;
+
+  CartState copyWith({CartView? view, bool? isLoading, bool? isUpdating, String? error}) =>
       CartState(
-        items: items ?? this.items,
-        couponCode: couponCode ?? this.couponCode,
-        couponDiscountPaise: couponDiscountPaise ?? this.couponDiscountPaise,
+        view: view ?? this.view,
+        isLoading: isLoading ?? this.isLoading,
+        isUpdating: isUpdating ?? this.isUpdating,
+        error: error,
       );
-
-  int get subtotal => items.fold(0, (s, i) => s + i.lineTotalPaise);
-  int get itemCount => items.fold(0, (s, i) => s + i.quantity);
-
-  bool get requiresPrescription =>
-      items.any((i) => i.drugSchedule == 'Schedule H' || i.drugSchedule == 'Schedule H1');
 }
 
 class CartNotifier extends StateNotifier<CartState> {
   CartNotifier() : super(const CartState());
 
-  void addItem(CartItem item) {
-    final existing = state.items.indexWhere((i) => i.productId == item.productId);
-    if (existing >= 0) {
-      final updated = List<CartItem>.from(state.items);
-      final newQty = (updated[existing].quantity + 1).clamp(1, item.maxQty);
-      updated[existing] = updated[existing].copyWith(quantity: newQty);
-      state = state.copyWith(items: updated);
-    } else {
-      state = state.copyWith(items: [...state.items, item]);
+  /// Bumped on sign-out so late responses for the old session are ignored.
+  int _generation = 0;
+
+  void reset() {
+    _generation++;
+    state = const CartState();
+  }
+
+  /// GET /cart
+  Future<void> load() async {
+    final gen = _generation;
+    state = state.copyWith(isLoading: true, error: state.error);
+    try {
+      final view = await apiService.getCart();
+      if (!mounted || gen != _generation) return;
+      state = CartState(view: view);
+    } catch (e) {
+      if (!mounted || gen != _generation) return;
+      state = state.copyWith(
+        isLoading: false,
+        error: ApiService.errorMessage(e, fallback: 'Could not load your cart'),
+      );
     }
   }
 
-  void removeItem(String productId) {
-    state = state.copyWith(
-      items: state.items.where((i) => i.productId != productId).toList(),
-    );
+  /// Runs a cart mutation; returns an error message or null on success.
+  Future<String?> _mutate(Future<CartView> Function() call, String fallback) async {
+    final gen = _generation;
+    state = state.copyWith(isUpdating: true);
+    try {
+      final view = await call();
+      if (!mounted || gen != _generation) return null;
+      state = CartState(view: view);
+      return null;
+    } catch (e) {
+      final message = ApiService.errorMessage(e, fallback: fallback);
+      if (mounted && gen == _generation) {
+        state = state.copyWith(isUpdating: false);
+      }
+      return message;
+    }
   }
 
-  void updateQty(String productId, int qty) {
-    if (qty <= 0) { removeItem(productId); return; }
-    final updated = state.items.map((i) =>
-        i.productId == productId ? i.copyWith(quantity: qty.clamp(1, i.maxQty)) : i,
-    ).toList();
-    state = state.copyWith(items: updated);
+  /// PUT /cart/items/:productId { quantity } (absolute; 0 removes).
+  Future<String?> setQuantity(String productId, int quantity) => _mutate(
+        () => apiService.setCartItemQuantity(productId, quantity < 0 ? 0 : quantity),
+        'Could not update your cart',
+      );
+
+  /// "Add to cart" = PUT with (current server quantity + 1).
+  Future<String?> addOne(String productId) {
+    final current = state.view.lineFor(productId)?.quantity ?? 0;
+    return setQuantity(productId, current + 1);
   }
 
-  void setCoupon(String code, int discountPaise) {
-    state = CartState(
-      items: state.items,
-      couponCode: code,
-      couponDiscountPaise: discountPaise,
-    );
-  }
+  Future<String?> remove(String productId) => setQuantity(productId, 0);
 
-  void removeCoupon() {
-    state = CartState(items: state.items);
-  }
+  /// PUT /cart/coupon { code }. Invalid codes come back as a 400 message.
+  Future<String?> applyCoupon(String code) =>
+      _mutate(() => apiService.setCartCoupon(code), 'Invalid coupon');
 
-  void clear() {
-    state = const CartState();
-  }
+  Future<String?> removeCoupon() =>
+      _mutate(() => apiService.setCartCoupon(null), 'Could not remove the coupon');
+
+  /// DELETE /cart
+  Future<String?> clear() =>
+      _mutate(() => apiService.clearCart(), 'Could not clear your cart');
 }
 
-final cartProvider = StateNotifierProvider<CartNotifier, CartState>(
-  (_) => CartNotifier(),
-);
+final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
+  final notifier = CartNotifier();
+  ref.listen<bool>(
+    authProvider.select((s) => s.isAuthenticated),
+    (previous, isAuthenticated) {
+      if (isAuthenticated) {
+        notifier.load();
+      } else {
+        notifier.reset();
+      }
+    },
+    fireImmediately: true,
+  );
+  return notifier;
+});

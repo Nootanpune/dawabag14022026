@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, MapPin, ChevronRight, Package } from 'lucide-react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useCartStore } from '@/store/cartStore';
+import { useAddToCart } from '@/hooks/useCart';
+import { usePincode } from '@/hooks/usePincode';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import ProductCard from '@/components/shop/ProductCard';
@@ -15,20 +16,14 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [pincode, setPincode] = useState('');
-  const { addItem } = useCartStore();
+  const { pincode, setPincode } = usePincode();
+  const { addToCart, isPending: isAdding, pendingProductId } = useAddToCart();
 
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  // Load saved pincode
-  useEffect(() => {
-    const saved = localStorage.getItem('dawabag_pincode');
-    if (saved) setPincode(saved);
-  }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', debouncedQuery, selectedCategory, pincode],
@@ -60,23 +55,7 @@ export default function HomePage() {
       toast.error('Out of stock');
       return;
     }
-    addItem({
-      product_id: product.id,
-      name: product.name,
-      sku: product.sku,
-      unit_price_paise: product.offer_price_paise,
-      mrp_paise: product.mrp_paise,
-      drug_schedule: product.drug_schedule,
-      max_qty: product.max_qty_per_order,
-      cold_chain: product.cold_chain,
-      image_key: product.s3_image_key,
-    });
-    toast.success(`${product.name} added to cart`);
-  };
-
-  const handlePincodeChange = (newPincode: string) => {
-    setPincode(newPincode);
-    localStorage.setItem('dawabag_pincode', newPincode);
+    addToCart(product.id, product.name);
   };
 
   return (
@@ -87,7 +66,7 @@ export default function HomePage() {
         {/* Pin code banner */}
         <PinCodeBanner
           pincode={pincode}
-          onPincodeChange={handlePincodeChange}
+          onPincodeChange={setPincode}
           pincodeInfo={data?.pincode_info}
         />
 
@@ -131,6 +110,7 @@ export default function HomePage() {
                 key={product.id}
                 product={product}
                 onAddToCart={handleAddToCart}
+                isAdding={isAdding && pendingProductId === product.id}
               />
             ))}
           </div>

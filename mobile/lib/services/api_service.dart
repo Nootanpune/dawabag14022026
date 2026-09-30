@@ -1,31 +1,51 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+
+import 'api_utils.dart';
+import 'session_store.dart';
 
 const String _baseUrl = String.fromEnvironment(
   'API_URL',
   defaultValue: 'http://10.0.2.2:4000', // Android emulator localhost
 );
 
+/// HTTP client + session.
+///
+/// Session rules (docs/DECISIONS.md, server-as-single-source-of-truth):
+/// - the access token is held in memory only ([_accessToken]);
+/// - the refresh token is the only value written to the device, via
+///   [SessionStore] (OS keychain). Refresh tokens rotate: every successful
+///   /auth/refresh returns a new one, which replaces the old one.
+/// - on a 401 the client refreshes once and retries the request.
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
 
   late final Dio _dio;
-  final _storage = const FlutterSecureStorage();
-  bool _isRefreshing = false;
+
+  /// Client without interceptors, for /auth/refresh and /auth/logout.
+  late final Dio _bare;
+
+  final SessionStore _sessionStore = SessionStore();
+  String? _accessToken;
+  Future<Map<String, dynamic>?>? _refreshInFlight;
+
+  /// Called when the server rejects the refresh token (session is over).
+  void Function()? onSessionExpired;
 
   ApiService._internal() {
-    _dio = Dio(BaseOptions(
+    final options = BaseOptions(
       baseUrl: '$_baseUrl/api/v1',
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       headers: {'Content-Type': 'application/json'},
-    ));
+    );
+    _dio = Dio(options);
+    _bare = Dio(options);
 
     _dio.interceptors.addAll([
-      PrettyDioLogger(requestBody: true, responseBody: false),
+      PrettyDioLogger(requestBody: false, responseBody: false),
       InterceptorsWrapper(
         onRequest: _onRequest,
         onError: _onError,
@@ -35,115 +55,124 @@ class ApiService {
 
   Dio get dio => _dio;
 
-  Future<void> _onRequest(
-    RequestOptions options,
-    RequestInterceptorHandler handler,
-  ) async {
-    final token = await _storage.read(key: 'access_token');
-    if (token != null) {
+  String? get accessToken => _accessToken;
+
+  bool get hasSession => _accessToken != null;
+
+  // ── Interceptors ───────────────────────────────────────────────────────────
+
+  void _onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final token = _accessToken;
+    if (token != null && !options.headers.containsKey('Authorization')) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
   }
 
-  Future<void> _onError(
-    DioException error,
-    ErrorInterceptorHandler handler,
-  ) async {
-    if (error.response?.statusCode == 401 && !_isRefreshing) {
-      _isRefreshing = true;
-      try {
-        final refreshToken = await _storage.read(key: 'refresh_token');
-        if (refreshToken == null) {
-          await _clearTokens();
-          handler.next(error);
-          return;
-        }
-
-        final refreshDio = Dio();
-        final res = await refreshDio.post(
-          '$_baseUrl/api/v1/auth/refresh',
-          data: {'refresh_token': refreshToken},
-        );
-
-        final newAccess = res.data['data']['access_token'];
-        final newRefresh = res.data['data']['refresh_token'];
-        await _storage.write(key: 'access_token', value: newAccess);
-        await _storage.write(key: 'refresh_token', value: newRefresh);
-
-        // Retry original request
-        final opts = error.requestOptions;
-        opts.headers['Authorization'] = 'Bearer $newAccess';
-        final retryRes = await _dio.fetch(opts);
-        handler.resolve(retryRes);
-      } catch (_) {
-        await _clearTokens();
-        handler.next(error);
-      } finally {
-        _isRefreshing = false;
-      }
-    } else {
+  Future<void> _onError(DioException error, ErrorInterceptorHandler handler) async {
+    final request = error.requestOptions;
+    final isUnauthorized = error.response?.statusCode == 401;
+    final isAuthCall = request.path.startsWith('/auth/');
+    if (!isUnauthorized || isAuthCall || request.extra['retried'] == true) {
       handler.next(error);
+      return;
+    }
+
+    final session = await refreshSession();
+    final token = _accessToken;
+    if (session == null || token == null) {
+      handler.next(error);
+      return;
+    }
+    try {
+      request.extra['retried'] = true;
+      request.headers['Authorization'] = 'Bearer $token';
+      final response = await _dio.fetch<dynamic>(request);
+      handler.resolve(response);
+    } on DioException catch (e) {
+      handler.next(e);
     }
   }
 
-  Future<void> saveTokens(String accessToken, String refreshToken) async {
-    await _storage.write(key: 'access_token', value: accessToken);
-    await _storage.write(key: 'refresh_token', value: refreshToken);
+  // ── Session ────────────────────────────────────────────────────────────────
+
+  /// Stores a new session: access token in memory, refresh token in keychain.
+  Future<void> setSession({required String accessToken, String? refreshToken}) async {
+    _accessToken = accessToken;
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await _sessionStore.writeRefreshToken(refreshToken);
+    }
   }
 
-  Future<void> _clearTokens() async {
-    await _storage.deleteAll();
+  /// Stores the tokens from a login / verify-otp / refresh response `data`.
+  Future<void> setSessionFromAuthData(Map<String, dynamic> data) => setSession(
+        accessToken: data['access_token'] as String,
+        refreshToken: data['refresh_token'] as String?,
+      );
+
+  Future<void> clearSession() async {
+    _accessToken = null;
+    await _sessionStore.deleteRefreshToken();
   }
 
-  Future<void> logout() async {
+  /// App start: exchanges the keychain refresh token for a new session.
+  /// Returns the refresh response `data` (user_id, role, customer_type,
+  /// kyc_status, mobile, full_name, ...) or null when signed out.
+  Future<Map<String, dynamic>?> restoreSession() async {
     try {
-      await _dio.post('/auth/logout');
+      await _sessionStore.deleteLegacyEntries();
     } catch (_) {}
-    await _clearTokens();
+    return refreshSession();
   }
 
-  Future<bool> hasValidToken() async {
-    return await _storage.read(key: 'access_token') != null;
+  /// POST /auth/refresh { refresh_token }. Concurrent callers share one
+  /// request, because the server revokes the old refresh token on use.
+  Future<Map<String, dynamic>?> refreshSession() {
+    return _refreshInFlight ??=
+        _refreshRequest().whenComplete(() => _refreshInFlight = null);
   }
 
-  Future<String?> readAccessToken() => _storage.read(key: 'access_token');
-
-  // ── Registration / OTP ─────────────────────────────────────────────────────
-
-  /// POST /auth/register. Returns the response `data` map
-  /// (`mobile, otp_sent, customer_type, kyc_required, required_documents`).
-  Future<Map<String, dynamic>> register(Map<String, dynamic> payload) async {
-    final res = await _dio.post('/auth/register', data: payload);
-    return dataOf(res);
+  Future<Map<String, dynamic>?> _refreshRequest() async {
+    final refreshToken = await _sessionStore.readRefreshToken();
+    if (refreshToken == null) {
+      _accessToken = null;
+      return null;
+    }
+    try {
+      final res = await _bare.post('/auth/refresh', data: {'refresh_token': refreshToken});
+      final data = apiData(res);
+      if (data['access_token'] is! String) return null;
+      await setSessionFromAuthData(data);
+      return data;
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) {
+        await clearSession();
+        onSessionExpired?.call();
+      }
+      return null;
+    }
   }
 
-  /// POST /auth/send-otp (resend).
-  Future<void> sendOtp(String mobile) async {
-    await _dio.post('/auth/send-otp', data: {'mobile': mobile});
-  }
-
-  /// POST /auth/verify-otp. On success the access/refresh tokens are saved to
-  /// secure storage and the response `data` map is returned
-  /// (`user_id, role, customer_type, kyc_status, full_name, access_token, ...`).
-  Future<Map<String, dynamic>> verifyOtp(String mobile, String otp) async {
-    final res = await _dio.post('/auth/verify-otp', data: {
-      'mobile': mobile,
-      'otp': otp,
-    });
-    final data = dataOf(res);
-    await saveTokens(
-      data['access_token'] as String,
-      data['refresh_token'] as String,
-    );
-    return data;
+  /// POST /auth/logout { refresh_token } with Authorization, then forget the
+  /// session locally (keychain entry deleted) even if the call fails.
+  Future<void> logout() async {
+    final refreshToken = await _sessionStore.readRefreshToken();
+    final token = _accessToken;
+    try {
+      await _bare.post(
+        '/auth/logout',
+        data: {if (refreshToken != null) 'refresh_token': refreshToken},
+        options: Options(headers: {if (token != null) 'Authorization': 'Bearer $token'}),
+      );
+    } catch (_) {}
+    await clearSession();
   }
 
   // ── Multipart upload ───────────────────────────────────────────────────────
 
   /// Generic multipart/form-data POST with a single file part.
-  /// The Bearer token is attached by the request interceptor; pass
-  /// [accessToken] to set it explicitly.
+  /// Pass [accessToken] to set the Bearer token explicitly.
   Future<Map<String, dynamic>> uploadMultipart(
     String path, {
     required String filePath,
@@ -172,96 +201,18 @@ class ApiService {
         receiveTimeout: const Duration(seconds: 60),
       ),
     );
-    return dataOf(res);
+    return apiData(res);
   }
 
-  /// POST /kyc/documents (multipart: document_type + file).
-  /// Returns `{document_type, uploaded, kyc_status, missing_documents}`.
-  Future<Map<String, dynamic>> uploadKycDocument({
-    required String documentType,
-    required String filePath,
-    required String filename,
-    String? accessToken,
-    ProgressCallback? onSendProgress,
-  }) {
-    return uploadMultipart(
-      '/kyc/documents',
-      filePath: filePath,
-      filename: filename,
-      fields: {'document_type': documentType},
-      mimeType: mimeTypeForFilename(filename),
-      accessToken: accessToken,
-      onSendProgress: onSendProgress,
-    );
-  }
+  // ── Helpers (kept as statics for existing callers) ─────────────────────────
 
-  /// GET /kyc/documents — `{customer_type, kyc_status, required, uploaded, missing}`.
-  Future<Map<String, dynamic>> getKycDocuments() async {
-    final res = await _dio.get('/kyc/documents');
-    return dataOf(res);
-  }
+  static Map<String, dynamic> dataOf(Response<dynamic> res) => apiData(res);
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  static Map<String, dynamic> dataOf(Response<dynamic> res) {
-    final body = res.data;
-    if (body is Map && body['data'] is Map) {
-      return Map<String, dynamic>.from(body['data'] as Map);
-    }
-    return <String, dynamic>{};
-  }
-
-  static String? mimeTypeForFilename(String filename) {
-    final dot = filename.lastIndexOf('.');
-    if (dot < 0) return null;
-    switch (filename.substring(dot + 1).toLowerCase()) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      default:
-        return null;
-    }
-  }
-
-  /// Human-readable message from an API error. Understands the
-  /// `{ success:false, message, errors:[{path, message}] }` envelope
-  /// (and the legacy `error` key).
   static String errorMessage(
     Object error, {
     String fallback = 'Something went wrong. Please try again.',
-  }) {
-    if (error is DioException) {
-      final data = error.response?.data;
-      if (data is Map) {
-        final errors = data['errors'];
-        if (errors is List && errors.isNotEmpty) {
-          final msgs = errors
-              .map((e) => e is Map ? e['message']?.toString() : e?.toString())
-              .whereType<String>()
-              .where((s) => s.isNotEmpty)
-              .toList();
-          if (msgs.isNotEmpty) return msgs.join('\n');
-        }
-        final msg = data['message'] ?? data['error'];
-        if (msg is String && msg.isNotEmpty) return msg;
-      }
-      switch (error.type) {
-        case DioExceptionType.connectionTimeout:
-        case DioExceptionType.sendTimeout:
-        case DioExceptionType.receiveTimeout:
-          return 'The request timed out. Check your connection and try again.';
-        case DioExceptionType.connectionError:
-          return 'Cannot reach the server. Check your internet connection.';
-        default:
-          break;
-      }
-    }
-    return fallback;
-  }
+  }) =>
+      apiErrorMessage(error, fallback: fallback);
 }
 
 final apiService = ApiService();

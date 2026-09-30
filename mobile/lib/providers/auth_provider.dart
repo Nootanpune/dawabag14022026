@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/api_service.dart';
+import '../services/registration_api.dart';
 
+/// Signed-in account state, held in memory only. It comes from the auth
+/// responses (login / verify-otp / refresh) and GET /users/me — never from
+/// device storage (owner rule: the server is the single source of truth).
 class AuthState {
   final bool isAuthenticated;
   final bool isLoading;
@@ -36,29 +39,25 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  final _storage = const FlutterSecureStorage();
-
   AuthNotifier() : super(const AuthState()) {
-    _checkAuth();
+    apiService.onSessionExpired = _onSessionExpired;
+    _restoreSession();
   }
 
-  Future<void> _checkAuth() async {
+  /// App start: keychain refresh token → POST /auth/refresh → new session.
+  Future<void> _restoreSession() async {
     state = state.copyWith(isLoading: true);
-    final token = await _storage.read(key: 'access_token');
-    if (token == null) {
-      state = state.copyWith(isLoading: false, isAuthenticated: false);
+    final data = await apiService.restoreSession();
+    if (!mounted) return;
+    if (data == null) {
+      state = const AuthState();
       return;
     }
-    try {
-      final res = await apiService.dio.get('/users/me');
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        user: res.data['data'] as Map<String, dynamic>,
-      );
-    } catch (_) {
-      state = state.copyWith(isLoading: false, isAuthenticated: false);
-    }
+    completeSignIn(data);
+  }
+
+  void _onSessionExpired() {
+    if (mounted && state.isAuthenticated) state = const AuthState();
   }
 
   Future<bool> login(String mobile, String password) async {
@@ -69,15 +68,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'password': password,
       });
       final data = ApiService.dataOf(res);
-      await apiService.saveTokens(
-        data['access_token'] as String,
-        data['refresh_token'] as String,
-      );
-      state = state.copyWith(
-        isAuthenticated: true,
-        isLoading: false,
-        user: userFromAuthData(data),
-      );
+      await apiService.setSessionFromAuthData(data);
+      completeSignIn(data);
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
@@ -97,8 +89,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Verifies the OTP and stores the tokens, but does NOT publish the session
-  /// to [state] yet. Used by the registration flow so the router does not
+  /// Verifies the OTP and starts the API session, but does NOT publish it to
+  /// [state] yet. Used by the registration flow so the router does not
   /// redirect away from the auth screens while KYC documents are uploaded.
   /// Call [completeSignIn] with the returned map when done.
   /// Throws (DioException) on failure; use [ApiService.errorMessage].
@@ -106,7 +98,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return apiService.verifyOtp(mobile, otp);
   }
 
-  /// Publishes a signed-in session from a verify-otp / login response map.
+  /// Publishes a signed-in session from a login / verify-otp / refresh
+  /// response map, then loads the full profile from GET /users/me.
   void completeSignIn(Map<String, dynamic> authData) {
     state = state.copyWith(
       isAuthenticated: true,
@@ -114,28 +107,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
       user: userFromAuthData(authData),
       error: null,
     );
+    fetchMe();
   }
 
-  /// Builds the stored user map from a login / verify-otp response `data`.
+  /// Builds the in-memory user map from an auth response `data`.
   static Map<String, dynamic> userFromAuthData(Map<String, dynamic> data) => {
         'id': data['user_id'],
         'role': data['role'],
         'full_name': data['full_name'],
         'customer_type': data['customer_type'],
         'kyc_status': data['kyc_status'],
+        if (data['mobile'] != null) 'mobile': data['mobile'],
       };
 
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
     await apiService.logout();
-    state = const AuthState();
+    if (mounted) state = const AuthState();
   }
 
+  /// GET /users/me — current account state (profile, customer_type,
+  /// kyc_status, wallet, credit) into memory.
   Future<void> fetchMe() async {
     try {
       final res = await apiService.dio.get('/users/me');
-      final me = res.data['data'] as Map<String, dynamic>;
-      // Keep customer_type / kyc_status from login if /users/me omits them.
+      final me = ApiService.dataOf(res);
+      if (!mounted || !state.isAuthenticated || me.isEmpty) return;
       state = state.copyWith(user: {...?state.user, ...me});
     } catch (_) {}
   }

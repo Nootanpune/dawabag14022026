@@ -2,17 +2,20 @@
 import Link from 'next/link';
 import { ShoppingCart, User, LogOut, ClipboardList, Home } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
-import { useCartStore } from '@/store/cartStore';
+import { useCart } from '@/hooks/useCart';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuthStore();
-  const { items } = useCartStore();
+  const { data: cart } = useCart();
+  const queryClient = useQueryClient();
   const router = useRouter();
-  const cartCount = items.reduce((s, i) => s + i.quantity, 0);
+  const cartCount = isAuthenticated ? cart?.item_count ?? 0 : 0;
 
   const handleLogout = async () => {
     await logout();
+    queryClient.clear(); // drop the signed-in user's cached server data
     router.push('/auth/login');
   };
 

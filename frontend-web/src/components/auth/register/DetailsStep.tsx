@@ -1,16 +1,15 @@
 'use client';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
+import ConsentFields from './ConsentFields';
+import ProfessionalFields from './ProfessionalFields';
+import { Field, upper } from './FormField';
 import { Eye, EyeOff, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import {
   buildDetailsSchema,
   getCustomerTypeOption,
   GST_DECLARATION_TEXT,
-  RETAILER_DL_TYPES,
-  SPECIALITIES,
-  WHOLESALER_DL_TYPES,
   type CustomerType,
   type DetailsFormValues,
 } from '@/lib/registration';
@@ -25,43 +24,6 @@ interface Props {
   /** receives the current (unvalidated) values so they survive going back */
   onBack: (values: DetailsFormValues) => void;
   onSubmit: (values: DetailsFormValues) => void | Promise<void>;
-}
-
-function Field({
-  label,
-  optional,
-  error,
-  hint,
-  children,
-}: {
-  label: string;
-  optional?: boolean;
-  error?: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label} {optional && <span className="text-gray-400">(optional)</span>}
-      </label>
-      {children}
-      {hint && !error && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-    </div>
-  );
-}
-
-/** Wraps a registered input so typed text is upper-cased (PAN, GSTIN). */
-function upper(reg: UseFormRegisterReturn): UseFormRegisterReturn {
-  return {
-    ...reg,
-    onChange: (e) => {
-      const target = e.target as HTMLInputElement;
-      target.value = target.value.toUpperCase();
-      return reg.onChange(e);
-    },
-  };
 }
 
 export default function DetailsStep({
@@ -95,7 +57,6 @@ export default function DetailsStep({
   const isDoctor = customerType === 'doc_hospital';
   const gstin = watch('gstin');
   const showDeclaration = isDoctor || (customerType === 'b2b_retailer' && !gstin?.trim());
-  const dlTypes = customerType === 'b2b_wholesaler' ? WHOLESALER_DL_TYPES : RETAILER_DL_TYPES;
   const option = getCustomerTypeOption(customerType);
 
   return (
@@ -105,54 +66,7 @@ export default function DetailsStep({
         <p className="text-sm text-gray-500 mt-0.5">{option.label}</p>
       </div>
 
-      {/* ── Business / professional section ── */}
-      {isB2B && (
-        <>
-          <Field label="Business name" error={errors.business_name?.message}>
-            <input {...register('business_name')} placeholder="Shah Medical Stores" className="input" />
-          </Field>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Drug license type" error={errors.drug_license_type?.message}>
-              <select {...register('drug_license_type')} className="input">
-                <option value="">Select</option>
-                {dlTypes.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Drug license number" error={errors.drug_license_number?.message}>
-              <input {...register('drug_license_number')} placeholder="MH-NSK-123456" className="input" />
-            </Field>
-          </div>
-        </>
-      )}
-
-      {isDoctor && (
-        <>
-          <Field label="NMC / Council registration number" error={errors.nmc_reg_number?.message}>
-            <input {...register('nmc_reg_number')} placeholder="e.g. 2011/05/1234" className="input" />
-          </Field>
-          <Field label="Medical council" error={errors.nmc_council_state?.message}>
-            <input
-              {...register('nmc_council_state')}
-              placeholder="Maharashtra Medical Council"
-              className="input"
-            />
-          </Field>
-          <Field label="Speciality" error={errors.speciality?.message}>
-            <select {...register('speciality')} className="input">
-              <option value="">Select</option>
-              {SPECIALITIES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </>
-      )}
+      <ProfessionalFields customerType={customerType} register={register} errors={errors} />
 
       {/* ── Contact person ── */}
       <Field
@@ -281,39 +195,7 @@ export default function DetailsStep({
         <input {...register('referral_code')} placeholder="e.g. RAJA20" className="input uppercase" />
       </Field>
 
-      {/* ── Consents ── */}
-      <div className="space-y-3 border-t border-gray-100 pt-4">
-        <div>
-          <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
-              type="checkbox"
-              {...register('accept_privacy_notice')}
-              className="mt-0.5 w-4 h-4 accent-brand-600"
-            />
-            <span>
-              I have read the{' '}
-              <Link href="/privacy" target="_blank" className="text-brand-600 font-medium hover:underline">
-                Privacy Notice
-              </Link>{' '}
-              and agree to Dawabag processing my personal and health data to provide pharmacy services.
-            </span>
-          </label>
-          {errors.accept_privacy_notice && (
-            <p className="text-xs text-red-500 mt-1">{errors.accept_privacy_notice.message}</p>
-          )}
-        </div>
-        <div>
-          <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
-            <input type="checkbox" {...register('age_confirmed')} className="mt-0.5 w-4 h-4 accent-brand-600" />
-            <span>I confirm I am 18 years or older.</span>
-          </label>
-          {errors.age_confirmed && <p className="text-xs text-red-500 mt-1">{errors.age_confirmed.message}</p>}
-        </div>
-        <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
-          <input type="checkbox" {...register('marketing_consent')} className="mt-0.5 w-4 h-4 accent-brand-600" />
-          <span>Send me offers and health reminders by SMS/email (optional).</span>
-        </label>
-      </div>
+      <ConsentFields register={register} errors={errors} />
 
       <div className="flex gap-3 pt-1">
         <button

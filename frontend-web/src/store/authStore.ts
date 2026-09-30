@@ -1,6 +1,14 @@
+// Auth state held in memory only (no persist). The session is restored on each
+// page load from the server via POST /auth/refresh (httpOnly cookie) — see SessionBootstrap.
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import api, { type AuthResponseData } from '../lib/api';
+import api from '../lib/api';
+import {
+  notifySessionExpired,
+  onSessionExpired,
+  refreshSession,
+  setAccessToken,
+  type AuthResponseData,
+} from '../lib/session';
 
 export interface User {
   id: string;
@@ -10,16 +18,23 @@ export interface User {
   full_name?: string;
   wallet_balance_paise?: number;
   referral_code?: string;
+  business_name?: string;
   /** customer | b2b_retailer | b2b_wholesaler | doc_hospital */
   customer_type?: string;
   /** not_required | pending_otp | pending_kyc | approved | rejected | ... */
   kyc_status?: string;
 }
 
+/** 'unknown' until the startup refresh has answered */
+export type SessionStatus = 'unknown' | 'signed_in' | 'signed_out';
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  status: SessionStatus;
+  /** Restore the session from the refresh cookie (called once on app load). */
+  bootstrap: () => Promise<void>;
   login: (data: AuthResponseData) => void;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
@@ -27,58 +42,63 @@ interface AuthState {
   setKycStatus: (kycStatus: string) => void;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
+function userFromSession(d: AuthResponseData): User {
+  return {
+    id: d.user_id,
+    role: d.role,
+    full_name: d.full_name,
+    mobile: d.mobile ?? '',
+    customer_type: d.customer_type,
+    kyc_status: d.kyc_status,
+  };
+}
 
-      login: ({ user_id, role, full_name, mobile, customer_type, kyc_status, access_token, refresh_token }) => {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('access_token', access_token);
-          localStorage.setItem('refresh_token', refresh_token);
-        }
-        set({
-          user: { id: user_id, role, full_name, mobile: mobile ?? '', customer_type, kyc_status },
-          isAuthenticated: true,
-        });
-      },
+const SIGNED_OUT = { user: null, isAuthenticated: false, status: 'signed_out' as const };
 
-      logout: async () => {
-        try {
-          await api.post('/auth/logout');
-        } catch (_) {}
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        set({ user: null, isAuthenticated: false });
-      },
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  user: null,
+  isAuthenticated: false,
+  isLoading: false,
+  status: 'unknown',
 
-      fetchMe: async () => {
-        set({ isLoading: true });
-        try {
-          const { data } = await api.get('/users/me');
-          set({ user: data.data, isAuthenticated: true });
-        } catch (_) {
-          set({ user: null, isAuthenticated: false });
-        } finally {
-          set({ isLoading: false });
-        }
-      },
+  bootstrap: async () => {
+    const session = await refreshSession();
+    if (session) get().login(session);
+    else set(SIGNED_OUT);
+  },
 
-      setUser: (user) => set({ user }),
+  login: (data) => {
+    setAccessToken(data.access_token);
+    set({ user: userFromSession(data), isAuthenticated: true, status: 'signed_in' });
+  },
 
-      setKycStatus: (kyc_status) => {
-        const user = get().user;
-        if (user) set({ user: { ...user, kyc_status } });
-      },
-    }),
-    {
-      name: 'dawabag-auth',
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (_) {}
+    setAccessToken(null);
+    set(SIGNED_OUT);
+  },
+
+  fetchMe: async () => {
+    set({ isLoading: true });
+    try {
+      const { data } = await api.get('/users/me');
+      set({ user: data.data, isAuthenticated: true, status: 'signed_in' });
+    } catch (_) {
+      notifySessionExpired();
+    } finally {
+      set({ isLoading: false });
     }
-  )
-);
+  },
+
+  setUser: (user) => set({ user }),
+
+  setKycStatus: (kyc_status) => {
+    const user = get().user;
+    if (user) set({ user: { ...user, kyc_status } });
+  },
+}));
+
+// A failed refresh anywhere in the app signs the user out of the in-memory store.
+onSessionExpired(() => useAuthStore.setState(SIGNED_OUT));
