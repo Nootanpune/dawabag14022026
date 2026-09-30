@@ -42,7 +42,7 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 Pharmacist sign-off gate + H1 register (C-08, C-09), invoice PDF (pdf.service is a
 placeholder), B2B licence on invoices (column added, C-13), MRP/NPPA price checks
 (C-16), grievance module and legal footer (C-04, C-36), recall tool (C-28),
-admin KYC review screen, crons (Sprint 2 list in the Resume Guide).
+prescription-view access log (C-41), address management page (web).
 
 ## Session history
 | Date | Change |
