@@ -76,6 +76,17 @@ class StepDetails extends StatelessWidget {
               registerPanField(c),
               const SizedBox(height: 8),
               _gstDeclaration('I confirm I am not registered under GST.'),
+              // Unticked by default; the server requires it for doctors (C-15)
+              CheckboxFormField(
+                value: c.practitionerDeclared,
+                onChanged: (v) => c.update(() => c.practitionerDeclared = v),
+                requiredMessage: 'Please confirm to continue',
+                title: const Text(
+                  'I will buy medicines only to treat or dispense to my own patients, not for '
+                  'resale, and never Schedule X or narcotic (NDPS) drugs.',
+                  style: TextStyle(fontSize: 14),
+                ),
+              ),
               const SizedBox(height: 20),
             ],
 

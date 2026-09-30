@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
 import 'register_constants.dart';
 import 'register_controller.dart';
+import 'register_docs.dart';
 import 'register_widgets.dart';
 
 /// Step 3 (B2B / doctor) — pick documents; held in memory until after OTP.

@@ -34,6 +34,19 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 - Owner to fill in: legal.* settings (entity, licences, pharmacist-in-charge, grievance
   officer); appoint the pharmacist-in-charge and grievance officer.
 
+## Mobile Sprint 5 (buyer screens, not compiled — no Flutter SDK here)
+- Checkout: address → review (POST /orders/preview: per-seller block with licence and
+  delivery estimate, lines with country of origin, charge break-up, returns note, policy
+  links; C-35) → place order → prescription → payment. Doctors tick an unticked
+  practitioner declaration, sent as practitioner_declaration (C-15); also added to register.
+- Order detail: delivery code card (C-26), seal / received-by per shipment, invoice and
+  credit-note PDFs via signed links opened in the external viewer (no local file), cancel
+  (can_cancel), refunds / credit notes / returns card, "Report a problem" per delivered
+  shipment and "Report a side effect" per line.
+- New screens: /account/returns (+ /new, /:id), /account/side-effects (+ /new),
+  /account/addresses (+ /new, /:id/edit), public /policies/:key; policies listed on About &
+  legal; privacy screen lists GET /privacy/requests.
+
 ## Done in Sprint 3 (backend)
 - Owner decisions: allocation rule (> ₹10k + Dawabag ≤24 h → own stock first, else
   nearest seller), partners sell at catalogue price, refills with reminders +

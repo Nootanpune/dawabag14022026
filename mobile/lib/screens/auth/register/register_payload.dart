@@ -47,6 +47,8 @@ extension RegisterPayload on RegisterController {
         'speciality': speciality,
         'pan_number': pan,
         'gst_unregistered_declaration': gstDeclared,
+        // C-15: buys only to treat own patients, never for resale
+        'practitioner_declaration': practitionerDeclared,
       });
     }
     return payload;

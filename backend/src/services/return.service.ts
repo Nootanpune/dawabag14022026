@@ -112,7 +112,7 @@ export async function getReturn(id: string, scope: { userId?: string; partnerId?
      LEFT JOIN partner_order_items poi ON poi.order_item_id = oi.id
      LEFT JOIN partner_inventory pi ON pi.id = poi.partner_inv_id
      WHERE ri.return_id = $1`, [id]);
-  const creditNotes = await query(`SELECT credit_note_number, total_paise, created_at FROM credit_notes WHERE return_id = $1`, [id]);
+  const creditNotes = await query(`SELECT id, credit_note_number, total_paise, created_at FROM credit_notes WHERE return_id = $1`, [id]);
   const refunds = await query(`SELECT method, amount_paise, status, processed_at FROM refunds WHERE return_id = $1`, [id]);
   return { ...r, items, credit_notes: creditNotes, refunds };
 }

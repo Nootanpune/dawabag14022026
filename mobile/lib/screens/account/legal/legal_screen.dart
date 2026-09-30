@@ -11,6 +11,7 @@ import '../../../services/api_service.dart';
 import '../../../utils/formatters.dart';
 import '../../../widgets/error_retry_view.dart';
 import 'legal_section.dart';
+import 'policies_section.dart';
 
 /// /legal — "About & legal": seller entity, drug licences, pharmacist in
 /// charge and grievance officer, as published by the server (C-04, C-36).
@@ -40,7 +41,10 @@ class LegalScreen extends ConsumerWidget {
         ),
         data: (info) => RefreshIndicator(
           color: AppTheme.brandGreen,
-          onRefresh: () => ref.refresh(legalInfoProvider.future),
+          onRefresh: () {
+            ref.invalidate(policiesProvider);
+            return ref.refresh(legalInfoProvider.future);
+          },
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: _sections(context, ref, info),
@@ -103,6 +107,8 @@ class LegalScreen extends ConsumerWidget {
           ],
         ),
       ),
+      // Terms, privacy, shipping, cancellation and refund policies (C-39)
+      const PoliciesSection(),
     ];
   }
 }

@@ -17,8 +17,16 @@ import '../screens/account/refill_screen.dart';
 import '../screens/account/grievances/grievance_detail_screen.dart';
 import '../screens/account/grievances/grievance_list_screen.dart';
 import '../screens/account/grievances/new_grievance_screen.dart';
+import '../screens/account/addresses/address_form_screen.dart';
+import '../screens/account/addresses/address_list_screen.dart';
 import '../screens/account/legal/legal_screen.dart';
+import '../screens/account/legal/policy_screen.dart';
 import '../screens/account/privacy/privacy_screen.dart';
+import '../screens/account/returns/new_return_screen.dart';
+import '../screens/account/returns/return_detail_screen.dart';
+import '../screens/account/returns/returns_screen.dart';
+import '../screens/account/side_effects/new_side_effect_screen.dart';
+import '../screens/account/side_effects/side_effect_list_screen.dart';
 import '../screens/doctor/doctor_list_screen.dart';
 import '../screens/doctor/doctor_portal_screen.dart';
 import '../screens/admin/admin_screen.dart';
@@ -94,8 +102,42 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // Consents and data rights (C-40..C-44)
       GoRoute(path: '/account/privacy', builder: (c, s) => const PrivacyScreen()),
-      // Statutory disclosures — public, no sign-in needed (C-04)
+      // Saved addresses ('/new' before '/:id/edit')
+      GoRoute(path: '/account/addresses', builder: (c, s) => const AddressListScreen()),
+      GoRoute(path: '/account/addresses/new', builder: (c, s) => const AddressFormScreen()),
+      GoRoute(
+        path: '/account/addresses/:id/edit',
+        builder: (c, s) => AddressFormScreen(addressId: s.pathParameters['id']!),
+      ),
+      // Returns and refunds (C-37)
+      GoRoute(path: '/account/returns', builder: (c, s) => const ReturnsScreen()),
+      GoRoute(
+        path: '/account/returns/new',
+        builder: (c, s) => NewReturnScreen(
+          orderId: s.uri.queryParameters['orderId'] ?? '',
+          shipmentId: s.uri.queryParameters['shipmentId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/account/returns/:id',
+        builder: (c, s) => ReturnDetailScreen(returnId: s.pathParameters['id']!),
+      ),
+      // Side-effect reports (C-29)
+      GoRoute(path: '/account/side-effects', builder: (c, s) => const SideEffectListScreen()),
+      GoRoute(
+        path: '/account/side-effects/new',
+        builder: (c, s) => NewSideEffectScreen(
+          productId: s.uri.queryParameters['productId'] ?? '',
+          productName: s.uri.queryParameters['productName'],
+          orderId: s.uri.queryParameters['orderId'],
+        ),
+      ),
+      // Statutory disclosures and policies — public, no sign-in needed (C-04, C-39)
       GoRoute(path: '/legal', builder: (c, s) => const LegalScreen()),
+      GoRoute(
+        path: '/policies/:key',
+        builder: (c, s) => PolicyScreen(policyKey: s.pathParameters['key']!),
+      ),
       GoRoute(path: '/doctors', builder: (c, s) => const DoctorListScreen()),
       GoRoute(path: '/doctor/portal', builder: (c, s) => const DoctorPortalScreen()),
       GoRoute(path: '/admin', builder: (c, s) => const AdminScreen()),

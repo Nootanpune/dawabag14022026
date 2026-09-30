@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../models/checkout_summary.dart';
 import '../checkout_flow.dart';
 import 'address_step.dart';
 import 'confirmed_step.dart';
 import 'payment_step.dart';
 import 'prescription_step.dart';
+import 'review_step.dart';
 
 /// The content of the current checkout step. State lives in the screen;
 /// this only picks the widget for [step].
@@ -14,6 +16,10 @@ class CheckoutStepBody extends StatelessWidget {
   final List<Map<String, dynamic>> addresses;
   final String? selectedAddressId;
   final ValueChanged<String> onSelectAddress;
+  final CheckoutSummary? summary;
+  final bool isPractitioner;
+  final bool declared;
+  final ValueChanged<bool> onDeclared;
   final XFile? prescriptionFile;
   final List<dynamic> savedPrescriptions;
   final String? savedPrescriptionId;
@@ -27,6 +33,10 @@ class CheckoutStepBody extends StatelessWidget {
     required this.addresses,
     required this.selectedAddressId,
     required this.onSelectAddress,
+    required this.summary,
+    required this.isPractitioner,
+    required this.declared,
+    required this.onDeclared,
     required this.prescriptionFile,
     required this.savedPrescriptions,
     required this.savedPrescriptionId,
@@ -41,6 +51,13 @@ class CheckoutStepBody extends StatelessWidget {
             addresses: addresses,
             selectedId: selectedAddressId,
             onSelect: onSelectAddress,
+          ),
+        CheckoutStep.review => ReviewStep(
+            summary: summary,
+            isPractitioner: isPractitioner,
+            declared: declared,
+            onDeclared: onDeclared,
+            orderPlaced: order != null,
           ),
         CheckoutStep.prescription => PrescriptionStep(
             prescriptionFile: prescriptionFile,

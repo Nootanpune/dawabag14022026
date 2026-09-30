@@ -139,12 +139,15 @@ class AccountScreen extends ConsumerWidget {
           _Section('Orders', [
             _MenuItem(icon: Icons.receipt_long, label: 'My orders', onTap: () => context.go('/orders')),
             _MenuItem(icon: Icons.replay, label: 'Refill subscriptions', onTap: () => context.push('/account/refills')),
+            // C-37 returns and refunds; C-29 side-effect reports
+            _MenuItem(icon: Icons.assignment_return_outlined, label: 'Returns & refunds', onTap: () => context.push('/account/returns')),
+            _MenuItem(icon: Icons.healing_outlined, label: 'Side-effect reports', onTap: () => context.push('/account/side-effects')),
             _MenuItem(icon: Icons.description, label: 'My prescriptions', onTap: () {}),
           ]),
 
           _Section('Patients & Addresses', [
             _MenuItem(icon: Icons.people, label: 'Patient profiles', onTap: () {}),
-            _MenuItem(icon: Icons.location_on_outlined, label: 'Saved addresses', onTap: () {}),
+            _MenuItem(icon: Icons.location_on_outlined, label: 'Saved addresses', onTap: () => context.push('/account/addresses')),
           ]),
 
           _Section('Offers & Referrals', [

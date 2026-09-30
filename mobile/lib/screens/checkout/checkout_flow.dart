@@ -1,24 +1,32 @@
+import '../../models/cart_view.dart';
+import '../../models/json_utils.dart';
+import '../../services/checkout_api.dart';
 import '../../utils/formatters.dart';
 import '../orders/widgets/order_shipments_card.dart';
 
-enum CheckoutStep { address, prescription, payment, confirmed }
+/// address → review (C-35 summary, POST /orders on confirm) →
+/// prescription (Rx orders only) → payment → confirmed.
+enum CheckoutStep { address, review, prescription, payment, confirmed }
 
 /// Step-bar labels; the prescription step appears only for Rx orders.
-List<String> checkoutBarLabels(bool hasRx) =>
-    hasRx ? const ['Address', 'Prescription', 'Payment'] : const ['Address', 'Payment'];
+List<String> checkoutBarLabels(bool hasRx) => hasRx
+    ? const ['Address', 'Review', 'Prescription', 'Payment']
+    : const ['Address', 'Review', 'Payment'];
 
 extension CheckoutStepX on CheckoutStep {
   /// Position in the step bar (-1 once confirmed; the bar is then hidden).
   int barIndex(bool hasRx) => switch (this) {
         CheckoutStep.address => 0,
-        CheckoutStep.prescription => 1,
-        CheckoutStep.payment => hasRx ? 2 : 1,
+        CheckoutStep.review => 1,
+        CheckoutStep.prescription => 2,
+        CheckoutStep.payment => hasRx ? 3 : 2,
         CheckoutStep.confirmed => -1,
       };
 
-  /// Bottom-button label; the amount is the server's order total.
-  String buttonLabel(int totalPaise) => switch (this) {
-        CheckoutStep.address => 'Continue',
+  /// Bottom-button label; amounts are the server's figures.
+  String buttonLabel({required int totalPaise, required bool orderPlaced}) => switch (this) {
+        CheckoutStep.address => 'Review order',
+        CheckoutStep.review => orderPlaced ? 'Continue' : 'Place order',
         CheckoutStep.prescription => 'Continue to payment',
         CheckoutStep.payment => 'Pay ${formatPrice(totalPaise)} securely',
         CheckoutStep.confirmed => '',
@@ -43,13 +51,31 @@ class PlacedOrder {
   });
 
   factory PlacedOrder.fromJson(Map<String, dynamic> data) {
-    final total = data['total_paise'];
     return PlacedOrder(
       id: data['id']?.toString(),
       orderNumber: data['order_number']?.toString(),
-      totalPaise: total is num ? total.round() : 0,
+      totalPaise: asInt(data['total_paise']),
       requiresPrescription: data['requires_prescription'] == true,
       shipments: OrderShipmentsCard.fromOrder(data),
     );
   }
+}
+
+/// Body for POST /orders/preview and POST /orders from the server cart and
+/// the chosen address (its pincode decides serviceability and sellers).
+Map<String, dynamic> checkoutOrderBody(
+  CartView cart,
+  Map<String, dynamic> address, {
+  bool? practitionerDeclaration,
+}) {
+  final coupon = cart.coupon;
+  return CheckoutApi.orderBody(
+    addressId: address['id'],
+    items: cart.orderableItems
+        .map((l) => <String, dynamic>{'product_id': l.productId, 'quantity': l.quantity})
+        .toList(),
+    couponCode: coupon != null && coupon.valid ? coupon.code : null,
+    pincode: address['pincode']?.toString() ?? '',
+    practitionerDeclaration: practitionerDeclaration,
+  );
 }

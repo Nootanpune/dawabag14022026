@@ -7,6 +7,7 @@ import '../../../services/api_service.dart';
 import '../../../services/registration_api.dart';
 import '../../../widgets/otp_input.dart';
 import 'register_constants.dart';
+import 'register_docs.dart';
 import 'register_payload.dart';
 import 'register_otp.dart';
 import 'register_uploads.dart';
@@ -49,6 +50,7 @@ class RegisterController extends ChangeNotifier {
   String? dlType;
   String? speciality;
   bool gstDeclared = false;
+  bool practitionerDeclared = false; // doctors: own patients only, not for resale (C-15)
   bool showPassword = false;
 
   // Consents (all customer types)
@@ -84,11 +86,8 @@ class RegisterController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     resendTimer?.cancel();
-    for (final c in [
-      nameCtrl, mobileCtrl, emailCtrl, passwordCtrl, confirmCtrl,
-      pincodeCtrl, referralCtrl, businessCtrl, dlNumberCtrl, panCtrl,
-      gstinCtrl, nmcRegCtrl, nmcCouncilCtrl,
-    ]) {
+    for (final c in [nameCtrl, mobileCtrl, emailCtrl, passwordCtrl, confirmCtrl, pincodeCtrl,
+        referralCtrl, businessCtrl, dlNumberCtrl, panCtrl, gstinCtrl, nmcRegCtrl, nmcCouncilCtrl]) {
       c.dispose();
     }
     super.dispose();
@@ -117,51 +116,6 @@ class RegisterController extends ChangeNotifier {
       ? const [RegisterStep.type, RegisterStep.details, RegisterStep.otp]
       : const [RegisterStep.type, RegisterStep.details, RegisterStep.documents, RegisterStep.otp];
 
-  /// Required documents per the contract (plus anything the server asked for).
-  List<String> get requiredDocs {
-    final List<String> local;
-    if (isRetailer) {
-      local = [
-        'drug_license',
-        'pan_card',
-        if (gstinCtrl.text.trim().isNotEmpty) 'gst_certificate',
-      ];
-    } else if (isWholesaler) {
-      local = ['drug_license', 'gst_certificate', 'pan_card', 'cancelled_cheque'];
-    } else if (isDoctor) {
-      local = ['nmc_certificate', 'pan_card'];
-    } else {
-      local = [];
-    }
-    return [
-      ...local,
-      ...serverRequiredDocs.where((d) => !local.contains(d)),
-    ];
-  }
-
-  List<String> get optionalDocs {
-    if (!isDoctor) return const [];
-    final reqDocs = requiredDocs;
-    return ['clinic_address_proof'].where((d) => !reqDocs.contains(d)).toList();
-  }
-
-  List<String> get missingHeldDocs =>
-      requiredDocs.where((d) => !files.containsKey(d)).toList();
-
-  /// Rows on the upload screen: held files plus anything still missing.
-  List<String> get uploadRows => [
-        ...files.keys,
-        ...?missingDocs?.where((d) => !files.containsKey(d)),
-      ];
-
-  bool get allUploadsDone =>
-      files.keys.every((t) => uploadStatus[t] == UploadStatus.done) &&
-      (missingDocs?.isEmpty ?? true);
-
-  bool get anyUploading => uploadStatus.values.any((s) => s == UploadStatus.uploading);
-
-  bool get anyFailed => uploadStatus.values.any((s) => s == UploadStatus.failed);
-
   // ── Navigation ──────────────────────────────────────────────────────────────
 
   void goTo(RegisterStep next) => update(() {
@@ -185,6 +139,7 @@ class RegisterController extends ChangeNotifier {
       dlType = null;
       speciality = null;
       gstDeclared = false;
+      practitionerDeclared = false;
       files.clear();
     });
   }

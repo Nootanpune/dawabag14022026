@@ -7,6 +7,7 @@ import '../../../providers/privacy_provider.dart';
 import '../../../widgets/error_retry_view.dart';
 import '../../auth/register/register_constants.dart' show kPrivacyNoticeUrl;
 import 'consent_section.dart';
+import 'data_requests_section.dart';
 import 'data_rights_section.dart';
 
 /// /account/privacy — consents and data-principal rights (C-40..C-44).
@@ -60,6 +61,7 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
     final error = await ref.read(privacyProvider.notifier).request(type, details: details);
     if (!mounted) return;
     setState(() => _requesting = false);
+    if (error == null) ref.invalidate(dataRequestsProvider);
     _snack(
       error ??
           (erasure
@@ -88,7 +90,10 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
     } else {
       body = RefreshIndicator(
         color: AppTheme.brandGreen,
-        onRefresh: notifier.load,
+        onRefresh: () async {
+          ref.invalidate(dataRequestsProvider);
+          await notifier.load();
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -108,6 +113,7 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
               onErasure: () => _request('erasure'),
               onOpenNotice: _openNotice,
             ),
+            const DataRequestsSection(),
             const SizedBox(height: 24),
           ],
         ),

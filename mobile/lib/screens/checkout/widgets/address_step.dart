@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/theme.dart';
 
-/// Pick a delivery address (from GET /users/me/addresses).
+/// Pick a delivery address (from GET /users/me/addresses). Adding or
+/// editing opens the account address screens, which save to the server and
+/// reload the shared list.
 class AddressStep extends StatelessWidget {
   final List<Map<String, dynamic>> addresses;
   final String? selectedId;
@@ -28,13 +30,30 @@ class AddressStep extends StatelessWidget {
             const Text('No saved addresses', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             OutlinedButton(
-                onPressed: () => context.push('/account'), child: const Text('Add address')),
+                onPressed: () => context.push('/account/addresses/new'),
+                child: const Text('Add address')),
           ],
         ),
       );
     }
     return Column(
-      children: addresses.map<Widget>((addr) => _tile(addr)).toList(),
+      children: [
+        ...addresses.map<Widget>((addr) => _tile(addr)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton.icon(
+              onPressed: () => context.push('/account/addresses/new'),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('New address'),
+            ),
+            TextButton(
+              onPressed: () => context.push('/account/addresses'),
+              child: const Text('Manage addresses'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -81,6 +100,9 @@ class AddressStep extends StatelessWidget {
                     '${addr['city']} — ${addr['pincode']}',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
+                  if (addr['is_serviceable'] != true)
+                    Text('We do not deliver to this pincode yet',
+                        style: TextStyle(fontSize: 11, color: Colors.orange.shade800)),
                 ],
               ),
             ),
