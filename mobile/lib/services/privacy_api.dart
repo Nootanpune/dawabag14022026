@@ -1,9 +1,8 @@
-import '../models/legal_info.dart';
 import '../models/privacy.dart';
 import 'api_service.dart';
 import 'api_utils.dart';
 
-/// Data-principal rights (C-40..C-44) and statutory disclosures (C-04).
+/// Data-principal rights (C-40..C-44).
 /// Responses are shown as-is and never stored on the device. The data export
 /// (GET /privacy/export) is deliberately not called here: it would produce a
 /// file, and the app writes no files — the website offers it instead.
@@ -28,11 +27,5 @@ extension PrivacyApi on ApiService {
       if (details != null && details.trim().isNotEmpty) 'details': details.trim(),
     });
     return apiData(res);
-  }
-
-  /// GET /legal/info (public)
-  Future<LegalInfo> getLegalInfo() async {
-    final res = await dio.get('/legal/info');
-    return LegalInfo.fromJson(apiData(res));
   }
 }

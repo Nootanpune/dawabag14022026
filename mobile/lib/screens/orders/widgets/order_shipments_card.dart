@@ -8,9 +8,21 @@ import '../../../utils/formatters.dart';
 /// name if the server ever includes one. Each seller issues its own invoice
 /// (docs/DECISIONS.md 2026-09-30: partners invoice as seller of record;
 /// C-05, C-32, C-33).
+///
+/// Invoice PDFs (GET /invoices/shipments/:id.pdf) are not opened in the app:
+/// there is no PDF viewer dependency, the endpoint needs the Bearer token (so
+/// an external browser cannot open it), and saving the file to the device is
+/// not allowed (server is the single source of truth). With
+/// [showInvoiceNote] the card shows the invoice number and where to get it.
 class OrderShipmentsCard extends StatelessWidget {
   final List<Map<String, dynamic>> shipments;
-  const OrderShipmentsCard({super.key, required this.shipments});
+  final bool showInvoiceNote;
+  const OrderShipmentsCard({super.key, required this.shipments, this.showInvoiceNote = false});
+
+  static bool _hasInvoice(Map<String, dynamic> s) {
+    final invoice = s['invoice_number'];
+    return invoice != null && invoice.toString().isNotEmpty;
+  }
 
   /// Shipments from an order map, or empty when the API sent none.
   static List<Map<String, dynamic>> fromOrder(Map<String, dynamic>? order) {
@@ -53,8 +65,8 @@ class OrderShipmentsCard extends StatelessWidget {
                         children: [
                           Text(sellerLabel(s),
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                          if (invoice != null && invoice.toString().isNotEmpty)
-                            Text('Invoice $invoice',
+                          if (_hasInvoice(s))
+                            Text('Tax invoice $invoice',
                                 style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                         ],
                       ),
@@ -66,6 +78,24 @@ class OrderShipmentsCard extends StatelessWidget {
                 ),
               );
             }),
+            if (showInvoiceNote && shipments.any(_hasInvoice))
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline, size: 14, color: Colors.grey.shade500),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Each seller issues its own tax invoice. To view or download the PDF, '
+                        'open this order on the Dawabag website (dawabag.in).',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
