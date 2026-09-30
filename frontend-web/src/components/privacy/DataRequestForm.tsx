@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createDataRequest, type DataRequestType } from '@/lib/privacy/api';
+import { createDataRequest, privacyKeys, type DataRequestType } from '@/lib/privacy/api';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 
 /** Ask Dawabag to correct or erase personal data (C-43, C-44); staff act on it from the admin queue. */
@@ -11,12 +11,14 @@ export default function DataRequestForm() {
   const [type, setType] = useState<DataRequestType>('correction');
   const [details, setDetails] = useState('');
   const [error, setError] = useState('');
+  const queryClient = useQueryClient();
 
   const send = useMutation({
     mutationFn: () => createDataRequest(type, details.trim() || undefined),
     onSuccess: () => {
       toast.success(type === 'erasure' ? 'Erasure request received' : 'Correction request received');
       setDetails('');
+      queryClient.invalidateQueries({ queryKey: privacyKeys.myRequests });
     },
     onError: (err) => setError(getApiErrorMessage(err, 'Could not send your request')),
   });

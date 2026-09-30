@@ -1,6 +1,6 @@
 import type { OrderShipment } from '@/components/orders/SoldBySection';
 
-export type CheckoutStep = 'address' | 'prescription' | 'payment' | 'confirmed';
+export type CheckoutStep = 'address' | 'review' | 'prescription' | 'payment' | 'confirmed';
 
 /** Subset of the order returned by POST /orders (data.order) — amounts are the server's. */
 export interface PlacedOrder {

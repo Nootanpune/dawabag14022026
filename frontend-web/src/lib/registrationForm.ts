@@ -35,6 +35,10 @@ export const GST_DECLARATION_TEXT: Partial<Record<CustomerType, string>> = {
   doc_hospital: 'I confirm I am not registered under GST.',
 };
 
+/** Doctors / hospitals, at registration (C-15); starts unticked. */
+export const PRACTITIONER_REGISTRATION_TEXT =
+  'I will buy medicines only for dispensing to my own patients, not for resale. I will not order Schedule X or narcotic (NDPS) drugs online.';
+
 /** All Step-2 fields. Fields not relevant to the chosen type are simply left empty. */
 export interface DetailsFormValues {
   full_name: string;
@@ -53,6 +57,7 @@ export interface DetailsFormValues {
   nmc_reg_number: string;
   nmc_council_state: string;
   speciality: string;
+  practitioner_declaration: boolean;
   accept_privacy_notice: boolean;
   age_confirmed: boolean;
   marketing_consent: boolean;
@@ -75,6 +80,7 @@ export const EMPTY_DETAILS: DetailsFormValues = {
   nmc_reg_number: '',
   nmc_council_state: '',
   speciality: '',
+  practitioner_declaration: false,
   accept_privacy_notice: false,
   age_confirmed: false,
   marketing_consent: false,
@@ -103,6 +109,7 @@ export function buildDetailsSchema(type: CustomerType) {
       nmc_reg_number: str,
       nmc_council_state: str,
       speciality: str,
+      practitioner_declaration: z.boolean(),
       accept_privacy_notice: z.boolean(),
       age_confirmed: z.boolean(),
       marketing_consent: z.boolean(),
@@ -160,6 +167,9 @@ export function buildDetailsSchema(type: CustomerType) {
         if (!d.gst_unregistered_declaration) {
           issue('gst_unregistered_declaration', 'Please confirm the GST declaration');
         }
+        if (!d.practitioner_declaration) {
+          issue('practitioner_declaration', 'Confirm you will buy only to treat your own patients, not for resale');
+        }
       }
     });
 }
@@ -200,6 +210,7 @@ export function buildRegisterPayload(type: CustomerType, d: DetailsFormValues): 
       speciality: d.speciality,
       pan_number: d.pan_number.trim().toUpperCase(),
       gst_unregistered_declaration: d.gst_unregistered_declaration,
+      practitioner_declaration: d.practitioner_declaration, // C-15
     });
   }
 

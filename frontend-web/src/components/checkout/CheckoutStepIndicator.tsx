@@ -1,13 +1,14 @@
-import { MapPin, Upload, CreditCard } from 'lucide-react';
+import { MapPin, Upload, CreditCard, ClipboardCheck } from 'lucide-react';
 import type { CheckoutStep } from './types';
 
 const STEPS = [
   { key: 'address', label: 'Address', icon: MapPin },
+  { key: 'review', label: 'Review', icon: ClipboardCheck },
   { key: 'prescription', label: 'Prescription', icon: Upload },
   { key: 'payment', label: 'Payment', icon: CreditCard },
 ] as const;
 
-const ORDER: Record<CheckoutStep, number> = { address: 0, prescription: 1, payment: 2, confirmed: 3 };
+const ORDER: Record<CheckoutStep, number> = { address: 0, review: 1, prescription: 2, payment: 3, confirmed: 4 };
 
 export default function CheckoutStepIndicator({ step, showPrescription }: { step: CheckoutStep; showPrescription: boolean }) {
   const steps = STEPS.filter((s) => s.key !== 'prescription' || showPrescription);

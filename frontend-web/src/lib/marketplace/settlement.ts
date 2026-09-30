@@ -23,6 +23,8 @@ export interface Settlement {
   utr_reference: string | null;
   paid_at: string | null;
   created_at: string;
+  /** returns deducted in this batch (C-37); older batches may not send it */
+  return_deductions_paise?: number | null;
 }
 
 export interface SettlementLine {
@@ -38,6 +40,16 @@ export interface SettlementLine {
   delivered_at: string | null;
 }
 
-export type SettlementDetail = Settlement & { lines: SettlementLine[] };
+/** A return credit note deducted from the partner's net sales (negative values). */
+export interface SettlementAdjustment {
+  id: string;
+  taxable_paise: number;
+  gst_paise: number;
+  reason: string;
+  credit_note_number: string | null;
+  created_at: string;
+}
+
+export type SettlementDetail = Settlement & { lines: SettlementLine[]; adjustments?: SettlementAdjustment[] };
 
 export const SETTLEMENT_STATUSES = ['pending', 'processed', 'paid', 'disputed', 'on_hold'] as const;

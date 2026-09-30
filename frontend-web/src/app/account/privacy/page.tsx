@@ -8,6 +8,7 @@ import ConsentStatus from '@/components/privacy/ConsentStatus';
 import ConsentHistory from '@/components/privacy/ConsentHistory';
 import DownloadMyData from '@/components/privacy/DownloadMyData';
 import DataRequestForm from '@/components/privacy/DataRequestForm';
+import MyDataRequests from '@/components/privacy/MyDataRequests';
 
 // Personal-data rights (DPDP Act 2023, C-40..C-44)
 export default function PrivacyPage() {
@@ -27,6 +28,7 @@ export default function PrivacyPage() {
         )}
         <DownloadMyData />
         <DataRequestForm />
+        <MyDataRequests />
       </div>
     </div>
   );

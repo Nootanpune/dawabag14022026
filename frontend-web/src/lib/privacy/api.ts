@@ -35,6 +35,7 @@ export interface DataRequest {
 export const privacyKeys = {
   consents: ['privacy', 'consents'] as const,
   requests: (status: string) => ['privacy', 'requests', status] as const,
+  myRequests: ['privacy', 'my-requests'] as const,
 };
 
 export const PURPOSE_LABELS: Record<string, string> = {
@@ -61,6 +62,14 @@ export function downloadMyData() {
 export async function createDataRequest(request_type: DataRequestType, details?: string) {
   const { data } = await api.post('/privacy/requests', { request_type, ...(details ? { details } : {}) });
   return data.data as { id: string; request_type: DataRequestType; status: DataRequestStatus; created_at: string };
+}
+
+export type MyDataRequest = Omit<DataRequest, 'user_id' | 'user_name' | 'mobile'>;
+
+/** The signed-in user's own correction / erasure requests and their outcome (C-43, C-44). */
+export async function fetchMyDataRequests(): Promise<MyDataRequest[]> {
+  const { data } = await api.get('/privacy/requests');
+  return data.data?.requests ?? [];
 }
 
 // ── Admin ──

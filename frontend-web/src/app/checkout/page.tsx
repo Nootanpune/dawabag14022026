@@ -1,28 +1,31 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { ADDRESSES_QUERY_KEY, fetchAddresses } from '@/lib/addresses';
 import { CART_QUERY_KEY } from '@/lib/cart';
+import { buildOrderBody, placeOrder } from '@/lib/checkout';
 import { useCart } from '@/hooks/useCart';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 import CheckoutStepIndicator from '@/components/checkout/CheckoutStepIndicator';
 import AddressStep from '@/components/checkout/AddressStep';
+import ReviewStep from '@/components/checkout/ReviewStep';
 import PrescriptionStep from '@/components/checkout/PrescriptionStep';
 import PaymentStep from '@/components/checkout/PaymentStep';
 import OrderConfirmed from '@/components/checkout/OrderConfirmed';
 import type { CheckoutStep, PlacedOrder } from '@/components/checkout/types';
 
+// Address → review (C-35 disclosure) → prescription (if needed) → payment
 export default function CheckoutPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const customerType = useAuthStore((s) => s.user?.customer_type);
   const { data: cart, isLoading: cartLoading } = useCart();
 
   const [step, setStep] = useState<CheckoutStep>('address');
@@ -45,21 +48,17 @@ export default function CheckoutPage() {
     if (!selectedAddressId && addresses?.length) setSelectedAddressId(addresses[0].id);
   }, [addresses, selectedAddressId]);
 
-  const placeOrder = async () => {
-    const address = addresses?.find((a) => a.id === selectedAddressId);
+  const address = addresses?.find((a) => a.id === selectedAddressId);
+  const previewBody = useMemo(() => (address && cart ? buildOrderBody(address, cart) : null), [address, cart]);
+
+  const submitOrder = async (declaration: boolean) => {
     if (!address || !cart) {
       toast.error('Please select a delivery address');
       return;
     }
     setPlacing(true);
     try {
-      const { data } = await api.post('/orders', {
-        address_id: address.id,
-        items: cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-        coupon_code: cart.coupon?.valid ? cart.coupon.code : undefined,
-        pincode: address.pincode,
-      });
-      const placed: PlacedOrder = data.data.order;
+      const placed: PlacedOrder = await placeOrder(buildOrderBody(address, cart, declaration));
       setOrder(placed);
       // Ordered lines were removed from the server cart.
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY });
@@ -103,6 +102,17 @@ export default function CheckoutPage() {
         </div>
       );
     }
+    if (step === 'review' && previewBody) {
+      return (
+        <ReviewStep
+          body={previewBody}
+          needsDeclaration={customerType === 'doc_hospital'}
+          placing={placing}
+          onBack={() => setStep('address')}
+          onPlace={submitOrder}
+        />
+      );
+    }
     return (
       <AddressStep
         addresses={addresses}
@@ -110,8 +120,7 @@ export default function CheckoutPage() {
         selectedId={selectedAddressId}
         onSelect={setSelectedAddressId}
         cart={cart}
-        placing={placing}
-        onContinue={placeOrder}
+        onContinue={() => setStep('review')}
       />
     );
   };

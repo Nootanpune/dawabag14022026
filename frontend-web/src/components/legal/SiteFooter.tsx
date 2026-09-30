@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useLegalInfo } from './useLegalInfo';
 import LegalBlocks from './LegalBlocks';
+import PolicyLinks from './PolicyLinks';
+import { POLICY_KEYS } from '@/lib/legal/policies';
 
 /** Site-wide footer with licence and grievance-officer details from the server (C-04, C-36). */
 export default function SiteFooter() {
@@ -22,6 +24,8 @@ export default function SiteFooter() {
           <Link href="/account/privacy" className="hover:text-brand-600">
             Privacy &amp; your data
           </Link>
+          {/* Published policies (C-39) */}
+          <PolicyLinks keys={POLICY_KEYS} className="contents" />
         </div>
       </div>
     </footer>

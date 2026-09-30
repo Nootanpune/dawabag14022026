@@ -15,15 +15,28 @@ import {
   MessageSquareWarning,
   ShieldAlert,
   UserCog,
+  Undo2,
+  Banknote,
+  FileText,
+  BadgeCheck,
+  Send,
+  ClipboardCheck,
+  HeartPulse,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
-import { hasRole, MANAGER_ROLES, ADMIN_ROLES } from '@/lib/admin/roles';
+import { hasRole, MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_ROLES } from '@/lib/fulfilment/roles';
 
 const ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, roles: MANAGER_ROLES },
   { href: '/staff/fulfilment', label: 'Fulfilment', icon: PackageCheck, roles: FULFILMENT_ROLES },
+  { href: '/admin/deliveries', label: 'Deliveries', icon: Send, roles: MANAGER_ROLES },
+  { href: '/admin/returns', label: 'Returns', icon: Undo2, roles: ADMIN_ROLES },
+  { href: '/staff/returns', label: 'Returns', icon: Undo2, roles: ['pharmacist_pack'] },
+  { href: '/admin/refunds', label: 'Refunds', icon: Banknote, roles: MANAGER_ROLES },
+  { href: '/staff/content-review', label: 'Product copy', icon: ClipboardCheck, roles: PHARMACIST_ROLES },
+  { href: '/staff/adverse-events', label: 'Side effects', icon: HeartPulse, roles: PHARMACIST_ROLES },
   { href: '/admin/kyc', label: 'KYC review', icon: ShieldCheck, roles: ADMIN_ROLES },
   { href: '/admin/grievances', label: 'Complaints', icon: MessageSquareWarning, roles: ADMIN_ROLES },
   { href: '/admin/recalls', label: 'Batch recalls', icon: ShieldAlert, roles: MANAGER_ROLES },
@@ -34,6 +47,8 @@ const ITEMS = [
   { href: '/admin/stock', label: 'Low stock', icon: PackageX, roles: MANAGER_ROLES },
   { href: '/admin/credit', label: 'Credit', icon: IndianRupee, roles: MANAGER_ROLES },
   { href: '/admin/jobs', label: 'Jobs', icon: Timer, roles: MANAGER_ROLES },
+  { href: '/admin/policies', label: 'Policies', icon: FileText, roles: MANAGER_ROLES },
+  { href: '/admin/licences', label: 'Licences', icon: BadgeCheck, roles: MANAGER_ROLES },
   { href: '/admin/settings', label: 'Settings', icon: Settings, roles: MANAGER_ROLES },
 ];
 

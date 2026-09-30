@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import ConsentFields from './ConsentFields';
 import ProfessionalFields from './ProfessionalFields';
+import PractitionerDeclarationField from './PractitionerDeclarationField';
 import { Field, upper } from './FormField';
 import { Eye, EyeOff, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import {
@@ -159,6 +160,8 @@ export default function DetailsStep({
           )}
         </div>
       )}
+
+      {isDoctor && <PractitionerDeclarationField register={register} error={errors.practitioner_declaration?.message} />}
 
       {/* ── Credentials ── */}
       <Field label="Password" error={errors.password?.message}>

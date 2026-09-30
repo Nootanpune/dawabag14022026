@@ -20,7 +20,7 @@ export default function ConsentFields({ register, errors }: Props) {
           />
           <span>
             I have read the{' '}
-            <Link href="/privacy" target="_blank" className="text-brand-600 font-medium hover:underline">
+            <Link href="/policies/privacy" target="_blank" className="text-brand-600 font-medium hover:underline">
               Privacy Notice
             </Link>{' '}
             and agree to Dawabag processing my personal and health data to provide pharmacy services.

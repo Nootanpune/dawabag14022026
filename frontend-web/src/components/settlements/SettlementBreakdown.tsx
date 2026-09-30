@@ -22,6 +22,12 @@ export default function SettlementBreakdown({ s }: { s: Settlement }) {
       <div className="card text-sm">
         <h3 className="font-semibold mb-2">Payout</h3>
         <Line label="Gross sale value" paise={s.gross_sale_value_paise} />
+        {/* Gross is already net of returns; shown so the partner sees what was deducted (C-37) */}
+        {!!s.return_deductions_paise && (
+          <p className="text-xs text-gray-500 -mt-1 mb-1">
+            after return deductions of {formatPrice(Number(s.return_deductions_paise))}
+          </p>
+        )}
         <Line label="Commission" paise={s.commission_paise} minus />
         <Line label="Finding fee" paise={s.finding_fee_paise} minus />
         <Line label="GST on fees" paise={s.fee_gst_paise} minus />

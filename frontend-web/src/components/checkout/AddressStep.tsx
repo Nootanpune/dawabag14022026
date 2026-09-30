@@ -1,9 +1,11 @@
 'use client';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { Loader2, MapPin, ChevronRight } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import type { Address } from '@/lib/addresses';
 import type { CartView } from '@/lib/cart';
+import AddressSummary from '@/components/addresses/AddressSummary';
+import AddressFormDialog from '@/components/addresses/AddressFormDialog';
 
 interface Props {
   addresses: Address[] | undefined;
@@ -11,12 +13,12 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   cart: CartView;
-  placing: boolean;
   onContinue: () => void;
 }
 
-export default function AddressStep({ addresses, loading, selectedId, onSelect, cart, placing, onContinue }: Props) {
-  const router = useRouter();
+export default function AddressStep({ addresses, loading, selectedId, onSelect, cart, onContinue }: Props) {
+  const [adding, setAdding] = useState(false);
+  const selected = addresses?.find((a) => a.id === selectedId);
   return (
     <div className="card">
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -42,23 +44,14 @@ export default function AddressStep({ addresses, loading, selectedId, onSelect, 
                 onChange={() => onSelect(addr.id)}
                 className="mt-1 accent-brand-600"
               />
-              <div>
-                <p className="font-medium text-sm">
-                  {addr.label} — {addr.full_name}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {addr.address_line1}
-                  {addr.address_line2 ? `, ${addr.address_line2}` : ''}, {addr.city} — {addr.pincode}, {addr.state}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">Mob: {addr.mobile}</p>
-              </div>
+              <AddressSummary a={addr} />
             </label>
           ))}
           {(!addresses || addresses.length === 0) && (
-            <p className="text-center text-gray-400 py-4 text-sm">No saved addresses. Add one from your account.</p>
+            <p className="text-center text-gray-400 py-4 text-sm">No saved addresses yet.</p>
           )}
           <button
-            onClick={() => router.push('/account/addresses')}
+            onClick={() => setAdding(true)}
             className="w-full border-2 border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-500 hover:border-brand-300 hover:text-brand-600"
           >
             + Add new address
@@ -77,17 +70,17 @@ export default function AddressStep({ addresses, loading, selectedId, onSelect, 
             <span>–{formatPrice(cart.discount_paise)}</span>
           </div>
         )}
-        <p className="text-xs text-gray-400">Shipping and GST are added for this address when the order is placed.</p>
+        <p className="text-xs text-gray-400">GST and delivery for this address are shown on the next step, before you pay.</p>
       </div>
 
       <button
         onClick={onContinue}
-        disabled={placing || !selectedId}
+        disabled={!selected || selected.is_serviceable === false}
         className="btn-primary w-full mt-5 py-3 flex items-center justify-center gap-2"
       >
-        {placing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-        Place order <ChevronRight className="w-4 h-4" />
+        Review order <ChevronRight className="w-4 h-4" />
       </button>
+      {adding && <AddressFormDialog onClose={() => setAdding(false)} onSaved={(a) => onSelect(a.id)} />}
     </div>
   );
 }

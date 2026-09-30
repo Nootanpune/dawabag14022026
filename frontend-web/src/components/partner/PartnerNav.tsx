@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Search, ListChecks, Truck, IndianRupee } from 'lucide-react';
+import { LayoutDashboard, Search, ListChecks, Truck, IndianRupee, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
@@ -9,6 +9,7 @@ const ITEMS = [
   { href: '/partner/catalogue', label: 'Catalogue', icon: Search },
   { href: '/partner/listings', label: 'My listings', icon: ListChecks },
   { href: '/partner/shipments', label: 'Shipments', icon: Truck },
+  { href: '/partner/returns', label: 'Returns', icon: Undo2 },
   { href: '/partner/settlements', label: 'Settlements', icon: IndianRupee },
 ];
 
