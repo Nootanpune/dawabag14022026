@@ -5,6 +5,22 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 (built in a Claude chat, 30 Mar 2026). Sprint 1 is in progress on branch
 `claude/dawabag-pharmacy-status-0h7mr3`.
 
+## Standing rules from the owner (2026-09-30)
+- Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
+- Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprint 2 (backend + web client)
+- Server cart, httpOnly cookie sessions, S3-only storage, no client storage (web).
+- KYC review API, credit limits/settlement, scheduled jobs (licence expiry,
+  GSTIN re-check, low stock, credit reminders), audit logging, coupon rule C-21.
+- Fixed: credit columns missing (all credit orders failed), low-stock query
+  ambiguous, KYC count-based approval, logout never revoked tokens.
+- Tests: test/sprint2.smoke.mjs (43 checks) + Sprint 1 suite pass.
+
+## In progress
+- Web admin screens (KYC review, vendors, low stock, credit, jobs).
+- Mobile: remove Hive/shared_preferences, server cart, split register screen.
+
 ## Done in Sprint 1
 - Migrations fixed (02 view, 03 unique index) and 04 added (registration fields,
   kyc_documents, consent_records, audit_logs.performed_by/notes, order fixes).
@@ -34,3 +50,4 @@ admin KYC review screen, crons (Sprint 2 list in the Resume Guide).
 | 2026-02-14..17 | Kilo prototype (Next.js, mock data) |
 | 2026-03-30 | v2 package produced in Claude chat (not in Git) |
 | 2026-09-30 | v2 imported; compliance rulebook drafted; owner decisions logged; Sprint 1 registration/KYC built and tested |
+| 2026-09-30 | Standing rules (server SSOT, modular); Sprint 2 backend + web SSOT |
