@@ -79,14 +79,10 @@ export default function AdminDashboard() {
               <h2 className="font-semibold text-sm mb-4">Order pipeline</h2>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {pipelineStages.map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => router.push('/admin/orders')}
-                    className={`rounded-xl p-4 text-center transition-opacity hover:opacity-80 ${s.color}`}
-                  >
+                  <div key={s.key} className={`rounded-xl p-4 text-center ${s.color}`}>
                     <p className="text-2xl font-bold">{pipeline[s.key] || 0}</p>
                     <p className="text-xs font-medium mt-0.5">{s.label}</p>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -95,8 +91,6 @@ export default function AdminDashboard() {
             <div className="card">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-sm">Pending queue</h2>
-                <button onClick={() => router.push('/admin/orders')}
-                  className="text-xs text-brand-600 hover:underline font-medium">View all →</button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -113,8 +107,7 @@ export default function AdminDashboard() {
                     {(queueData?.orders || []).map((order: any) => {
                       const si = ORDER_STATUS_LABELS[order.status] || { label: order.status, color: 'text-gray-600 bg-gray-100' };
                       return (
-                        <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => router.push(`/admin/orders/${order.id}`)}>
+                        <tr key={order.id} className="border-b border-gray-50">
                           <td className="py-2.5 font-medium text-brand-600">{order.order_number}</td>
                           <td className="py-2.5">
                             <p className="font-medium">{order.customer_name || '—'}</p>

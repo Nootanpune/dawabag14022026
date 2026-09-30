@@ -42,7 +42,8 @@ export default function LoginPage() {
       const role = res.data.data.role;
       if (role === 'admin' || role === 'super_admin') router.push('/admin');
       else if (role === 'doctor') router.push('/doctor/dashboard');
-      else if (['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(role)) router.push('/admin/orders');
+      // Order-fulfilment screens are not built yet; pharmacists work the KYC queue
+      else if (role === 'pharmacist_rx') router.push('/admin/kyc');
       else router.push('/');
     } catch (err: any) {
       const msg = getApiErrorMessage(err, 'Login failed');

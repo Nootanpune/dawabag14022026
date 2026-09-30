@@ -17,9 +17,16 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
   ambiguous, KYC count-based approval, logout never revoked tokens.
 - Tests: test/sprint2.smoke.mjs (43 checks) + Sprint 1 suite pass.
 
-## In progress
-- Web admin screens (KYC review, vendors, low stock, credit, jobs).
-- Mobile: remove Hive/shared_preferences, server cart, split register screen.
+- Web admin screens: KYC review (queue + detail with per-check decisions,
+  document links, reject, credit limit), vendors, low stock, open credit,
+  jobs; route guards for /orders and /admin. KYC approval driven end to end
+  in headless Chromium.
+- Mobile: Hive/shared_preferences removed, server cart, refresh token only in
+  keychain, register screen split into screens/auth/register/ (not compiled).
+
+## Known gaps
+- No order-fulfilment screens (/admin/orders: pharmacist Rx check, packing).
+- No address-management page (web /account/addresses, mobile add address).
 
 ## Done in Sprint 1
 - Migrations fixed (02 view, 03 unique index) and 04 added (registration fields,
