@@ -13,6 +13,7 @@ import { syncOrderStatus } from './fulfilment.service';
 export async function listPartnerShipments(vendorId: string, status?: string) {
   return query(
     `SELECT s.id, s.invoice_number, s.status, s.subtotal_paise, s.gst_paise, s.total_paise, s.cold_chain,
+            s.seal_number, s.handover_code_required,
             s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at, s.created_at,
             o.order_number, o.status AS order_status,
             a.full_name AS ship_to_name, a.mobile AS ship_to_mobile, a.address_line1, a.city, a.state, a.pincode,

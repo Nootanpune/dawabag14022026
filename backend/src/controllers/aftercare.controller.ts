@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { cancelOrder } from '../services/cancellation.service';
-import { RETURN_REASONS, createReturn, decideReturn, getReturn, listReturns, recordDisposition } from '../services/return.service';
+import { RETURN_REASONS, createReturn, returnWindows, decideReturn, getReturn, listReturns, recordDisposition } from '../services/return.service';
 import { listRefunds, markRefundProcessed } from '../services/refund.service';
 
 const uuid = z.string().uuid();
@@ -81,4 +81,9 @@ export async function postRefundProcessed(req: Request, res: Response, next: Nex
     const { reference } = z.object({ reference: z.string().trim().min(3).max(100) }).parse(req.body);
     res.json({ success: true, data: await markRefundProcessed(req.user!.id, uuid.parse(req.params.id), reference) });
   } catch (err) { next(err); }
+}
+
+// GET /returns/windows — public; the time limits for reporting problems (C-37)
+export async function getReturnWindows(_req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await returnWindows() }); } catch (err) { next(err); }
 }

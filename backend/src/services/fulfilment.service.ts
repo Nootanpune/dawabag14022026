@@ -31,7 +31,7 @@ export async function fulfilmentQueue(stage: QueueStage) {
   const shipmentStatus = { pack: 'pending', dispatch: 'packed', deliver: 'dispatched' }[stage];
   return query(
     `SELECT s.id AS shipment_id, s.invoice_number, s.status, s.total_paise, s.cold_chain, s.created_at,
-            s.courier_partner, s.awb_number, o.id AS order_id, o.order_number, o.status AS order_status,
+            s.courier_partner, s.awb_number, s.seal_number, s.handover_code_required, o.id AS order_id, o.order_number, o.status AS order_status,
             a.full_name AS ship_to_name, a.city, a.pincode,
             json_agg(json_build_object('product_name', oi.product_name, 'quantity', oi.quantity,
               'batch_number', ib.batch_number, 'expiry_date', ib.expiry_date, 'rx_cleared',

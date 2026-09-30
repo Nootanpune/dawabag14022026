@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { createReturn, RETURN_REASONS, returnKeys, type ReturnReason } from '@/lib/returns/api';
+import { createReturn, fetchReturnWindows, RETURN_REASONS, returnKeys, type ReturnReason } from '@/lib/returns/api';
 import { orderKeys, type OrderDetail, type OrderShipmentDetail } from '@/lib/orders/api';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '@/components/admin/Modal';
@@ -28,6 +28,7 @@ export default function ReturnRequestDialog({ order, shipment, onClose }: Props)
   const [reason, setReason] = useState<ReturnReason | ''>('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  const windows = useQuery({ queryKey: ['returns', 'windows'], queryFn: fetchReturnWindows, staleTime: 5 * 60_000 }).data;
 
   const send = useMutation({
     mutationFn: () =>
@@ -59,8 +60,8 @@ export default function ReturnRequestDialog({ order, shipment, onClose }: Props)
   return (
     <Modal title="Report a problem / return" onClose={onClose} size="lg">
       <p className="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 mb-3">
-        Damaged, wrong or missing items must be reported within 48 hours of delivery; expired, near-expiry, quality and
-        recall issues within 30 days. Returned medicines are destroyed or sent back to the supplier — never resold.
+        Damaged, wrong or missing items must be reported within {windows?.report_within_hours ?? 48} hours of delivery;
+        expired, near-expiry and quality issues within {windows?.expiry_claim_days ?? 30} days; recalled batches at any time. Returned medicines are destroyed or sent back to the supplier — never resold.
       </p>
       <label className="block text-sm font-medium text-gray-700 mb-1">What went wrong?</label>
       <select value={reason} onChange={(e) => setReason(e.target.value as ReturnReason)} className="input mb-3">

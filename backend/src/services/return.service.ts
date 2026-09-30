@@ -23,6 +23,15 @@ export interface ReturnInput {
   items: { order_item_id: string; quantity: number }[];
 }
 
+// The windows buyers see in help text come from the same settings the server enforces
+export async function returnWindows() {
+  return {
+    report_within_hours: Number(await getSetting('returns.report_within_hours', 48)),
+    expiry_claim_days: Number(await getSetting('returns.expiry_claim_days', 30)),
+    near_expiry_days: Number(await getSetting('returns.near_expiry_days', 90)),
+  };
+}
+
 export async function createReturn(userId: string, input: ReturnInput) {
   const hours = Number(await getSetting('returns.report_within_hours', 48));
   const claimDays = Number(await getSetting('returns.expiry_claim_days', 30));

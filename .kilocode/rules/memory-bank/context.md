@@ -2,8 +2,9 @@
 
 ## Current state (2026-09-30)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprint 1 is in progress on branch
-`claude/dawabag-pharmacy-status-0h7mr3`.
+(built in a Claude chat, 30 Mar 2026). Sprints 1–5 are done on branch
+`claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
+the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
@@ -34,6 +35,15 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 - Owner to fill in: legal.* settings (entity, licences, pharmacist-in-charge, grievance
   officer); appoint the pharmacist-in-charge and grievance officer.
 
+## Done in Sprint 5 (after-sale care and consumer protection)
+- Migration 08. Cancellation, returns, refund ledger, GST credit notes, partner settlement
+  deductions (C-37); checkout preview (C-35); versioned policies (C-39); product declarations
+  and pharmacist copy review, trade prices no longer public (C-17, C-19); sealed dispatch and
+  delivery code (C-26); side-effect reports (C-29); licence register + alert job (C-07);
+  doctor declaration (C-15); addresses; signed PDF links; `GET /returns/windows`.
+- Defaults to confirm with the owner: DECISIONS.md "Sprint 5 defaults".
+- Tests: test/sprint5.smoke.mjs (83 checks) + Sprint 1–4 suites + 25 jest tests pass.
+
 ## Mobile Sprint 5 (buyer screens, not compiled — no Flutter SDK here)
 - Checkout: address → review (POST /orders/preview: per-seller block with licence and
   delivery estimate, lines with country of origin, charge break-up, returns note, policy
@@ -46,6 +56,27 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 - New screens: /account/returns (+ /new, /:id), /account/side-effects (+ /new),
   /account/addresses (+ /new, /:id/edit), public /policies/:key; policies listed on About &
   legal; privacy screen lists GET /privacy/requests.
+
+## Web Sprint 5 (tsc + next lint + next build pass)
+- Checkout: address → review (POST /orders/preview, C-35: seller + licence + estimate,
+  lines with origin/expiry, charge break-up, returns note, policy links) → place → Rx →
+  pay. doc_hospital ticks an unticked own-patients declaration (C-15), also on register.
+- Order detail split into components/orders/*: shipments with seal, delivery code (C-26),
+  receiver; cancel (can_cancel); returns/refunds/credit-note PDFs (C-37); "Report a
+  problem / return" per delivered shipment; "Report a side effect" per line (C-29).
+- New buyer pages: /account/addresses, /account/returns (+[id], refunds list),
+  /account/side-effects (+new, [id]), /shop/[productId] with declarations (C-17/C-19),
+  public /policies and /policies/[key] (C-39, text only, no HTML); privacy page lists
+  own requests; footer policy links.
+- Staff/admin: seal number on staff + partner dispatch; handover dialog (code, receiver,
+  admin override) for staff/partner delivery and /admin/deliveries; /admin/returns and
+  /staff/returns (+[id]) decide/close; /admin/refunds (mark paid with UTR, failure
+  reason); /admin/policies (new version + history); /admin/licences (C-07);
+  /staff/content-review (C-19); /staff/adverse-events (C-29); partner /partner/returns and
+  settlement return adjustments.
+- Backend gaps seen from web: fulfilment and partner shipment queues do not return
+  handover_code_required / seal_number; return detail credit_notes have no id (PDF only
+  from order page); no admin product create/edit screen exists yet on web.
 
 ## Done in Sprint 3 (backend)
 - Owner decisions: allocation rule (> ₹10k + Dawabag ≤24 h → own stock first, else
@@ -73,9 +104,9 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
   keychain, register screen split into screens/auth/register/ (not compiled).
 
 ## Known gaps
-- No address-management page (web /account/addresses, mobile add address).
-- Recall returns/refunds and settlement deductions for returns are manual.
-- Mobile cannot open invoice PDFs: needs a short-lived signed invoice URL from the API.
+- Buyer cannot attach a saved verified prescription at checkout (pharmacist applies it instead).
+- Refunds through Razorpay untested (no keys; legs wait for accounts). Replacement = new order.
+- No web admin product create/edit form (API only). Policy texts must be published by the owner.
 - WhatsApp channel not wired; GSTR-8 filing manual; Razorpay mandates untested.
 
 ## Done in Sprint 1
@@ -96,8 +127,9 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 - Flutter build on a machine with the SDK (`flutter pub get`, run on device).
 
 ## Next (before beta)
-Owner data and credentials (legal settings, API keys, S3, Razorpay, MSG91), lawyer/CA
-sign-off on the rulebook, address management page, returns and refunds flow, Flutter build.
+Owner data and credentials (legal settings, licence register, policy texts, API keys, S3,
+Razorpay, MSG91), lawyer/CA sign-off on the rulebook and Sprint 5 defaults, Flutter build,
+deployment per docs/Dawabag_Beta_Deployment_Guide.docx.
 
 ## Session history
 | Date | Change |
@@ -108,3 +140,4 @@ sign-off on the rulebook, address management page, returns and refunds flow, Flu
 | 2026-09-30 | Standing rules (server SSOT, modular); Sprint 2 backend + web SSOT |
 | 2026-09-30 | Sprint 3 backend: marketplace, allocation, settlements, refills |
 | 2026-09-30 | Sprint 4: pharmacist gate, H1 register, invoices, price checks, grievances, recall, privacy |
+| 2026-09-30 | Sprint 5: cancellation, returns, refunds, credit notes, checkout disclosure, policies, handover code, ADR, licences, addresses |

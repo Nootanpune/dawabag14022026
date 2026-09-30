@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
-  getAllRefunds, getAllReturns, getMyRefunds, getMyReturns, getOneReturn, postCloseReturn, postDecideReturn,
+  getAllRefunds, getAllReturns, getReturnWindows, getMyRefunds, getMyReturns, getOneReturn, postCloseReturn, postDecideReturn,
   postRefundProcessed, postReturn,
 } from '../controllers/aftercare.controller';
 
 // Returns and refunds — /api/v1/returns/* (C-37)
 const router = Router();
+router.get('/windows', getReturnWindows);   // public
 router.use(authenticate);
 
 const staff = authorize('admin', 'super_admin', 'pharmacist_rx', 'pharmacist_pack');

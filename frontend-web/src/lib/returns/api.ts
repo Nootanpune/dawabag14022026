@@ -160,3 +160,9 @@ export async function fetchPartnerReturn(id: string): Promise<ReturnDetail> {
   const { data } = await api.get(`/partner/returns/${id}`);
   return data.data;
 }
+
+// Time limits for reporting problems, set by the admin on the server (C-37)
+export interface ReturnWindows { report_within_hours: number; expiry_claim_days: number; near_expiry_days: number }
+export async function fetchReturnWindows(): Promise<ReturnWindows> {
+  return (await api.get('/returns/windows')).data.data;
+}

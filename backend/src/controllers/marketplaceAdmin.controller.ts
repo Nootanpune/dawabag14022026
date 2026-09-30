@@ -135,6 +135,11 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'marketplace.tds_pct': z.number().min(0).max(5),
   'marketplace.fee_gst_pct': z.number().min(0).max(28),
   'refill.reminder_days_before': z.number().int().min(1).max(14),
+  // Sprint 5 — returns and delivery handover (C-37, C-26)
+  'returns.report_within_hours': z.number().int().min(24).max(240),
+  'returns.expiry_claim_days': z.number().int().min(7).max(90),
+  'returns.near_expiry_days': z.number().int().min(30).max(365),
+  'delivery.handover_code_scope': z.enum(['rx_only', 'all', 'off']),
   // Sprint 4 — public legal details (C-03, C-04, C-36)
   'legal.entity': z.object({ name: z.string().min(2).max(200), address: z.string().max(500), gstin: z.string().max(15), cin: z.string().max(21) }).strict(),
   'legal.drug_licences': z.object({ retail_20: z.string().max(60), retail_21: z.string().max(60), wholesale_20b: z.string().max(60),
