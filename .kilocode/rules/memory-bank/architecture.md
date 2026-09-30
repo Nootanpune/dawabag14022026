@@ -27,3 +27,19 @@
 - Scheduled jobs: `jobs/registry.ts` (definitions), `jobs/scheduler.ts` (cron + lock +
   job_runs), one file per job. Admin: `GET /admin/jobs`, `POST /admin/jobs/:name/run`.
 - Audit: always through `utils/audit.ts` (`writeAudit` / `writeAuditTx`).
+- **Orders (Sprint 3):** `services/orderPlacement.service.ts` places every order (API
+  and refill job). `services/allocation.service.ts` picks one seller + batch per line
+  (rule in the pure `services/sellerSelection.ts`; thresholds in `app_settings`), then
+  `services/shipment.service.ts` creates one `order_shipments` row per seller of record,
+  each with its own gap-free invoice number (`next_invoice_number(series, prefix)`:
+  'DWB' Dawabag goods, 'DWS' Dawabag services/commission, 'P:<vendor>' partners).
+  `orders.invoice_number` is Dawabag's invoice only (NULL if only partners ship).
+- **Marketplace:** partners are `vendors` (vendor_type marketplace_partner|both) with
+  logins linked through `vendor_users` (role 'partner', guard `middleware/partner.middleware.ts`).
+  Partner portal `/api/v1/partner/*`; listings sell at catalogue price; settlements in
+  `services/settlement.service.ts` with arithmetic in `services/settlementMath.ts`.
+- **Refills:** `services/refill.service.ts` + `services/mandate.service.ts` (Razorpay
+  recurring; untested without keys). Payment capture → `services/paymentCapture.service.ts`.
+  Razorpay client + webhook signature: `services/razorpay.client.ts` (raw-body HMAC).
+- **Settings:** `app_settings` via `services/settings.service.ts`; admin edits keys with
+  validation in `controllers/marketplaceAdmin.controller.ts`.

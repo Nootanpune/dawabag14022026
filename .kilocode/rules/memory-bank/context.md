@@ -9,6 +9,16 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Done in Sprint 3 (backend)
+- Owner decisions: allocation rule (> ₹10k + Dawabag ≤24 h → own stock first, else
+  nearest seller), partners sell at catalogue price, refills with reminders +
+  auto-order + mandate auto-charge.
+- Migration 06; allocation + per-seller shipments/invoices; gap-free invoice numbering;
+  partner portal API; listing review with Schedule H1 gate; settlements with commission,
+  fee, GST on fees, TCS, TDS; refills API + jobs; payment webhook and verify hardening.
+- Tests: test/sprint3.smoke.mjs (48 checks) + Sprint 1/2 suites + 21 jest tests pass.
+- Not exercised: Razorpay mandate/recurring calls (no keys).
+
 ## Done in Sprint 2 (backend + web client)
 - Server cart, httpOnly cookie sessions, S3-only storage, no client storage (web).
 - KYC review API, credit limits/settlement, scheduled jobs (licence expiry,
@@ -58,3 +68,4 @@ prescription-view access log (C-41), address management page (web).
 | 2026-03-30 | v2 package produced in Claude chat (not in Git) |
 | 2026-09-30 | v2 imported; compliance rulebook drafted; owner decisions logged; Sprint 1 registration/KYC built and tested |
 | 2026-09-30 | Standing rules (server SSOT, modular); Sprint 2 backend + web SSOT |
+| 2026-09-30 | Sprint 3 backend: marketplace, allocation, settlements, refills |
