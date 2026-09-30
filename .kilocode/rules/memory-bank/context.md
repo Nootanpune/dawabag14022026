@@ -1,111 +1,36 @@
-# Active Context: Dawabag - Pharmaceutical E-Commerce Platform
+# Active Context
 
-## Current State
+## Current state (2026-09-30)
+The February Kilo Next.js prototype was replaced by the Dawabag v2 package
+(built in a Claude chat, 30 Mar 2026). Sprint 1 is in progress on branch
+`claude/dawabag-pharmacy-status-0h7mr3`.
 
-**Project Status**: ✅ COMPLETE - All Phases Done
+## Done in Sprint 1
+- Migrations fixed (02 view, 03 unique index) and 04 added (registration fields,
+  kyc_documents, consent_records, audit_logs.performed_by/notes, order fixes).
+- Backend compiles (was 23 errors); runtime bugs fixed: order routes/params,
+  product search SQL, notification payloads, order_items/orders schema mismatches.
+- customer_type in JWT and on req.user; trade pricing gated on KYC approval.
+- 4-step registration: API (per-type validation, consent, 18+), KYC document
+  upload (`GET/POST /api/v1/kyc/documents`), web UI, Flutter UI.
+- Schedule X / NDPS hidden from search. Doctor referral bonus removed.
+- Tests: 12 jest unit tests; `test/sprint1.smoke.mjs` (all checks pass locally);
+  web registration driven end to end in headless Chromium.
 
-The Dawabag pharmaceutical e-commerce platform has been fully developed based on a comprehensive URS (User Requirements Specification). All phases are complete and code has been pushed to main branch.
+## Still open in Sprint 1 (need owner credentials/data)
+- Fill PTR/PTS/Institutional prices in `templates/01_Medicine_and_Inventory.xlsx`.
+- IRIS IRP sandbox e-invoice test; GSTIN/PAN KYC API sandbox tests.
+- Flutter build on a machine with the SDK (`flutter pub get`, run on device).
 
-## Recently Completed
+## Next (from Compliance Rulebook, before beta)
+Pharmacist sign-off gate + H1 register (C-08, C-09), invoice PDF (pdf.service is a
+placeholder), B2B licence on invoices (column added, C-13), MRP/NPPA price checks
+(C-16), grievance module and legal footer (C-04, C-36), recall tool (C-28),
+admin KYC review screen, crons (Sprint 2 list in the Resume Guide).
 
-- [x] URS gap analysis and documentation
-- [x] Comprehensive specification document (SPECIFICATION.md)
-- [x] Customer-facing features (search, cart, checkout, pincode delivery)
-- [x] Admin dashboard (orders, inventory, staff, reports)
-- [x] Doctor portal (referrals, patients, B2B catalog)
-- [x] Pharmacy portal (B2B catalog, credit management, invoices)
-- [x] TypeScript type definitions for all entities
-- [x] SPECIFICATION.md converted to Word format (SPECIFICATION.docx)
-- [x] **Phase 6: Backend API Routes** - 12 endpoints implemented
-- [x] **TypeScript fixes** - All type errors resolved
-- [x] **Committed and pushed to main branch**
-
-## Current Structure
-
-| File/Directory | Purpose | Status |
-|----------------|---------|--------|
-| `SPECIFICATION.md` | Complete specification addressing all gaps | ✅ Complete |
-| `SPECIFICATION.docx` | Word format of specification document | ✅ Complete |
-| `src/types/index.ts` | TypeScript interfaces for all user roles | ✅ Complete |
-| `src/lib/utils.ts` | Utility functions (validation, security) | ✅ Complete |
-| `src/app/page.tsx` | Customer home page | ✅ Complete |
-| `src/app/admin/dashboard/page.tsx` | Admin dashboard | ✅ Complete |
-| `src/app/doctor/dashboard/page.tsx` | Doctor portal | ✅ Complete |
-| `src/app/pharmacy/dashboard/page.tsx` | Pharmacy portal | ✅ Complete |
-
-## Key Gaps Addressed
-
-### Customer Features
-- Search without login (brand/generic name)
-- Pincode-based delivery check
-- Cart persistence
-- Prescription upload and validation
-- Order tracking
-- Referral code system
-- Patient management
-
-### Backend Features
-- Multiple role logins (Admin, Super Admin, Pharmacist, Packing, Delivery)
-- Inventory alerts and management
-- Vendor management with PO generation
-- GSTR-compliant invoice export
-- Reports generation
-- Audit logging
-
-### Doctor Portal
-- Registration ID verification
-- Referral code generation
-- Bonus points system
-- Patient management
-- Separate B2B catalog with wholesale pricing
-
-### Pharmacy Portal
-- Drug license verification
-- GST validation
-- Credit limit management
-- Post-paid payment terms
-- Separate wholesale catalog
-- Invoice management
-
-### Security & Compliance
-- Password encryption utilities
-- Input validation
-- Drug interaction checking
-- Age verification
-- Scheduled drug controls
-- GDPR-ready data structure
-
-## Current Focus
-
-The core portals have been implemented. Next steps:
-
-1. Database integration with Drizzle
-2. API route implementation
-3. Authentication system
-4. Payment gateway integration
-5. Real prescription verification
-
-## Available Recipes
-
-| Recipe | File | Use Case |
-|--------|------|----------|
-| Add Database | `.kilocode/recipes/add-database.md` | Data persistence with Drizzle + SQLite |
-
-## Pending Improvements
-
-- [ ] API routes for all endpoints
-- [ ] Authentication system (JWT)
-- [ ] Payment gateway integration
-- [ ] SMS/Email notifications
-- [ ] Mobile app development
-- [ ] Testing setup
-
-## Session History
-
-| Date | Changes |
-|------|---------|
-| Initial | Template created with base setup |
-| 2026-02-14 | Analyzed URS and identified gaps |
-| 2026-02-14 | Created SPECIFICATION.md with gap solutions |
-| 2026-02-14 | Implemented customer, admin, doctor, pharmacy portals |
-| 2026-02-14 | Converted SPECIFICATION.md to Word format (SPECIFICATION.docx) |
+## Session history
+| Date | Change |
+| --- | --- |
+| 2026-02-14..17 | Kilo prototype (Next.js, mock data) |
+| 2026-03-30 | v2 package produced in Claude chat (not in Git) |
+| 2026-09-30 | v2 imported; compliance rulebook drafted; owner decisions logged; Sprint 1 registration/KYC built and tested |

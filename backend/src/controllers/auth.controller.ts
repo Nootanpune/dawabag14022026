@@ -27,7 +27,18 @@ const commonFields = {
   password: z.string().min(8, 'Password must be at least 8 characters'),
   full_name: z.string().trim().min(2).max(255),
   referral_code: z.string().optional(),
+  // Rulebook C-40 / C-42: notice + consent and 18+ are mandatory; marketing is opt-in
+  accept_privacy_notice: z.literal(true, {
+    errorMap: () => ({ message: 'Please read and accept the privacy notice to continue' }),
+  }),
+  age_confirmed: z.literal(true, {
+    errorMap: () => ({ message: 'You must be 18 or older to create an account' }),
+  }),
+  marketing_consent: z.boolean().optional().default(false),
 };
+
+// Bump when the privacy notice text changes; stored with every consent record
+const PRIVACY_POLICY_VERSION = process.env.PRIVACY_POLICY_VERSION || '2026-10-v1';
 
 // One schema per buyer type — URS v3.1 §2 and the §3 document matrix
 const registerSchema = z.discriminatedUnion('customer_type', [
@@ -55,7 +66,7 @@ const registerSchema = z.discriminatedUnion('customer_type', [
     email: z.string().email(),
     pincode,
     business_name: z.string().trim().min(2).max(200),
-    drug_license_type: z.enum(['dl20c', 'dl21c']),
+    drug_license_type: z.enum(['dl20b', 'dl21b']),
     drug_license_number: z.string().trim().min(3).max(100),
     gstin,
     pan_number: pan,
@@ -134,7 +145,8 @@ export async function register(req: Request, res: Response, next: NextFunction) 
            business_name, registration_pincode, pan_number, gstin,
            gst_unregistered_declaration, drug_license_type, drug_license_number,
            nmc_reg_number, nmc_council_state, doctor_speciality
-         ) VALUES ($1,$2,$3,'customer',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+           , age_confirmed_at
+         ) VALUES ($1,$2,$3,'customer',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, NOW())
          RETURNING id`,
         [
           mobile, email || null, passwordHash, customer_type, kycStatus,
@@ -151,6 +163,21 @@ export async function register(req: Request, res: Response, next: NextFunction) 
         ]
       );
       const userId = user.rows[0].id;
+
+      // Consent log — append-only; purposes per Rulebook C-40 / C-42
+      const ip = req.ip || null;
+      const agent = req.get('user-agent')?.slice(0, 500) || null;
+      for (const [purpose, granted] of [
+        ['privacy_notice', true],
+        ['age_18_plus', true],
+        ['marketing', data.marketing_consent],
+      ] as const) {
+        await client.query(
+          `INSERT INTO consent_records (user_id, purpose, granted, policy_version, ip_address, user_agent)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [userId, purpose, granted, PRIVACY_POLICY_VERSION, ip, agent]
+        );
+      }
 
       // Generate referral code for this user
       const myReferralCode = `${full_name.substring(0, 4).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;

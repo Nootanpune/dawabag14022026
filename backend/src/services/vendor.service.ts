@@ -1,3 +1,7 @@
+// NOTE (2026-09-30, docs/DECISIONS.md): marketplace partners are the seller of
+// record and invoice the customer themselves. The allocation and settlement code
+// below predates that decision; Sprint 3 must rework settlement around
+// partner-issued invoices, Dawabag commission invoices and TCS/TDS.
 // src/services/vendor.service.ts — v2.0
 // Fixes: GAP-03 (vendor approval workflow), GAP-04 (vendor rating system),
 //        GAP-12 (vendor pincode for distance allocation)
@@ -12,7 +16,7 @@ export class VendorApprovalService {
   static async approveVendor(params: {
     vendorId: string;
     adminId: string;
-    drugLicenseType: 'dl20' | 'dl21' | 'dl20c' | 'dl21c';
+    drugLicenseType: 'dl20' | 'dl21' | 'dl20b' | 'dl21b';
     drugLicenseExpiry: string; // YYYY-MM-DD
     vendorType: 'supplier' | 'marketplace_partner' | 'both';
     notes?: string;

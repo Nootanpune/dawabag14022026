@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS kyc_verifications (
   -- What was verified
   document_type         VARCHAR(50) NOT NULL,
   -- Values: gstin | pan | pan_name_mismatch | drug_license_dl20 | drug_license_dl21
-  --         drug_license_dl20c | drug_license_dl21c | nmc_registration
+  --         drug_license_dl20b | drug_license_dl21b | nmc_registration
   --         cancelled_cheque | establishment_cert
 
   input_value           VARCHAR(100) NOT NULL,
@@ -89,7 +89,7 @@ ALTER TABLE users
   -- Drug license fields
   ADD COLUMN IF NOT EXISTS drug_license_number   VARCHAR(100),
   ADD COLUMN IF NOT EXISTS drug_license_type     VARCHAR(20)
-    CHECK (drug_license_type IN ('dl20','dl21','dl20c','dl21c','none')),
+    CHECK (drug_license_type IN ('dl20','dl21','dl20b','dl21b','none')),
   ADD COLUMN IF NOT EXISTS drug_license_verified BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS drug_license_expiry   DATE,
   ADD COLUMN IF NOT EXISTS drug_license_holder_name VARCHAR(200),

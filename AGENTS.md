@@ -1,18 +1,9 @@
-## Optional Feature Guides
+## Project Rules
 
-When users request features beyond the base template, check for available recipes in `.kilocode/recipes/`.
-
-### Available Recipes
-
-| Recipe       | File                                | When to Use                                           |
-| ------------ | ----------------------------------- | ----------------------------------------------------- |
-| Add Database | `.kilocode/recipes/add-database.md` | When user needs data persistence (users, posts, etc.) |
-
-### How to Use Recipes
-
-1. Read the recipe file when the user requests the feature
-2. Follow the step-by-step instructions
-3. Update the memory bank after implementing the feature
+- This is the Dawabag online pharmacy (backend/, frontend-web/, mobile/, database/).
+- Owner decisions: `docs/DECISIONS.md`. Legal requirements: the Dawabag Regulatory
+  Compliance Rulebook (rules C-01..C-46) — cite rule numbers in code comments.
+- Development rules: `.kilocode/rules/development.md`.
 
 ## Memory Bank Maintenance
 

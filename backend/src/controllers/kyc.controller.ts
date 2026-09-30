@@ -93,8 +93,8 @@ export const adminVerifyDrugLicense = async (req: Request, res: Response, next: 
       throw new AppError('user_id, dl_number, dl_type, and verified (boolean) are required', 400);
     }
 
-    if (!['DL-20','DL-21','DL-20C','DL-21C'].includes(dl_type)) {
-      throw new AppError('dl_type must be DL-20, DL-21, DL-20C, or DL-21C', 400);
+    if (!['DL-20','DL-21','DL-20B','DL-21B'].includes(dl_type)) {
+      throw new AppError('dl_type must be DL-20, DL-21, DL-20B, or DL-21B', 400);
     }
 
     if (!verified && !rejection_reason) {

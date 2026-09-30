@@ -46,7 +46,7 @@ export const CUSTOMER_TYPE_OPTIONS: CustomerTypeOption[] = [
   {
     value: 'doc_hospital',
     label: 'Doctor (NMC / State Medical Council reg.)',
-    description: 'For registered medical practitioners and clinics.',
+    description: 'Individual doctors with NMC or State Medical Council registration. Clinics and hospitals register as a Retail Pharmacy.',
     pricing: 'Institutional pricing',
     kycNote: 'KYC review: 1–2 working days',
   },
@@ -124,8 +124,8 @@ export const RETAILER_DL_TYPES = [
 ] as const;
 
 export const WHOLESALER_DL_TYPES = [
-  { value: 'dl20c', label: 'DL Form 20C' },
-  { value: 'dl21c', label: 'DL Form 21C' },
+  { value: 'dl20b', label: 'DL Form 20B' },
+  { value: 'dl21b', label: 'DL Form 21B' },
 ] as const;
 
 export const SPECIALITIES = [
@@ -163,6 +163,9 @@ export interface DetailsFormValues {
   nmc_reg_number: string;
   nmc_council_state: string;
   speciality: string;
+  accept_privacy_notice: boolean;
+  age_confirmed: boolean;
+  marketing_consent: boolean;
 }
 
 export const EMPTY_DETAILS: DetailsFormValues = {
@@ -182,6 +185,9 @@ export const EMPTY_DETAILS: DetailsFormValues = {
   nmc_reg_number: '',
   nmc_council_state: '',
   speciality: '',
+  accept_privacy_notice: false,
+  age_confirmed: false,
+  marketing_consent: false,
 };
 
 const str = z.string();
@@ -207,6 +213,9 @@ export function buildDetailsSchema(type: CustomerType) {
       nmc_reg_number: str,
       nmc_council_state: str,
       speciality: str,
+      accept_privacy_notice: z.boolean(),
+      age_confirmed: z.boolean(),
+      marketing_consent: z.boolean(),
     })
     .superRefine((d, ctx) => {
       const issue = (path: keyof DetailsFormValues, message: string) =>
@@ -228,6 +237,9 @@ export function buildDetailsSchema(type: CustomerType) {
       const pincode = d.pincode.trim();
       if (type !== 'customer' && !pincode) issue('pincode', 'Pincode is required');
       else if (pincode && !PINCODE_REGEX.test(pincode)) issue('pincode', 'Enter a valid 6-digit pincode');
+
+      if (!d.accept_privacy_notice) issue('accept_privacy_notice', 'Please accept the Privacy Notice to continue');
+      if (!d.age_confirmed) issue('age_confirmed', 'You must be 18 years or older to register');
 
       if (type === 'customer') return;
 
@@ -274,6 +286,9 @@ export function buildRegisterPayload(type: CustomerType, d: DetailsFormValues): 
     email: opt(d.email),
     referral_code: opt(d.referral_code)?.toUpperCase(),
     pincode: opt(d.pincode),
+    accept_privacy_notice: d.accept_privacy_notice,
+    age_confirmed: d.age_confirmed,
+    marketing_consent: d.marketing_consent,
   };
 
   if (type === 'b2b_retailer' || type === 'b2b_wholesaler') {

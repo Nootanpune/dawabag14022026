@@ -112,14 +112,16 @@ export function getApiErrorMessage(err: any, fallback = 'Something went wrong'):
   return fallback;
 }
 
-/** Field-level validation errors (`errors: [{ path, message }]`) keyed by field name. */
+/** Field-level validation errors from a 422 `{ success:false, message, error, errors: [{ path, message }] }`, keyed by field name. */
 export function getApiFieldErrors(err: any): Record<string, string> {
   const out: Record<string, string> = {};
   const errors = err?.response?.data?.errors;
   if (!Array.isArray(errors)) return out;
   for (const e of errors) {
+    // path is normally the field name ("pan_number"); tolerate arrays / dotted paths too.
     const raw = Array.isArray(e?.path) ? e.path[e.path.length - 1] : e?.path;
-    if (raw != null && e?.message && !out[String(raw)]) out[String(raw)] = String(e.message);
+    const field = raw == null ? '' : String(raw).split('.').pop() ?? '';
+    if (field && e?.message && !out[field]) out[field] = String(e.message);
   }
   return out;
 }

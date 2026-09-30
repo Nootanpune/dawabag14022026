@@ -23,7 +23,7 @@ export default function SubmittedScreen({ customerType, documentsIncomplete }: P
           sent for review once all required documents are uploaded.
         </p>
         <p className="text-sm text-gray-600 mt-3">
-          Until then you can browse at retail prices but cannot place trade orders.
+          Until then you can browse products; ordering opens once your account is approved.
         </p>
         <Link href="/" className="btn-primary w-full py-2.5 mt-6 inline-flex items-center justify-center">
           Start browsing
@@ -44,7 +44,7 @@ export default function SubmittedScreen({ customerType, documentsIncomplete }: P
       </p>
       <p className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mt-4">
         <Clock className="w-3.5 h-3.5" />
-        Until then you can browse at retail prices but cannot place trade orders.
+        Until then you can browse products; ordering opens once your account is approved.
       </p>
       <Link href="/" className="btn-primary w-full py-2.5 mt-6 inline-flex items-center justify-center">
         Start browsing

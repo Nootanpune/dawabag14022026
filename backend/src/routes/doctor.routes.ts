@@ -154,32 +154,6 @@ router.patch('/me/slots/:slotId/block', authenticate, authorize('doctor'), async
   } catch (e) { next(e); }
 });
 
-// ─── Doctor: referral codes ───────────────────────────────────────────────────
-router.get('/me/referrals', authenticate, authorize('doctor'), async (req, res, next) => {
-  try {
-    const profile = await queryOne<{ id: string; bonus_points: number }>(
-      'SELECT id, bonus_points FROM doctor_profiles WHERE user_id = $1',
-      [req.user!.id]
-    );
-    if (!profile) throw new AppError('Profile not found', 404);
-
-    const referrals = await query(
-      `SELECT dr.*, u.mobile as redeemed_by_mobile, up.full_name as redeemed_by_name
-       FROM doctor_referrals dr
-       LEFT JOIN users u ON u.id = dr.redeemed_by
-       LEFT JOIN user_profiles up ON up.user_id = dr.redeemed_by
-       WHERE dr.doctor_id = $1
-       ORDER BY dr.redeemed_at DESC LIMIT 50`,
-      [profile.id]
-    );
-
-    res.json({
-      success: true,
-      data: { bonus_points: profile.bonus_points, referrals },
-    });
-  } catch (e) { next(e); }
-});
-
 // ─── Admin: verify doctor ─────────────────────────────────────────────────────
 router.patch('/:doctorId/verify', authenticate, authorize('admin', 'super_admin'), async (req, res, next) => {
   try {

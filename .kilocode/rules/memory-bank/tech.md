@@ -1,143 +1,32 @@
-# Technical Context: Next.js Starter Template
+# Technical Context
 
-## Technology Stack
+| Part | Stack | Folder |
+| --- | --- | --- |
+| API | Node.js + TypeScript, Express, PostgreSQL (`pg`), Redis (ioredis, Bull), zod | `backend/` |
+| Web | Next.js 14 (App Router), Tailwind, zustand, axios | `frontend-web/` |
+| Mobile | Flutter (flutter_riverpod, dio, go_router, file_picker) | `mobile/` |
+| DB schema | Plain SQL migrations, run in order | `database/01..04_*.sql` |
+| Integrations | Razorpay, MSG91, AWS S3/SES, FCM, IRIS IRP (e-invoice), Masters India GSTN, Surepass PAN | |
 
-| Technology   | Version | Purpose                         |
-| ------------ | ------- | ------------------------------- |
-| Next.js      | 16.x    | React framework with App Router |
-| React        | 19.x    | UI library                      |
-| TypeScript   | 5.9.x   | Type-safe JavaScript            |
-| Tailwind CSS | 4.x     | Utility-first CSS               |
-| Bun          | Latest  | Package manager & runtime       |
+Package manager: npm (backend and web each have their own package-lock.json).
 
-## Development Environment
-
-### Prerequisites
-
-- Bun installed (`curl -fsSL https://bun.sh/install | bash`)
-- Node.js 20+ (for compatibility)
-
-### Commands
-
+## Commands
 ```bash
-bun install        # Install dependencies
-bun dev            # Start dev server (http://localhost:3000)
-bun build          # Production build
-bun start          # Start production server
-bun lint           # Run ESLint
-bun typecheck      # Run TypeScript type checking
+# backend
+cd backend && npm install
+npx tsc --noEmit            # typecheck
+npm test                    # jest unit tests (src/**/*.test.ts)
+npm run dev                 # API on :4000 (needs Postgres + Redis + .env)
+npm run test:smoke          # end-to-end Sprint 1 checks against a running API
+                            # (API_URL, DATABASE_URL, REDIS_URL; STORAGE_DRIVER=local on the API)
+# database
+for f in database/0*.sql; do psql -U dawabag_user -d dawabag -f "$f"; done
+# web
+cd frontend-web && npm install && npx tsc --noEmit
+NEXT_PUBLIC_API_URL=http://localhost:4000 npx next build
 ```
+Flutter is not installed in the cloud dev environment; mobile code cannot be compiled there.
 
-## Project Configuration
-
-### Next.js Config (`next.config.ts`)
-
-- App Router enabled
-- Default settings for flexibility
-
-### TypeScript Config (`tsconfig.json`)
-
-- Strict mode enabled
-- Path alias: `@/*` → `src/*`
-- Target: ESNext
-
-### Tailwind CSS 4 (`postcss.config.mjs`)
-
-- Uses `@tailwindcss/postcss` plugin
-- CSS-first configuration (v4 style)
-
-### ESLint (`eslint.config.mjs`)
-
-- Uses `eslint-config-next`
-- Flat config format
-
-## Key Dependencies
-
-### Production Dependencies
-
-```json
-{
-  "next": "^16.1.3", // Framework
-  "react": "^19.2.3", // UI library
-  "react-dom": "^19.2.3" // React DOM
-}
-```
-
-### Dev Dependencies
-
-```json
-{
-  "typescript": "^5.9.3",
-  "@types/node": "^24.10.2",
-  "@types/react": "^19.2.7",
-  "@types/react-dom": "^19.2.3",
-  "@tailwindcss/postcss": "^4.1.17",
-  "tailwindcss": "^4.1.17",
-  "eslint": "^9.39.1",
-  "eslint-config-next": "^16.0.0"
-}
-```
-
-## File Structure
-
-```
-/
-├── .gitignore              # Git ignore rules
-├── package.json            # Dependencies and scripts
-├── bun.lock                # Bun lockfile
-├── next.config.ts          # Next.js configuration
-├── tsconfig.json           # TypeScript configuration
-├── postcss.config.mjs      # PostCSS (Tailwind) config
-├── eslint.config.mjs       # ESLint configuration
-├── public/                 # Static assets
-│   └── .gitkeep
-└── src/                    # Source code
-    └── app/                # Next.js App Router
-        ├── layout.tsx      # Root layout
-        ├── page.tsx        # Home page
-        ├── globals.css     # Global styles
-        └── favicon.ico     # Site icon
-```
-
-## Technical Constraints
-
-### Starting Point
-
-- Minimal structure - expand as needed
-- No database by default (use recipe to add)
-- No authentication by default (add when needed)
-
-### Browser Support
-
-- Modern browsers (ES2020+)
-- No IE11 support
-
-## Performance Considerations
-
-### Image Optimization
-
-- Use Next.js `Image` component for optimization
-- Place images in `public/` directory
-
-### Bundle Size
-
-- Tree-shaking enabled by default
-- Tailwind CSS purges unused styles
-
-### Core Web Vitals
-
-- Server Components reduce client JavaScript
-- Streaming and Suspense for better UX
-
-## Deployment
-
-### Build Output
-
-- Server-rendered pages by default
-- Can be configured for static export
-
-### Environment Variables
-
-- None required for base template
-- Add as needed for features
-- Use `.env.local` for local development
+## Environment
+See `backend/.env.example`. Local development without AWS: `STORAGE_DRIVER=local`.
+No MSG91 key → SMS is skipped with a warning (OTP is in Redis at `otp:<mobile>`).

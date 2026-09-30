@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -65,8 +67,8 @@ const Map<String, String> _retailerDlTypes = {
 };
 
 const Map<String, String> _wholesalerDlTypes = {
-  'dl20c': 'Form 20C (DL-20C)',
-  'dl21c': 'Form 21C (DL-21C)',
+  'dl20b': 'Form 20B (DL-20B)',
+  'dl21b': 'Form 21B (DL-21B)',
 };
 
 const List<String> _specialities = [
@@ -94,6 +96,7 @@ String _docLabel(String type) => _documentLabels[type] ?? type;
 
 const List<String> _allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
 const int _maxFileBytes = 5 * 1024 * 1024;
+const String _privacyNoticeUrl = 'https://dawabag.in/privacy';
 
 final RegExp _mobileRe = RegExp(r'^[6-9]\d{9}$');
 final RegExp _panRe = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$');
@@ -155,6 +158,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _gstDeclared = false;
   bool _showPassword = false;
 
+  // Consents (all customer types)
+  bool _acceptPrivacy = false;
+  bool _ageConfirmed = false;
+  bool _marketingConsent = false;
+  late final TapGestureRecognizer _privacyTap = TapGestureRecognizer()
+    ..onTap = _openPrivacyNotice;
+
   // Register call
   bool _isSubmitting = false;
   String? _error;
@@ -182,6 +192,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   void dispose() {
     _resendTimer?.cancel();
+    _privacyTap.dispose();
     for (final c in [
       _nameCtrl, _mobileCtrl, _emailCtrl, _passwordCtrl, _confirmCtrl,
       _pincodeCtrl, _referralCtrl, _businessCtrl, _dlNumberCtrl, _panCtrl,
@@ -360,6 +371,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (email.isNotEmpty) 'email': email,
       if (pincode.isNotEmpty) 'pincode': pincode,
       if (referral.isNotEmpty) 'referral_code': referral.toUpperCase(),
+      'accept_privacy_notice': _acceptPrivacy,
+      'age_confirmed': _ageConfirmed,
+      'marketing_consent': _marketingConsent,
     };
 
     if (_isRetailer) {
@@ -1034,7 +1048,48 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     v != _passwordCtrl.text ? 'Passwords do not match' : null),
             const SizedBox(height: 14),
             _field(_referralCtrl, 'Referral code (optional)', hint: 'e.g. RAJA20', caps: true),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
+            _checkboxField(
+              value: _acceptPrivacy,
+              onChanged: (v) => setState(() => _acceptPrivacy = v),
+              requiredMessage: 'Please accept the Privacy Notice to continue',
+              title: Text.rich(
+                TextSpan(
+                  style: const TextStyle(fontSize: 14),
+                  children: [
+                    const TextSpan(text: 'I have read the '),
+                    TextSpan(
+                      text: 'Privacy Notice',
+                      style: const TextStyle(
+                        color: AppTheme.brandGreen,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                      ),
+                      recognizer: _privacyTap,
+                    ),
+                    const TextSpan(
+                      text: ' and agree to Dawabag processing my personal and health data '
+                          'to provide pharmacy services.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            _checkboxField(
+              value: _ageConfirmed,
+              onChanged: (v) => setState(() => _ageConfirmed = v),
+              requiredMessage: 'You must be 18 or older to register',
+              title: const Text('I confirm I am 18 years or older.',
+                  style: TextStyle(fontSize: 14)),
+            ),
+            _checkboxField(
+              value: _marketingConsent,
+              onChanged: (v) => setState(() => _marketingConsent = v),
+              title: const Text('Send me offers and health reminders by SMS/email (optional).',
+                  style: TextStyle(fontSize: 14)),
+            ),
+            const SizedBox(height: 20),
 
             _errorBanner(),
             _primaryButton(
@@ -1158,19 +1213,47 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         validator: (v) => v == null ? 'Select your speciality' : null,
       );
 
-  Widget _gstDeclarationField(String text) => FormField<bool>(
-        initialValue: _gstDeclared,
-        validator: (_) => _gstDeclared ? null : 'Please confirm to continue',
+  Widget _gstDeclarationField(String text) => _checkboxField(
+        value: _gstDeclared,
+        onChanged: (v) => setState(() => _gstDeclared = v),
+        requiredMessage: 'Please confirm to continue',
+        title: Text(text, style: const TextStyle(fontSize: 14)),
+      );
+
+  Future<void> _openPrivacyNotice() async {
+    bool ok = false;
+    try {
+      ok = await launchUrl(
+        Uri.parse(_privacyNoticeUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      ok = false;
+    }
+    if (!ok) _snack('Could not open the Privacy Notice', error: true);
+  }
+
+  /// Checkbox inside the form. When [requiredMessage] is given the box must be
+  /// ticked for the form to validate (the message is shown inline).
+  Widget _checkboxField({
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required Widget title,
+    String? requiredMessage,
+  }) =>
+      FormField<bool>(
+        initialValue: value,
+        validator: (_) => (requiredMessage != null && !value) ? requiredMessage : null,
         builder: (field) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CheckboxListTile(
-              value: _gstDeclared,
+              value: value,
               onChanged: (v) {
-                setState(() => _gstDeclared = v ?? false);
+                onChanged(v ?? false);
                 field.didChange(v ?? false);
               },
-              title: Text(text, style: const TextStyle(fontSize: 14)),
+              title: title,
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
               dense: true,
@@ -1487,7 +1570,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Text(
-            'Until then you can browse at retail prices but cannot place trade orders.',
+            'Until then you can browse products; ordering opens once your account is approved.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppTheme.amberText, fontSize: 13.5),
           ),

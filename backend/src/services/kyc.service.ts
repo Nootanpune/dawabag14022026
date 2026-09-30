@@ -32,7 +32,7 @@ export interface PANVerificationResult {
 export interface DrugLicenseVerificationResult {
   verified: boolean;
   license_holder_name?: string;
-  license_type?: string;    // 'DL-20' | 'DL-21' | 'DL-20C' | 'DL-21C'
+  license_type?: string;    // 'DL-20' | 'DL-21' | 'DL-20B' | 'DL-21B'
   valid_upto?: string;
   premises_address?: string;
   is_expired?: boolean;
@@ -196,7 +196,7 @@ export class DrugLicenseVerifier {
   static async recordAdminVerification(params: {
     userId: string;
     dlNumber: string;
-    dlType: 'DL-20' | 'DL-21' | 'DL-20C' | 'DL-21C';
+    dlType: 'DL-20' | 'DL-21' | 'DL-20B' | 'DL-21B';
     verified: boolean;
     licenseHolderName?: string;
     validUpto?: string;
@@ -399,7 +399,7 @@ export class KYCOrchestrator {
     pan: string;
     companyName: string;
     dlNumber: string;
-    dlType: 'DL-20C' | 'DL-21C';
+    dlType: 'DL-20B' | 'DL-21B';
     stateCode: string;
   }): Promise<{ autoChecksPassed: boolean; message: string; pendingManual: string[] }> {
     const pendingManual: string[] = [];
@@ -492,7 +492,7 @@ export class KYCOrchestrator {
     if (user.customer_type === 'b2b_wholesaler') {
       allPassed = verifs['gstin'] === 'verified' &&
                   verifs['pan']   === 'verified' &&
-                  verifs['drug_license_dl20c'] === 'verified';
+                  verifs['drug_license_dl20b'] === 'verified';
     }
 
     if (user.customer_type === 'doc_hospital') {

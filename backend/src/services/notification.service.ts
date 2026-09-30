@@ -154,6 +154,11 @@ function buildMessage(payload: NotificationPayload) {
 
 // ─── SMS via MSG91 ────────────────────────────────────────────────────────────
 export async function sendSMS(mobile: string, message: string): Promise<void> {
+  // No key configured (local development, tests): don't call MSG91 at all
+  if (!process.env.MSG91_AUTH_KEY) {
+    logger.warn(`SMS not sent to ${mobile.substring(0, 5)}XXXXX: MSG91_AUTH_KEY not set`);
+    return;
+  }
   try {
     const response = await fetch('https://api.msg91.com/api/v5/flow/', {
       method: 'POST',

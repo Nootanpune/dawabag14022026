@@ -45,7 +45,7 @@ ALTER TABLE vendors
   ADD COLUMN IF NOT EXISTS kyc_status         VARCHAR(20) DEFAULT 'pending_kyc'
     CHECK (kyc_status IN ('pending_kyc','approved','rejected','suspended')),
   ADD COLUMN IF NOT EXISTS drug_license_type  VARCHAR(20)
-    CHECK (drug_license_type IN ('dl20','dl21','dl20c','dl21c','none')),
+    CHECK (drug_license_type IN ('dl20','dl21','dl20b','dl21b','none')),
   ADD COLUMN IF NOT EXISTS drug_license_expiry DATE,
   ADD COLUMN IF NOT EXISTS drug_license_verified BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS approved_by        UUID REFERENCES users(id),

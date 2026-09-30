@@ -233,7 +233,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       }
 
       // Buyer GSTIN/PAN for invoice
-      const buyer = await client.query('SELECT gstin, pan_number FROM users WHERE id = $1', [userId]);
+      const buyer = await client.query('SELECT gstin, pan_number, drug_license_number FROM users WHERE id = $1', [userId]);
       const buyerGstin = buyer.rows[0]?.gstin || null;
 
       // Generate invoice number
@@ -249,8 +249,8 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
            status, payment_terms, credit_due_date,
            subtotal_paise, discount_paise, shipping_paise, gst_paise,
            total_paise, coupon_id, wallet_used_paise,
-           buyer_gstin, buyer_pan, e_invoice_status
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+           buyer_gstin, buyer_pan, e_invoice_status, buyer_drug_license
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
          RETURNING id, order_number, invoice_number`,
         [
           orderNumber, invoiceNumber,
@@ -260,6 +260,9 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
           totalPaise, couponId, walletUsedPaise,
           buyerGstin, buyer.rows[0]?.pan_number||null,
           buyerGstin ? 'pending' : 'not_applicable',
+          // Licensed trade buyers only (Rulebook C-13)
+          isBuyerType(registeredType) && TRADE_TYPES.includes(registeredType)
+            ? buyer.rows[0]?.drug_license_number || null : null,
         ]
       );
       const orderId = newOrder.rows[0].id;
@@ -322,7 +325,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
 export async function updateOrderStatus(req: Request, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
-    const { status, tracking_id, courier_partner } = req.body;
+    const { status, awb_number, courier_partner } = req.body;
     const validStatuses = ['confirmed','packed','dispatched','delivered','cancelled'];
     if (!validStatuses.includes(status)) throw new AppError(`Invalid status`, 400);
 
@@ -332,9 +335,9 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     if (!orderResult) throw new AppError('Order not found', 404);
 
     await query(
-      `UPDATE orders SET status=$1, tracking_id=COALESCE($2,tracking_id),
+      `UPDATE orders SET status=$1, awb_number=COALESCE($2,awb_number),
        courier_partner=COALESCE($3,courier_partner), updated_at=NOW() WHERE id=$4`,
-      [status, tracking_id||null, courier_partner||null, id]
+      [status, awb_number||null, courier_partner||null, id]
     );
 
     // Trigger e-invoice when packed (for B2B orders with GSTIN)
@@ -355,7 +358,7 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
       userId: orderResult.user_id,
       type: ['packed', 'dispatched', 'delivered'].includes(status) ? status : 'order_status',
       status, orderId: id, orderNumber: orderResult.order_number,
-      awbNumber: tracking_id, courierPartner: courier_partner,
+      awbNumber: awb_number, courierPartner: courier_partner,
     });
 
     res.json({ success: true, data: { id, status } });

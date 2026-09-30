@@ -24,7 +24,11 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
       );
     }
 
-    const conditions: string[] = ['p.is_active = TRUE', 'p.deleted_at IS NULL'];
+    // Schedule X and NDPS can never be sold online, so they are not listed (Rulebook C-10)
+    const conditions: string[] = [
+      'p.is_active = TRUE', 'p.deleted_at IS NULL',
+      "COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')",
+    ];
     const params: any[] = [];
     let paramIdx = 1;
 

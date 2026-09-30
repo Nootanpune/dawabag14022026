@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "db:migrate": "node dist/db/migrate.js",
     "lint": "eslint src/**/*.ts",
-    "test": "jest"
+    "test": "jest",
+    "test:smoke": "node test/sprint1.smoke.mjs"
   },
   "dependencies": {
     "aws-sdk": "^2.1490.0",
@@ -38,6 +39,7 @@
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/morgan": "^1.9.9",
     "@types/multer": "^1.4.11",
@@ -45,6 +47,8 @@
     "@types/nodemailer": "^6.4.14",
     "@types/pg": "^8.10.9",
     "@types/uuid": "^9.0.7",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.14",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.2"
   }

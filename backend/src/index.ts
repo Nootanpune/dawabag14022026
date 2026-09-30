@@ -53,18 +53,20 @@ app.use(cors({
 }));
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────────
+const limitMessage = (message: string) => ({ success: false, message, error: message });
+
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: parseInt(process.env.RATE_LIMIT_MAX || '200'),
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests. Please try again later.' },
+  message: limitMessage('Too many requests. Please try again later.'),
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'Too many auth attempts. Please try again later.' },
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '20'),
+  message: limitMessage('Too many auth attempts. Please try again later.'),
 });
 
 app.use(globalLimiter);

@@ -369,8 +369,6 @@ CREATE TABLE IF NOT EXISTS doctor_profiles (
   consultation_fee_paise INTEGER NOT NULL DEFAULT 50000,
   bio TEXT,
   languages_spoken TEXT[],
-  bonus_points INTEGER NOT NULL DEFAULT 0,
-  points_expire_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -430,16 +428,8 @@ CREATE TABLE IF NOT EXISTS digital_prescription_items (
   instructions TEXT
 );
 
-CREATE TABLE IF NOT EXISTS doctor_referrals (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  doctor_id UUID NOT NULL REFERENCES doctor_profiles(id),
-  code VARCHAR(30) NOT NULL,
-  redeemed_by UUID REFERENCES users(id),
-  order_id UUID REFERENCES orders(id),
-  discount_pct INTEGER NOT NULL DEFAULT 12,
-  points_earned INTEGER NOT NULL DEFAULT 15,
-  redeemed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- No doctor referral rewards: incentives to doctors for referrals are prohibited
+-- (Compliance Rulebook C-20). The earlier doctor_referrals table was removed.
 
 -- ─── PHARMACY PROFILES ───────────────────────────────────────────────────────
 
