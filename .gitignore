@@ -23,8 +23,6 @@ mobile/.packages
 *.log
 coverage/
 
-# local KYC document storage (development)
-local-storage/
 
 # redis snapshots from local runs
 *.rdb

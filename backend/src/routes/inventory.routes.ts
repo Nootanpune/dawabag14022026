@@ -2,11 +2,14 @@ import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
+import { getLowStock } from '../controllers/stock.controller';
 
 const router = Router();
 
 const adminOnly = authorize('admin', 'super_admin');
 const staffOrAdmin = authorize('pharmacist_rx', 'pharmacist_pack', 'delivery', 'admin', 'super_admin');
+
+router.get('/low-stock', authenticate, adminOnly, getLowStock);
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
 router.get('/inventory', authenticate, staffOrAdmin, async (req, res, next) => {

@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { register, verifyMobileOTP, login, refreshToken, sendLoginOTP, logout } from '../controllers/auth.controller';
-import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -9,6 +8,6 @@ router.post('/verify-otp', verifyMobileOTP);
 router.post('/login', login);
 router.post('/send-otp', sendLoginOTP);
 router.post('/refresh', refreshToken);
-router.post('/logout', authenticate, logout);
+router.post('/logout', logout);
 
 export default router;

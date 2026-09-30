@@ -356,11 +356,15 @@ export class PartnerAllocationService {
 
 // ── Low stock alert checker ───────────────────────────────────────────────────
 // GAP-08 fix: daily cron to check all products and alert admin
-export async function checkLowStockAndAlert(): Promise<void> {
+export interface LowStockAlert { id: string; name: string; sku: string; current_stock: number; reorder_level_qty: number }
+
+// Records one alert per product per day; returns the products newly alerted
+// today so the scheduled job can send the admin digest.
+export async function checkLowStockAndAlert(): Promise<{ flagged: number; newAlerts: LowStockAlert[] }> {
   const lowStockProducts = await pool.query(
-    `SELECT id, name, sku, reorder_level_qty,
+    `SELECT p.id, p.name, p.sku, p.reorder_level_qty,
             COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0) AS current_stock,
-            preferred_vendor_id
+            p.preferred_vendor_id
      FROM products p
      LEFT JOIN inventory_batches b ON b.product_id = p.id
        AND b.expiry_date > CURRENT_DATE + 30
@@ -370,6 +374,7 @@ export async function checkLowStockAndAlert(): Promise<void> {
      HAVING COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0) <= p.reorder_level_qty`
   );
 
+  const newAlerts: LowStockAlert[] = [];
   for (const product of lowStockProducts.rows) {
     // Check if alert was already sent today
     const existing = await pool.query(
@@ -390,8 +395,9 @@ export async function checkLowStockAndAlert(): Promise<void> {
       `Current: ${product.current_stock}, Reorder level: ${product.reorder_level_qty}`
     );
 
-    // TODO: Send SMS/email to admin and auto-draft purchase order to preferred vendor
+    newAlerts.push({ ...product, current_stock: Number(product.current_stock) });
   }
 
   logger.info(`Low stock check complete: ${lowStockProducts.rows.length} products flagged`);
+  return { flagged: lowStockProducts.rows.length, newAlerts };
 }

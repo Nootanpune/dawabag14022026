@@ -3,7 +3,9 @@
 //   API_URL=http://localhost:4000 DATABASE_URL=postgresql://... REDIS_URL=redis://localhost:6379 \
 //     node test/sprint1.smoke.mjs
 //
-// Needs STORAGE_DRIVER=local on the API (no AWS). Writes test users/products
+// KYC file uploads need S3 (AWS_S3_BUCKET on the API). Without it the upload
+// checks expect 503 and the test seeds kyc_documents rows directly, so the
+// rest of the flow still runs. Writes test users/products
 // with mobile numbers 90000000xx and SKU prefix SMOKE-; it deletes them first,
 // so it can be re-run. NEVER point it at a production database.
 import { createRequire } from 'module';
@@ -67,7 +69,7 @@ async function cleanup() {
     for (const t of ['order_items']) {
       await db.query(`DELETE FROM ${t} WHERE order_id IN (SELECT id FROM orders WHERE user_id = ANY($1))`, [ids]);
     }
-    for (const t of ['notifications', 'orders', 'addresses', 'kyc_documents', 'consent_records', 'audit_logs', 'user_profiles']) {
+    for (const t of ['cart_items', 'carts', 'notifications', 'orders', 'addresses', 'kyc_documents', 'consent_records', 'audit_logs', 'user_profiles']) {
       await db.query(`DELETE FROM ${t} WHERE user_id = ANY($1)`, [ids]);
     }
     await db.query('DELETE FROM users WHERE id = ANY($1)', [ids]);
@@ -156,6 +158,16 @@ async function main() {
     form.append('document_type', doc);
     form.append('file', pdfBlob(), `${doc}.pdf`);
     r = await call('POST', '/kyc/documents', { token: session.b2b_retailer.token, form });
+    if (r.status === 503) {
+      // No object store configured: the server refuses rather than storing locally
+      check(`upload ${doc} → 503 without S3 (no local storage)`, true);
+      await db.query(
+        `INSERT INTO kyc_documents (user_id, document_type, storage_key, original_name, mime_type, size_bytes)
+         VALUES ($1, $2, $3, $4, 'application/pdf', 100) ON CONFLICT DO NOTHING`,
+        [session.b2b_retailer.id, doc, `kyc/${session.b2b_retailer.id}/${doc}/fixture.pdf`, `${doc}.pdf`]);
+      if (i === 1) await db.query(`UPDATE users SET kyc_status = 'pending_kyc', kyc_submitted_at = NOW() WHERE id = $1`, [session.b2b_retailer.id]);
+      continue;
+    }
     check(`upload ${doc}`, r.status === 200, r.json);
     if (i === 1) check('all documents in → pending_kyc', r.json.data?.kyc_status === 'pending_kyc', r.json);
   }

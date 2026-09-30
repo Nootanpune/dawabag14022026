@@ -4,12 +4,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { query, queryOne, withTransaction } from '../config/database';
 import { storeOTP, verifyOTP, blacklistToken } from '../config/redis';
-import { generateTokens, verifyRefreshToken } from '../utils/jwt';
+import { generateTokens, verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
 import { sendOTP } from '../services/sms.service';
 import { sendWelcomeEmail } from '../services/email.service';
 import { AppError } from '../utils/AppError';
 import { logger } from '../config/logger';
 import { requiredKycDocuments } from '../utils/customerType';
+import { clearSession, issueSession, readRefreshToken } from '../utils/sessionCookie';
 
 // ─── Validation Schemas ─────────────────────────────────────────────────────
 const MOBILE_RE = /^[6-9]\d{9}$/;
@@ -269,7 +270,7 @@ export async function verifyMobileOTP(req: Request, res: Response, next: NextFun
         customer_type: user.customer_type,
         kyc_status: user.kyc_status,
         full_name: profile?.full_name,
-        ...tokens,
+        ...issueSession(req, res, tokens),
       },
     });
   } catch (error) {
@@ -359,7 +360,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
         customer_type: user.customer_type,
         kyc_status: user.kyc_status,
         full_name: profile?.full_name,
-        ...tokens,
+        ...issueSession(req, res, tokens),
       },
     });
   } catch (error) {
@@ -368,26 +369,45 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 }
 
 // ─── Refresh Token ──────────────────────────────────────────────────────────
+// Also how the web app restores a session on page load: the cookie is the
+// credential, and the response carries the current account state from the DB.
 export async function refreshToken(req: Request, res: Response, next: NextFunction) {
   try {
-    const { refresh_token } = req.body;
-    if (!refresh_token) throw new AppError('Refresh token required', 400);
+    const refresh_token = readRefreshToken(req);
+    if (!refresh_token) throw new AppError('Not signed in', 401);
 
     const payload = await verifyRefreshToken(refresh_token);
 
-    const user = await queryOne<{ id: string; role: string; is_active: boolean; customer_type: string }>(
-      'SELECT id, role, is_active, customer_type FROM users WHERE id = $1 AND deleted_at IS NULL',
+    const user = await queryOne<{ id: string; role: string; is_active: boolean; customer_type: string; kyc_status: string; mobile: string }>(
+      `SELECT id, role, is_active, customer_type, kyc_status, mobile
+       FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [payload.sub]
     );
 
     if (!user || !user.is_active) throw new AppError('Invalid token', 401);
 
-    // Blacklist old refresh token
+    // Rotate: the old refresh token can never be used again
     await blacklistToken(payload.jti, 7 * 24 * 3600);
 
     const tokens = await generateTokens(user.id, user.role, user.customer_type);
-    res.json({ success: true, data: tokens });
+    const profile = await queryOne<{ full_name: string }>(
+      'SELECT full_name FROM user_profiles WHERE user_id = $1',
+      [user.id]
+    );
+    res.json({
+      success: true,
+      data: {
+        user_id: user.id,
+        role: user.role,
+        customer_type: user.customer_type,
+        kyc_status: user.kyc_status,
+        mobile: user.mobile,
+        full_name: profile?.full_name,
+        ...issueSession(req, res, tokens),
+      },
+    });
   } catch (error) {
+    if (error instanceof AppError && error.statusCode === 401) clearSession(res);
     next(error);
   }
 }
@@ -416,13 +436,20 @@ export async function sendLoginOTP(req: Request, res: Response, next: NextFuncti
 }
 
 // ─── Logout ─────────────────────────────────────────────────────────────────
+// Revokes the refresh token (cookie or body) and the presented access token.
 export async function logout(req: Request, res: Response, next: NextFunction) {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (token) {
-      const decoded = await verifyRefreshToken(token).catch(() => null);
+    const refresh = readRefreshToken(req);
+    if (refresh) {
+      const decoded = await verifyRefreshToken(refresh).catch(() => null);
       if (decoded) await blacklistToken(decoded.jti, 7 * 24 * 3600);
     }
+    const access = req.headers.authorization?.split(' ')[1];
+    if (access) {
+      const decoded = await verifyAccessToken(access).catch(() => null);
+      if (decoded) await blacklistToken(decoded.jti, 15 * 60);
+    }
+    clearSession(res);
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
     next(error);

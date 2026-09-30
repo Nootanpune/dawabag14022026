@@ -6,6 +6,9 @@ import axios from 'axios';
 import { pool } from '../config/database';
 import { logger } from '../config/logger';
 import { AppError } from '../utils/AppError';
+import { writeAudit } from '../utils/audit';
+import { isBuyerType, requiredKycDocuments } from '../utils/customerType';
+import { queueNotification } from './notification.service';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface GSTINVerificationResult {
@@ -226,22 +229,18 @@ export class DrugLicenseVerifier {
       verified_by_admin_id: adminId,
     });
 
-    // Update user's drug license fields
+    // Record the licence result only. Approval is decided by
+    // KYCOrchestrator.checkAndActivate once every required check has passed.
     await pool.query(`
       UPDATE users SET
         drug_license_verified = $1,
-        drug_license_expiry = $2,
-        kyc_status = CASE
-          WHEN $1 = TRUE THEN
-            CASE WHEN (SELECT COUNT(*) FROM kyc_verifications
-                       WHERE user_id = $3 AND result = 'verified') >= 2
-              THEN 'approved' ELSE kyc_status END
-          ELSE 'rejected'
-        END,
-        kyc_rejection_reason = $4,
+        drug_license_expiry = COALESCE($2::date, drug_license_expiry),
+        drug_license_holder_name = COALESCE($5, drug_license_holder_name),
+        kyc_status = CASE WHEN $1 = TRUE THEN kyc_status ELSE 'rejected' END,
+        kyc_rejection_reason = CASE WHEN $1 = TRUE THEN kyc_rejection_reason ELSE $4 END,
         updated_at = NOW()
       WHERE id = $3
-    `, [verified, params.validUpto, userId, params.rejectionReason]);
+    `, [verified, params.validUpto || null, userId, params.rejectionReason || null, params.licenseHolderName || null]);
 
     // If rejected, notify user
     if (!verified) {
@@ -309,20 +308,16 @@ export class NMCVerifier {
       verified_by_admin_id: adminId,
     });
 
+    // Approval is decided by KYCOrchestrator.checkAndActivate (needs PAN too)
     await pool.query(`
       UPDATE users SET
         nmc_reg_verified = $1,
-        kyc_status = CASE
-          WHEN $1 = TRUE THEN
-            CASE WHEN (SELECT COUNT(*) FROM kyc_verifications
-                       WHERE user_id = $2 AND result = 'verified') >= 1
-              THEN 'approved' ELSE kyc_status END
-          ELSE 'rejected'
-        END,
-        kyc_rejection_reason = $3,
+        nmc_doctor_name_as_per_register = COALESCE($4, nmc_doctor_name_as_per_register),
+        kyc_status = CASE WHEN $1 = TRUE THEN kyc_status ELSE 'rejected' END,
+        kyc_rejection_reason = CASE WHEN $1 = TRUE THEN kyc_rejection_reason ELSE $3 END,
         updated_at = NOW()
       WHERE id = $2
-    `, [verified, userId, params.rejectionReason]);
+    `, [verified, userId, params.rejectionReason || null, params.doctorNameAsPerRegister || null]);
 
     if (!verified) {
       await notifyUserKYCRejected(userId, 'nmc_registration', params.rejectionReason);
@@ -464,56 +459,130 @@ export class KYCOrchestrator {
     };
   }
 
-  // Checks if all required verifications are complete → activates account
-  static async checkAndActivate(userId: string): Promise<boolean> {
-    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
-    const user = userResult.rows[0];
-    if (!user) return false;
-
-    const verifResult = await pool.query(
-      `SELECT document_type, result FROM kyc_verifications WHERE user_id = $1 ORDER BY verified_at DESC`,
-      [userId]
-    );
-    const verifs = verifResult.rows.reduce((acc: Record<string, string>, row: any) => {
-      if (!acc[row.document_type]) acc[row.document_type] = row.result;
-      return acc;
-    }, {});
-
-    let allPassed = false;
-
-    if (user.customer_type === 'b2b_retailer') {
-      const dlKey = user.drug_license_type === 'dl20' ? 'drug_license_dl20' : 'drug_license_dl21';
-      const panOk = verifs['pan'] === 'verified';
-      const dlOk  = verifs[dlKey] === 'verified';
-      const gstOk = user.gstin ? verifs['gstin'] === 'verified' : true; // GST optional
-      allPassed = panOk && dlOk && gstOk;
+  // Verification checks each buyer type needs before activation (URS v3.1 §3)
+  static requiredChecks(user: { customer_type: string; drug_license_type: string | null; gstin: string | null }): string[] {
+    const dl = user.drug_license_type ? `drug_license_${user.drug_license_type}` : 'drug_license';
+    switch (user.customer_type) {
+      case 'b2b_retailer':   return user.gstin ? ['pan', dl, 'gstin'] : ['pan', dl];
+      case 'b2b_wholesaler': return ['pan', dl, 'gstin'];
+      case 'doc_hospital':   return ['pan', 'nmc_registration'];
+      default:               return [];
     }
-
-    if (user.customer_type === 'b2b_wholesaler') {
-      allPassed = verifs['gstin'] === 'verified' &&
-                  verifs['pan']   === 'verified' &&
-                  verifs['drug_license_dl20b'] === 'verified';
-    }
-
-    if (user.customer_type === 'doc_hospital') {
-      allPassed = verifs['pan']              === 'verified' &&
-                  verifs['nmc_registration'] === 'verified';
-    }
-
-    if (allPassed) {
-      await pool.query(`
-        UPDATE users SET
-          kyc_status = 'approved',
-          kyc_approved_at = NOW(),
-          updated_at = NOW()
-        WHERE id = $1
-      `, [userId]);
-      await notifyUserAccountActivated(userId);
-      logger.info(`Account activated: ${userId}`);
-    }
-
-    return allPassed;
   }
+
+  // Current state of every check, for the admin review screen and activation
+  static async checkStatus(userId: string) {
+    const user = (await pool.query(
+      `SELECT id, customer_type, kyc_status, drug_license_type, drug_license_expiry, gstin
+       FROM users WHERE id = $1`, [userId])).rows[0];
+    if (!user) return null;
+    const rows = (await pool.query(
+      `SELECT document_type, result, verification_method, verified_at
+       FROM kyc_verifications WHERE user_id = $1`, [userId])).rows;
+    const byType = Object.fromEntries(rows.map((r: any) => [r.document_type, r]));
+    const checks = this.requiredChecks(user).map((type) => ({
+      check: type,
+      result: byType[type]?.result ?? 'pending',
+      method: byType[type]?.verification_method ?? null,
+      verified_at: byType[type]?.verified_at ?? null,
+    }));
+    const type = isBuyerType(user.customer_type) ? user.customer_type : 'customer';
+    const docs = (await pool.query('SELECT document_type FROM kyc_documents WHERE user_id = $1', [userId]))
+      .rows.map((r: any) => r.document_type);
+    const missingDocuments = requiredKycDocuments(type, !!user.gstin).filter((d) => !docs.includes(d));
+    const licenceExpired = !!user.drug_license_expiry && new Date(user.drug_license_expiry) < startOfToday();
+    return { user, checks, missingDocuments, licenceExpired };
+  }
+
+  // Activates the account when every required check has passed, all required
+  // documents are uploaded and the drug licence (if any) has not expired.
+  static async checkAndActivate(userId: string, adminId?: string): Promise<boolean> {
+    const state = await this.checkStatus(userId);
+    if (!state || state.checks.length === 0) return false;
+    if (!['pending_kyc', 'pending_renewal', 'flagged_gstin', 'rejected'].includes(state.user.kyc_status)) return false;
+
+    const allPassed = state.checks.every((c) => c.result === 'verified')
+      && state.missingDocuments.length === 0
+      && !state.licenceExpired;
+    if (!allPassed) return false;
+
+    await pool.query(`
+      UPDATE users SET
+        kyc_status = 'approved',
+        kyc_approved_at = NOW(),
+        kyc_rejection_reason = NULL,
+        updated_at = NOW()
+      WHERE id = $1
+    `, [userId]);
+    await writeAudit({
+      userId, action: 'kyc_approved', performedBy: adminId ?? null,
+      oldValue: { kyc_status: state.user.kyc_status },
+      newValue: { kyc_status: 'approved', checks: state.checks.map((c) => c.check) },
+    });
+    await notifyUserAccountActivated(userId);
+    logger.info(`Account activated: ${userId}`);
+    return true;
+  }
+
+  // Admin rejects the whole application with a reason the buyer will see
+  static async rejectApplication(userId: string, reason: string, adminId: string): Promise<void> {
+    const before = (await pool.query('SELECT kyc_status FROM users WHERE id = $1', [userId])).rows[0];
+    if (!before) throw new AppError('User not found', 404);
+    await pool.query(
+      `UPDATE users SET kyc_status = 'rejected', kyc_rejection_reason = $2, updated_at = NOW() WHERE id = $1`,
+      [userId, reason]
+    );
+    await writeAudit({
+      userId, action: 'kyc_rejected', performedBy: adminId,
+      oldValue: { kyc_status: before.kyc_status }, newValue: { kyc_status: 'rejected' }, notes: reason,
+    });
+    await notifyUserKYCRejected(userId, 'application', reason);
+  }
+}
+
+// Manual PAN / GSTIN check by an admin — used when the Surepass / GSTN APIs
+// are not configured or return an error.
+export class IdentityVerifier {
+  static async recordAdminVerification(params: {
+    userId: string;
+    documentType: 'pan' | 'gstin';
+    verified: boolean;
+    rejectionReason?: string;
+    notes?: string;
+    adminId: string;
+  }): Promise<void> {
+    const user = (await pool.query('SELECT pan_number, gstin FROM users WHERE id = $1', [params.userId])).rows[0];
+    if (!user) throw new AppError('User not found', 404);
+    const value = params.documentType === 'pan' ? user.pan_number : user.gstin;
+    if (!value) throw new AppError(`No ${params.documentType.toUpperCase()} on this account`, 400);
+
+    await KYCVerificationStore.save({
+      user_id: params.userId,
+      document_type: params.documentType,
+      input_value: value,
+      verification_method: 'admin_manual',
+      result: params.verified ? 'verified' : 'failed',
+      raw_response: JSON.stringify({ rejection_reason: params.rejectionReason, notes: params.notes }),
+      verified_at: new Date(),
+      verified_by_admin_id: params.adminId,
+    });
+    await pool.query(
+      `UPDATE users SET
+         ${params.documentType === 'pan' ? 'pan_verified' : 'gstin_verified'} = $2,
+         kyc_status = CASE WHEN $2 = TRUE THEN kyc_status ELSE 'rejected' END,
+         kyc_rejection_reason = CASE WHEN $2 = TRUE THEN kyc_rejection_reason ELSE $3 END,
+         updated_at = NOW()
+       WHERE id = $1`,
+      [params.userId, params.verified, params.rejectionReason || null]
+    );
+    if (!params.verified) await notifyUserKYCRejected(params.userId, params.documentType, params.rejectionReason);
+  }
+}
+
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 // ── KYC Verification Store ────────────────────────────────────────────────────
@@ -546,60 +615,97 @@ export class KYCVerificationStore {
   }
 }
 
-// ── Re-verification scheduler (called by cron job monthly) ───────────────────
-export async function runMonthlyReVerification(): Promise<void> {
-  logger.info('Running monthly KYC re-verification...');
-
-  // 1. Check for expired drug licenses (60-day advance alert)
-  const expiringDLs = await pool.query(`
-    SELECT id, full_name, mobile, drug_license_number, drug_license_expiry
+// ── Scheduled: drug licence expiry (daily, Rulebook C-14) ─────────────────────
+// Warns 60 and 30 days ahead and on the last 7 days; blocks trade ordering from
+// the expiry date by moving the account to 'pending_renewal'.
+export async function runDailyLicenceExpiryCheck(): Promise<{ warned: number; blocked: number }> {
+  const warn = await pool.query(`
+    SELECT id, drug_license_expiry, (drug_license_expiry - CURRENT_DATE) AS days_left
     FROM users
     WHERE customer_type IN ('b2b_retailer', 'b2b_wholesaler')
-      AND drug_license_expiry IS NOT NULL
-      AND drug_license_expiry BETWEEN NOW() AND NOW() + INTERVAL '60 days'
       AND kyc_status = 'approved'
+      AND drug_license_expiry IS NOT NULL
+      AND (drug_license_expiry - CURRENT_DATE) IN (60, 30, 7, 6, 5, 4, 3, 2, 1)
   `);
-  for (const user of expiringDLs.rows) {
-    await pool.query(`
-      UPDATE users SET kyc_status = 'pending_renewal' WHERE id = $1
-    `, [user.id]);
-    logger.info(`DL expiry alert sent for user ${user.id}, DL expires ${user.drug_license_expiry}`);
+  for (const u of warn.rows) {
+    await queueNotification({
+      userId: u.id, type: 'licence_expiring',
+      expiryDate: formatDate(u.drug_license_expiry), daysLeft: u.days_left,
+    });
   }
 
-  // 2. Re-check GSTIN status for all active B2B accounts
+  const expired = await pool.query(`
+    UPDATE users SET kyc_status = 'pending_renewal', updated_at = NOW()
+    WHERE customer_type IN ('b2b_retailer', 'b2b_wholesaler')
+      AND kyc_status = 'approved'
+      AND drug_license_expiry IS NOT NULL
+      AND drug_license_expiry < CURRENT_DATE
+    RETURNING id, drug_license_expiry
+  `);
+  for (const u of expired.rows) {
+    await writeAudit({
+      userId: u.id, action: 'licence_expired_blocked',
+      oldValue: { kyc_status: 'approved' }, newValue: { kyc_status: 'pending_renewal' },
+      notes: `Drug licence expired ${formatDate(u.drug_license_expiry)}`,
+    });
+    await queueNotification({ userId: u.id, type: 'licence_expired' });
+  }
+
+  logger.info(`Licence expiry check: ${warn.rowCount} warned, ${expired.rowCount} blocked`);
+  return { warned: warn.rowCount ?? 0, blocked: expired.rowCount ?? 0 };
+}
+
+// ── Scheduled: GSTIN re-verification (monthly, Rulebook C-14) ────────────────
+// Needs GST_API_URL / GST_API_KEY; without them it skips rather than flagging
+// every account.
+export async function runMonthlyReVerification(): Promise<{ checked: number; flagged: number; skipped?: string }> {
+  if (!process.env.GST_API_URL || !process.env.GST_API_KEY) {
+    logger.warn('GSTIN re-verification skipped: GST_API_URL / GST_API_KEY not set');
+    return { checked: 0, flagged: 0, skipped: 'GST API not configured' };
+  }
+
   const b2bAccounts = await pool.query(`
-    SELECT id, gstin, business_name FROM users
+    SELECT id, gstin FROM users
     WHERE customer_type IN ('b2b_retailer', 'b2b_wholesaler')
       AND gstin IS NOT NULL AND gstin != ''
       AND kyc_status = 'approved'
   `);
+  let flagged = 0;
   for (const user of b2bAccounts.rows) {
     const result = await GSTINVerifier.verify(user.gstin, user.id);
     if (!result.valid || result.status !== 'Active') {
+      flagged++;
       await pool.query(`
         UPDATE users SET kyc_status = 'flagged_gstin', updated_at = NOW() WHERE id = $1
       `, [user.id]);
-      logger.warn(`GSTIN flagged for user ${user.id}: ${user.gstin} status = ${result.status}`);
+      await writeAudit({
+        userId: user.id, action: 'gstin_flagged',
+        oldValue: { kyc_status: 'approved' }, newValue: { kyc_status: 'flagged_gstin', gstn_status: result.status },
+      });
+      logger.warn(`GSTIN flagged for user ${user.id}: status = ${result.status}`);
     }
     // Rate limit: 1 second between GSTN API calls
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
-  logger.info('Monthly re-verification complete');
+  logger.info('Monthly GSTIN re-verification complete');
+  return { checked: b2bAccounts.rowCount ?? 0, flagged };
 }
 
-// ── Notification helpers (stubs — implemented in notification.service.ts) ─────
+function formatDate(d: Date | string): string {
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
 async function notifyUserKYCRejected(userId: string, docType: string, reason?: string): Promise<void> {
-  // TODO: trigger SMS + email to user explaining what was rejected and how to resubmit
-  logger.info(`KYC rejection notification queued for user ${userId}, doc: ${docType}`);
+  await queueNotification({ userId, type: 'kyc_rejected', reason, docType });
 }
 
 async function notifyAdminNewKYC(userId: string, customerType: string, docNumber: string, portalUrl: string): Promise<void> {
-  // TODO: send notification to admin WhatsApp / email group with portal link for verification
+  // Admins work from the KYC queue in the admin panel; no push channel yet
   logger.info(`New KYC queued for admin review: user ${userId} (${customerType}), doc: ${docNumber}`);
 }
 
 async function notifyUserAccountActivated(userId: string): Promise<void> {
-  // TODO: SMS + email to user: "Your Dawabag account is now active. You can start placing orders."
-  logger.info(`Account activation notification queued for user ${userId}`);
+  await queueNotification({ userId, type: 'kyc_approved' });
 }

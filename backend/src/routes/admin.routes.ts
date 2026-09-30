@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
+import { listOpenCredit, setCreditLimit } from '../controllers/credit.controller';
+import { listJobs, runJobNow } from '../controllers/jobs.controller';
 
 const router = Router();
 
@@ -75,5 +77,11 @@ router.patch('/users/:userId/status', authenticate, authorize('super_admin'), as
     res.json({ success: true });
   } catch (e) { next(e); }
 });
+
+// ─── Sprint 2: credit accounts and scheduled jobs ────────────────────────────
+router.patch('/users/:userId/credit', authenticate, authorize('admin', 'super_admin'), setCreditLimit);
+router.get('/credit/open', authenticate, authorize('admin', 'super_admin'), listOpenCredit);
+router.get('/jobs', authenticate, authorize('admin', 'super_admin'), listJobs);
+router.post('/jobs/:name/run', authenticate, authorize('super_admin'), runJobNow);
 
 export default router;

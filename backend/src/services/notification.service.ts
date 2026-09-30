@@ -147,6 +147,52 @@ function buildMessage(payload: NotificationPayload) {
       sms: `Dawabag: Order ${on} status updated to ${payload.status}.`,
       push: { title: 'Order update', body: `Order ${on}: ${payload.status}` },
     },
+    // ── Sprint 2: KYC, licences, credit, stock ──
+    kyc_approved: {
+      sms: 'Dawabag: Your business account is verified and active. You can now order at trade prices.',
+      email: {
+        subject: 'Your Dawabag account is approved',
+        body: 'Your documents have been verified. Your account is active and trade pricing now applies.',
+      },
+      push: { title: 'Account approved', body: 'You can now place orders at trade prices.' },
+    },
+    kyc_rejected: {
+      sms: `Dawabag: We could not verify your account. Reason: ${payload.reason || 'documents not valid'}. Re-upload in the app or contact support.`,
+      email: {
+        subject: 'Action needed: Dawabag account verification',
+        body: `We could not verify your account. Reason: ${payload.reason || 'documents not valid'}. Please upload corrected documents in the app.`,
+      },
+      push: { title: 'Verification failed', body: payload.reason || 'Please re-upload your documents.' },
+    },
+    licence_expiring: {
+      sms: `Dawabag: Your drug licence expires on ${payload.expiryDate}. Upload the renewed licence to keep ordering.`,
+      email: {
+        subject: 'Your drug licence is expiring',
+        body: `Your drug licence on file expires on ${payload.expiryDate}. Upload the renewed licence before then; orders are blocked from the expiry date.`,
+      },
+    },
+    licence_expired: {
+      sms: 'Dawabag: Your drug licence on file has expired, so trade orders are paused. Upload the renewed licence to resume.',
+      email: {
+        subject: 'Trade orders paused: drug licence expired',
+        body: 'Your drug licence on file has expired. Trade orders are paused until you upload the renewed licence and we verify it.',
+      },
+    },
+    credit_due: {
+      sms: payload.daysBefore > 0
+        ? `Dawabag: ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} for order ${on} is due on ${payload.dueDate} (in ${payload.daysBefore} day${payload.daysBefore === 1 ? '' : 's'}).`
+        : `Dawabag: ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} for order ${on} is due today (${payload.dueDate}).`,
+      email: {
+        subject: `Payment reminder: order ${on}`,
+        body: `${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} for order ${on} is due on ${payload.dueDate}.`,
+      },
+    },
+    low_stock_digest: {
+      email: {
+        subject: `Low stock: ${payload.count} product(s) at or below reorder level`,
+        body: payload.html || '',
+      },
+    },
   };
 
   return messages[payload.type] || null;

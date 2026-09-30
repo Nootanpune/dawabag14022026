@@ -9,6 +9,7 @@ import { AppError } from '../utils/AppError';
 import { generateOrderNumber } from '../utils/helpers';
 import { queueNotification } from '../services/notification.service';
 import { logger } from '../config/logger';
+import { evaluateCoupon } from '../services/coupon.service';
 import { TRADE_TYPES, allowsCreditTerms, isBuyerType, priceField, requiresPrescription } from '../utils/customerType';
 
 const createOrderSchema = z.object({
@@ -151,33 +152,20 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
           quantity: item.quantity, unit_price_paise: unitPricePaise,
           mrp_paise: prod.mrp_paise, gst_rate: prod.gst_rate,
           gst_amount_paise: gstAmt, assessable_paise: assessable,
+          drug_schedule: prod.drug_schedule,
           line_total_paise: assessable + gstAmt,
         });
       }
 
-      // Coupon
+      // Coupon — shared rules with the cart preview (services/coupon.service.ts)
       let couponId: string | null = null;
       if (data.coupon_code) {
-        const coupon = await client.query(
-          `SELECT id, type, value, min_order_paise, max_discount_paise
-           FROM coupons WHERE code = $1 AND is_active = TRUE
-             AND (expires_at IS NULL OR expires_at > NOW())
-             AND (uses_limit IS NULL OR uses_count < uses_limit)`,
-          [data.coupon_code]
-        );
-        if (!coupon.rows[0]) throw new AppError('Invalid or expired coupon', 400);
-        const c = coupon.rows[0];
-        if (subtotalPaise < c.min_order_paise) {
-          throw new AppError(`Minimum order ₹${Math.round(c.min_order_paise/100)} required for coupon`, 400);
-        }
-        if (c.type === 'percentage') {
-          discountPaise = Math.round(subtotalPaise * c.value / 100);
-          if (c.max_discount_paise) discountPaise = Math.min(discountPaise, c.max_discount_paise);
-        } else if (c.type === 'flat') {
-          discountPaise = c.value;
-        }
-        couponId = c.id;
-        await client.query('UPDATE coupons SET uses_count = uses_count + 1 WHERE id = $1', [c.id]);
+        const coupon = await evaluateCoupon(client, data.coupon_code, lineItems.map((li) => ({
+          drug_schedule: li.drug_schedule, line_subtotal_paise: li.assessable_paise,
+        })));
+        discountPaise = coupon.discountPaise;
+        couponId = coupon.couponId;
+        await client.query('UPDATE coupons SET uses_count = uses_count + 1 WHERE id = $1', [couponId]);
       }
 
       // Shipping — free for B2B orders above Rs.5000
@@ -295,6 +283,15 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
           total_paise: totalPaise
         }), req.ip||null]
       );
+
+      // Ordered lines leave the server-side cart in the same transaction
+      await client.query(
+        'DELETE FROM cart_items WHERE user_id = $1 AND product_id = ANY($2::uuid[])',
+        [userId, data.items.map((i) => i.product_id)]
+      );
+      if (data.coupon_code) {
+        await client.query('UPDATE carts SET coupon_code = NULL, updated_at = NOW() WHERE user_id = $1', [userId]);
+      }
 
       return {
         id: orderId, order_number: orderNumber, invoice_number: invoiceNumber,

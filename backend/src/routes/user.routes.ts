@@ -10,6 +10,8 @@ router.get('/me', authenticate, async (req, res, next) => {
   try {
     const user = await queryOne(
       `SELECT u.id, u.mobile, u.email, u.role, u.mobile_verified,
+              u.customer_type, u.kyc_status, u.business_name,
+              u.credit_limit_paise, u.credit_used_paise,
               up.full_name, up.wallet_balance_paise, up.referral_code,
               up.date_of_birth, up.gender
        FROM users u

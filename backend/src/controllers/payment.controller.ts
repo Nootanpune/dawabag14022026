@@ -5,6 +5,7 @@ import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { queueNotification } from '../services/notification.service';
 import { logger } from '../config/logger';
+import { writeAudit, writeAuditTx } from '../utils/audit';
 
 let razorpay: Razorpay;
 
@@ -127,6 +128,11 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
         `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`,
         [newStatus, order_id]
       );
+
+      await writeAuditTx(client, {
+        userId: req.user!.id, action: 'payment_captured', performedBy: req.user!.id, ip: req.ip,
+        newValue: { order_id, gateway_order_id: razorpay_order_id, gateway_payment_id: razorpay_payment_id, order_status: newStatus },
+      });
     });
 
     // Get order details for notification
@@ -225,9 +231,9 @@ export async function initiateRefund(req: Request, res: Response, next: NextFunc
     const { order_id, reason } = req.body;
 
     const payment = await queryOne<{
-      gateway_payment_id: string; amount_paise: number; status: string;
+      gateway_payment_id: string; amount_paise: number; status: string; user_id: string;
     }>(
-      `SELECT p.gateway_payment_id, p.amount_paise, p.status
+      `SELECT p.gateway_payment_id, p.amount_paise, p.status, o.user_id
        FROM payments p JOIN orders o ON o.id = p.order_id
        WHERE o.id = $1 AND p.status = 'captured'`,
       [order_id]
@@ -247,6 +253,11 @@ export async function initiateRefund(req: Request, res: Response, next: NextFunc
        WHERE gateway_payment_id = $3`,
       [refund.amount, refund.id, payment.gateway_payment_id]
     );
+
+    await writeAudit({
+      userId: payment.user_id, action: 'refund_initiated', performedBy: req.user!.id, ip: req.ip,
+      newValue: { order_id, refund_id: refund.id, amount_paise: refund.amount }, notes: reason,
+    });
 
     res.json({ success: true, message: 'Refund initiated', data: { refund_id: refund.id } });
   } catch (error) {

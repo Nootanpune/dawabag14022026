@@ -9,6 +9,7 @@ import {
   DrugLicenseVerifier, NMCVerifier
 } from '../services/kyc.service';
 import { AppError } from '../utils/AppError';
+import { writeAudit } from '../utils/audit';
 import { logger } from '../config/logger';
 
 // ── Auto-verify GSTIN (called at signup) ─────────────────────────────────────
@@ -115,7 +116,11 @@ export const adminVerifyDrugLicense = async (req: Request, res: Response, next: 
     });
 
     // Check if all verifications complete → activate account
-    const activated = await KYCOrchestrator.checkAndActivate(user_id);
+    await writeAudit({
+      userId: user_id, action: verified ? 'kyc_check_verified' : 'kyc_check_failed',
+      performedBy: req.user!.id, newValue: { check: 'drug_license' }, notes: rejection_reason ?? notes,
+    });
+    const activated = verified ? await KYCOrchestrator.checkAndActivate(user_id, req.user!.id) : false;
 
     res.json({
       success: true,
@@ -163,7 +168,11 @@ export const adminVerifyNMC = async (req: Request, res: Response, next: NextFunc
       notes,
     });
 
-    const activated = await KYCOrchestrator.checkAndActivate(user_id);
+    await writeAudit({
+      userId: user_id, action: verified ? 'kyc_check_verified' : 'kyc_check_failed',
+      performedBy: req.user!.id, newValue: { check: 'nmc_registration' }, notes: rejection_reason ?? notes,
+    });
+    const activated = verified ? await KYCOrchestrator.checkAndActivate(user_id, req.user!.id) : false;
 
     res.json({
       success: true,
