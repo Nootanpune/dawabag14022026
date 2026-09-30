@@ -2,6 +2,8 @@
 import { runDailyLicenceExpiryCheck, runMonthlyReVerification } from '../services/kyc.service';
 import { runCreditRemindersJob } from './creditReminders.job';
 import { runLowStockJob } from './lowStock.job';
+import { runSettlementJob } from './settlement.job';
+import { runRefillOrdersJob, runRefillRemindersJob } from './refill.job';
 
 export interface JobDefinition {
   name: string;
@@ -34,6 +36,24 @@ export const JOBS: JobDefinition[] = [
     description: 'Remind B2B buyers 3 days, 1 day and on the day credit is due',
     cron: '0 9 * * *',                       // daily 09:00
     run: runCreditRemindersJob,
+  },
+  {
+    name: 'partner_settlements',
+    description: 'Build last month\'s partner settlements: commission, fees, GST on fees, TCS, TDS (C-32)',
+    cron: '0 3 1 * *',                       // 1st of month 03:00
+    run: runSettlementJob,
+  },
+  {
+    name: 'refill_orders',
+    description: 'Place refill orders due today; charge active mandates (no prescription lines)',
+    cron: '0 7 * * *',                       // daily 07:00
+    run: runRefillOrdersJob,
+  },
+  {
+    name: 'refill_reminders',
+    description: 'Remind buyers before a refill (pre-debit notice for mandates)',
+    cron: '0 8 * * *',                       // daily 08:00
+    run: runRefillRemindersJob,
   },
 ];
 

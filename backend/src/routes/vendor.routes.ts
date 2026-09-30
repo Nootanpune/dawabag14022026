@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { VendorApprovalService } from '../services/vendor.service';
 import { logger } from '../config/logger';
+import { getReviewQueue, postApproveListing, postListingLive, postRejectListing } from '../controllers/marketplaceAdmin.controller';
 
 const router = Router();
 
@@ -39,12 +40,12 @@ router.get('/pending-approval', authenticate, authorize('admin','super_admin'), 
 // Approve vendor
 router.post('/:id/approve', authenticate, authorize('admin','super_admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { drug_license_type, drug_license_expiry, vendor_type } = req.body;
+    const { drug_license_type, drug_license_expiry, vendor_type, invoice_prefix } = req.body;
     if (!drug_license_type || !drug_license_expiry) throw new AppError('drug_license_type and drug_license_expiry required', 400);
     await VendorApprovalService.approveVendor({
       vendorId: req.params.id, adminId: req.user!.id,
       drugLicenseType: drug_license_type, drugLicenseExpiry: drug_license_expiry,
-      vendorType: vendor_type || 'supplier',
+      vendorType: vendor_type || 'supplier', invoicePrefix: invoice_prefix,
     });
     res.json({ success: true, data: { message: 'Vendor approved', vendor_id: req.params.id } });
   } catch (err) { next(err); }
@@ -78,71 +79,11 @@ router.get('/:id/performance', authenticate, authorize('admin','super_admin'), a
   } catch (err) { next(err); }
 });
 
-// Partner product review queue
-router.get('/partner-products/pending', authenticate, authorize('admin','super_admin','pharmacist_rx'), async (_req, res, next) => {
-  try {
-    const result = await pool.query(
-      `SELECT pp.*, v.name AS partner_name, v.pincode, v.vendor_rating
-       FROM partner_products pp JOIN vendors v ON pp.partner_id = v.id
-       WHERE pp.approval_status = 'pending' ORDER BY pp.submission_date ASC`
-    );
-    res.json({ success: true, data: { count: result.rows.length, products: result.rows } });
-  } catch (err) { next(err); }
-});
-
-// Approve partner product
-router.post('/partner-products/:id/approve', authenticate, authorize('admin','super_admin','pharmacist_rx'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    await pool.query(
-      `UPDATE partner_products SET approval_status='approved', listing_status='pending',
-       product_id=$1, reviewed_by=$2, reviewed_at=NOW(), updated_at=NOW() WHERE id=$3`,
-      [req.body.product_id||null, req.user!.id, req.params.id]
-    );
-    res.json({ success: true, data: { message: 'Product approved. Post live when ready.' } });
-  } catch (err) { next(err); }
-});
-
-// Reject partner product
-router.post('/partner-products/:id/reject', authenticate, authorize('admin','super_admin','pharmacist_rx'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { rejection_reason_code, rejection_details } = req.body;
-    if (!rejection_reason_code) throw new AppError('rejection_reason_code required (e.g. REJ-01)', 400);
-    await pool.query(
-      `UPDATE partner_products SET approval_status='rejected', listing_status='not_listed',
-       rejection_reason_code=$1, rejection_details=$2, reviewed_by=$3, reviewed_at=NOW() WHERE id=$4`,
-      [rejection_reason_code, rejection_details||null, req.user!.id, req.params.id]
-    );
-    res.json({ success: true, data: { message: `Rejected (${rejection_reason_code})` } });
-  } catch (err) { next(err); }
-});
-
-// Post approved product live on portal
-router.post('/partner-products/:id/post-live', authenticate, authorize('admin','super_admin'), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await pool.query(
-      `UPDATE partner_products SET listing_status='live', posted_at=NOW(), posted_by=$1, updated_at=NOW()
-       WHERE id=$2 AND approval_status='approved' RETURNING medicine_name`,
-      [req.user!.id, req.params.id]
-    );
-    if (!result.rows[0]) throw new AppError('Product not found or not approved', 400);
-    res.json({ success: true, data: { message: `${result.rows[0].medicine_name} is now live on portal` } });
-  } catch (err) { next(err); }
-});
-
-// Pending settlements
-router.get('/settlements/pending', authenticate, authorize('admin','super_admin'), async (_req, res, next) => {
-  try {
-    const result = await pool.query(
-      `SELECT poi.partner_id, v.name AS partner_name,
-              COUNT(poi.id) AS unfulfilled_orders,
-              SUM(poi.supply_price_paise * poi.allocated_qty) AS gross_value_paise,
-              SUM(poi.net_payable_paise) AS total_net_payable_paise
-       FROM partner_order_items poi JOIN vendors v ON poi.partner_id = v.id
-       WHERE poi.dispatch_status = 'delivered' AND poi.settlement_batch_id IS NULL
-       GROUP BY poi.partner_id, v.name ORDER BY total_net_payable_paise DESC`
-    );
-    res.json({ success: true, data: { partners: result.rows } });
-  } catch (err) { next(err); }
-});
+// Partner listing review — controllers/marketplaceAdmin.controller.ts
+const reviewers = authorize('admin', 'super_admin', 'pharmacist_rx');
+router.get('/partner-products/pending', authenticate, reviewers, getReviewQueue);
+router.post('/partner-products/:id/approve', authenticate, reviewers, postApproveListing);
+router.post('/partner-products/:id/reject', authenticate, reviewers, postRejectListing);
+router.post('/partner-products/:id/post-live', authenticate, authorize('admin', 'super_admin'), postListingLive);
 
 export default router;

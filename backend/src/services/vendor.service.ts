@@ -19,9 +19,15 @@ export class VendorApprovalService {
     drugLicenseType: 'dl20' | 'dl21' | 'dl20b' | 'dl21b';
     drugLicenseExpiry: string; // YYYY-MM-DD
     vendorType: 'supplier' | 'marketplace_partner' | 'both';
+    invoicePrefix?: string;   // required for marketplace partners (their own invoice series)
     notes?: string;
   }): Promise<void> {
     const { vendorId, adminId, drugLicenseType, drugLicenseExpiry, vendorType } = params;
+    const isPartner = vendorType !== 'supplier';
+    const prefix = params.invoicePrefix?.trim().toUpperCase();
+    if (isPartner && !prefix) throw new AppError('invoice_prefix is required for marketplace partners', 400);
+    if (prefix && !/^[A-Z0-9]{2,10}$/.test(prefix)) throw new AppError('invoice_prefix must be 2–10 letters/digits', 400);
+    if (prefix && ['DWB', 'DWS'].includes(prefix)) throw new AppError('That prefix is reserved for Dawabag', 400);
 
     const result = await pool.query(
       `UPDATE vendors SET
@@ -34,10 +40,11 @@ export class VendorApprovalService {
          approved_by          = $4,
          approved_at          = NOW(),
          is_active            = TRUE,
+         invoice_prefix       = COALESCE($6, invoice_prefix),
          updated_at           = NOW()
        WHERE id = $5
        RETURNING name, contact_mobile, contact_email`,
-      [drugLicenseType, drugLicenseExpiry, vendorType, adminId, vendorId]
+      [drugLicenseType, drugLicenseExpiry, vendorType, adminId, vendorId, prefix || null]
     );
 
     if (!result.rows[0]) throw new AppError('Vendor not found', 404);

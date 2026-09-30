@@ -1,23 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import { getRazorpay, validWebhookSignature } from '../services/razorpay.client';
+import { handleRecurringCapture } from '../services/mandate.service';
+import { moveOrderToFulfilment } from '../services/paymentCapture.service';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { queueNotification } from '../services/notification.service';
 import { logger } from '../config/logger';
 import { writeAudit, writeAuditTx } from '../utils/audit';
-
-let razorpay: Razorpay;
-
-function getRazorpay(): Razorpay {
-  if (!razorpay) {
-    razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID!,
-      key_secret: process.env.RAZORPAY_KEY_SECRET!,
-    });
-  }
-  return razorpay;
-}
 
 // ─── Create Razorpay Order ────────────────────────────────────────────────────
 export async function createPaymentOrder(req: Request, res: Response, next: NextFunction) {
@@ -79,8 +69,22 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      order_id,
     } = req.body;
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      throw new AppError('razorpay_order_id, razorpay_payment_id and razorpay_signature are required', 400);
+    }
+
+    // The order is the one this Razorpay order was created for, and it must be
+    // the caller's — never an order_id taken from the request body.
+    const owned = await queryOne<{ order_id: string; amount_paise: number; status: string }>(
+      `SELECT p.order_id, p.amount_paise, p.status FROM payments p
+       JOIN orders o ON o.id = p.order_id
+       WHERE p.gateway_order_id = $1 AND o.user_id = $2`,
+      [razorpay_order_id, req.user!.id]
+    );
+    if (!owned) throw new AppError('Payment not found for this account', 404);
+    if (owned.status === 'captured') throw new AppError('This payment is already recorded', 409);
+    const order_id = owned.order_id;
 
     // Verify signature
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
@@ -99,6 +103,9 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
     if (payment.status !== 'captured' && payment.status !== 'authorized') {
       throw new AppError(`Payment not captured. Status: ${payment.status}`, 400);
     }
+    if (payment.order_id !== razorpay_order_id || Number(payment.amount) !== owned.amount_paise) {
+      throw new AppError('Payment does not match this order', 400);
+    }
 
     await withTransaction(async (client) => {
       // Update payment record
@@ -110,24 +117,8 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
         [razorpay_payment_id, razorpay_signature, payment.method, razorpay_order_id]
       );
 
-      // Update order status to rx_pending (if has Rx-required items) or packing
-      const orderItems = await client.query(
-        `SELECT p.drug_schedule FROM order_items oi
-         JOIN products p ON p.id = oi.product_id
-         WHERE oi.order_id = $1`,
-        [order_id]
-      );
-
-      const needsRx = orderItems.rows.some((r: any) =>
-        ['Schedule H', 'Schedule H1'].includes(r.drug_schedule)
-      );
-
-      const newStatus = needsRx ? 'rx_pending' : 'packing';
-
-      await client.query(
-        `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`,
-        [newStatus, order_id]
-      );
+      // rx_pending for prescription lines (buyer's exemption applied), else packing
+      const newStatus = await moveOrderToFulfilment(client, order_id);
 
       await writeAuditTx(client, {
         userId: req.user!.id, action: 'payment_captured', performedBy: req.user!.id, ip: req.ip,
@@ -168,21 +159,20 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
 // ─── Razorpay Webhook ─────────────────────────────────────────────────────────
 export async function handleWebhook(req: Request, res: Response, next: NextFunction) {
   try {
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-    if (webhookSecret) {
-      const signature = req.headers['x-razorpay-signature'] as string;
-      const body = JSON.stringify(req.body);
-      const expectedSig = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(body)
-        .digest('hex');
-      if (signature !== expectedSig) {
-        return res.status(400).json({ error: 'Invalid webhook signature' });
-      }
+    // Never act on an unsigned or mis-signed webhook (it could mark orders paid)
+    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+    if (!validWebhookSignature(rawBody, req.headers['x-razorpay-signature'] as string | undefined)) {
+      logger.warn('Rejected Razorpay webhook: missing secret or invalid signature');
+      return res.status(400).json({ success: false, message: 'Invalid webhook signature' });
     }
 
     const { event, payload } = req.body;
     logger.info(`Razorpay webhook: ${event}`);
+
+    // Mandate registration and recurring (refill) charges
+    if (event === 'payment.captured' || event === 'token.confirmed') {
+      await handleRecurringCapture(event, payload);
+    }
 
     if (event === 'payment.failed') {
       const paymentEntity = payload.payment?.entity;

@@ -29,6 +29,8 @@ import reportRoutes from './routes/report.routes';
 // v2.0 — compatibility patch routes
 import kycRoutes from './routes/kyc.routes';
 import cartRoutes from './routes/cart.routes';
+import partnerRoutes from './routes/partner.routes';
+import refillRoutes from './routes/refill.routes';
 import eInvoiceRouter from './controllers/einvoice.controller';
 
 import { errorHandler } from './middleware/errorHandler';
@@ -73,7 +75,11 @@ const authLimiter = rateLimit({
 app.use(globalLimiter);
 app.use(compression());
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
+// Keep the raw bytes for webhook signature checks (payment.controller handleWebhook)
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, _res, buf) => { (req as express.Request & { rawBody?: Buffer }).rawBody = buf; },
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('combined', {
   stream: { write: (msg) => logger.http(msg.trim()) },
@@ -110,6 +116,8 @@ app.use(`${api}/reports`, reportRoutes);
 // v2.0 routes
 app.use(`${api}/kyc`, kycRoutes);
 app.use(`${api}/cart`, cartRoutes);
+app.use(`${api}/partner`, partnerRoutes);
+app.use(`${api}/refills`, refillRoutes);
 app.use(`${api}/einvoice`, eInvoiceRouter);
 
 // ─── Error Handling ─────────────────────────────────────────────────────────

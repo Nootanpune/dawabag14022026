@@ -4,6 +4,10 @@ import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { listOpenCredit, setCreditLimit } from '../controllers/credit.controller';
 import { listJobs, runJobNow } from '../controllers/jobs.controller';
+import {
+  getSettings, getSettlementDetail, getSettlements, linkPartnerUser, postGenerateSettlements,
+  postSettlementPaid, postShipmentDelivered, putSetting, setCommission,
+} from '../controllers/marketplaceAdmin.controller';
 
 const router = Router();
 
@@ -83,5 +87,17 @@ router.patch('/users/:userId/credit', authenticate, authorize('admin', 'super_ad
 router.get('/credit/open', authenticate, authorize('admin', 'super_admin'), listOpenCredit);
 router.get('/jobs', authenticate, authorize('admin', 'super_admin'), listJobs);
 router.post('/jobs/:name/run', authenticate, authorize('super_admin'), runJobNow);
+
+// ─── Sprint 3: marketplace, settlements, settings ───────────────────────────
+const managers = authorize('admin', 'super_admin');
+router.post('/partners/:vendorId/users', authenticate, managers, linkPartnerUser);
+router.put('/partners/:vendorId/commission', authenticate, managers, setCommission);
+router.post('/shipments/:id/delivered', authenticate, managers, postShipmentDelivered);
+router.get('/settlements', authenticate, managers, getSettlements);
+router.post('/settlements/generate', authenticate, managers, postGenerateSettlements);
+router.get('/settlements/:id', authenticate, managers, getSettlementDetail);
+router.post('/settlements/:id/pay', authenticate, managers, postSettlementPaid);
+router.get('/settings', authenticate, managers, getSettings);
+router.put('/settings/:key', authenticate, authorize('super_admin'), putSetting);
 
 export default router;

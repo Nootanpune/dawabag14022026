@@ -187,6 +187,31 @@ function buildMessage(payload: NotificationPayload) {
         body: `${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} for order ${on} is due on ${payload.dueDate}.`,
       },
     },
+    // ── Sprint 3: refills ──
+    refill_upcoming: {
+      sms: payload.autoCharge
+        ? `Dawabag: Your refill of about ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} will be ordered and charged to your saved payment method on ${payload.refillDate}. Pause or change it in the app.`
+        : `Dawabag: Your refill of about ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} will be ordered on ${payload.refillDate}. Pause or change it in the app.`,
+      email: {
+        subject: `Refill coming up on ${payload.refillDate}`,
+        body: payload.autoCharge
+          ? `Your refill (about ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`}) will be ordered on ${payload.refillDate} and charged to your saved payment method. Pause or edit it in the app before then.`
+          : `Your refill (about ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`}) will be ordered on ${payload.refillDate}. You will get a link to pay.`,
+      },
+      push: { title: 'Refill coming up', body: `Ordering on ${payload.refillDate}` },
+    },
+    refill_order_created: {
+      sms: payload.autoCharged
+        ? `Dawabag: Refill order ${on} placed and ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} is being charged to your saved payment method.`
+        : payload.needsPrescription
+          ? `Dawabag: Refill order ${on} placed. Please pay ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} in the app; a pharmacist will verify your prescription.`
+          : `Dawabag: Refill order ${on} placed. Please pay ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} in the app to confirm it.`,
+      push: { title: 'Refill order placed', body: payload.autoCharged ? `Order ${on} — charging your saved method` : `Order ${on} — tap to pay` },
+    },
+    refill_failed: {
+      sms: `Dawabag: We could not place your refill order (${payload.reason || 'item unavailable'}). Please order from the app.`,
+      push: { title: 'Refill not placed', body: payload.reason || 'Please order from the app.' },
+    },
     low_stock_digest: {
       email: {
         subject: `Low stock: ${payload.count} product(s) at or below reorder level`,

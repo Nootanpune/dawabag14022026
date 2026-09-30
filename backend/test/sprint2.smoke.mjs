@@ -252,8 +252,8 @@ async function main() {
   r = await call('GET', '/inventory/low-stock', { token: admin });
   check('low-stock list includes S2-LOW', r.json.data?.products?.some((p) => p.id === low), r.json.data?.counts);
   r = await call('GET', '/admin/jobs', { token: admin });
-  check('job list shows 4 jobs with recorded runs',
-    r.json.data?.jobs?.length === 4 && r.json.data.jobs.find((j) => j.name === 'low_stock')?.recent_runs?.length >= 1, r.json);
+  check('job list shows the scheduled jobs with recorded runs',
+    r.json.data?.jobs?.length >= 4 && r.json.data.jobs.find((j) => j.name === 'low_stock')?.recent_runs?.length >= 1, r.json);
   r = await call('POST', '/admin/jobs/nope/run', { token: admin });
   check('unknown job → 404', r.status === 404, r.json);
   r = await call('POST', '/admin/jobs/low_stock/run', { token: retailer });
