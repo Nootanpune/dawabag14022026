@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft, ExternalLink, RefreshCw } from 'lucide-react';
@@ -145,6 +146,16 @@ export default function OrderDetailPage() {
         <SoldBySection shipments={order?.shipments} />
 
         {order?.status === 'delivered' && <RefillSetupButton orderId={order.id} />}
+
+        {/* Complaint about this order (C-36) */}
+        {order?.id && (
+          <p className="text-xs text-gray-500 mb-4">
+            Problem with this order?{' '}
+            <Link href={`/account/complaints/new?order=${order.id}`} className="text-brand-600 hover:underline">
+              Raise a complaint
+            </Link>
+          </p>
+        )}
 
         {/* Bill */}
         <div className="card mb-4">

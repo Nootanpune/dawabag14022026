@@ -17,6 +17,16 @@ The February Kilo Next.js prototype was replaced by the Dawabag v2 package
   privacy consents/export/erasure (C-40, C-44), listing rejection codes REJ-01..14.
 - Tests: test/sprint4.smoke.mjs (63 checks) + Sprint 1–3 suites + 21 jest tests pass.
 - Web and mobile Sprint 4 screens: see the latest commits.
+- Web Sprint 4 (tsc + next build pass): /staff/fulfilment tabs (Rx verify, Pack, Dispatch,
+  Deliver, H1 register + CSV) shown per role; /account/complaints (list/new/thread);
+  /account/privacy (consents, marketing toggle, history, export, correction/erasure);
+  /admin/grievances (status + overdue filter, reply, status/resolution); /admin/recalls
+  (list, create with product search, affected orders); /admin/privacy (request queue);
+  invoice PDF download per shipment on buyer order detail, partner shipments and staff
+  queue (fetched via Bearer client, lib/download.ts — nothing kept locally).
+- Web gaps needing backend: buyer cannot list own data requests (no GET /privacy/requests);
+  GET /grievances/:id has no buyer_name; delivery role not allowed to fetch invoices;
+  recall detail has no recalled_by_name; eslint is not configured in frontend-web.
 - Mobile Sprint 4 (not compiled): complaints list/new/thread (/account/complaints),
   privacy consents + erasure/correction requests (/account/privacy; export is web-only),
   public About & legal (/legal), order timeline handles every status, invoice number +

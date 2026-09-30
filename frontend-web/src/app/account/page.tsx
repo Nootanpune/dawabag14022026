@@ -1,12 +1,14 @@
 'use client';
 import Link from 'next/link';
-import { ClipboardList, Repeat, ChevronRight } from 'lucide-react';
+import { ClipboardList, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 
 const LINKS = [
   { href: '/orders', label: 'My orders', icon: ClipboardList },
   { href: '/account/refills', label: 'Refills & automatic payment', icon: Repeat },
+  { href: '/account/complaints', label: 'Complaints', icon: MessageSquareWarning },
+  { href: '/account/privacy', label: 'Privacy and your data', icon: ShieldCheck },
 ];
 
 export default function AccountPage() {

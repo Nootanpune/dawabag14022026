@@ -4,6 +4,7 @@ import { formatDateTimeIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
 import ShipmentLines from './ShipmentLines';
+import InvoiceDownloadButton from '@/components/orders/InvoiceDownloadButton';
 
 interface Props {
   shipment: PartnerShipment;
@@ -24,8 +25,8 @@ export default function ShipmentCard({ shipment: s, onDispatch, onDelivered, bus
           <p className="text-xs text-gray-400">Received {formatDateTimeIST(s.created_at)}</p>
         </div>
         <div className="flex items-center gap-2">
-          {s.cold_chain && <span className="badge-cold">Cold chain</span>}
-          <StatusBadge status={s.status} />
+            {s.cold_chain && <span className="badge-cold">Cold chain</span>}
+            <StatusBadge status={s.status} />
         </div>
       </div>
 
@@ -53,16 +54,19 @@ export default function ShipmentCard({ shipment: s, onDispatch, onDelivered, bus
           )}
           {s.delivered_at && <p className="mt-0.5">Delivered {formatDateTimeIST(s.delivered_at)}</p>}
         </div>
-        {s.status === 'pending' && (
-          <button onClick={() => onDispatch(s)} className="btn-primary text-xs py-1.5 px-3">
-            Dispatch
-          </button>
-        )}
-        {s.status === 'dispatched' && (
-          <button onClick={() => onDelivered(s)} disabled={busy} className="btn-outline text-xs py-1.5 px-3 disabled:opacity-50">
-            Mark delivered
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {s.invoice_number && <InvoiceDownloadButton shipmentId={s.id} invoiceNumber={s.invoice_number} />}
+          {s.status === 'pending' && (
+            <button onClick={() => onDispatch(s)} className="btn-primary text-xs py-1.5 px-3">
+              Dispatch
+            </button>
+          )}
+          {s.status === 'dispatched' && (
+            <button onClick={() => onDelivered(s)} disabled={busy} className="btn-outline text-xs py-1.5 px-3 disabled:opacity-50">
+              Mark delivered
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
