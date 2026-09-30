@@ -9,24 +9,7 @@ import { AppError } from '../utils/AppError';
 import { generateOrderNumber } from '../utils/helpers';
 import { queueNotification } from '../services/notification.service';
 import { logger } from '../config/logger';
-
-// Helper: pick correct price field based on customer type
-function selectPriceField(customerType: string): string {
-  switch (customerType) {
-    case 'b2b_retailer':   return 'ptr_price_paise';
-    case 'b2b_wholesaler': return 'pts_price_paise';
-    case 'doc_hospital':   return 'institutional_price_paise';
-    default:               return 'offer_price_paise';
-  }
-}
-
-// Helper: does this customer need a prescription?
-function requiresPrescription(customerType: string, drugSchedule: string): boolean {
-  if (['b2b_retailer', 'b2b_wholesaler', 'doc_hospital'].includes(customerType)) {
-    return false; // Drug license = authorisation
-  }
-  return ['Schedule H', 'Schedule H1'].includes(drugSchedule);
-}
+import { TRADE_TYPES, allowsCreditTerms, isBuyerType, priceField, requiresPrescription } from '../utils/customerType';
 
 const createOrderSchema = z.object({
   patient_id:           z.string().uuid().optional(),
@@ -45,10 +28,16 @@ const createOrderSchema = z.object({
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
     const userId       = req.user!.id;
-    const customerType = (req.user as any).customer_type || 'customer';
+    const customerType = req.user!.pricing_type;
     const data         = createOrderSchema.parse(req.body);
-    const isB2B        = ['b2b_retailer', 'b2b_wholesaler'].includes(customerType);
-    const priceField   = selectPriceField(customerType);
+    const isB2B        = allowsCreditTerms(customerType);
+    const priceColumn  = priceField(customerType);
+
+    // Trade accounts cannot order until admin approves their KYC (URS v3.1 §2)
+    const registeredType = req.user!.customer_type;
+    if (isBuyerType(registeredType) && TRADE_TYPES.includes(registeredType) && req.user!.kyc_status !== 'approved') {
+      throw new AppError('Your business account is awaiting KYC approval. Orders open once our team verifies your documents.', 403);
+    }
 
     // Validate payment terms against customer type
     if (!isB2B && data.payment_terms !== 'prepaid') {
@@ -123,7 +112,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
         }
 
         // Price selection based on customer type
-        const unitPricePaise: number = prod[priceField] || prod.offer_price_paise;
+        const unitPricePaise: number = prod[priceColumn] || prod.offer_price_paise;
         const assessable = unitPricePaise * item.quantity;
         const gstAmt     = Math.round(assessable * prod.gst_rate / 100);
         subtotalPaise   += assessable;
@@ -314,10 +303,8 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     });
 
     await queueNotification({
-      user_id: userId, type: 'ORDER_PLACED',
-      title: 'Order placed successfully',
-      body: `Order ${order.order_number} for ₹${Math.round(order.total_paise/100)} placed.`,
-      data: { order_id: order.id, order_number: order.order_number },
+      userId, type: 'order_status', status: 'placed',
+      orderId: order.id, orderNumber: order.order_number,
     });
 
     logger.info(`Order ${order.order_number} by ${userId} (${customerType}) — ${order.payment_terms}`);
@@ -340,7 +327,7 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     if (!validStatuses.includes(status)) throw new AppError(`Invalid status`, 400);
 
     const orderResult = await queryOne<any>(
-      'SELECT id, status, user_id, buyer_gstin, e_invoice_status FROM orders WHERE id = $1', [id]
+      'SELECT id, order_number, status, user_id, buyer_gstin, e_invoice_status FROM orders WHERE id = $1', [id]
     );
     if (!orderResult) throw new AppError('Order not found', 404);
 
@@ -363,17 +350,12 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
       [orderResult.user_id, JSON.stringify({order_id:id, new_status:status}), req.user!.id]
     );
 
-    const msgs: Record<string,string> = {
-      confirmed: 'Your order is confirmed and being prepared.',
-      packed:    'Your order has been packed.',
-      dispatched:`Your order is on the way! Tracking: ${tracking_id||'updating soon'}`,
-      delivered: 'Your order has been delivered. Thank you!',
-      cancelled: 'Your order has been cancelled. Refund within 5-7 days.',
-    };
+    // Templates exist for packed/dispatched/delivered; other statuses use the generic one
     await queueNotification({
-      user_id: orderResult.user_id, type: `ORDER_${status.toUpperCase()}`,
-      title: `Order ${status}`, body: msgs[status]||`Status: ${status}`,
-      data: { order_id: id, status },
+      userId: orderResult.user_id,
+      type: ['packed', 'dispatched', 'delivered'].includes(status) ? status : 'order_status',
+      status, orderId: id, orderNumber: orderResult.order_number,
+      awbNumber: tracking_id, courierPartner: courier_partner,
     });
 
     res.json({ success: true, data: { id, status } });
@@ -414,10 +396,19 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
   } catch (err) { next(err); }
 }
 
-export async function listOrders(req: Request, res: Response, next: NextFunction) {
+// GET /orders/my — the caller's own orders, whatever their role
+export function getMyOrders(req: Request, res: Response, next: NextFunction) {
+  return listOrders(req, res, next, false);
+}
+
+// GET /orders/queue — all orders, for staff (route restricts roles)
+export function getOrderQueue(req: Request, res: Response, next: NextFunction) {
+  return listOrders(req, res, next, true);
+}
+
+async function listOrders(req: Request, res: Response, next: NextFunction, isAdmin: boolean) {
   try {
     const userId  = req.user!.id;
-    const isAdmin = ['admin','super_admin','pharmacist_rx','pharmacist_pack'].includes(req.user!.role);
     const status  = req.query.status as string;
     const page    = Math.max(1, parseInt(req.query.page as string||'1'));
     const limit   = Math.min(50, parseInt(req.query.limit as string||'20'));

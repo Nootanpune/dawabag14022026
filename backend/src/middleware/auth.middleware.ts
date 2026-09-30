@@ -2,13 +2,44 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
 import { AppError } from '../utils/AppError';
 import { queryOne } from '../config/database';
+import { BuyerType, effectiveCustomerType } from '../utils/customerType';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: { id: string; role: string; mobile: string };
+      user?: {
+        id: string;
+        role: string;
+        mobile: string;
+        customer_type: string;        // as registered
+        kyc_status: string | null;
+        pricing_type: BuyerType;      // customer_type once KYC-approved, else 'customer'
+      };
     }
   }
+}
+
+// customer_type and kyc_status are read from the database on every request, not
+// trusted from the token, so a KYC approval or suspension takes effect at once.
+const AUTH_USER_COLUMNS = 'id, role, mobile, customer_type, kyc_status';
+
+interface AuthUserRow {
+  id: string;
+  role: string;
+  mobile: string;
+  customer_type: string | null;
+  kyc_status: string | null;
+}
+
+function toRequestUser(row: AuthUserRow): NonNullable<Request['user']> {
+  return {
+    id: row.id,
+    role: row.role,
+    mobile: row.mobile,
+    customer_type: row.customer_type || 'customer',
+    kyc_status: row.kyc_status,
+    pricing_type: effectiveCustomerType(row.customer_type, row.kyc_status),
+  };
 }
 
 export async function authenticate(
@@ -25,15 +56,15 @@ export async function authenticate(
     const token = authHeader.split(' ')[1];
     const payload = await verifyAccessToken(token);
 
-    const user = await queryOne<{ id: string; role: string; mobile: string; is_active: boolean }>(
-      'SELECT id, role, mobile, is_active FROM users WHERE id = $1 AND deleted_at IS NULL',
+    const user = await queryOne<AuthUserRow & { is_active: boolean }>(
+      `SELECT ${AUTH_USER_COLUMNS}, is_active FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [payload.sub]
     );
 
     if (!user) throw new AppError('User not found', 401);
     if (!user.is_active) throw new AppError('Account deactivated', 403);
 
-    req.user = { id: user.id, role: user.role, mobile: user.mobile };
+    req.user = toRequestUser(user);
     next();
   } catch (error) {
     next(error);
@@ -61,11 +92,11 @@ export function optionalAuth(
   const token = authHeader.split(' ')[1];
   verifyAccessToken(token)
     .then(async (payload) => {
-      const user = await queryOne<{ id: string; role: string; mobile: string }>(
-        'SELECT id, role, mobile FROM users WHERE id = $1 AND deleted_at IS NULL AND is_active = TRUE',
+      const user = await queryOne<AuthUserRow>(
+        `SELECT ${AUTH_USER_COLUMNS} FROM users WHERE id = $1 AND deleted_at IS NULL AND is_active = TRUE`,
         [payload.sub]
       );
-      if (user) req.user = user;
+      if (user) req.user = toRequestUser(user);
       next();
     })
     .catch(() => next());

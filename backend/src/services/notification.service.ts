@@ -3,6 +3,7 @@ import { getRedis } from '../config/redis';
 import { query } from '../config/database';
 import { logger } from '../config/logger';
 import nodemailer from 'nodemailer';
+import SESTransport from 'nodemailer/lib/ses-transport';
 import AWS from 'aws-sdk';
 
 // ─── Queue Setup ──────────────────────────────────────────────────────────────
@@ -190,7 +191,7 @@ function getTransporter(): nodemailer.Transporter {
     const ses = new AWS.SES({ region: process.env.AWS_REGION });
     transporter = nodemailer.createTransport({
       SES: { ses, aws: AWS },
-    });
+    } as SESTransport.Options);
   }
   return transporter;
 }

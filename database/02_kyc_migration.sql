@@ -121,7 +121,7 @@ ALTER TABLE users
 CREATE OR REPLACE VIEW admin_kyc_queue AS
 SELECT
   u.id                    AS user_id,
-  u.full_name,
+  up.full_name,
   u.mobile,
   u.email,
   u.customer_type,
@@ -157,6 +157,7 @@ SELECT
   u.created_at            AS registered_at
 
 FROM users u
+LEFT JOIN user_profiles up ON up.user_id = u.id
 WHERE u.kyc_status IN ('pending_kyc', 'pending_renewal', 'flagged_gstin')
   AND u.customer_type IN ('b2b_retailer', 'b2b_wholesaler', 'doc_hospital')
 ORDER BY u.kyc_submitted_at ASC NULLS LAST;  -- FIFO queue — oldest first

@@ -38,7 +38,7 @@ export const getKYCStatus = async (req: Request, res: Response, next: NextFuncti
   try {
     const userId = req.params.userId;
     // Only the user themselves or an admin can view
-    if (req.user.id !== userId && !['admin','super_admin'].includes(req.user.role)) {
+    if (req.user!.id !== userId && !['admin','super_admin'].includes(req.user!.role)) {
       throw new AppError('Forbidden', 403);
     }
 
@@ -110,7 +110,7 @@ export const adminVerifyDrugLicense = async (req: Request, res: Response, next: 
       validUpto: valid_upto,
       premisesAddress: premises_address,
       rejectionReason: rejection_reason,
-      adminId: req.user.id,
+      adminId: req.user!.id,
       notes,
     });
 
@@ -159,7 +159,7 @@ export const adminVerifyNMC = async (req: Request, res: Response, next: NextFunc
       registrationDate: registration_date,
       registrationStatus: registration_status,
       rejectionReason: rejection_reason,
-      adminId: req.user.id,
+      adminId: req.user!.id,
       notes,
     });
 
@@ -256,17 +256,17 @@ export const upgradeDocToRetailer = async (req: Request, res: Response, next: Ne
           account_upgrade_by    = $4,
           updated_at            = NOW()
         WHERE id = $5
-      `, [new_gstin || null, drug_license_number, drug_license_type, req.user.id, user_id]);
+      `, [new_gstin || null, drug_license_number, drug_license_type, req.user!.id, user_id]);
 
       // Log in audit_log
       await pool.query(`
         INSERT INTO audit_logs (user_id, action, old_value, new_value, performed_by, notes)
         VALUES ($1, 'account_type_upgrade', 'doc_hospital', 'b2b_retailer', $2, $3)
-      `, [user_id, req.user.id, notes || '']);
+      `, [user_id, req.user!.id, notes || '']);
 
       await pool.query('COMMIT');
 
-      logger.info(`Account upgraded: user ${user_id} from doc_hospital to b2b_retailer by admin ${req.user.id}`);
+      logger.info(`Account upgraded: user ${user_id} from doc_hospital to b2b_retailer by admin ${req.user!.id}`);
       res.json({
         success: true,
         data: {

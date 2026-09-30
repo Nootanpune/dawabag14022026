@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 
 const loginSchema = z.object({
@@ -45,7 +45,7 @@ export default function LoginPage() {
       else if (['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(role)) router.push('/admin/orders');
       else router.push('/');
     } catch (err: any) {
-      const msg = err.response?.data?.error || 'Login failed';
+      const msg = getApiErrorMessage(err, 'Login failed');
       if (msg.includes('OTP sent')) {
         setMobileForOTP(data.mobile);
         setNeedsOTP(true);
@@ -66,7 +66,7 @@ export default function LoginPage() {
       toast.success('Mobile verified! Welcome to Dawabag.');
       router.push('/');
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Invalid OTP');
+      toast.error(getApiErrorMessage(err, 'Invalid OTP'));
     } finally {
       setIsLoading(false);
     }

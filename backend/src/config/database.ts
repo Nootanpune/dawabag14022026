@@ -1,7 +1,8 @@
 import { Pool, PoolClient } from 'pg';
 import { logger } from './logger';
 
-let pool: Pool;
+// Exported as a live binding: modules that import { pool } see it once connectDB() has run.
+export let pool: Pool;
 
 export function connectDB(): Promise<void> {
   return new Promise((resolve, reject) => {

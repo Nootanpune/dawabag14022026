@@ -315,10 +315,11 @@ CREATE TABLE IF NOT EXISTS low_stock_alerts (
   current_qty     INTEGER NOT NULL,
   reorder_level   INTEGER NOT NULL,
   alert_sent_at   TIMESTAMPTZ DEFAULT NOW(),
+  alert_date      DATE NOT NULL DEFAULT CURRENT_DATE,
   po_raised       BOOLEAN DEFAULT FALSE,
   po_id           UUID REFERENCES purchase_orders(id),
   resolved_at     TIMESTAMPTZ,
-  UNIQUE (product_id, alert_sent_at::DATE)  -- One alert per product per day max
+  UNIQUE (product_id, alert_date)  -- One alert per product per day max
 );
 
 CREATE INDEX IF NOT EXISTS idx_low_stock_product ON low_stock_alerts(product_id)

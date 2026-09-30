@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { AppError } from './AppError';
 import { isTokenBlacklisted } from '../config/redis';
@@ -6,29 +6,34 @@ import { isTokenBlacklisted } from '../config/redis';
 interface TokenPayload {
   sub: string;
   role: string;
+  customer_type?: string;
   jti: string;
   type: 'access' | 'refresh';
   iat: number;
   exp: number;
 }
 
+// customer_type is carried for clients (web/mobile) to pick the right screens.
+// The API itself re-reads customer_type and kyc_status from the database on
+// every request (auth.middleware), so a stale token cannot unlock B2B pricing.
 export async function generateTokens(
   userId: string,
-  role: string
+  role: string,
+  customerType: string = 'customer'
 ): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
   const accessJti = uuidv4();
   const refreshJti = uuidv4();
 
   const accessToken = jwt.sign(
-    { sub: userId, role, jti: accessJti, type: 'access' },
+    { sub: userId, role, customer_type: customerType, jti: accessJti, type: 'access' },
     process.env.JWT_ACCESS_SECRET!,
-    { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+    { expiresIn: (process.env.JWT_ACCESS_EXPIRY || '15m') as SignOptions['expiresIn'] }
   );
 
   const refreshToken = jwt.sign(
-    { sub: userId, role, jti: refreshJti, type: 'refresh' },
+    { sub: userId, role, customer_type: customerType, jti: refreshJti, type: 'refresh' },
     process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d' }
+    { expiresIn: (process.env.JWT_REFRESH_EXPIRY || '7d') as SignOptions['expiresIn'] }
   );
 
   return {

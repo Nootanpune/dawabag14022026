@@ -9,16 +9,82 @@ import { sendOTP } from '../services/sms.service';
 import { sendWelcomeEmail } from '../services/email.service';
 import { AppError } from '../utils/AppError';
 import { logger } from '../config/logger';
+import { requiredKycDocuments } from '../utils/customerType';
 
 // ─── Validation Schemas ─────────────────────────────────────────────────────
-const registerSchema = z.object({
-  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number'),
-  email: z.string().email().optional(),
+const MOBILE_RE = /^[6-9]\d{9}$/;
+const PAN_RE    = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+const GSTIN_RE  = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+
+const upper = (re: RegExp, msg: string) =>
+  z.string().trim().transform((v) => v.toUpperCase()).pipe(z.string().regex(re, msg));
+const pan     = upper(PAN_RE, 'Invalid PAN (format ABCDE1234F)');
+const gstin   = upper(GSTIN_RE, 'Invalid GSTIN');
+const pincode = z.string().regex(/^[1-9]\d{5}$/, 'Invalid pincode');
+
+const commonFields = {
+  mobile: z.string().regex(MOBILE_RE, 'Invalid Indian mobile number'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  full_name: z.string().min(2).max(255),
-  role: z.enum(['customer', 'doctor', 'pharmacy']).default('customer'),
+  full_name: z.string().trim().min(2).max(255),
   referral_code: z.string().optional(),
+};
+
+// One schema per buyer type — URS v3.1 §2 and the §3 document matrix
+const registerSchema = z.discriminatedUnion('customer_type', [
+  z.object({
+    ...commonFields,
+    customer_type: z.literal('customer'),
+    email: z.string().email().optional(),
+    pincode: pincode.optional(),
+  }),
+  z.object({
+    ...commonFields,
+    customer_type: z.literal('b2b_retailer'),
+    email: z.string().email(),
+    pincode,
+    business_name: z.string().trim().min(2).max(200),
+    drug_license_type: z.enum(['dl20', 'dl21']),
+    drug_license_number: z.string().trim().min(3).max(100),
+    pan_number: pan,
+    gstin: z.union([gstin, z.literal('')]).optional(),
+    gst_unregistered_declaration: z.boolean().optional(),
+  }),
+  z.object({
+    ...commonFields,
+    customer_type: z.literal('b2b_wholesaler'),
+    email: z.string().email(),
+    pincode,
+    business_name: z.string().trim().min(2).max(200),
+    drug_license_type: z.enum(['dl20c', 'dl21c']),
+    drug_license_number: z.string().trim().min(3).max(100),
+    gstin,
+    pan_number: pan,
+  }),
+  z.object({
+    ...commonFields,
+    customer_type: z.literal('doc_hospital'),
+    email: z.string().email().optional(),
+    pincode,
+    nmc_reg_number: z.string().trim().min(2).max(50),
+    nmc_council_state: z.string().trim().min(2).max(50),
+    speciality: z.string().trim().min(2).max(100),
+    pan_number: pan,
+    gst_unregistered_declaration: z.literal(true, {
+      errorMap: () => ({ message: 'Confirm you are not registered under GST' }),
+    }),
+  }),
+]).superRefine((d, ctx) => {
+  // Decision A: a retailer may be unregistered, but must say so explicitly
+  if (d.customer_type === 'b2b_retailer' && !d.gstin && d.gst_unregistered_declaration !== true) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['gst_unregistered_declaration'],
+      message: 'Enter GSTIN, or confirm the business is not registered under GST',
+    });
+  }
 });
+
+type RegisterInput = z.infer<typeof registerSchema>;
 
 const loginSchema = z.object({
   mobile: z.string().regex(/^[6-9]\d{9}$/),
@@ -33,8 +99,8 @@ const otpSchema = z.object({
 // ─── Register ───────────────────────────────────────────────────────────────
 export async function register(req: Request, res: Response, next: NextFunction) {
   try {
-    const data = registerSchema.parse(req.body);
-    const { mobile, email, password, full_name, role, referral_code } = data;
+    const data: RegisterInput = registerSchema.parse(req.body);
+    const { mobile, email, password, full_name, customer_type } = data;
 
     // Check if mobile already exists
     const existing = await queryOne<{ id: string }>(
@@ -43,17 +109,46 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     );
     if (existing) throw new AppError('Mobile number already registered', 409);
 
+    if (email) {
+      const emailTaken = await queryOne<{ id: string }>(
+        'SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL',
+        [email]
+      );
+      if (emailTaken) throw new AppError('Email already registered', 409);
+    }
+
     const passwordHash = await bcrypt.hash(
       password,
       parseInt(process.env.BCRYPT_ROUNDS || '12')
     );
 
+    // Trade accounts wait for documents + admin review; B2C is active after OTP
+    const kycStatus = customer_type === 'customer' ? 'not_required' : 'pending_otp';
+    const trade = customer_type === 'customer' ? null : data;
+
     await withTransaction(async (client) => {
-      // Create user
+      // All buyer types share role 'customer'; customer_type drives pricing and KYC
       const user = await client.query(
-        `INSERT INTO users (mobile, email, password_hash, role)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [mobile, email || null, passwordHash, role]
+        `INSERT INTO users (
+           mobile, email, password_hash, role, customer_type, kyc_status,
+           business_name, registration_pincode, pan_number, gstin,
+           gst_unregistered_declaration, drug_license_type, drug_license_number,
+           nmc_reg_number, nmc_council_state, doctor_speciality
+         ) VALUES ($1,$2,$3,'customer',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         RETURNING id`,
+        [
+          mobile, email || null, passwordHash, customer_type, kycStatus,
+          trade && 'business_name' in trade ? trade.business_name : null,
+          data.pincode || null,
+          trade ? trade.pan_number : null,
+          trade && 'gstin' in trade && trade.gstin ? trade.gstin : null,
+          trade && 'gst_unregistered_declaration' in trade ? trade.gst_unregistered_declaration === true : false,
+          trade && 'drug_license_type' in trade ? trade.drug_license_type : null,
+          trade && 'drug_license_number' in trade ? trade.drug_license_number : null,
+          trade && 'nmc_reg_number' in trade ? trade.nmc_reg_number : null,
+          trade && 'nmc_council_state' in trade ? trade.nmc_council_state : null,
+          trade && 'speciality' in trade ? trade.speciality : null,
+        ]
       );
       const userId = user.rows[0].id;
 
@@ -94,10 +189,21 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       await sendWelcomeEmail(email, full_name);
     }
 
+    const requiredDocuments = requiredKycDocuments(
+      customer_type,
+      !!(trade && 'gstin' in trade && trade.gstin)
+    );
+
     res.status(201).json({
       success: true,
       message: 'Registration successful. Please verify your mobile number.',
-      data: { mobile, otp_sent: true },
+      data: {
+        mobile,
+        otp_sent: true,
+        customer_type,
+        kyc_required: customer_type !== 'customer',
+        required_documents: requiredDocuments,
+      },
     });
   } catch (error) {
     next(error);
@@ -112,16 +218,20 @@ export async function verifyMobileOTP(req: Request, res: Response, next: NextFun
     const isValid = await verifyOTP(mobile, otp);
     if (!isValid) throw new AppError('Invalid or expired OTP', 400);
 
-    const user = await queryOne<{ id: string; role: string }>(
+    const user = await queryOne<{ id: string; role: string; customer_type: string; kyc_status: string }>(
       `UPDATE users SET mobile_verified = TRUE, updated_at = NOW()
        WHERE mobile = $1 AND deleted_at IS NULL
-       RETURNING id, role`,
+       RETURNING id, role, customer_type, kyc_status`,
       [mobile]
     );
 
     if (!user) throw new AppError('User not found', 404);
 
-    const tokens = await generateTokens(user.id, user.role);
+    const tokens = await generateTokens(user.id, user.role, user.customer_type);
+    const profile = await queryOne<{ full_name: string }>(
+      'SELECT full_name FROM user_profiles WHERE user_id = $1',
+      [user.id]
+    );
 
     res.json({
       success: true,
@@ -129,6 +239,9 @@ export async function verifyMobileOTP(req: Request, res: Response, next: NextFun
       data: {
         user_id: user.id,
         role: user.role,
+        customer_type: user.customer_type,
+        kyc_status: user.kyc_status,
+        full_name: profile?.full_name,
         ...tokens,
       },
     });
@@ -146,9 +259,10 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       id: string; role: string; password_hash: string;
       mobile_verified: boolean; is_active: boolean;
       failed_login_attempts: number; locked_until: Date | null;
+      customer_type: string; kyc_status: string;
     }>(
       `SELECT id, role, password_hash, mobile_verified, is_active,
-              failed_login_attempts, locked_until
+              failed_login_attempts, locked_until, customer_type, kyc_status
        FROM users WHERE mobile = $1 AND deleted_at IS NULL`,
       [mobile]
     );
@@ -202,7 +316,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       [user.id]
     );
 
-    const tokens = await generateTokens(user.id, user.role);
+    const tokens = await generateTokens(user.id, user.role, user.customer_type);
 
     // Fetch profile
     const profile = await queryOne<{ full_name: string }>(
@@ -215,6 +329,8 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       data: {
         user_id: user.id,
         role: user.role,
+        customer_type: user.customer_type,
+        kyc_status: user.kyc_status,
         full_name: profile?.full_name,
         ...tokens,
       },
@@ -232,8 +348,8 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
 
     const payload = await verifyRefreshToken(refresh_token);
 
-    const user = await queryOne<{ id: string; role: string; is_active: boolean }>(
-      'SELECT id, role, is_active FROM users WHERE id = $1 AND deleted_at IS NULL',
+    const user = await queryOne<{ id: string; role: string; is_active: boolean; customer_type: string }>(
+      'SELECT id, role, is_active, customer_type FROM users WHERE id = $1 AND deleted_at IS NULL',
       [payload.sub]
     );
 
@@ -242,7 +358,7 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
     // Blacklist old refresh token
     await blacklistToken(payload.jti, 7 * 24 * 3600);
 
-    const tokens = await generateTokens(user.id, user.role);
+    const tokens = await generateTokens(user.id, user.role, user.customer_type);
     res.json({ success: true, data: tokens });
   } catch (error) {
     next(error);

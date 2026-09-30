@@ -1,192 +1,241 @@
 'use client';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage, getApiFieldErrors, type AuthResponseData } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
+import {
+  buildRegisterPayload,
+  EMPTY_DETAILS,
+  getOptionalDocuments,
+  getRequiredDocuments,
+  type CustomerType,
+  type DetailsFormValues,
+  type DocumentType,
+  type RegisterResponseData,
+} from '@/lib/registration';
+import StepIndicator from '@/components/auth/register/StepIndicator';
+import CustomerTypeStep from '@/components/auth/register/CustomerTypeStep';
+import DetailsStep from '@/components/auth/register/DetailsStep';
+import DocumentsStep, { type HeldFiles } from '@/components/auth/register/DocumentsStep';
+import OtpStep from '@/components/auth/register/OtpStep';
+import KycUploadStep from '@/components/auth/register/KycUploadStep';
+import SubmittedScreen from '@/components/auth/register/SubmittedScreen';
 
-const schema = z.object({
-  full_name: z.string().min(2, 'Name must be at least 2 characters'),
-  mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
-  email: z.string().email('Enter a valid email').optional().or(z.literal('')),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirm_password: z.string(),
-  referral_code: z.string().optional(),
-}).refine((d) => d.password === d.confirm_password, {
-  message: 'Passwords do not match',
-  path: ['confirm_password'],
-});
-
-type FormData = z.infer<typeof schema>;
-
-const OTPSchema = z.object({ otp: z.string().length(6, 'OTP must be 6 digits') });
-type OTPData = z.infer<typeof OTPSchema>;
+type Step = 'type' | 'details' | 'documents' | 'otp' | 'upload' | 'submitted';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
-  const [step, setStep] = useState<'register' | 'otp'>('register');
-  const [registeredMobile, setRegisteredMobile] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const { login, setKycStatus } = useAuthStore();
 
-  const form = useForm<FormData>({ resolver: zodResolver(schema) });
-  const otpForm = useForm<OTPData>({ resolver: zodResolver(OTPSchema) });
+  const [step, setStep] = useState<Step>('type');
+  const [customerType, setCustomerType] = useState<CustomerType | null>(null);
+  const [details, setDetails] = useState<DetailsFormValues>(EMPTY_DETAILS);
+  const [files, setFiles] = useState<HeldFiles>({});
+  const [registration, setRegistration] = useState<RegisterResponseData | null>(null);
+  const [accessToken, setAccessToken] = useState('');
+  const [documentsIncomplete, setDocumentsIncomplete] = useState(false);
 
-  const onRegister = async (data: FormData) => {
-    setIsLoading(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const isB2C = customerType === 'customer';
+  const stepLabels = isB2C
+    ? ['Account type', 'Details', 'Verify']
+    : ['Account type', 'Details', 'Documents', 'Verify'];
+  const stepIndex = { type: 0, details: 1, documents: 2, otp: stepLabels.length - 1, upload: stepLabels.length - 1, submitted: stepLabels.length }[step];
+
+  const goTo = (next: Step) => {
+    setFormError('');
+    setStep(next);
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // ─── POST /auth/register ──────────────────────────────────────────────────
+  const register = async (type: CustomerType, values: DetailsFormValues): Promise<boolean> => {
+    setIsSubmitting(true);
+    setFormError('');
+    setFieldErrors({});
     try {
-      await api.post('/auth/register', {
-        full_name: data.full_name,
-        mobile: data.mobile,
-        email: data.email || undefined,
-        password: data.password,
-        role: 'customer',
-        referral_code: data.referral_code || undefined,
+      const res = await api.post('/auth/register', buildRegisterPayload(type, values));
+      const data: RegisterResponseData = res.data.data;
+      setRegistration({
+        ...data,
+        mobile: data?.mobile || values.mobile.trim(),
+        required_documents: Array.isArray(data?.required_documents)
+          ? data.required_documents
+          : getRequiredDocuments(type, !!values.gstin.trim()),
       });
-      setRegisteredMobile(data.mobile);
-      setStep('otp');
-      toast.success('OTP sent to your mobile number');
+      toast.success(`OTP sent to +91 ${values.mobile.trim()}`);
+      return true;
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Registration failed');
+      const msg =
+        err?.response?.status === 409
+          ? getApiErrorMessage(err, 'This mobile number is already registered. Please sign in.')
+          : getApiErrorMessage(err, 'Registration failed');
+      const fe = getApiFieldErrors(err);
+      setFormError(msg);
+      setFieldErrors(fe);
+      toast.error(msg);
+      // Field-level problems can only be fixed on the details step.
+      if (Object.keys(fe).length && step !== 'details') setStep('details');
+      return false;
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const onVerifyOTP = async (data: OTPData) => {
-    setIsLoading(true);
-    try {
-      await api.post('/auth/verify-otp', { mobile: registeredMobile, otp: data.otp });
-      toast.success('Registration complete! Please login.');
-      router.push('/auth/login');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Invalid OTP');
-    } finally {
-      setIsLoading(false);
+  // ─── Step handlers ────────────────────────────────────────────────────────
+  const onSelectType = (type: CustomerType) => {
+    if (type !== customerType) setFiles({});
+    setCustomerType(type);
+    setFieldErrors({});
+    goTo('details');
+  };
+
+  const onDetailsSubmit = async (values: DetailsFormValues) => {
+    if (!customerType) return;
+    setDetails(values);
+    if (customerType === 'customer') {
+      if (await register(customerType, values)) goTo('otp');
+    } else {
+      // Drop a held GST certificate if a retailer removed their GSTIN.
+      const allowed = new Set<DocumentType>([
+        ...getRequiredDocuments(customerType, !!values.gstin.trim()),
+        ...getOptionalDocuments(customerType),
+      ]);
+      setFiles((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([d]) => allowed.has(d as DocumentType))) as HeldFiles
+      );
+      goTo('documents');
     }
   };
 
-  if (step === 'otp') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="w-14 h-14 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <span className="text-white font-bold text-2xl">D</span>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">dawabag</h1>
-          </div>
-          <div className="card shadow-sm">
-            <h2 className="text-lg font-semibold mb-2">Verify your mobile</h2>
-            <p className="text-sm text-gray-500 mb-5">
-              OTP sent to +91 {registeredMobile}
-            </p>
-            <form onSubmit={otpForm.handleSubmit(onVerifyOTP)} className="space-y-4">
-              <input
-                {...otpForm.register('otp')}
-                type="text"
-                maxLength={6}
-                autoFocus
-                placeholder="000000"
-                className="input text-center text-2xl tracking-[0.5em] font-mono"
-              />
-              {otpForm.formState.errors.otp && (
-                <p className="text-xs text-red-500">{otpForm.formState.errors.otp.message}</p>
-              )}
-              <button type="submit" disabled={isLoading}
-                className="btn-primary w-full py-2.5 flex items-center justify-center gap-2">
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                Verify & complete registration
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const onDocumentsContinue = async () => {
+    if (!customerType) return;
+    if (registration) return goTo('otp'); // already registered — just return to OTP
+    if (await register(customerType, details)) goTo('otp');
+  };
+
+  const onOtpVerified = async (data: AuthResponseData) => {
+    login(data);
+    if (customerType === 'customer' || registration?.kyc_required === false) {
+      toast.success('Welcome to Dawabag!');
+      router.push('/');
+      return;
+    }
+    toast.success('Mobile verified');
+    setAccessToken(data.access_token);
+    goTo('upload');
+  };
+
+  const onUploadComplete = useCallback(
+    (kycStatus?: string) => {
+      if (kycStatus) setKycStatus(kycStatus);
+      setDocumentsIncomplete(false);
+      setStep('submitted');
+    },
+    [setKycStatus]
+  );
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+  const requiredDocs = customerType ? getRequiredDocuments(customerType, !!details.gstin.trim()) : [];
+  const optionalDocs = customerType ? getOptionalDocuments(customerType) : [];
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
           <div className="w-14 h-14 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
             <span className="text-white font-bold text-2xl">D</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Create account</h1>
           <p className="text-sm text-gray-500 mt-1">Join Dawabag today</p>
         </div>
+
         <div className="card shadow-sm">
-          <form onSubmit={form.handleSubmit(onRegister)} className="space-y-4">
-            {/* Full name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full name</label>
-              <input {...form.register('full_name')} placeholder="Rajesh Shah" className="input" />
-              {form.formState.errors.full_name && (
-                <p className="text-xs text-red-500 mt-1">{form.formState.errors.full_name.message}</p>
-              )}
-            </div>
+          {step !== 'submitted' && <StepIndicator steps={stepLabels} current={stepIndex} />}
 
-            {/* Mobile */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mobile number</label>
-              <div className="flex">
-                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
-                <input {...form.register('mobile')} type="tel" maxLength={10} placeholder="9876543210" className="input rounded-l-none" />
-              </div>
-              {form.formState.errors.mobile && (
-                <p className="text-xs text-red-500 mt-1">{form.formState.errors.mobile.message}</p>
-              )}
+          {formError && (step === 'details' || step === 'documents') && (
+            <div className="mb-4 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{formError}</span>
             </div>
+          )}
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-gray-400">(optional)</span></label>
-              <input {...form.register('email')} type="email" placeholder="rajesh@example.com" className="input" />
-            </div>
+          {step === 'type' && <CustomerTypeStep selected={customerType} onSelect={onSelectType} />}
 
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <div className="relative">
-                <input {...form.register('password')} type={showPassword ? 'text' : 'password'} placeholder="Min. 8 characters" className="input pr-10" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {form.formState.errors.password && (
-                <p className="text-xs text-red-500 mt-1">{form.formState.errors.password.message}</p>
-              )}
-            </div>
+          {step === 'details' && customerType && (
+            <DetailsStep
+              key={customerType}
+              customerType={customerType}
+              defaultValues={details}
+              serverErrors={fieldErrors}
+              isSubmitting={isSubmitting}
+              submitLabel={isB2C ? 'Continue & send OTP' : 'Continue'}
+              onBack={(values) => {
+                setDetails(values);
+                goTo('type');
+              }}
+              onSubmit={onDetailsSubmit}
+            />
+          )}
 
-            {/* Confirm password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
-              <input {...form.register('confirm_password')} type="password" placeholder="Re-enter password" className="input" />
-              {form.formState.errors.confirm_password && (
-                <p className="text-xs text-red-500 mt-1">{form.formState.errors.confirm_password.message}</p>
-              )}
-            </div>
+          {step === 'documents' && customerType && (
+            <DocumentsStep
+              requiredDocs={requiredDocs}
+              optionalDocs={optionalDocs}
+              files={files}
+              onChange={(d, f) =>
+                setFiles((prev) => {
+                  const next = { ...prev };
+                  if (f) next[d] = f;
+                  else delete next[d];
+                  return next;
+                })
+              }
+              onBack={registration ? undefined : () => goTo('details')}
+              onContinue={onDocumentsContinue}
+              isSubmitting={isSubmitting}
+            />
+          )}
 
-            {/* Referral code */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Referral code <span className="text-gray-400">(optional)</span></label>
-              <input {...form.register('referral_code')} placeholder="e.g. RAJA20" className="input uppercase" />
-            </div>
+          {step === 'otp' && registration && (
+            <OtpStep
+              mobile={registration.mobile}
+              onVerified={onOtpVerified}
+              onBack={isB2C ? undefined : () => goTo('documents')}
+            />
+          )}
 
-            <button type="submit" disabled={isLoading}
-              className="btn-primary w-full py-2.5 flex items-center justify-center gap-2">
-              {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Create account
-            </button>
-          </form>
-          <p className="text-center text-sm text-gray-500 mt-4">
-            Already have an account?{' '}
-            <Link href="/auth/login" className="text-brand-600 font-medium hover:underline">Sign in</Link>
-          </p>
+          {step === 'upload' && registration && accessToken && (
+            <KycUploadStep
+              requiredDocs={registration.required_documents}
+              files={files}
+              accessToken={accessToken}
+              onComplete={onUploadComplete}
+              onSkip={() => {
+                setDocumentsIncomplete(true);
+                setStep('submitted');
+              }}
+            />
+          )}
+
+          {step === 'submitted' && customerType && (
+            <SubmittedScreen customerType={customerType} documentsIncomplete={documentsIncomplete} />
+          )}
+
+          {(step === 'type' || step === 'details') && (
+            <p className="text-center text-sm text-gray-500 mt-4">
+              Already have an account?{' '}
+              <Link href="/auth/login" className="text-brand-600 font-medium hover:underline">
+                Sign in
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>

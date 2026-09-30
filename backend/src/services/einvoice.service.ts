@@ -289,7 +289,7 @@ export class EInvoiceService {
       JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = $1
     `, [orderId]);
-    const items = itemsResult.rows.map(item => ({
+    const items = itemsResult.rows.map((item: any) => ({
       ...item,
       unit_price: item.unit_price_paise / 100,
     }));

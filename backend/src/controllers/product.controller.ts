@@ -52,7 +52,7 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
       : 'ORDER BY p.name ASC';
 
     // GAP-01 fix: return correct price + qty based on customer type
-    const customerType = (req.user as any)?.customer_type || 'customer';
+    const customerType = req.user?.pricing_type ?? 'customer';
     const displayPrice = customerType === 'b2b_retailer'
       ? 'COALESCE(p.ptr_price_paise, p.offer_price_paise)'
       : customerType === 'b2b_wholesaler'
@@ -83,10 +83,10 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
        FROM products p
        LEFT JOIN inventory_batches b ON b.product_id = p.id
          AND b.expiry_date > CURRENT_DATE + 30
-       \${whereClause}
+       ${whereClause}
        GROUP BY p.id
-       \${orderClause}
-       LIMIT $\${paramIdx} OFFSET $\${paramIdx + 1}`,
+       ${orderClause}
+       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
       [...params, limit, offset]
     );
 

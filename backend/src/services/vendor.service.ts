@@ -370,7 +370,7 @@ export async function checkLowStockAndAlert(): Promise<void> {
     // Check if alert was already sent today
     const existing = await pool.query(
       `SELECT id FROM low_stock_alerts
-       WHERE product_id = $1 AND alert_sent_at::DATE = CURRENT_DATE`,
+       WHERE product_id = $1 AND alert_date = CURRENT_DATE`,
       [product.id]
     );
     if (existing.rows[0]) continue; // Already alerted today

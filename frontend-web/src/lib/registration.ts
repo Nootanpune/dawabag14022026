@@ -1,0 +1,318 @@
+import { z } from 'zod';
+
+// ─── Customer types ──────────────────────────────────────────────────────────
+export type CustomerType = 'customer' | 'b2b_retailer' | 'b2b_wholesaler' | 'doc_hospital';
+
+export type KycStatus =
+  | 'not_required'
+  | 'pending_otp'
+  | 'pending_kyc'
+  | 'approved'
+  | 'rejected'
+  | 'suspended'
+  | 'pending_renewal'
+  | 'flagged_gstin';
+
+export interface CustomerTypeOption {
+  value: CustomerType;
+  label: string;
+  description: string;
+  pricing: string;
+  kycNote: string;
+}
+
+export const CUSTOMER_TYPE_OPTIONS: CustomerTypeOption[] = [
+  {
+    value: 'customer',
+    label: 'Patient / Individual (B2C)',
+    description: 'Order medicines for yourself or your family.',
+    pricing: 'Offer price',
+    kycNote: 'No KYC — account active right after OTP',
+  },
+  {
+    value: 'b2b_retailer',
+    label: 'Retail Pharmacy / Hospital Pharmacy',
+    description: 'Buy stock for your chemist shop or hospital pharmacy.',
+    pricing: 'PTR pricing',
+    kycNote: 'KYC review: 1–2 working days',
+  },
+  {
+    value: 'b2b_wholesaler',
+    label: 'Wholesaler / Distributor / Stockist',
+    description: 'Bulk trade purchases for distribution.',
+    pricing: 'PTS pricing',
+    kycNote: 'KYC review: 2–3 working days',
+  },
+  {
+    value: 'doc_hospital',
+    label: 'Doctor (NMC / State Medical Council reg.)',
+    description: 'For registered medical practitioners and clinics.',
+    pricing: 'Institutional pricing',
+    kycNote: 'KYC review: 1–2 working days',
+  },
+];
+
+export function getCustomerTypeOption(type: CustomerType): CustomerTypeOption {
+  return CUSTOMER_TYPE_OPTIONS.find((o) => o.value === type)!;
+}
+
+// ─── KYC documents ───────────────────────────────────────────────────────────
+export type DocumentType =
+  | 'drug_license'
+  | 'pan_card'
+  | 'gst_certificate'
+  | 'cancelled_cheque'
+  | 'nmc_certificate'
+  | 'clinic_address_proof';
+
+export const DOCUMENT_LABELS: Record<DocumentType, string> = {
+  drug_license: 'Drug license',
+  pan_card: 'PAN card',
+  gst_certificate: 'GST registration certificate',
+  cancelled_cheque: 'Cancelled cheque',
+  nmc_certificate: 'NMC / State Medical Council registration certificate',
+  clinic_address_proof: 'Clinic address proof',
+};
+
+/** Required documents per the contract (gst_certificate for retailers only when a GSTIN was given). */
+export function getRequiredDocuments(type: CustomerType, hasGstin: boolean): DocumentType[] {
+  switch (type) {
+    case 'b2b_retailer':
+      return hasGstin ? ['drug_license', 'pan_card', 'gst_certificate'] : ['drug_license', 'pan_card'];
+    case 'b2b_wholesaler':
+      return ['drug_license', 'gst_certificate', 'pan_card', 'cancelled_cheque'];
+    case 'doc_hospital':
+      return ['nmc_certificate', 'pan_card'];
+    default:
+      return [];
+  }
+}
+
+export function getOptionalDocuments(type: CustomerType): DocumentType[] {
+  return type === 'doc_hospital' ? ['clinic_address_proof'] : [];
+}
+
+export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const ACCEPTED_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+export const ACCEPT_ATTR = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
+
+/** Returns an error message, or null if the file is acceptable. */
+export function validateKycFile(file: File): string | null {
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const typeOk = ACCEPTED_FILE_TYPES.includes(file.type) || ['pdf', 'jpg', 'jpeg', 'png'].includes(ext);
+  if (!typeOk) return 'Only PDF, JPG or PNG files are allowed';
+  if (file.size > MAX_FILE_BYTES) return 'File must be 5 MB or smaller';
+  if (file.size === 0) return 'File is empty';
+  return null;
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// ─── Step 2 form ─────────────────────────────────────────────────────────────
+export const MOBILE_REGEX = /^[6-9]\d{9}$/;
+export const PINCODE_REGEX = /^\d{6}$/;
+export const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+export const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+
+export const RETAILER_DL_TYPES = [
+  { value: 'dl20', label: 'DL Form 20' },
+  { value: 'dl21', label: 'DL Form 21' },
+] as const;
+
+export const WHOLESALER_DL_TYPES = [
+  { value: 'dl20c', label: 'DL Form 20C' },
+  { value: 'dl21c', label: 'DL Form 21C' },
+] as const;
+
+export const SPECIALITIES = [
+  'General Physician',
+  'Diabetologist',
+  'Cardiologist',
+  'Paediatrician',
+  'Gynaecologist',
+  'Dermatologist',
+  'Orthopaedic',
+  'ENT',
+  'Other',
+];
+
+export const GST_DECLARATION_TEXT: Partial<Record<CustomerType, string>> = {
+  b2b_retailer: 'I confirm this business is not registered under GST.',
+  doc_hospital: 'I confirm I am not registered under GST.',
+};
+
+/** All Step-2 fields. Fields not relevant to the chosen type are simply left empty. */
+export interface DetailsFormValues {
+  full_name: string;
+  mobile: string;
+  email: string;
+  password: string;
+  confirm_password: string;
+  referral_code: string;
+  pincode: string;
+  business_name: string;
+  drug_license_type: string;
+  drug_license_number: string;
+  pan_number: string;
+  gstin: string;
+  gst_unregistered_declaration: boolean;
+  nmc_reg_number: string;
+  nmc_council_state: string;
+  speciality: string;
+}
+
+export const EMPTY_DETAILS: DetailsFormValues = {
+  full_name: '',
+  mobile: '',
+  email: '',
+  password: '',
+  confirm_password: '',
+  referral_code: '',
+  pincode: '',
+  business_name: '',
+  drug_license_type: '',
+  drug_license_number: '',
+  pan_number: '',
+  gstin: '',
+  gst_unregistered_declaration: false,
+  nmc_reg_number: '',
+  nmc_council_state: '',
+  speciality: '',
+};
+
+const str = z.string();
+
+export function buildDetailsSchema(type: CustomerType) {
+  const isB2B = type === 'b2b_retailer' || type === 'b2b_wholesaler';
+
+  return z
+    .object({
+      full_name: str,
+      mobile: str,
+      email: str,
+      password: str,
+      confirm_password: str,
+      referral_code: str,
+      pincode: str,
+      business_name: str,
+      drug_license_type: str,
+      drug_license_number: str,
+      pan_number: str,
+      gstin: str,
+      gst_unregistered_declaration: z.boolean(),
+      nmc_reg_number: str,
+      nmc_council_state: str,
+      speciality: str,
+    })
+    .superRefine((d, ctx) => {
+      const issue = (path: keyof DetailsFormValues, message: string) =>
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+
+      const name = d.full_name.trim();
+      if (name.length < 2) issue('full_name', 'Name must be at least 2 characters');
+      else if (name.length > 255) issue('full_name', 'Name must be at most 255 characters');
+
+      if (!MOBILE_REGEX.test(d.mobile.trim())) issue('mobile', 'Enter a valid 10-digit mobile number');
+
+      const email = d.email.trim();
+      if (isB2B && !email) issue('email', 'Email is required — invoices are emailed');
+      else if (email && !z.string().email().safeParse(email).success) issue('email', 'Enter a valid email');
+
+      if (d.password.length < 8) issue('password', 'Password must be at least 8 characters');
+      if (d.password !== d.confirm_password) issue('confirm_password', 'Passwords do not match');
+
+      const pincode = d.pincode.trim();
+      if (type !== 'customer' && !pincode) issue('pincode', 'Pincode is required');
+      else if (pincode && !PINCODE_REGEX.test(pincode)) issue('pincode', 'Enter a valid 6-digit pincode');
+
+      if (type === 'customer') return;
+
+      const pan = d.pan_number.trim().toUpperCase();
+      if (!pan) issue('pan_number', 'PAN is required');
+      else if (!PAN_REGEX.test(pan)) issue('pan_number', 'Enter a valid PAN (e.g. ABCDE1234F)');
+
+      if (isB2B) {
+        if (!d.business_name.trim()) issue('business_name', 'Business name is required');
+        const allowed: readonly string[] = (type === 'b2b_retailer' ? RETAILER_DL_TYPES : WHOLESALER_DL_TYPES).map(
+          (o) => o.value
+        );
+        if (!allowed.includes(d.drug_license_type)) issue('drug_license_type', 'Select the drug license type');
+        if (!d.drug_license_number.trim()) issue('drug_license_number', 'Drug license number is required');
+
+        const gstin = d.gstin.trim().toUpperCase();
+        if (gstin && !GSTIN_REGEX.test(gstin)) issue('gstin', 'Enter a valid 15-character GSTIN');
+        if (type === 'b2b_wholesaler' && !gstin) issue('gstin', 'GSTIN is required for wholesalers');
+        if (type === 'b2b_retailer' && !gstin && !d.gst_unregistered_declaration) {
+          issue('gst_unregistered_declaration', 'Enter your GSTIN or confirm you are not registered under GST');
+        }
+      }
+
+      if (type === 'doc_hospital') {
+        if (!d.nmc_reg_number.trim()) issue('nmc_reg_number', 'Registration number is required');
+        if (!d.nmc_council_state.trim()) issue('nmc_council_state', 'Medical council is required');
+        if (!d.speciality.trim()) issue('speciality', 'Select your speciality');
+        if (!d.gst_unregistered_declaration) {
+          issue('gst_unregistered_declaration', 'Please confirm the GST declaration');
+        }
+      }
+    });
+}
+
+/** Builds the POST /auth/register body for the chosen type (only fields that apply). */
+export function buildRegisterPayload(type: CustomerType, d: DetailsFormValues): Record<string, unknown> {
+  const opt = (v: string) => (v.trim() ? v.trim() : undefined);
+
+  const body: Record<string, unknown> = {
+    customer_type: type,
+    full_name: d.full_name.trim(),
+    mobile: d.mobile.trim(),
+    password: d.password,
+    email: opt(d.email),
+    referral_code: opt(d.referral_code)?.toUpperCase(),
+    pincode: opt(d.pincode),
+  };
+
+  if (type === 'b2b_retailer' || type === 'b2b_wholesaler') {
+    const gstin = d.gstin.trim().toUpperCase();
+    Object.assign(body, {
+      business_name: d.business_name.trim(),
+      drug_license_type: d.drug_license_type,
+      drug_license_number: d.drug_license_number.trim(),
+      pan_number: d.pan_number.trim().toUpperCase(),
+      gstin: gstin || undefined,
+    });
+    if (type === 'b2b_retailer') body.gst_unregistered_declaration = !gstin && d.gst_unregistered_declaration;
+  }
+
+  if (type === 'doc_hospital') {
+    Object.assign(body, {
+      nmc_reg_number: d.nmc_reg_number.trim(),
+      nmc_council_state: d.nmc_council_state.trim(),
+      speciality: d.speciality,
+      pan_number: d.pan_number.trim().toUpperCase(),
+      gst_unregistered_declaration: d.gst_unregistered_declaration,
+    });
+  }
+
+  return body;
+}
+
+// ─── API response shapes ─────────────────────────────────────────────────────
+export interface RegisterResponseData {
+  mobile: string;
+  otp_sent: boolean;
+  customer_type: CustomerType;
+  kyc_required: boolean;
+  required_documents: DocumentType[];
+}
+
+export interface KycUploadResponseData {
+  document_type: DocumentType;
+  uploaded: boolean;
+  kyc_status: KycStatus;
+  missing_documents: DocumentType[];
+}

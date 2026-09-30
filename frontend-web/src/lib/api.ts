@@ -79,4 +79,73 @@ api.interceptors.response.use(
   }
 );
 
+// ─── Shared auth types ───────────────────────────────────────────────────────
+/** data returned by POST /auth/login and POST /auth/verify-otp */
+export interface AuthResponseData {
+  user_id: string;
+  role: string;
+  customer_type?: string;
+  kyc_status?: string;
+  full_name?: string;
+  mobile?: string;
+  access_token: string;
+  refresh_token: string;
+  expires_in?: number;
+}
+
+// ─── Error helper ────────────────────────────────────────────────────────────
+/**
+ * Extracts a human-readable message from an API error.
+ * Handles `{ message }`, legacy `{ error }` and validation `{ errors: [{ path, message }] }` bodies.
+ */
+export function getApiErrorMessage(err: any, fallback = 'Something went wrong'): string {
+  const body = err?.response?.data;
+  if (body) {
+    if (typeof body.message === 'string' && body.message) return body.message;
+    if (typeof body.error === 'string' && body.error) return body.error;
+    if (Array.isArray(body.errors) && body.errors.length) {
+      return body.errors.map((e: any) => e?.message).filter(Boolean).join('. ') || fallback;
+    }
+  }
+  if (err?.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
+  if (err?.request && !err?.response) return 'Network error. Check your connection and try again.';
+  return fallback;
+}
+
+/** Field-level validation errors (`errors: [{ path, message }]`) keyed by field name. */
+export function getApiFieldErrors(err: any): Record<string, string> {
+  const out: Record<string, string> = {};
+  const errors = err?.response?.data?.errors;
+  if (!Array.isArray(errors)) return out;
+  for (const e of errors) {
+    const raw = Array.isArray(e?.path) ? e.path[e.path.length - 1] : e?.path;
+    if (raw != null && e?.message && !out[String(raw)]) out[String(raw)] = String(e.message);
+  }
+  return out;
+}
+
+// ─── KYC document upload ─────────────────────────────────────────────────────
+/** POST /kyc/documents (multipart). `onProgress` receives 0–100. */
+export async function uploadKycDocument(
+  documentType: string,
+  file: File,
+  accessToken: string,
+  onProgress?: (percent: number) => void
+) {
+  const form = new FormData();
+  form.append('document_type', documentType);
+  form.append('file', file);
+  const { data } = await api.post('/kyc/documents', form, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 120000,
+    onUploadProgress: (e) => {
+      if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+    },
+  });
+  return data;
+}
+
 export default api;
