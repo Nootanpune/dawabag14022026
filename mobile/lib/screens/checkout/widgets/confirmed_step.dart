@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../orders/widgets/order_shipments_card.dart';
+
 class ConfirmedStep extends StatelessWidget {
   final String orderNumber;
-  const ConfirmedStep({super.key, required this.orderNumber});
+
+  /// `shipments` from the POST /orders response (seller + invoice per
+  /// shipment); empty when the API sent none.
+  final List<Map<String, dynamic>> shipments;
+
+  const ConfirmedStep({super.key, required this.orderNumber, this.shipments = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +33,10 @@ class ConfirmedStep extends StatelessWidget {
         Text("You'll receive SMS and email updates at every step.",
             style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
             textAlign: TextAlign.center),
+        if (shipments.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          SizedBox(width: double.infinity, child: OrderShipmentsCard(shipments: shipments)),
+        ],
         const SizedBox(height: 32),
         ElevatedButton(
           onPressed: () => context.go('/orders'),

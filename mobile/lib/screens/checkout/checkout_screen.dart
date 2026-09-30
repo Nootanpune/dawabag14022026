@@ -9,6 +9,7 @@ import '../../providers/address_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/formatters.dart';
+import '../orders/widgets/order_shipments_card.dart';
 import 'widgets/address_step.dart';
 import 'widgets/checkout_step_bar.dart';
 import 'widgets/confirmed_step.dart';
@@ -34,6 +35,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String? _orderNumber;
   int _orderTotalPaise = 0;
   bool? _orderRequiresPrescription;
+  List<Map<String, dynamic>> _orderShipments = const [];
   XFile? _prescriptionFile;
   String? _savedPrescriptionId;
   List<dynamic> _savedPrescriptions = [];
@@ -116,6 +118,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         _orderNumber = data['order_number']?.toString();
         _orderTotalPaise = total is num ? total.round() : 0;
         _orderRequiresPrescription = data['requires_prescription'] == true;
+        _orderShipments = OrderShipmentsCard.fromOrder(data);
         _step = _orderRequiresPrescription == true
             ? CheckoutStep.prescription
             : CheckoutStep.payment;
@@ -279,7 +282,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     orderNumber: _orderNumber ?? '',
                     totalPaise: _orderTotalPaise,
                   ),
-                CheckoutStep.confirmed => ConfirmedStep(orderNumber: _orderNumber ?? ''),
+                CheckoutStep.confirmed =>
+                    ConfirmedStep(orderNumber: _orderNumber ?? '', shipments: _orderShipments),
               },
             ),
           ),

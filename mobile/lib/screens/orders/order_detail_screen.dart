@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
+import 'widgets/order_shipments_card.dart';
+import 'widgets/refill_order_card.dart';
 
 final orderDetailProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, id) async {
   final res = await apiService.dio.get('/orders/$id');
@@ -222,6 +224,12 @@ class OrderDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
 
+                // Seller + invoice per shipment, only when the API sent them
+                if (OrderShipmentsCard.fromOrder(order).isNotEmpty) ...[
+                  OrderShipmentsCard(shipments: OrderShipmentsCard.fromOrder(order)),
+                  const SizedBox(height: 12),
+                ],
+
                 // Bill summary
                 Card(
                   child: Padding(
@@ -251,6 +259,10 @@ class OrderDetailScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (status == 'delivered') ...[
+                  const SizedBox(height: 12),
+                  RefillOrderCard(orderId: order['id']?.toString() ?? orderId),
+                ],
                 const SizedBox(height: 24),
               ],
             ),
