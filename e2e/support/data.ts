@@ -55,6 +55,12 @@ export async function cleanup(c: Client) {
   // Keep the shared trail rows, just unlink them from the test people
   await c.query('UPDATE audit_logs SET performed_by = NULL WHERE performed_by = ANY($1)', [ids]);
   await c.query('UPDATE app_settings SET updated_by = NULL WHERE updated_by = ANY($1)', [ids]);
+  // Partner pharmacies of the journeys ('E2E …'): vendors do not hang off a user,
+  // and their invoice and credit-note series are keyed by id and prefix
+  const vendors = (await c.query(`SELECT id::text, invoice_prefix FROM vendors WHERE name LIKE 'E2E %'`)).rows;
+  await c.query('DELETE FROM invoice_series WHERE series_key = ANY($1)',
+    [vendors.flatMap((v) => [`P:${v.id}`, ...(v.invoice_prefix ? [`CN:${v.invoice_prefix}-CN`] : [])])]);
+  await removeRows(c, 'vendors', vendors.map((v) => v.id));
   await removeRows(c, 'users', ids);
   await c.query(`DELETE FROM audit_logs WHERE new_value->>'product_id' = ANY($1::text[])`, [products]);
   await removeRows(c, 'products', products);

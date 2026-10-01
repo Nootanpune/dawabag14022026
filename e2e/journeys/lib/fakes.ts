@@ -26,3 +26,25 @@ export async function useFakeCheckout(ctx: BrowserContext) {
       const r = await window.__dawabagFakePay(o.order_id); o.handler(r); }; this.on = function () {}; };`,
   }));
 }
+
+/** Refunds wait at the fake Razorpay until settled, as real ones do for a few days (C-37) */
+export async function holdGatewayRefunds(hold: boolean) {
+  const { razorpay } = await fakes('razorpay.mjs');
+  razorpay.refundStatus = hold ? 'pending' : 'processed';
+}
+
+/** The fake Razorpay settles a refund and tells the API through the signed refund.processed webhook */
+export async function settleGatewayRefund(refundId: string) {
+  const { razorpay, sendWebhook } = await fakes('razorpay.mjs');
+  const r = razorpay.refunds.find((x: { id: string }) => x.id === refundId);
+  if (!r) throw new Error(`The fake Razorpay has no refund ${refundId}`);
+  r.status = 'processed';
+  const res = await sendWebhook('refund.processed', { refund: { entity: { ...r } } });
+  if (res.status >= 300) throw new Error(`refund.processed webhook: ${JSON.stringify(res.json)}`);
+}
+
+/** What Checkout hands back after a (fake) payment of a Razorpay order — for steps done through the API */
+export async function fakeCheckoutPayment(orderId: string) {
+  const { checkoutPayment } = await fakes('razorpay.mjs');
+  return checkoutPayment(orderId) as { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string };
+}

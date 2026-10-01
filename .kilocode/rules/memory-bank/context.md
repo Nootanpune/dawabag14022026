@@ -28,7 +28,23 @@ the lawyer/CA sign-off.
 - Gotchas: dev-env exports PORT=4000 (the API's) — start the website with PORT=3000;
   stale `next-server` processes answer on :3000 with an old build; `pkill -f` patterns
   must not match the calling shell's own command line.
-- Not yet recorded: doctor consultation, partner pharmacy, returns/refunds.
+- R2 extended (2026-10-01): journeys split into `e2e/journeys/flows/` (one file per
+  journey; `record.spec.ts` only orders the story, `lib/story.ts` carries order numbers).
+  New: Doctor consultation (admin enables doctor 9000001906, registration verified C-22,
+  slots, pharmacist List A C-23, patient books/pays, join screens only — no Agora call,
+  e-prescription C-24, public code check), Partner pharmacy (vendor 'E2E Lake Road
+  Pharmacy' at PIN 499919, prefix LRP, owner 9000001907, product E2E-ORS; approval,
+  listing, order allocated to partner, dispatch/deliver, settlement C-32), Returns and
+  refunds (damaged item on the delivered OTC order, pharmacist approves, refund held at
+  fake Razorpay then settled by signed refund.processed webhook, disposal, C-37).
+  99 steps, all on screen. e2e clean-up also removes 'E2E %' vendors and their series.
+- Found by the extended rehearsal and fixed (website): doctor login went to a missing
+  /doctor/dashboard (now /doctor); order timeline showed prescription steps on OTC
+  orders (now only when `requires_prescription`; sprint1 smoke checks the order detail);
+  settlement toast showed ₹NaN (BIGINT net_payable_paise arrives as a string); vendor
+  approval allowed 2–10-char invoice prefixes but the server takes 2–4.
+- Noted, not changed: cart/product stock counts only Dawabag batches, so a product
+  stocked only by partners shows out of stock (owner decision needed).
 
 ## Direction A — clinical trust redesign (mobile, 2026-10-01)
 - Theme: brand green aligned with the web (#167A4C / #105C38); Material 3 NavigationBar.

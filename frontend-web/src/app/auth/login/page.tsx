@@ -42,7 +42,8 @@ export default function LoginPage() {
       toast.success('Welcome back!');
       const role = res.data.data.role;
       if (role === 'admin' || role === 'super_admin') router.push('/admin');
-      else if (role === 'doctor') router.push('/doctor/dashboard');
+      // Teleconsultation doctors: the doctor portal home (app/doctor/page.tsx; C-22)
+      else if (role === 'doctor') router.push('/doctor');
       // Pharmacists work the fulfilment queues; riders their own run sheet (Sprint 13)
       else if (['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(role)) router.push(staffHome(role));
       // Marketplace partner logins work only in the partner portal

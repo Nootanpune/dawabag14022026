@@ -91,12 +91,12 @@ export default function ApproveVendorDialog({ vendor, onClose }: { vendor: Pendi
             <input
               value={prefix}
               onChange={(e) => setPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-              maxLength={10}
-              placeholder="e.g. RAJMED"
+              maxLength={4}
+              placeholder="e.g. RAJM"
               className="input font-mono"
             />
             <span className="block text-xs text-gray-400 mt-1">
-              Starts this partner&apos;s own invoice numbers (2–10 letters/digits; DWB and DWS are reserved).
+              Starts this partner&apos;s own invoice numbers (2–4 letters/digits, not starting with 0; DWB and DWS are reserved).
             </span>
           </label>
         )}

@@ -1,5 +1,5 @@
 // Small helpers shared by the journeys
-import { Page, BrowserContext, Browser, devices } from '@playwright/test';
+import { Page, BrowserContext, Browser, Locator, devices } from '@playwright/test';
 import { everyone } from './people';
 
 export const WEB = process.env.WEB_URL || 'http://localhost:3000';
@@ -36,3 +36,10 @@ export function prescriptionPng(): Buffer {
   // 1×1 PNG; the pharmacist sees the image the buyer uploaded
   return Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 }
+
+/** A form field by the start of its label (labels often carry a hint after the name) */
+export const field = (scope: Page | Locator, labelStart: string) =>
+  scope.getByLabel(new RegExp(`^${labelStart.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+
+/** The dialog on screen */
+export const dialog = (page: Page) => page.getByRole('dialog');

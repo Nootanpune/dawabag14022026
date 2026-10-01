@@ -14,8 +14,9 @@ const STATUS_ORDER = ['pending_payment', 'rx_pending', 'rx_verified', 'packing',
 
 export default function OrderTimeline({ order }: { order: OrderDetail }) {
   const currentIdx = STATUS_ORDER.indexOf(order.status);
+  // Prescription steps only for orders that need a prescription (C-08); an OTC order never goes through them
   const steps = TIMELINE_STEPS.filter(
-    (s) => !['rx_pending', 'rx_verified'].includes(s.status) || order.status !== 'pending_payment'
+    (s) => !['rx_pending', 'rx_verified'].includes(s.status) || (order.requires_prescription && order.status !== 'pending_payment')
   );
   return (
     <div className="card mb-4">

@@ -25,7 +25,8 @@ export async function generateSettlements(body: { period_from: string; period_to
   return data.data as {
     period_from: string;
     period_to: string;
-    batches: { id: string; batch_ref: string; net_payable_paise: number }[];
+    // BIGINT column: the API sends it as a string — convert with Number() before adding
+    batches: { id: string; batch_ref: string; net_payable_paise: number | string }[];
   };
 }
 

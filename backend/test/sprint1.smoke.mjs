@@ -218,6 +218,12 @@ async function main() {
   check('retailer order line priced at PTR (7500)', line?.unit_price_paise === 7500, line);
   r = await order('customer', products.rx, 1);
   check('B2C Schedule H order requires prescription', r.status === 201 && r.json.data?.order?.requires_prescription === true, r.json);
+  // The order page shows the prescription steps only when the order detail says so (C-08)
+  r = await call('GET', `/orders/${r.json.data?.order?.id}`, { token: session.customer.token });
+  check('B2C Schedule H order detail says a prescription is needed', r.json.data?.requires_prescription === true, r.json.data?.requires_prescription);
+  r = await order('customer', products.otc, 1);
+  r = await call('GET', `/orders/${r.json.data?.order?.id}`, { token: session.customer.token });
+  check('B2C OTC order detail says no prescription is needed', r.status === 200 && r.json.data?.requires_prescription === false, r.json.data?.requires_prescription);
   r = await order('b2b_retailer', products.rx, 1);
   check('retailer Schedule H order needs no prescription', r.status === 201 && r.json.data?.order?.requires_prescription === false, r.json);
   r = await order('b2b_wholesaler', products.otc, 2);

@@ -17,7 +17,7 @@ export default function GenerateSettlementsForm() {
   const generate = useMutation({
     mutationFn: () => generateSettlements({ period_from: from, period_to: to }),
     onSuccess: (res) => {
-      const total = res.batches.reduce((sum, b) => sum + b.net_payable_paise, 0);
+      const total = res.batches.reduce((sum, b) => sum + Number(b.net_payable_paise), 0);
       toast.success(
         res.batches.length
           ? `${res.batches.length} batch(es) generated · net ${formatPrice(total)}`
