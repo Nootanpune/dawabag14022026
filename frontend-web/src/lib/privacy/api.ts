@@ -51,6 +51,7 @@ export const privacyKeys = {
 
 export const PURPOSE_LABELS: Record<string, string> = {
   marketing: 'Offers and health tips (marketing)',
+  whatsapp: 'Send order and refill updates on WhatsApp',
   privacy_notice: 'Privacy notice accepted',
   age_18_plus: 'Confirmed 18 years or older',
 };
@@ -63,6 +64,19 @@ export async function fetchConsents(): Promise<Consents> {
 export async function setMarketingConsent(granted: boolean): Promise<Consents> {
   const { data } = await api.put('/privacy/consents/marketing', { granted });
   return data.data;
+}
+
+/** Purposes the buyer can switch on and off at any time (DPDP s.6(4), C-42) */
+export type OptionalPurpose = 'marketing' | 'whatsapp';
+
+/** PUT /privacy/consents/whatsapp — order updates on WhatsApp, opt-in only (Sprint 13, C-42) */
+export async function setWhatsAppConsent(granted: boolean): Promise<Consents> {
+  const { data } = await api.put('/privacy/consents/whatsapp', { granted });
+  return data.data;
+}
+
+export function setOptionalConsent(purpose: OptionalPurpose, granted: boolean): Promise<Consents> {
+  return purpose === 'whatsapp' ? setWhatsAppConsent(granted) : setMarketingConsent(granted);
 }
 
 /** Downloads everything held about the signed-in user as JSON (C-42). */

@@ -9,6 +9,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { getApiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { staffHome } from '@/lib/fulfilment/roles';
 
 const loginSchema = z.object({
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
@@ -42,8 +43,8 @@ export default function LoginPage() {
       const role = res.data.data.role;
       if (role === 'admin' || role === 'super_admin') router.push('/admin');
       else if (role === 'doctor') router.push('/doctor/dashboard');
-      // Pharmacists and delivery staff work the fulfilment queues
-      else if (['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(role)) router.push('/staff/fulfilment');
+      // Pharmacists work the fulfilment queues; riders their own run sheet (Sprint 13)
+      else if (['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(role)) router.push(staffHome(role));
       // Marketplace partner logins work only in the partner portal
       else if (role === 'partner') router.push('/partner');
       else router.push('/');

@@ -152,6 +152,15 @@ export interface JoinInfo {
   mode: ConsultMode;
   app_id: string | null;
   role: 'doctor' | 'patient';
+  /**
+   * Sprint 13 (C-23): a call token for this channel and this person only. `uid`
+   * is the Agora user account the token is bound to; `token` is null when the
+   * video provider is not configured on the server.
+   */
+  uid?: string;
+  token?: string | null;
+  /** seconds the token stays valid (until an hour after the slot ends) */
+  token_expires_in?: number;
 }
 
 export interface PayOrder {

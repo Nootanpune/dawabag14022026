@@ -107,7 +107,7 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
       newValue: { shipment_id: shipmentId, courier, awb, h1_register_rows: h1 } });
     await queueNotification({ userId: s.user_id, type: 'dispatched', orderId: s.order_id, orderNumber: s.order_number,
       awbNumber: awb, courierPartner: courier, handoverCode: codeNeeded ? await dispatchedCode(client, shipmentId) : undefined });
-    return { id: shipmentId, status: 'dispatched', h1_register_rows: h1 };
+    return { id: shipmentId, status: 'dispatched', courier_partner: courier, awb_number: awb, h1_register_rows: h1 };
   });
 }
 

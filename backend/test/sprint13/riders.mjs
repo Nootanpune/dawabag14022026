@@ -16,6 +16,9 @@ export async function runRiders(ctx) {
   r = await dispatch({ rider_id: ids.rider1 });
   const sh = (await q(`SELECT courier_partner, awb_number, rider_id, status FROM order_shipments WHERE id = $1`, [a.shipmentId]))[0];
   check('dispatched with a rider and a run reference', r.status === 200 && sh.courier_partner === 'Dawabag rider' && /^DWR\d{7}$/.test(sh.awb_number) && sh.rider_id === ids.rider1, { r: r.json, sh });
+  check('…and the reference comes back with the dispatch', r.json.data?.awb_number === sh.awb_number && r.json.data?.courier_partner === 'Dawabag rider', r.json.data);
+  r = await call('GET', '/fulfilment/queue?stage=deliver', { token: t.packer });
+  check('packers see the delivery queue to reassign riders', r.status === 200 && r.json.data.items.some((x) => x.shipment_id === a.shipmentId), r.status);
 
   r = await call('GET', '/fulfilment/my-run', { token: t.rider1 });
   const row = r.json.data?.find((x) => x.shipment_id === a.shipmentId);

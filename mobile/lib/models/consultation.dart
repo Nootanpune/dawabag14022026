@@ -169,17 +169,29 @@ class ConsultPaymentOrder {
 }
 
 /// GET /consultations/:id/join → where the call client connects.
+///
+/// Sprint 13 (C-23): the server also issues a call token bound to this channel
+/// and this person ([uid] is the Agora user account). [token] is null when the
+/// video provider is not configured on the server. Held in memory only for as
+/// long as the join screen is open — never stored on the device.
 class ConsultJoin {
   final String channel;
   final String mode;
   final String? appId;
   final String role;
+  final String? uid;
+  final String? token;
+  /// Seconds the token stays valid (until an hour after the slot ends).
+  final int tokenExpiresIn;
 
   const ConsultJoin({
     required this.channel,
     required this.mode,
     this.appId,
     required this.role,
+    this.uid,
+    this.token,
+    this.tokenExpiresIn = 0,
   });
 
   factory ConsultJoin.fromJson(Map<String, dynamic> json) => ConsultJoin(
@@ -187,5 +199,14 @@ class ConsultJoin {
         mode: asString(json['mode']) ?? 'video',
         appId: asString(json['app_id']),
         role: asString(json['role']) ?? 'patient',
+        uid: asString(json['uid']),
+        token: asString(json['token']),
+        tokenExpiresIn: asInt(json['token_expires_in']),
       );
+
+  /// A secure call link was issued (the video provider is configured).
+  bool get hasToken => token != null && token!.isNotEmpty && tokenExpiresIn > 0;
+
+  /// Whole minutes the call link stays valid (at least 1).
+  int get tokenMinutes => tokenExpiresIn <= 60 ? 1 : (tokenExpiresIn / 60).round();
 }

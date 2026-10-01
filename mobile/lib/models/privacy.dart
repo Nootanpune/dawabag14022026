@@ -55,6 +55,9 @@ class PrivacyConsents {
   /// Marketing is opt-in: off unless the latest record grants it (C-40 / C-42).
   bool get marketingGranted => currentFor('marketing')?.granted ?? false;
 
+  /// WhatsApp order and refill updates are opt-in too (Sprint 13, C-42).
+  bool get whatsappGranted => currentFor('whatsapp')?.granted ?? false;
+
   factory PrivacyConsents.fromJson(Map<String, dynamic> json) => PrivacyConsents(
         current: asMapList(json['current']).map(ConsentRecord.fromJson).toList(),
         history: asMapList(json['history']).map(ConsentRecord.fromJson).toList(),
@@ -77,6 +80,8 @@ String consentPurposeLabel(String purpose) {
   switch (purpose) {
     case 'marketing':
       return 'Offers and marketing messages';
+    case 'whatsapp':
+      return 'Order and refill updates on WhatsApp';
     case 'privacy_notice':
       return 'Privacy notice accepted';
     case 'age_18_plus':

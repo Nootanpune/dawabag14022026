@@ -13,8 +13,13 @@ import HandoverDialog from '@/components/delivery/HandoverDialog';
 import StaffShipmentCard from './StaffShipmentCard';
 import StaffDispatchDialog from './StaffDispatchDialog';
 import BookCourierButton from './BookCourierButton';
+import ReassignRiderDialog from './ReassignRiderDialog';
+import { OWN_RIDER_COURIER } from '@/lib/fulfilment/riders';
 
 type ShipmentStage = Exclude<QueueStage, 'rx'>;
+
+// Packers see the Deliver tab only to reassign riders; delivery is confirmed by riders and managers (C-26)
+const DELIVER_ROLES = ['delivery', 'admin', 'super_admin'];
 
 const COPY: Record<ShipmentStage, { action: string; empty: string }> = {
   pack: { action: 'Mark packed', empty: 'Nothing waiting to be packed' },
@@ -38,6 +43,8 @@ export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
   });
   const [dispatching, setDispatching] = useState<QueueShipment | null>(null);
   const [delivering, setDelivering] = useState<QueueShipment | null>(null);
+  // Sprint 13: a parcel out with our own rider can be handed to another rider
+  const [reassigning, setReassigning] = useState<QueueShipment | null>(null);
   const [deliverError, setDeliverError] = useState('');
 
   const pack = useMutation({
@@ -70,6 +77,18 @@ export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
     pack.mutate(s);
   };
 
+  const extraFor = (s: QueueShipment) => {
+    if (stage === 'dispatch' && s.status === 'packed' && !s.awb_number) return <BookCourierButton shipment={s} />;
+    if (stage === 'deliver' && s.courier_partner === OWN_RIDER_COURIER) {
+      return (
+        <button onClick={() => setReassigning(s)} className="btn-outline text-xs py-1.5 px-3">
+          Reassign rider
+        </button>
+      );
+    }
+    return undefined;
+  };
+
   return (
     <div>
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText={COPY[stage].empty} />
@@ -78,14 +97,15 @@ export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
           <StaffShipmentCard
             key={s.shipment_id}
             shipment={s}
-            actionLabel={COPY[stage].action}
+            actionLabel={stage === 'deliver' && !hasRole(role, DELIVER_ROLES) ? '' : COPY[stage].action}
             onAction={() => onAction(s)}
             busy={pack.isPending && pack.variables?.shipment_id === s.shipment_id}
-            extra={stage === 'dispatch' && s.status === 'packed' && !s.awb_number ? <BookCourierButton shipment={s} /> : undefined}
+            extra={extraFor(s)}
           />
         ))}
       </div>
       {dispatching && <StaffDispatchDialog shipment={dispatching} onClose={() => setDispatching(null)} />}
+      {reassigning && <ReassignRiderDialog shipment={reassigning} onClose={() => setReassigning(null)} />}
       {delivering && (
         <HandoverDialog
           title={`Deliver ${delivering.order_number}`}

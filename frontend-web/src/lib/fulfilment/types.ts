@@ -95,3 +95,33 @@ export interface H1Entry {
   pharmacist_name: string | null;
   pharmacist_reg_no: string | null;
 }
+
+/** GET /fulfilment/riders — Dawabag's own delivery staff (Sprint 13) */
+export interface Rider {
+  id: string;
+  full_name: string | null;
+  mobile: string;
+  /** parcels this rider has out right now */
+  out_now: number;
+}
+
+/**
+ * One stop on a rider's run sheet (GET /fulfilment/my-run, Sprint 13).
+ * Only what the hand-over needs — never the medicines inside (C-41, C-26).
+ */
+export interface RunStop {
+  shipment_id: string;
+  invoice_number: string | null;
+  order_number: string;
+  /** the DWR… run reference */
+  run_ref: string | null;
+  seal_number: string | null;
+  cold_chain: boolean;
+  handover_code_required: boolean;
+  handover_attempts: number | null;
+  dispatched_at: string | null;
+  deliver_to: string | null;
+  contact_mobile: string | null;
+  address: string;
+  item_lines: number;
+}

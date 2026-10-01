@@ -6,12 +6,15 @@ import '../../models/consultation.dart';
 import '../../providers/consultation_provider.dart';
 import '../../utils/consult_format.dart';
 import '../../widgets/error_retry_view.dart';
+import 'widgets/call_link_notice.dart';
 
 /// /consultations/:id/join — asks the server for the call room (GET
 /// /consultations/:id/join). The server decides whether the patient may join
 /// (fee paid, from 15 minutes before the slot) and its message is shown when
 /// it refuses. The video/audio/chat client itself is not built into the app
-/// yet; it will open on this screen.
+/// yet; it will open on this screen and join `channel` as `uid` with `token`
+/// (Sprint 13, C-23). Until then the screen shows how long the secure call
+/// link is valid, or that the video service is not set up (token null).
 class JoinConsultationScreen extends ConsumerWidget {
   final String consultationId;
   const JoinConsultationScreen({super.key, required this.consultationId});
@@ -54,6 +57,8 @@ class JoinConsultationScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            CallLinkNotice(join: j),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(14),

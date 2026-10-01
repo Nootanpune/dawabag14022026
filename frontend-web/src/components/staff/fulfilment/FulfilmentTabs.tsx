@@ -7,6 +7,7 @@ import StatusTabs from '@/components/admin/StatusTabs';
 import RxQueue from './RxQueue';
 import ShipmentQueue from './ShipmentQueue';
 import H1Register from './H1Register';
+import RunSheet from '@/components/staff/delivery/RunSheet';
 
 type Tab = 'rx' | 'pack' | 'dispatch' | 'deliver' | 'h1';
 
@@ -25,6 +26,8 @@ export default function FulfilmentTabs() {
   const [picked, setPicked] = useState<Tab | null>(null);
   const tab = picked && tabs.some((t) => t.value === picked) ? picked : tabs[0]?.value;
 
+  // Riders get their own run sheet (GET /fulfilment/my-run), not the queue (Sprint 13, C-41)
+  if (role === 'delivery') return <RunSheet />;
   if (!tab) return <p className="text-sm text-gray-500">Your role has no fulfilment stages.</p>;
   return (
     <div>

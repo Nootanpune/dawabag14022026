@@ -42,13 +42,15 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
-import { FULFILMENT_ROLES } from '@/lib/fulfilment/roles';
+import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
 import { STORE_ROLES } from '@/lib/purchasing/roles';
 import { DOCTOR_ADMIN_ROLES, TELE_LIST_ROLES } from '@/lib/telemedicine/roles';
 
 const ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, roles: MANAGER_ROLES },
-  { href: '/staff/fulfilment', label: 'Fulfilment', icon: PackageCheck, roles: FULFILMENT_ROLES },
+  { href: '/staff/fulfilment', label: 'Fulfilment', icon: PackageCheck, roles: FULFILMENT_QUEUE_ROLES },
+  // Sprint 13 — Dawabag's own riders work from their run sheet (C-26, C-41)
+  { href: '/staff/run-sheet', label: 'Run sheet', icon: Truck, roles: RIDER_ROLES },
   { href: '/admin/deliveries', label: 'Deliveries', icon: Send, roles: MANAGER_ROLES },
   { href: '/admin/returns', label: 'Returns', icon: Undo2, roles: ADMIN_ROLES },
   { href: '/staff/returns', label: 'Returns', icon: Undo2, roles: ['pharmacist_pack'] },

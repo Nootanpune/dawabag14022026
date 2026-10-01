@@ -42,6 +42,12 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
         error: error != null);
   }
 
+  Future<void> _setWhatsApp(bool granted) async {
+    final error = await ref.read(privacyProvider.notifier).setWhatsApp(granted);
+    _snack(error ?? (granted ? 'WhatsApp updates turned on' : 'WhatsApp updates turned off'),
+        error: error != null);
+  }
+
   Future<void> _request(String type) async {
     final erasure = type == 'erasure';
     final details = await askDataRequestDetails(
@@ -104,6 +110,7 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
               consents: consents,
               busy: state.isUpdating,
               onMarketingChanged: _setMarketing,
+              onWhatsAppChanged: _setWhatsApp,
             ),
             const SizedBox(height: 16),
             const _Heading('Your rights'),

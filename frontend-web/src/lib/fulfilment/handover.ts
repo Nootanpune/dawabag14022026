@@ -14,6 +14,8 @@ export interface DispatchInput {
   /** may be left out when the courier was booked through the server (Sprint 8): it uses the stored AWB */
   courier_partner?: string;
   awb_number?: string;
+  /** Dawabag's own rider instead of a courier (Sprint 13) — never sent with courier/AWB (server: 400) */
+  rider_id?: string;
   seal_number: string;
   /** cold-chain shipments only: pack temperature at dispatch, must be 2–8 °C (C-25) */
   cold_chain_temp_c?: number;
@@ -54,6 +56,12 @@ export interface HandoverInput {
  * `booked`: the shipment already has an AWB on the server, so courier and AWB may be blank.
  */
 export function dispatchError(d: DispatchInput, booked = false): string {
+  // Own rider: the server generates the run reference (DWR…) as the AWB
+  if (d.rider_id !== undefined) {
+    if (!d.rider_id) return 'Choose the rider';
+    if (d.seal_number.trim().length < 3) return 'Enter the tamper-evident seal number on the pack';
+    return '';
+  }
   const courier = (d.courier_partner ?? '').trim();
   const awb = (d.awb_number ?? '').trim();
   if ((!booked || courier) && courier.length < 2) return 'Enter the courier name';

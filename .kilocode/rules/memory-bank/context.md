@@ -11,13 +11,40 @@ the lawyer/CA sign-off.
 - Modular software: no monolithic HTML/single-file apps.
 
 ## Done in Sprint 13 (backend)
-- Own riders: dispatch to a rider (rider_id) or a courier, reassign, rider run sheet
+- Own riders: dispatch to a rider (rider_id) or a courier (response carries the DWR AWB), reassign (packers see the deliver queue for it), rider run sheet
   (GET /fulfilment/my-run), delivered/invoice limited to the rider's own parcels, delivery
   role 404 on orders — closes the Sprint 12 review item on delivery-staff scope (C-26, C-41).
 - Agora call tokens on join (uid, token, token_expires_in) — closes the video-token item (C-23).
 - GST period lock `accounts.locked_until` for GRNs and supplier credit notes (C-31).
 - WhatsApp through MSG91 templates after opt-in consent (`whatsapp` purpose).
-- Tests: Sprint 1–13 smoke 651 checks pass, jest 60, fresh-DB migrations 01–16 apply.
+- Tests: Sprint 1–13 smoke 653 checks pass, jest 60, fresh-DB migrations 01–16 apply.
+
+## Web Sprint 13 (tsc + next lint + next build pass)
+- Dispatch dialog: "Our rider" (RiderSelect from GET /fulfilment/riders) or courier — never
+  both; courier-booked packs stay courier-only. After a rider dispatch the DWR… run reference
+  is read back from GET /orders/:id (dispatch response has no AWB) and shown (RunRefNotice).
+  Deliver tab: "Reassign rider" on parcels whose courier is "Dawabag rider" (admin/super_admin
+  only — packers cannot see the deliver queue; the endpoint itself also allows packers).
+- Delivery role: /staff/run-sheet (RunSheet + RunStopCard: address, contact, seal, run ref,
+  code needed, line count, invoice; no medicines, no order links) with HandoverDialog (no
+  override). Fulfilment tabs render the run sheet for riders; nav "Run sheet"; login/header
+  route riders there; header "Orders" hidden for delivery.
+- Join dialog: "Secure call link valid for N minutes" from token_expires_in; token null →
+  "video service not set up" (no web video SDK wired yet). lib/telemedicine/callToken.ts.
+- Privacy: ConsentToggleRow for marketing + WhatsApp ("Send order and refill updates on
+  WhatsApp", can be turned off any time) → PUT /privacy/consents/whatsapp (C-42).
+- Settings: AccountsLockSection ("GST period locked up to", date ≤ UTC yesterday or clear,
+  confirm step) and WhatsAppTemplatesSection/Editor (type → name [a-z0-9_], language
+  xx/xx_XX, ordered vars ≤ 10; mirrors server zod; 422 list shown). GRN form and supplier
+  credit-note dialog show a LockedPeriodBanner on "closed GST period" 409s.
+
+## Mobile Sprint 13 (not compiled — no Flutter SDK here)
+- ConsultJoin gains uid/token/tokenExpiresIn; join screen shows CallLinkNotice (valid N
+  minutes, or video service not set up when token is null). agora_rtc_engine is in
+  pubspec but no call client is wired, so the token is not passed anywhere yet.
+- Privacy: WhatsApp SwitchListTile ("Send order and refill updates on WhatsApp") →
+  PUT /privacy/consents/whatsapp via PrivacyNotifier.setWhatsApp.
+- Rider run sheet skipped: the app has no staff/delivery section (customer + doctor only).
 
 ## Web Sprint 12 (tsc + next lint + next build pass)
 - Policies in en/mr/hi (C-40): /policies/:key switcher (?lang=, "Not yet available in …;

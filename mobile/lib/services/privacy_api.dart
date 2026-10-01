@@ -19,6 +19,13 @@ extension PrivacyApi on ApiService {
     return PrivacyConsents.fromJson(apiData(res));
   }
 
+  /// PUT /privacy/consents/whatsapp { granted } → updated consents
+  /// (Sprint 13, C-42: order and refill updates on WhatsApp, opt-in only)
+  Future<PrivacyConsents> setWhatsAppConsent(bool granted) async {
+    final res = await dio.put('/privacy/consents/whatsapp', data: {'granted': granted});
+    return PrivacyConsents.fromJson(apiData(res));
+  }
+
   /// POST /privacy/requests { request_type: erasure|correction, details? }.
   /// The server answers 409 when the same kind of request is already pending.
   Future<Map<String, dynamic>> createDataRequest(String requestType, {String? details}) async {

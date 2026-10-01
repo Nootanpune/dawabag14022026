@@ -15,6 +15,13 @@ import { RETENTION_KEY } from '@/lib/admin/retention';
 import LegalSettingsSection from '@/components/admin/legal/LegalSettingsSection';
 import PharmacistRegistrationSection from '@/components/admin/legal/PharmacistRegistrationSection';
 import { isLegalKey } from '@/lib/admin/legalSettings';
+import AccountsLockSection from '@/components/admin/settings/AccountsLockSection';
+import WhatsAppTemplatesSection from '@/components/admin/settings/WhatsAppTemplatesSection';
+import { ACCOUNTS_LOCK_KEY } from '@/lib/admin/accountsLock';
+import { WHATSAPP_TEMPLATES_KEY } from '@/lib/admin/whatsappTemplates';
+
+// Edited in their own sections below, not the generic list
+const OWN_SECTION_KEYS = [DLT_TEMPLATES_KEY, RETENTION_KEY, ACCOUNTS_LOCK_KEY, WHATSAPP_TEMPLATES_KEY];
 
 export default function AdminSettingsPage() {
   const isSuperAdmin = useAuthStore((s) => s.user?.role === 'super_admin');
@@ -24,8 +31,8 @@ export default function AdminSettingsPage() {
     queryFn: fetchSettings,
   });
   const meta = editing ? SETTING_KINDS[editing.key] : undefined;
-  // legal.* objects, the SMS DLT templates and retention periods get their own forms below
-  const rules = data?.filter((s) => !isLegalKey(s.key) && s.key !== DLT_TEMPLATES_KEY && s.key !== RETENTION_KEY);
+  // legal.* objects, SMS / WhatsApp templates, retention periods and the GST lock get their own forms below
+  const rules = data?.filter((s) => !isLegalKey(s.key) && !OWN_SECTION_KEYS.includes(s.key));
 
   return (
     <div>
@@ -66,7 +73,10 @@ export default function AdminSettingsPage() {
           })}
         </div>
       )}
+      {/* Sprint 13 — GST period lock (C-31) and WhatsApp templates (C-42) */}
+      {!!data?.length && <AccountsLockSection setting={data.find((s) => s.key === ACCOUNTS_LOCK_KEY)} canEdit={isSuperAdmin} />}
       {!!data?.length && <DltTemplatesSection setting={data.find((s) => s.key === DLT_TEMPLATES_KEY)} canEdit={isSuperAdmin} />}
+      {!!data?.length && <WhatsAppTemplatesSection setting={data.find((s) => s.key === WHATSAPP_TEMPLATES_KEY)} canEdit={isSuperAdmin} />}
       {!!data?.length && <RetentionSection setting={data.find((s) => s.key === RETENTION_KEY)} canEdit={isSuperAdmin} />}
       {!!data?.length && <LegalSettingsSection settings={data} canEdit={isSuperAdmin} />}
       <PharmacistRegistrationSection />

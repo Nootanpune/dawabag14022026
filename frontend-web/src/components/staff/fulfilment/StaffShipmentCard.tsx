@@ -72,9 +72,11 @@ export default function StaffShipmentCard({ shipment: s, actionLabel, onAction, 
         <div className="flex items-center gap-2">
           {s.invoice_number && <InvoiceDownloadButton shipmentId={s.shipment_id} invoiceNumber={s.invoice_number} />}
           {extra}
-          <button onClick={onAction} disabled={busy} className="btn-primary text-xs py-1.5 px-3">
-            {actionLabel}
-          </button>
+          {actionLabel && (
+            <button onClick={onAction} disabled={busy} className="btn-primary text-xs py-1.5 px-3">
+              {actionLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

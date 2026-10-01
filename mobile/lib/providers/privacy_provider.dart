@@ -59,11 +59,19 @@ class PrivacyNotifier extends StateNotifier<PrivacyState> {
   /// PUT /privacy/consents/marketing (C-40 / C-42: marketing is opt-in and
   /// can be withdrawn as easily as it was given).
   /// Returns an error message, or null on success.
-  Future<String?> setMarketing(bool granted) async {
+  Future<String?> setMarketing(bool granted) =>
+      _setConsent(() => apiService.setMarketingConsent(granted));
+
+  /// PUT /privacy/consents/whatsapp (Sprint 13, C-42: WhatsApp updates are
+  /// opt-in and can be turned off any time). Returns an error message, or null.
+  Future<String?> setWhatsApp(bool granted) =>
+      _setConsent(() => apiService.setWhatsAppConsent(granted));
+
+  Future<String?> _setConsent(Future<PrivacyConsents> Function() send) async {
     final gen = _generation;
     state = state.copyWith(isUpdating: true, error: state.error);
     try {
-      final consents = await apiService.setMarketingConsent(granted);
+      final consents = await send();
       if (mounted && gen == _generation) state = PrivacyState(consents: consents);
       return null;
     } catch (e) {

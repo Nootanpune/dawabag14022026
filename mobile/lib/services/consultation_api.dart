@@ -54,7 +54,8 @@ extension ConsultationApi on ApiService {
     });
   }
 
-  /// GET /consultations/:id/join → { channel, mode, app_id, role }.
+  /// GET /consultations/:id/join → { channel, mode, app_id, role, uid, token,
+  /// token_expires_in } (token fields Sprint 13, C-23).
   /// 402 when unpaid; 409 when more than 15 minutes early or not open.
   Future<ConsultJoin> joinConsultation(String id) async {
     final res = await dio.get('/consultations/$id/join');

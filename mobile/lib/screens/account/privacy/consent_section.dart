@@ -4,25 +4,31 @@ import '../../../config/theme.dart';
 import '../../../models/privacy.dart';
 import '../../../utils/formatters.dart';
 
-/// Marketing switch + the current consent record per purpose, with the
+/// Marketing and WhatsApp switches (WhatsApp: Sprint 13, C-42) + the current
+/// consent record per purpose, with the
 /// append-only history behind an expander (C-40 / C-42). Values are the
 /// server's; the switch sends a request and shows the server's answer.
 class ConsentSection extends StatelessWidget {
   final PrivacyConsents consents;
   final bool busy;
   final ValueChanged<bool> onMarketingChanged;
+  final ValueChanged<bool> onWhatsAppChanged;
 
   const ConsentSection({
     super.key,
     required this.consents,
     required this.busy,
     required this.onMarketingChanged,
+    required this.onWhatsAppChanged,
   });
+
+  static const _optional = {'marketing', 'whatsapp'};
 
   @override
   Widget build(BuildContext context) {
     final marketing = consents.currentFor('marketing');
-    final others = consents.current.where((c) => c.purpose != 'marketing').toList();
+    final whatsapp = consents.currentFor('whatsapp');
+    final others = consents.current.where((c) => !_optional.contains(c.purpose)).toList();
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -38,6 +44,18 @@ class ConsentSection extends StatelessWidget {
                 marketing?.recordedAt != null
                     ? 'Last changed ${formatDateTime(marketing!.recordedAt!)}. You can change this at any time.'
                     : 'Off unless you turn it on. Order and health updates are sent regardless.',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+            SwitchListTile(
+              value: consents.whatsappGranted,
+              onChanged: busy ? null : onWhatsAppChanged,
+              activeColor: AppTheme.brandGreen,
+              title: const Text('Send order and refill updates on WhatsApp', style: TextStyle(fontSize: 14)),
+              subtitle: Text(
+                whatsapp?.recordedAt != null
+                    ? 'Last changed ${formatDateTime(whatsapp!.recordedAt!)}. You can turn this off any time.'
+                    : 'Off unless you turn it on. You can turn it off any time; SMS updates continue either way.',
                 style: const TextStyle(fontSize: 12),
               ),
             ),

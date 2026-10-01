@@ -36,7 +36,7 @@ const STAGE_ROLES: Record<QueueStage, string[]> = {
   rx: ['pharmacist_rx'],
   pack: ['pharmacist_pack', 'admin', 'super_admin'],
   dispatch: ['pharmacist_pack', 'admin', 'super_admin'],
-  deliver: ['delivery', 'admin', 'super_admin'],
+  deliver: ['delivery', 'pharmacist_pack', 'admin', 'super_admin'],   // packers see it to reassign riders
 };
 
 export async function getQueue(req: Request, res: Response, next: NextFunction) {

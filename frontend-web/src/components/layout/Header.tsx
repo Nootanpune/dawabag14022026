@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useCart } from '@/hooks/useCart';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { staffHome } from '@/lib/fulfilment/roles';
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -39,7 +40,8 @@ export default function Header() {
           <Link href="/consult" className="hover:text-brand-600 flex items-center gap-1">
             <Stethoscope className="w-4 h-4" /> Consult a doctor
           </Link>
-          {isAuthenticated && (
+          {/* Riders have no orders of their own and cannot open buyers' orders (Sprint 13, C-41) */}
+          {isAuthenticated && user?.role !== 'delivery' && (
             <Link href="/orders" className="hover:text-brand-600 flex items-center gap-1">
               <ClipboardList className="w-4 h-4" /> Orders
             </Link>
@@ -48,7 +50,9 @@ export default function Header() {
             <Link href="/admin" className="hover:text-brand-600">Admin</Link>
           ) : null}
           {['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(user?.role ?? '') ? (
-            <Link href="/staff/fulfilment" className="hover:text-brand-600">Fulfilment</Link>
+            <Link href={staffHome(user?.role)} className="hover:text-brand-600">
+              {user?.role === 'delivery' ? 'Run sheet' : 'Fulfilment'}
+            </Link>
           ) : null}
           {user?.role === 'partner' ? (
             <Link href="/partner" className="hover:text-brand-600">Partner portal</Link>

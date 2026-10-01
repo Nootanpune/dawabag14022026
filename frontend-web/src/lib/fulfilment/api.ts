@@ -82,7 +82,7 @@ export async function bookCourier(shipmentId: string) {
  */
 export async function dispatchOwnShipment(shipmentId: string, body: DispatchInput) {
   const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/dispatch`, body);
-  return data.data as { h1_register_rows?: number };
+  return data.data as { h1_register_rows?: number; courier_partner?: string; awb_number?: string };
 }
 
 /** Handover: code + receiver for prescription shipments (C-26); admins may override with a reason. */

@@ -18,6 +18,8 @@ import {
 } from '@/lib/purchasing/receiptForm';
 import { formatPaise } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import { isLockedPeriodError } from '@/lib/admin/accountsLock';
+import LockedPeriodBanner from '@/components/admin/accounts/LockedPeriodBanner';
 import CatalogueSearch from '@/components/admin/purchasing/CatalogueSearch';
 import ReceiptHeaderFields from './ReceiptHeaderFields';
 import ReceiptLineFields from './ReceiptLineFields';
@@ -40,6 +42,8 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
   });
   const [lines, setLines] = useState<ReceiptLineDraft[]>(() => (po ? linesFromPo(po) : []));
   const [problems, setProblems] = useState<{ title: string; list: string[] }>({ title: '', list: [] });
+  // Supplier invoice dated in a closed GST period (409, Sprint 13)
+  const [lockedPeriod, setLockedPeriod] = useState('');
 
   const save = useMutation({
     mutationFn: createReceipt,
@@ -52,6 +56,10 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
     onError: (err: any) => {
       const msg = getApiErrorMessage(err, 'Could not record the receipt');
       const status = err?.response?.status;
+      if (isLockedPeriodError(msg)) {
+        setProblems({ title: '', list: [] });
+        return setLockedPeriod(msg);
+      }
       setProblems({
         title: status === 409 || status === 403 ? 'Receipt refused' : 'Fix these and save again',
         list: status === 422 ? splitServerProblems(msg) : [msg],
@@ -66,6 +74,7 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
     const list = receiptProblems(header, lines);
     if (list.length) return setProblems({ title: 'Fix these and save again', list });
     setProblems({ title: '', list: [] });
+    setLockedPeriod('');
     save.mutate(receiptBody(header, lines, po?.id));
   };
 
@@ -100,6 +109,7 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
           <CatalogueSearch onPick={(p) => setLines((ls) => [...ls, blankLine(p)])} placeholder="Add a product received: search name or SKU" />
         )}
       </div>
+      {lockedPeriod && <LockedPeriodBanner message={lockedPeriod} />}
       <ProblemList title={problems.title} problems={problems.list} />
       <div className="flex justify-end">
         <button onClick={submit} disabled={save.isPending || !lines.length} className="btn-primary text-sm inline-flex items-center gap-2">
