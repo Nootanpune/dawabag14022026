@@ -2,13 +2,23 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–16 are done (Sprint 14 video calls wired on web and mobile) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–17 are done (Sprint 14 video calls wired on web and mobile) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprint 17 (installable mobile app)
+- Flutter 3.47.5 installed locally at /opt/flutter-sdk (not in the repo); android/ and ios/ generated
+  (org in.dawabag, app id in.dawabag.dawabag — owner to confirm before the first store upload).
+  Permissions: camera, mic, notifications, network; iOS usage texts; allowBackup=false; minSdk 24;
+  desugaring for flutter_local_notifications.
+- Firebase optional: options from --dart-define (lib/config/firebase_config.dart); app starts without.
+- Unused plugins removed (maps, local_auth, camera, share_plus, lottie, shimmer, connectivity,
+  package_info, crypto, codegen). pubspec.lock committed.
+- CI builds a debug APK artifact (dawabag-debug-apk; API from repo variable MOBILE_API_URL).
 
 ## Done in Sprint 16 (dependencies, mobile build, images, indexes)
 - npm audit 0 on backend and web: Next.js 15.5.27 + React 19 (14.x unpatched: RCE/SSRF/DoS), PostCSS

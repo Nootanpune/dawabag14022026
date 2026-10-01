@@ -212,6 +212,24 @@ told again until it has succeeded once.
   future indexes with `CREATE INDEX CONCURRENTLY` in a maintenance window instead of a
   normal migration.
 
+## 7b. Mobile app builds
+
+- Every push builds a debug APK (GitHub → Actions → CI → the run → Artifacts →
+  `dawabag-debug-apk`, kept 14 days). Set the repository variable `MOBILE_API_URL`
+  (Settings → Secrets and variables → Actions → Variables) to the API address testers
+  should use; without it the APK points at an Android emulator's own machine.
+- Push notifications need the Firebase values as build settings (`FIREBASE_API_KEY`,
+  `FIREBASE_APP_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_PROJECT_ID`, see mobile/README.md);
+  without them the app runs with push off. Firebase settings are not secrets but are
+  kept with the release configuration, not in the code.
+- Before the Play Store: choose the final application id (now `in.dawabag.dawabag`; it
+  cannot change after the first upload), create the upload key (keep it off the
+  repository: `android/key.properties` and `*.jks` are ignored), add release signing,
+  then build with `flutter build appbundle --release`. iOS needs an Apple developer
+  account, a Mac and Xcode for signing.
+- The app keeps nothing on the device except the sign-in token in the OS keychain;
+  Android backups are switched off so no copy of app data leaves the phone.
+
 ## 8. Before the first real customer
 
 1. Legal settings (Admin → Settings): entity, drug licences, pharmacist-in-charge,
