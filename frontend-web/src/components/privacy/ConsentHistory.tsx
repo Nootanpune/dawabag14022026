@@ -1,5 +1,5 @@
 import type { ConsentRecord } from '@/lib/privacy/api';
-import { PURPOSE_LABELS } from '@/lib/privacy/api';
+import { describeNotice, PURPOSE_LABELS } from '@/lib/privacy/api';
 import { formatDateTimeIST } from '@/lib/admin/format';
 
 /** Every consent given or withdrawn, newest first (append-only log on the server, C-40). */
@@ -15,7 +15,7 @@ export default function ConsentHistory({ history }: { history: ConsentRecord[] }
               <span className={c.granted ? 'text-green-700' : 'text-gray-500'}>{c.granted ? 'given' : 'withdrawn'}</span>
             </span>
             <span className="text-xs text-gray-400 whitespace-nowrap">
-              {formatDateTimeIST(c.recorded_at)} · v{c.policy_version}
+              {formatDateTimeIST(c.recorded_at)} · {describeNotice(c.policy_version)}
             </span>
           </li>
         ))}

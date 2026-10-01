@@ -62,10 +62,10 @@ class ConsentSection extends StatelessWidget {
                         ))
                     .toList(),
               ),
-            if (consents.policyVersion != null)
+            if (consents.noticeLabel != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: Text('Current privacy notice version: ${consents.policyVersion}',
+                child: Text(consents.noticeLabel!,
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
               ),
           ],
@@ -76,6 +76,6 @@ class ConsentSection extends StatelessWidget {
 
   static String _recordLine(ConsentRecord c) => [
         if (c.recordedAt != null) formatDateTime(c.recordedAt!),
-        if (c.policyVersion != null) 'notice ${c.policyVersion}',
+        if (c.policyVersion != null) describePrivacyNotice(c.policyVersion!),
       ].join(' · ');
 }

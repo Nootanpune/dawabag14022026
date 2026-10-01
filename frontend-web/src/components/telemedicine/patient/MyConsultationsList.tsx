@@ -8,6 +8,7 @@ import { payConsultation } from '@/lib/telemedicine/razorpay';
 import type { MyConsultation } from '@/lib/telemedicine/types';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { formatPaise } from '@/lib/admin/format';
+import { cancelRefundText } from '@/lib/telemedicine/labels';
 import ReasonDialog from '@/components/admin/ReasonDialog';
 import ConsultationCard from './ConsultationCard';
 import JoinDialog from '../common/JoinDialog';
@@ -29,7 +30,7 @@ export default function MyConsultationsList({ rows }: { rows: MyConsultation[] }
   const cancel = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => cancelConsultation(id, reason),
     onSuccess: (r) => {
-      toast.success(r.refund ? `Cancelled. ${formatPaise(r.refund.amount_paise)} will be refunded to your payment method.` : 'Cancelled');
+      toast.success(cancelRefundText(r.refund));
       setCancelling(null);
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Could not cancel')),

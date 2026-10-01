@@ -1,14 +1,16 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../config/theme.dart';
-import 'register_constants.dart';
+import '../../../models/policy.dart';
 import 'register_controller.dart';
 import 'register_widgets.dart';
 
-/// Privacy notice + age (both required) and marketing (optional) consents,
-/// sent as accept_privacy_notice / age_confirmed / marketing_consent.
+/// Privacy notice language, privacy notice + age (both required) and marketing
+/// (optional) consents, sent as notice_language / accept_privacy_notice /
+/// age_confirmed / marketing_consent. The notice opens in the chosen language,
+/// fetched from the server (C-40).
 class ConsentCheckboxes extends StatefulWidget {
   final RegisterController c;
   final void Function(String message, bool isError) onMessage;
@@ -29,17 +31,9 @@ class _ConsentCheckboxesState extends State<ConsentCheckboxes> {
     super.dispose();
   }
 
-  Future<void> _openPrivacyNotice() async {
-    bool ok = false;
-    try {
-      ok = await launchUrl(
-        Uri.parse(kPrivacyNoticeUrl),
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {
-      ok = false;
-    }
-    if (!ok && mounted) widget.onMessage('Could not open the Privacy Notice', true);
+  void _openPrivacyNotice() {
+    final lang = widget.c.noticeLanguage;
+    context.push(lang == 'en' ? '/policies/privacy' : '/policies/privacy?lang=$lang');
   }
 
   @override
@@ -48,6 +42,16 @@ class _ConsentCheckboxesState extends State<ConsentCheckboxes> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        DropdownButtonFormField<String>(
+          value: normalizePolicyLanguage(c.noticeLanguage),
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Read the privacy notice in'),
+          items: kPolicyLanguages.entries
+              .map((e) => DropdownMenuItem<String>(value: e.key, child: Text(e.value)))
+              .toList(),
+          onChanged: (v) => c.update(() => c.noticeLanguage = normalizePolicyLanguage(v)),
+        ),
+        const SizedBox(height: 8),
         CheckboxFormField(
           value: c.acceptPrivacy,
           onChanged: (v) => c.update(() => c.acceptPrivacy = v),

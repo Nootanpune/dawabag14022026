@@ -28,7 +28,9 @@ export default function CountSheet({ lines, values, onChange, showSystem }: Prop
         <tbody>
           {lines.map((l) => {
             const counted = onChange ? values[l.batch_id] ?? '' : l.counted_qty == null ? '' : String(l.counted_qty);
-            const variance = counted !== '' ? Number(counted) - l.system_qty : null;
+            // system_qty is withheld from non-admins while the count is open (blind count)
+            const hasSystem = typeof l.system_qty === 'number';
+            const variance = counted !== '' && hasSystem ? Number(counted) - (l.system_qty as number) : null;
             return (
               <tr key={l.batch_id} className="border-b border-gray-50">
                 <td className="px-4 py-2 text-xs">{l.storage_location ?? '—'}</td>
@@ -40,7 +42,7 @@ export default function CountSheet({ lines, values, onChange, showSystem }: Prop
                   <p className="font-mono">{l.batch_number}</p>
                   <p className="text-gray-400">{formatDateIST(l.expiry_date)}</p>
                 </td>
-                {showSystem && <td className="px-4 py-2 text-right tabular-nums">{l.system_qty}</td>}
+                {showSystem && <td className="px-4 py-2 text-right tabular-nums">{hasSystem ? l.system_qty : '—'}</td>}
                 <td className="px-4 py-2 text-right">
                   {onChange ? (
                     <input

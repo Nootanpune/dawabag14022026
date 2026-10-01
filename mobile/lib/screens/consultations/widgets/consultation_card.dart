@@ -31,6 +31,7 @@ class ConsultStatusChip extends StatelessWidget {
     final (Color bg, Color fg) = switch (paymentStatus) {
       'paid' || 'waived' => (AppTheme.brandGreen50, AppTheme.brandGreen700),
       'refunded' => (Colors.blue.shade50, Colors.blue.shade800),
+      'refund_pending' => (Colors.amber.shade50, Colors.amber.shade900),
       _ => (Colors.red.shade50, Colors.red.shade700),
     };
     return ConsultStatusChip(label: consultPaymentLabel(paymentStatus), background: bg, foreground: fg);

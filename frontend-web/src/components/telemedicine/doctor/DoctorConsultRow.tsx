@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import StatusBadge from '@/components/admin/StatusBadge';
-import { formatSlotTime, KIND_LABELS, MODE_LABELS, patientLine } from '@/lib/telemedicine/labels';
+import { formatSlotTime, KIND_LABELS, MODE_LABELS, patientLine, paymentStatusLabel } from '@/lib/telemedicine/labels';
 import type { DoctorConsultation } from '@/lib/telemedicine/types';
 
 /** One booked consultation on the doctor's day list. */
@@ -25,7 +25,7 @@ export default function DoctorConsultRow({ c, actions }: { c: DoctorConsultation
         </p>
         <div className="flex gap-1">
           <StatusBadge status={c.status} />
-          <StatusBadge status={c.payment_status} />
+          <StatusBadge status={c.payment_status} label={paymentStatusLabel(c.payment_status)} />
         </div>
       </div>
       <div className="flex flex-wrap gap-2 items-start justify-end">

@@ -141,7 +141,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/legal', builder: (c, s) => const LegalScreen()),
       GoRoute(
         path: '/policies/:key',
-        builder: (c, s) => PolicyScreen(policyKey: s.pathParameters['key']!),
+        // ?lang=mr|hi opens the Marathi / Hindi text where published (C-40)
+        builder: (c, s) => PolicyScreen(
+          policyKey: s.pathParameters['key']!,
+          initialLanguage: s.uri.queryParameters['lang'] ?? 'en',
+        ),
       ),
       // Teleconsultation (Telemedicine Practice Guidelines 2020; C-22..C-24).
       // The doctor directory is public; booking and everything under

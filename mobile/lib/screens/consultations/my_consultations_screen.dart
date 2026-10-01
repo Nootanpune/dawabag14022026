@@ -74,7 +74,10 @@ class _MyConsultationsScreenState extends ConsumerState<MyConsultationsScreen> {
       if (refund is Map) {
         final amount = refund['amount_paise'];
         final paise = amount is num ? amount.round() : int.tryParse('$amount') ?? c.feePaise;
-        _snack('Consultation cancelled. ${formatPrice(paise)} will be refunded to the way you paid.');
+        // { pending: true } — the gateway refund is queued and retried by the server
+        _snack(refund['pending'] == true
+            ? 'Consultation cancelled. Refund of ${formatPrice(paise)} initiated.'
+            : 'Consultation cancelled. ${formatPrice(paise)} will be refunded to the way you paid.');
       } else {
         _snack('Consultation cancelled.');
       }

@@ -2,7 +2,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { privacyKeys, PURPOSE_LABELS, setMarketingConsent, type Consents } from '@/lib/privacy/api';
+import { describeNotice, privacyKeys, PURPOSE_LABELS, setMarketingConsent, type Consents } from '@/lib/privacy/api';
 import { formatDateTimeIST } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 
@@ -60,7 +60,7 @@ export default function ConsentStatus({ consents }: { consents: Consents }) {
           </li>
         ))}
       </ul>
-      <p className="text-xs text-gray-400 mt-2">Privacy policy version {consents.policy_version}</p>
+      <p className="text-xs text-gray-400 mt-2">{describeNotice(consents.policy_version, consents.notice_language)}</p>
     </div>
   );
 }

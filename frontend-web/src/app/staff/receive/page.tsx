@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { PackagePlus } from 'lucide-react';
 import { fetchPurchaseOrders, fetchReceipts, purchasingKeys } from '@/lib/purchasing/api';
-import { STORE_ROLES } from '@/lib/purchasing/roles';
+import { RECEIVE_WITHOUT_PO_ROLES, STORE_ROLES } from '@/lib/purchasing/roles';
+import { hasRole } from '@/lib/admin/roles';
+import { useAuthStore } from '@/store/authStore';
 import type { ReceiptFilter } from '@/lib/purchasing/types';
 import { daysAgoIST, todayIST } from '@/lib/fulfilment/roles';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -18,6 +20,7 @@ import ReceiptFilters from '@/components/staff/receive/ReceiptFilters';
 const RECEIPT_PAGE_SIZE = 50;
 
 function ReceiveScreen() {
+  const canReceiveWithoutPo = hasRole(useAuthStore((s) => s.user?.role), RECEIVE_WITHOUT_PO_ROLES);
   const [filter, setFilter] = useState<ReceiptFilter>(() => ({
     from: daysAgoIST(30),
     to: todayIST(),
@@ -50,9 +53,11 @@ function ReceiveScreen() {
         }}
         refreshing={sent.isFetching || part.isFetching || receipts.isFetching}
         actions={
-          <Link href="/staff/receive/new" className="btn-outline text-sm inline-flex items-center gap-1">
-            <PackagePlus className="w-4 h-4" /> Receive without a PO
-          </Link>
+          canReceiveWithoutPo ? (
+            <Link href="/staff/receive/new" className="btn-outline text-sm inline-flex items-center gap-1">
+              <PackagePlus className="w-4 h-4" /> Receive without a PO
+            </Link>
+          ) : undefined
         }
       />
       <h2 className="text-sm font-semibold text-gray-700 mb-2">Purchase orders awaiting goods</h2>

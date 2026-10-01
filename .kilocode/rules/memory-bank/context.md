@@ -10,6 +10,25 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Web Sprint 12 (tsc + next lint + next build pass)
+- Policies in en/mr/hi (C-40): /policies/:key switcher (?lang=, "Not yet available in …;
+  showing English"), index links translations; /admin/policies "Publish translation"
+  (PolicyTranslationForm) + history grouped per version with languages. Registration sends
+  notice_language (notice link opens in that language); privacy screen shows "Privacy notice
+  v3, Marathi". Settings: RetentionSection (retention.days) + catalogue.opening_stock_open
+  switch. Doctor approve sends nmc_reg_number (409 → refresh), reject shows refunds count.
+  Telemedicine lists pharmacist_rx only. Receive-without-PO admin only; free ≤ paid qty;
+  PO approve / return hand-over / destruction hidden for the raiser. Blind counts (no
+  system_qty), count-approve 409 banner. Consult 'refund_pending' = "Refund in progress";
+  cancel refund {pending} = "Refund of ₹X initiated".
+
+## Mobile Sprint 12 (not compiled — no Flutter SDK here)
+- PolicyScreen gets an English/मराठी/हिंदी bar (policyInLanguageProvider, ?lang= route
+  param, English-fallback note). Register: "Read the privacy notice in" dropdown, opens
+  /policies/privacy?lang= in-app, sends notice_language. Privacy screen shows notice version
+  + language. Device registration 409 logged and ignored. Consult refund_pending label and
+  pending-refund snack.
+
 ## Web Sprint 11 (tsc + next lint + next build pass)
 - /admin/refunds: "Retry with Razorpay" on pending gateway refunds with a failure_reason
   (POST /returns/refunds/admin/:id/retry; 409 texts shown), attempts count; UTR path kept.

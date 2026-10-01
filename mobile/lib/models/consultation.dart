@@ -40,7 +40,8 @@ String consultStatusLabel(String status) {
   }
 }
 
-/// Payment statuses: unpaid, paid, waived (free), refunded.
+/// Payment statuses: unpaid, paid, waived (free), refund_pending (cancelled
+/// after payment, gateway refund not yet confirmed), refunded.
 String consultPaymentLabel(String status) {
   switch (status) {
     case 'unpaid':
@@ -49,6 +50,8 @@ String consultPaymentLabel(String status) {
       return 'Paid';
     case 'waived':
       return 'No fee';
+    case 'refund_pending':
+      return 'Refund in progress';
     case 'refunded':
       return 'Refunded';
     default:

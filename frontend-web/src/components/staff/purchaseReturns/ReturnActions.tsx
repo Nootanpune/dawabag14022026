@@ -49,9 +49,14 @@ export default function ReturnActions({ r }: { r: PurchaseReturn }) {
       {r.status === 'approved' && (
         <div className="card text-sm flex flex-wrap items-center justify-between gap-3">
           <p className="text-gray-600">Approved — the stock is out of the batches. Send the goods and record the dispatch reference.</p>
-          <button onClick={() => setOpen('dispatch')} className="btn-primary text-xs py-1.5 px-3">
-            Dispatch
-          </button>
+          {/* Hand-over by someone other than the requester (C-46; server 403) */}
+          {ownRequest ? (
+            <p className="text-xs text-gray-400">You raised this return; someone else must hand it over.</p>
+          ) : (
+            <button onClick={() => setOpen('dispatch')} className="btn-primary text-xs py-1.5 px-3">
+              Dispatch
+            </button>
+          )}
         </div>
       )}
       {r.status === 'dispatched' && (

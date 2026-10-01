@@ -19,6 +19,7 @@ extension RegisterPayload on RegisterController {
       if (pincode.isNotEmpty) 'pincode': pincode,
       if (referral.isNotEmpty) 'referral_code': referral.toUpperCase(),
       'accept_privacy_notice': acceptPrivacy,
+      'notice_language': noticeLanguage, // C-40
       'age_confirmed': ageConfirmed,
       'marketing_consent': marketingConsent,
     };

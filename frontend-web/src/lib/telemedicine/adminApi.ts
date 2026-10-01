@@ -19,10 +19,22 @@ export async function fetchAdminDoctors(status: DoctorReviewStatus | ''): Promis
   return data.data?.doctors ?? [];
 }
 
-/** Checked against the NMC / state council register; notes 3–1000 characters. */
-export async function verifyDoctor(id: string, approve: boolean, notes: string) {
-  const { data } = await api.post(`/doctors/${id}/verify`, { approve, notes });
-  return data.data as { id: string; is_verified: boolean };
+export interface VerifyDoctorResult {
+  id: string;
+  is_verified: boolean;
+  /** rejection: the doctor's open consultations cancelled and refunded */
+  consultations_cancelled_refunds?: number;
+}
+
+/**
+ * Checked against the NMC / state council register (C-22); notes 3–1000 characters.
+ * Approving sends the registration number the admin checked — 409 if the profile changed meanwhile.
+ */
+export async function verifyDoctor(id: string, approve: boolean, notes: string, nmcRegNumber?: string) {
+  const body: Record<string, unknown> = { approve, notes };
+  if (approve) body.nmc_reg_number = nmcRegNumber;
+  const { data } = await api.post(`/doctors/${id}/verify`, body);
+  return data.data as VerifyDoctorResult;
 }
 
 /** Schedule X / NDPS always come back 'prohibited' whatever is sent. */

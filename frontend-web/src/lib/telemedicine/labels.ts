@@ -1,6 +1,7 @@
 // Display text for teleconsultation screens. The server decides every rule;
 // these only describe them.
-import type { ConsultKind, ConsultMode, DoctorReviewStatus, TeleList } from './types';
+import type { CancelResult, ConsultKind, ConsultMode, DoctorReviewStatus, PaymentStatus, TeleList } from './types';
+import { formatPaise } from '../admin/format';
 
 export const MODE_LABELS: Record<ConsultMode, string> = { video: 'Video', audio: 'Audio call', text: 'Chat (text)' };
 export const MODES: readonly ConsultMode[] = ['video', 'audio', 'text'];
@@ -58,4 +59,23 @@ export function formatSlotDate(d: string | null | undefined): string {
 export function patientLine(age: number | null | undefined, gender: string | null | undefined): string {
   const parts = [age != null ? `${age} y` : null, gender ? gender : null].filter(Boolean);
   return parts.length ? parts.join(' · ') : 'age / gender not given';
+}
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  unpaid: 'Unpaid',
+  paid: 'Paid',
+  waived: 'No fee',
+  refund_pending: 'Refund in progress',
+  refunded: 'Refunded',
+};
+
+export function paymentStatusLabel(status: PaymentStatus): string {
+  return PAYMENT_STATUS_LABELS[status] ?? status.replace(/_/g, ' ');
+}
+
+/** Toast after a cancellation: the refund may be created at once or queued (pending) */
+export function cancelRefundText(refund: CancelResult['refund']): string {
+  if (!refund) return 'Cancelled';
+  if ('pending' in refund) return `Cancelled. Refund of ${formatPaise(refund.amount_paise)} initiated.`;
+  return `Cancelled. ${formatPaise(refund.amount_paise)} will be refunded to your payment method.`;
 }

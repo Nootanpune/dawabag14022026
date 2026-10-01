@@ -53,7 +53,7 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
       const msg = getApiErrorMessage(err, 'Could not record the receipt');
       const status = err?.response?.status;
       setProblems({
-        title: status === 409 ? 'Receipt refused' : 'Fix these and save again',
+        title: status === 409 || status === 403 ? 'Receipt refused' : 'Fix these and save again',
         list: status === 422 ? splitServerProblems(msg) : [msg],
       });
     },

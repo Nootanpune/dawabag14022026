@@ -86,6 +86,8 @@ export function receiptProblems(h: ReceiptHeaderDraft, lines: ReceiptLineDraft[]
     if (l.manufactured_date && l.manufactured_date > today) out.push(`${at}: manufacturing date is in the future`);
     if (!posInt(l.quantity)) out.push(`${at}: quantity must be a whole number above 0`);
     if (l.free_quantity && !/^\d+$/.test(l.free_quantity.trim())) out.push(`${at}: free quantity must be a whole number`);
+    else if (posInt(l.quantity) && Number(l.free_quantity || 0) > Number(l.quantity))
+      out.push(`${at}: free quantity cannot be more than the paid quantity`);
     if (rupeesToPaise(l.unit_cost) == null || !l.unit_cost.trim()) out.push(`${at}: enter the unit cost`);
     const mrp = rupeesToPaise(l.mrp);
     if (!mrp) out.push(`${at}: enter the MRP printed on the pack`);

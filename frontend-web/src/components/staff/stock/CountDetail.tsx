@@ -24,6 +24,8 @@ export default function CountDetail({ id }: { id: string }) {
   const me = useAuthStore((s) => s.user);
   const { data: c, isLoading, error, refetch, isFetching } = useQuery({ queryKey: stockControlKeys.count(id), queryFn: () => fetchCount(id) });
   const [values, setValues] = useState<Record<string, string>>({});
+  // e.g. 409 "Stock moved during the count for …; start a new count for these batches"
+  const [approveError, setApproveError] = useState('');
   useEffect(() => {
     if (!c) return;
     setValues(Object.fromEntries(c.lines.map((l) => [l.batch_id, l.counted_qty == null ? '' : String(l.counted_qty)])));
@@ -52,9 +54,16 @@ export default function CountDetail({ id }: { id: string }) {
     onSettled: refresh,
   });
   const approve = useMutation({
-    mutationFn: () => approveCount(id),
+    mutationFn: () => {
+      setApproveError('');
+      return approveCount(id);
+    },
     onSuccess: (r) => toast.success(`Count approved · ${r.variances} variance(s) posted as adjustments`),
-    onError: onError('Could not approve the count'),
+    onError: (err: any) => {
+      const message = getApiErrorMessage(err, 'Could not approve the count');
+      if (err?.response?.status === 409) setApproveError(message);
+      else toast.error(message);
+    },
     onSettled: refresh,
   });
 
@@ -103,6 +112,9 @@ export default function CountDetail({ id }: { id: string }) {
             <p className="text-xs text-gray-500 mb-3">
               Count what is physically on the shelf. {missing ? `${missing} batch(es) still to count.` : 'All batches counted.'}
             </p>
+          )}
+          {approveError && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">{approveError}</p>
           )}
           {c.status === 'submitted' && isCounter && (
             <p className="text-xs text-gray-500 mb-3">Waiting for an admin other than you to approve.</p>

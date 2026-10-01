@@ -62,7 +62,7 @@ extension ConsultationApi on ApiService {
   }
 
   /// POST /consultations/:id/cancel { reason (3–500) } → { id, status,
-  /// refund: { id, amount_paise } | null }
+  /// refund: { id, amount_paise } | { pending: true, amount_paise } | null }
   Future<Map<String, dynamic>> cancelConsultation(String id, String reason) async {
     final res = await dio.post('/consultations/$id/cancel', data: {'reason': reason});
     return apiData(res);

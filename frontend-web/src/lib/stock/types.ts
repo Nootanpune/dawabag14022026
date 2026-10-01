@@ -56,6 +56,8 @@ export interface Adjustment {
   created_at: string;
   decided_at: string | null;
   decision_notes: string | null;
+  /** user id of the requester (null for the expiry watch) — may not record its destruction (C-46) */
+  requested_by?: string | null;
   requested_by_name: string;
   approved_by_name: string | null;
   value_paise: number | string;
@@ -94,7 +96,8 @@ export interface CountLine {
   storage_location: string | null;
   product_name: string;
   sku: string;
-  system_qty: number;
+  /** left out for non-admins while the count is open (blind count, C-46) */
+  system_qty?: number | null;
   counted_qty: number | null;
 }
 

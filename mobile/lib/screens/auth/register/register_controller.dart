@@ -54,6 +54,9 @@ class RegisterController extends ChangeNotifier {
   bool showPassword = false;
 
   // Consents (all customer types)
+  /// Language the privacy notice is read in ('en' | 'mr' | 'hi'); the server
+  /// records consent against that notice version and language (C-40).
+  String noticeLanguage = 'en';
   bool acceptPrivacy = false;
   bool ageConfirmed = false;
   bool marketingConsent = false;

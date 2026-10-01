@@ -18,10 +18,14 @@ extension LegalApi on ApiService {
     return PolicyRef.listFrom(apiData(res)['policies']);
   }
 
-  /// GET /legal/policies/:key → { title, body, version, effective_from };
-  /// 404 when the policy has not been published yet.
-  Future<PolicyDocument> getPolicy(String key) async {
-    final res = await dio.get('/legal/policies/${Uri.encodeComponent(key)}');
+  /// GET /legal/policies/:key?lang=en|mr|hi → { title, body, version, effective_from,
+  /// language, translation_available }; 404 when the policy has not been published yet.
+  /// The server falls back to English when the translation is missing (C-40).
+  Future<PolicyDocument> getPolicy(String key, {String lang = 'en'}) async {
+    final res = await dio.get(
+      '/legal/policies/${Uri.encodeComponent(key)}',
+      queryParameters: lang == 'en' ? null : {'lang': lang},
+    );
     return PolicyDocument.fromJson(key, apiData(res));
   }
 }

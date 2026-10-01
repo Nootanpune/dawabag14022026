@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import StatusBadge from '@/components/admin/StatusBadge';
 import { formatPaise } from '@/lib/admin/format';
-import { formatSlotDate, formatSlotTime, KIND_LABELS, MODE_LABELS } from '@/lib/telemedicine/labels';
+import { formatSlotDate, formatSlotTime, KIND_LABELS, MODE_LABELS, paymentStatusLabel } from '@/lib/telemedicine/labels';
 import type { MyConsultation } from '@/lib/telemedicine/types';
 import DoctorRegistration from '../common/DoctorRegistration';
 
@@ -25,7 +25,10 @@ export default function ConsultationCard({ c, actions }: { c: MyConsultation; ac
           </p>
           <div className="flex gap-1 justify-end">
             <StatusBadge status={c.status} />
-            <StatusBadge status={c.payment_status} label={`${c.payment_status} ${c.fee_paise ? formatPaise(c.fee_paise) : ''}`.trim()} />
+            <StatusBadge
+              status={c.payment_status}
+              label={`${paymentStatusLabel(c.payment_status)} ${c.fee_paise ? formatPaise(c.fee_paise) : ''}`.trim()}
+            />
           </div>
         </div>
       </div>

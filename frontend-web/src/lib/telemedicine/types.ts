@@ -5,7 +5,8 @@
 export type ConsultMode = 'video' | 'audio' | 'text';
 export type ConsultKind = 'first' | 'follow_up';
 export type ConsultStatus = 'booked' | 'in_progress' | 'completed' | 'cancelled' | string;
-export type PaymentStatus = 'unpaid' | 'paid' | 'waived' | 'refunded' | string;
+/** 'refund_pending': cancelled after payment, gateway refund not yet confirmed */
+export type PaymentStatus = 'unpaid' | 'paid' | 'waived' | 'refund_pending' | 'refunded' | string;
 /** pharmacist's TPG classification of a medicine (C-23) */
 export type TeleList = 'O' | 'A' | 'B' | 'prohibited';
 
@@ -162,7 +163,8 @@ export interface PayOrder {
 export interface CancelResult {
   id: string;
   status: 'cancelled';
-  refund: { id: string; amount_paise: number } | null;
+  /** refund created at the gateway, or { pending: true } when it is queued for retry */
+  refund: { id: string; amount_paise: number } | { pending: true; amount_paise: number } | null;
 }
 
 export interface PrescriptionItemInput {

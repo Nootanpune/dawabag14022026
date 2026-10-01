@@ -7,13 +7,19 @@ import { toast } from 'sonner';
 import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder } from '@/lib/purchasing/api';
 import type { PurchaseOrder } from '@/lib/purchasing/types';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import { useAuthStore } from '@/store/authStore';
 import ReasonDialog from '../ReasonDialog';
 
 type Pending = 'cancel' | 'close' | null;
 
-/** Approve (draft → sent), cancel, close short, or go to receiving — by PO status. */
+/**
+ * Approve (draft → sent), cancel, close short, or go to receiving — by PO status.
+ * The admin who raised a PO cannot approve it (C-46; server 403), so the button is hidden for them.
+ */
 export default function PoActions({ po }: { po: PurchaseOrder }) {
   const queryClient = useQueryClient();
+  const userId = useAuthStore((s) => s.user?.id);
+  const raisedByMe = !!userId && !!po.raised_by && po.raised_by === userId;
   const [asking, setAsking] = useState<Pending>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['purchasing', 'orders'] });
 
@@ -37,7 +43,10 @@ export default function PoActions({ po }: { po: PurchaseOrder }) {
   const receivable = po.status === 'sent' || po.status === 'partially_received';
   return (
     <div className="flex flex-wrap gap-2">
-      {po.status === 'draft' && (
+      {po.status === 'draft' && raisedByMe && (
+        <span className="text-xs text-gray-500 self-center">You raised this order; another admin must approve it.</span>
+      )}
+      {po.status === 'draft' && !raisedByMe && (
         <button onClick={() => approve.mutate()} disabled={approve.isPending} className="btn-primary text-sm inline-flex items-center gap-2">
           {approve.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Approve &amp; send
         </button>

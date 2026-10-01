@@ -58,6 +58,15 @@ export const SETTING_KINDS: Record<string, SettingMeta> = {
       off: 'New B2B invoices will no longer be registered with the IRP and dispatch will not wait for an IRN. Switch off only if Dawabag is below the e-invoicing threshold.',
     },
   },
+  // Sprint 12 — opening stock by catalogue import closes at go-live (C-46)
+  'catalogue.opening_stock_open': {
+    kind: 'boolean',
+    label: 'Opening stock by catalogue import',
+    confirm: {
+      on: 'Re-open opening stock: catalogue imports may again add stock without a goods receipt. Do this only before go-live.',
+      off: 'Close opening stock at go-live: afterwards stock enters only by goods receipt.',
+    },
+  },
 };
 
 /** Edited in its own section (table of DLT templates), not the generic list */

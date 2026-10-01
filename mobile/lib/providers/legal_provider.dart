@@ -15,7 +15,8 @@ final policiesProvider = FutureProvider.autoDispose<List<PolicyRef>>((ref) {
   return apiService.getPolicies();
 });
 
-/// GET /legal/policies/:key (public, C-39).
-final policyProvider = FutureProvider.autoDispose.family<PolicyDocument, String>((ref, key) {
-  return apiService.getPolicy(key);
+/// GET /legal/policies/:key?lang= (public, C-39, C-40). Argument: (policy key, language code).
+final policyInLanguageProvider =
+    FutureProvider.autoDispose.family<PolicyDocument, (String, String)>((ref, arg) {
+  return apiService.getPolicy(arg.$1, lang: arg.$2);
 });

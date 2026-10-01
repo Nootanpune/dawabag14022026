@@ -1,6 +1,7 @@
 // Step 2 of registration: field rules (mirrors the backend contract) and the POST /auth/register body.
 import { z } from 'zod';
 import type { CustomerType } from './registration';
+import { POLICY_LANGUAGES, type PolicyLanguage } from './legal/policies';
 
 // ─── Step 2 form ─────────────────────────────────────────────────────────────
 export const MOBILE_REGEX = /^[6-9]\d{9}$/;
@@ -58,6 +59,8 @@ export interface DetailsFormValues {
   nmc_council_state: string;
   speciality: string;
   practitioner_declaration: boolean;
+  /** language the privacy notice was read in; consent cites that notice version + language (C-40) */
+  notice_language: PolicyLanguage;
   accept_privacy_notice: boolean;
   age_confirmed: boolean;
   marketing_consent: boolean;
@@ -81,6 +84,7 @@ export const EMPTY_DETAILS: DetailsFormValues = {
   nmc_council_state: '',
   speciality: '',
   practitioner_declaration: false,
+  notice_language: 'en',
   accept_privacy_notice: false,
   age_confirmed: false,
   marketing_consent: false,
@@ -110,6 +114,7 @@ export function buildDetailsSchema(type: CustomerType) {
       nmc_council_state: str,
       speciality: str,
       practitioner_declaration: z.boolean(),
+      notice_language: z.enum(POLICY_LANGUAGES),
       accept_privacy_notice: z.boolean(),
       age_confirmed: z.boolean(),
       marketing_consent: z.boolean(),
@@ -187,6 +192,7 @@ export function buildRegisterPayload(type: CustomerType, d: DetailsFormValues): 
     referral_code: opt(d.referral_code)?.toUpperCase(),
     pincode: opt(d.pincode),
     accept_privacy_notice: d.accept_privacy_notice,
+    notice_language: d.notice_language, // C-40
     age_confirmed: d.age_confirmed,
     marketing_consent: d.marketing_consent,
   };

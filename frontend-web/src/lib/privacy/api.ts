@@ -2,6 +2,7 @@
 // export and erasure/correction requests are all held on the server.
 import api from '../api';
 import { downloadFromApi } from '../download';
+import { isPolicyLanguage, LANGUAGE_NAMES, type PolicyLanguage } from '../legal/policies';
 
 export interface ConsentRecord {
   purpose: string;
@@ -13,7 +14,17 @@ export interface ConsentRecord {
 export interface Consents {
   current: ConsentRecord[];
   history: ConsentRecord[];
+  /** e.g. 'privacy-v3' — the privacy notice consent is recorded against (C-40) */
   policy_version: string;
+  /** language of that notice */
+  notice_language?: PolicyLanguage;
+}
+
+/** 'privacy-v3' + 'mr' → 'Privacy notice v3, Marathi' */
+export function describeNotice(policyVersion: string, language?: string): string {
+  const m = /^privacy-v(\d+)$/.exec(policyVersion ?? '');
+  const base = m ? `Privacy notice v${m[1]}` : policyVersion === 'unpublished' ? 'Privacy notice not yet published' : `Privacy notice ${policyVersion}`;
+  return isPolicyLanguage(language) && policyVersion !== 'unpublished' ? `${base}, ${LANGUAGE_NAMES[language]}` : base;
 }
 
 export type DataRequestType = 'erasure' | 'correction';

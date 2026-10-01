@@ -11,6 +11,7 @@ import StatusTabs from '@/components/admin/StatusTabs';
 import AdjustmentTable from '@/components/staff/stock/AdjustmentTable';
 import DisposalDialog from '@/components/staff/stock/DisposalDialog';
 import DestructionCsvButton from '@/components/staff/stock/DestructionCsvButton';
+import { useAuthStore } from '@/store/authStore';
 
 const TABS = [
   { value: 'pending', label: 'Awaiting destruction' },
@@ -21,6 +22,7 @@ const TABS = [
 function DestructionRegister() {
   const [tab, setTab] = useState<(typeof TABS)[number]['value']>('pending');
   const [recording, setRecording] = useState<Adjustment | null>(null);
+  const userId = useAuthStore((s) => s.user?.id);
   const pending = tab === 'pending';
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: stockControlKeys.destruction(pending),
@@ -43,11 +45,15 @@ function DestructionRegister() {
           rows={data}
           actions={
             pending
-              ? (a) => (
-                  <button onClick={() => setRecording(a)} className="btn-primary text-xs py-1.5 px-3">
-                    Record destruction
-                  </button>
-                )
+              ? (a) =>
+                  // The person who raised the write-off cannot record its destruction (C-46; server 403)
+                  userId && a.requested_by === userId ? (
+                    <span className="text-xs text-gray-400">Raised by you — someone else records it</span>
+                  ) : (
+                    <button onClick={() => setRecording(a)} className="btn-primary text-xs py-1.5 px-3">
+                      Record destruction
+                    </button>
+                  )
               : undefined
           }
         />

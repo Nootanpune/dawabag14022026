@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { fetchPolicies, POLICY_KEYS, POLICY_LABELS, policyKeys } from '@/lib/legal/policies';
+import { fetchPolicies, LANGUAGE_LABELS, POLICY_KEYS, POLICY_LABELS, policyKeys } from '@/lib/legal/policies';
 import { formatDateIST } from '@/lib/admin/format';
 import Header from '@/components/layout/Header';
 import QueryState from '@/components/admin/QueryState';
@@ -22,9 +22,18 @@ export default function PoliciesIndexPage() {
               return (
                 <div key={k} className="px-4 py-3 text-sm flex justify-between gap-3">
                   {p ? (
-                    <Link href={`/policies/${k}`} className="text-brand-700 hover:underline">
-                      {p.title}
-                    </Link>
+                    <span>
+                      <Link href={`/policies/${k}`} className="text-brand-700 hover:underline">
+                        {p.title}
+                      </Link>
+                      {(p.languages ?? [])
+                        .filter((l) => l !== 'en')
+                        .map((l) => (
+                          <Link key={l} href={`/policies/${k}?lang=${l}`} lang={l} className="ml-2 text-xs text-brand-700 hover:underline">
+                            {LANGUAGE_LABELS[l]}
+                          </Link>
+                        ))}
+                    </span>
                   ) : (
                     <span className="text-gray-400">{POLICY_LABELS[k]} — not yet published</span>
                   )}

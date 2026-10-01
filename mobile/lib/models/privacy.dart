@@ -1,4 +1,5 @@
 import 'json_utils.dart';
+import 'policy.dart' show kPolicyLanguageNames;
 
 /// Consent records from GET /api/v1/privacy/consents (C-40..C-44). The server
 /// keeps an append-only log; `current` is the latest row per purpose.
@@ -26,13 +27,23 @@ class ConsentRecord {
 class PrivacyConsents {
   final List<ConsentRecord> current;
   final List<ConsentRecord> history;
+
+  /// e.g. 'privacy-v3' — the privacy notice consent is recorded against (C-40)
   final String? policyVersion;
+
+  /// Language of that notice ('en' | 'mr' | 'hi')
+  final String? noticeLanguage;
 
   const PrivacyConsents({
     this.current = const [],
     this.history = const [],
     this.policyVersion,
+    this.noticeLanguage,
   });
+
+  /// "Privacy notice v3, Marathi"
+  String? get noticeLabel =>
+      policyVersion == null ? null : describePrivacyNotice(policyVersion!, noticeLanguage);
 
   ConsentRecord? currentFor(String purpose) {
     for (final c in current) {
@@ -48,7 +59,17 @@ class PrivacyConsents {
         current: asMapList(json['current']).map(ConsentRecord.fromJson).toList(),
         history: asMapList(json['history']).map(ConsentRecord.fromJson).toList(),
         policyVersion: asString(json['policy_version']),
+        noticeLanguage: asString(json['notice_language']),
       );
+}
+
+/// 'privacy-v3' + 'mr' → 'Privacy notice v3, Marathi'.
+String describePrivacyNotice(String policyVersion, [String? language]) {
+  if (policyVersion == 'unpublished') return 'Privacy notice not yet published';
+  final m = RegExp(r'^privacy-v(\d+)$').firstMatch(policyVersion);
+  final base = m != null ? 'Privacy notice v${m.group(1)}' : 'Privacy notice $policyVersion';
+  final name = kPolicyLanguageNames[language];
+  return name == null ? base : '$base, $name';
 }
 
 /// Human label for a consent purpose code.

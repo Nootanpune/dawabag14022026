@@ -10,6 +10,8 @@ import SettingValue from '@/components/admin/settings/SettingValue';
 import SettingEditor from '@/components/admin/settings/SettingEditor';
 import SettingSwitch from '@/components/admin/settings/SettingSwitch';
 import DltTemplatesSection from '@/components/admin/settings/DltTemplatesSection';
+import RetentionSection from '@/components/admin/settings/RetentionSection';
+import { RETENTION_KEY } from '@/lib/admin/retention';
 import LegalSettingsSection from '@/components/admin/legal/LegalSettingsSection';
 import PharmacistRegistrationSection from '@/components/admin/legal/PharmacistRegistrationSection';
 import { isLegalKey } from '@/lib/admin/legalSettings';
@@ -22,8 +24,8 @@ export default function AdminSettingsPage() {
     queryFn: fetchSettings,
   });
   const meta = editing ? SETTING_KINDS[editing.key] : undefined;
-  // legal.* objects and the SMS DLT templates get their own forms below
-  const rules = data?.filter((s) => !isLegalKey(s.key) && s.key !== DLT_TEMPLATES_KEY);
+  // legal.* objects, the SMS DLT templates and retention periods get their own forms below
+  const rules = data?.filter((s) => !isLegalKey(s.key) && s.key !== DLT_TEMPLATES_KEY && s.key !== RETENTION_KEY);
 
   return (
     <div>
@@ -65,6 +67,7 @@ export default function AdminSettingsPage() {
         </div>
       )}
       {!!data?.length && <DltTemplatesSection setting={data.find((s) => s.key === DLT_TEMPLATES_KEY)} canEdit={isSuperAdmin} />}
+      {!!data?.length && <RetentionSection setting={data.find((s) => s.key === RETENTION_KEY)} canEdit={isSuperAdmin} />}
       {!!data?.length && <LegalSettingsSection settings={data} canEdit={isSuperAdmin} />}
       <PharmacistRegistrationSection />
       {editing && meta && (

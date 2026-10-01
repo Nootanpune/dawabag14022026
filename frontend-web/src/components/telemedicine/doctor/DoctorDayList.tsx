@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { doctorCancelConsultation, doctorKeys, endConsultation } from '@/lib/telemedicine/doctorApi';
 import type { DoctorConsultation } from '@/lib/telemedicine/types';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import { formatPaise } from '@/lib/admin/format';
 import ReasonDialog from '@/components/admin/ReasonDialog';
 import JoinDialog from '../common/JoinDialog';
 import { useJoin } from '../common/useConsultActions';
@@ -33,7 +34,7 @@ export default function DoctorDayList({ rows }: { rows: DoctorConsultation[] }) 
   const cancel = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => doctorCancelConsultation(id, reason),
     onSuccess: (r) => {
-      toast.success(r.refund ? 'Cancelled; the patient’s fee is being refunded' : 'Cancelled');
+      toast.success(r.refund ? `Cancelled; refund of ${formatPaise(r.refund.amount_paise)} to the patient initiated` : 'Cancelled');
       setCancelling(null);
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Could not cancel')),

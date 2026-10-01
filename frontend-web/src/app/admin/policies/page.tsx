@@ -7,10 +7,11 @@ import QueryState from '@/components/admin/QueryState';
 import StatusTabs from '@/components/admin/StatusTabs';
 import PolicyEditor from '@/components/admin/policies/PolicyEditor';
 import PolicyHistory from '@/components/admin/policies/PolicyHistory';
+import PolicyTranslationForm from '@/components/admin/policies/PolicyTranslationForm';
 
 const TABS = POLICY_KEYS.map((k) => ({ value: k, label: POLICY_LABELS[k] }));
 
-// Versioned website policies (C-39)
+// Versioned website policies (C-39), in English, Marathi and Hindi (C-40)
 export default function AdminPoliciesPage() {
   const [key, setKey] = useState<PolicyKey>('terms');
   const history = useQuery({ queryKey: policyKeys.history(key), queryFn: () => fetchPolicyHistory(key) });
@@ -28,6 +29,7 @@ export default function AdminPoliciesPage() {
         {history.data && (
           <>
             <PolicyEditor key={`${key}-${history.data[0]?.version ?? 0}`} docKey={key} latestVersion={history.data[0]?.version} />
+            <PolicyTranslationForm key={`${key}-tr-${history.data[0]?.version ?? 0}`} docKey={key} versions={history.data} />
             <div>
               <h2 className="font-semibold text-sm mb-2">Version history</h2>
               <PolicyHistory docKey={key} versions={history.data} />

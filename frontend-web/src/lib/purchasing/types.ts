@@ -64,6 +64,8 @@ export interface PoReceiptRef {
 
 export interface PurchaseOrder extends Omit<PurchaseOrderRow, 'lines' | 'ordered_qty' | 'received_qty'> {
   vendor_id: string;
+  /** user who raised it — may not approve it (403; C-46) */
+  raised_by?: string | null;
   notes: string | null;
   closed_reason: string | null;
   approved_at: string | null;

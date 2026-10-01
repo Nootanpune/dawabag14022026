@@ -198,7 +198,7 @@ export default function DetailsStep({
         <input {...register('referral_code')} placeholder="e.g. RAJA20" className="input uppercase" />
       </Field>
 
-      <ConsentFields register={register} errors={errors} />
+      <ConsentFields register={register} errors={errors} noticeLanguage={watch('notice_language')} />
 
       <div className="flex gap-3 pt-1">
         <button
