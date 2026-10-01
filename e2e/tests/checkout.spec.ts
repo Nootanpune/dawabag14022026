@@ -2,7 +2,7 @@
 // charges, country of origin, refund and return policies) → order placed → payment
 // step. Razorpay's own checkout is not opened here (it is an external page).
 import { expect, Page, test } from '@playwright/test';
-import { signIn } from '../support/helpers';
+import { addToCart, signIn } from '../support/helpers';
 import { call, people } from '../support/data';
 
 async function emptyCart(page: Page) {
@@ -16,7 +16,7 @@ test('checkout shows the legally required disclosures before payment (C-35)', as
   await signIn(page, 'buyer');
   await emptyCart(page);
   await page.goto(`/shop/${process.env.E2E_PRODUCT_ID}`);
-  await page.getByRole('button', { name: 'Add to cart' }).first().click();
+  await addToCart(page);
   await page.goto('/checkout');
   await page.getByRole('button', { name: /Review order/ }).click();
 
@@ -34,7 +34,7 @@ test('a prescription medicine cannot reach payment without a prescription (C-08)
   await signIn(page, 'buyer');
   await emptyCart(page);
   await page.goto(`/shop/${process.env.E2E_RX_PRODUCT_ID}`);
-  await page.getByRole('button', { name: 'Add to cart' }).first().click();
+  await addToCart(page);
   await page.goto('/checkout');
   await page.getByRole('button', { name: /Review order/ }).click();
   await page.getByRole('button', { name: /Place order/ }).click();

@@ -15,3 +15,13 @@ export async function expectNoBrowserStorage(page: Page) {
   const used = await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length }));
   expect(used).toEqual({ local: 0, session: 0 });
 }
+
+// Adds the product on the current page to the server cart and waits for the
+// server to confirm it — navigating on straight after the click can cancel the
+// request on a slow machine and leave the cart empty
+export async function addToCart(page: Page) {
+  await Promise.all([
+    page.waitForResponse((r) => /\/cart\/items\//.test(r.url()) && r.request().method() === 'PUT' && r.ok()),
+    page.getByRole('button', { name: 'Add to cart' }).first().click(),
+  ]);
+}
