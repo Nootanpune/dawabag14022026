@@ -9,6 +9,19 @@ Map<String, dynamic> apiData(Response<dynamic> res) {
   return <String, dynamic>{};
 }
 
+/// The `data` array of a `{ success, data: [...] }` API envelope (list
+/// endpoints such as GET /doctors and GET /consultations/my).
+List<Map<String, dynamic>> apiDataList(Response<dynamic> res) {
+  final body = res.data;
+  if (body is Map && body['data'] is List) {
+    return (body['data'] as List)
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+  return const [];
+}
+
 /// MIME type for an upload, from the file extension (PDF / JPG / PNG).
 String? mimeTypeForFilename(String filename) {
   final dot = filename.lastIndexOf('.');

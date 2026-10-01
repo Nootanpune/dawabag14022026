@@ -157,7 +157,7 @@ class AccountScreen extends ConsumerWidget {
 
           _Section('Consultation', [
             _MenuItem(icon: Icons.video_call_outlined, label: 'Consult a doctor', onTap: () => context.push('/doctors')),
-            _MenuItem(icon: Icons.history, label: 'My consultations', onTap: () {}),
+            _MenuItem(icon: Icons.history, label: 'My consultations', onTap: () => context.push('/consultations')),
           ]),
 
           _Section('Help & privacy', [

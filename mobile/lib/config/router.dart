@@ -27,6 +27,11 @@ import '../screens/account/returns/return_detail_screen.dart';
 import '../screens/account/returns/returns_screen.dart';
 import '../screens/account/side_effects/new_side_effect_screen.dart';
 import '../screens/account/side_effects/side_effect_list_screen.dart';
+import '../screens/consultations/book_consultation_screen.dart';
+import '../screens/consultations/eprescription_screen.dart';
+import '../screens/consultations/join_consultation_screen.dart';
+import '../screens/consultations/my_consultations_screen.dart';
+import '../screens/doctor/doctor_detail_screen.dart';
 import '../screens/doctor/doctor_list_screen.dart';
 import '../screens/doctor/doctor_portal_screen.dart';
 import '../screens/admin/admin_screen.dart';
@@ -51,7 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
 
       // Protected routes
-      final protectedRoutes = ['/checkout', '/orders', '/account', '/doctor/portal', '/admin'];
+      final protectedRoutes = ['/checkout', '/orders', '/account', '/consultations', '/doctor/portal', '/admin'];
       final isProtected = protectedRoutes.any((r) => state.matchedLocation.startsWith(r));
 
       if (!isLoggedIn && isProtected) return '/auth/login?from=${state.matchedLocation}';
@@ -138,7 +143,36 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/policies/:key',
         builder: (c, s) => PolicyScreen(policyKey: s.pathParameters['key']!),
       ),
+      // Teleconsultation (Telemedicine Practice Guidelines 2020; C-22..C-24).
+      // The doctor directory is public; booking and everything under
+      // /consultations needs sign-in. '/book' and '/prescriptions/:id' are
+      // listed before '/:id/join'.
       GoRoute(path: '/doctors', builder: (c, s) => const DoctorListScreen()),
+      GoRoute(
+        path: '/doctors/:id',
+        builder: (c, s) => DoctorDetailScreen(doctorId: s.pathParameters['id']!),
+      ),
+      GoRoute(path: '/consultations', builder: (c, s) => const MyConsultationsScreen()),
+      GoRoute(
+        path: '/consultations/book',
+        builder: (c, s) => BookConsultationScreen(
+          doctorId: s.uri.queryParameters['doctorId'] ?? '',
+          slotId: s.uri.queryParameters['slotId'] ?? '',
+          date: s.uri.queryParameters['date'],
+          start: s.uri.queryParameters['start'],
+        ),
+      ),
+      GoRoute(
+        path: '/consultations/prescriptions/:id',
+        builder: (c, s) => EPrescriptionScreen(
+          prescriptionId: s.pathParameters['id']!,
+          orderId: s.uri.queryParameters['orderId'],
+        ),
+      ),
+      GoRoute(
+        path: '/consultations/:id/join',
+        builder: (c, s) => JoinConsultationScreen(consultationId: s.pathParameters['id']!),
+      ),
       GoRoute(path: '/doctor/portal', builder: (c, s) => const DoctorPortalScreen()),
       GoRoute(path: '/admin', builder: (c, s) => const AdminScreen()),
     ],
