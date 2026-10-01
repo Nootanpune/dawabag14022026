@@ -37,7 +37,7 @@ class MandateCheckout {
       'recurring': start.recurring,
       'name': 'Dawabag',
       'description': 'Automatic payment for refills',
-      'theme': {'color': '#1A8856'},
+      'theme': {'color': '#167A4C'},
     });
     return true;
   }

@@ -32,7 +32,7 @@ class CheckoutRazorpay {
         'description': 'Order $orderNumber',
         'order_id': paymentOrder['razorpay_order_id'],
         'prefill': {'contact': '', 'email': ''},
-        'theme': {'color': '#1A8856'},
+        'theme': {'color': '#167A4C'},
       });
     } catch (e) {
       onError(ApiService.errorMessage(e, fallback: 'Payment error'));

@@ -44,7 +44,7 @@ export async function payConsultation(consultationId: string, description: strin
         }
       },
       modal: { ondismiss: () => resolve(false) },
-      theme: { color: '#1A8856' },
+      theme: { color: '#167A4C' },
     });
     rzp.open();
   });

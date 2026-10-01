@@ -42,7 +42,7 @@ class ConsultPayment {
             : 'Doctor consultation',
         'order_id': order.gatewayOrderId,
         'prefill': {'contact': '', 'email': ''},
-        'theme': {'color': '#1A8856'},
+        'theme': {'color': '#167A4C'},
       });
     } catch (e) {
       onError(consultErrorMessage(e, fallback: 'Payment error'));

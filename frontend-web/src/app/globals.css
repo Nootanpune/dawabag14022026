@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --brand: #1A8856;
+    --brand: #167A4C;
     --brand-light: #EDFAF4;
   }
   * { box-sizing: border-box; }

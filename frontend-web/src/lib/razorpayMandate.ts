@@ -16,7 +16,7 @@ export function openMandateCheckout(c: MandateCheckout, onFinished: () => void):
     description: 'Automatic payment for refills',
     handler: onFinished,
     modal: { ondismiss: onFinished },
-    theme: { color: '#1A8856' },
+    theme: { color: '#167A4C' },
   });
   rzp.open();
   return true;

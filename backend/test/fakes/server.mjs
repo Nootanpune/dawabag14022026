@@ -1,9 +1,10 @@
 // One throwaway HTTP server playing MSG91 (flow API), Google OAuth + FCM HTTP v1,
-// Shiprocket, the GST IRP (irp.mjs) and Razorpay (razorpay.mjs). Every request is recorded in memory.
+// Shiprocket, the GST IRP (irp.mjs), Razorpay (razorpay.mjs) and an S3-style store (s3.mjs). Every request is recorded in memory.
 import crypto from 'crypto';
 import http from 'http';
 import { irpRoute } from './irp.mjs';
 import { razorpayRoute } from './razorpay.mjs';
+import { handleS3, isS3Request } from './s3.mjs';
 
 export const seen = [];
 const ACCESS = 'fake-google-access-token';
@@ -68,6 +69,12 @@ function route(req, body) {
 
 export function startFakes(port = Number(process.env.FAKE_PROVIDERS_PORT || 4890)) {
   const server = http.createServer((req, res) => {
+    if (isS3Request(req)) {   // binary bodies: collected as bytes, not text
+      const parts = [];
+      req.on('data', (d) => parts.push(d));
+      req.on('end', () => handleS3(req, res, Buffer.concat(parts)));
+      return;
+    }
     let body = '';
     req.on('data', (d) => { body += d; });
     req.on('end', () => {

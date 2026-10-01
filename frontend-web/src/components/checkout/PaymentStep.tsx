@@ -52,7 +52,7 @@ export default function PaymentStep({ order, onPaid }: Props) {
             }
           },
           prefill: {},
-          theme: { color: '#1A8856' },
+          theme: { color: '#167A4C' },
         });
         rzp.open();
         setLoading(false);
