@@ -222,7 +222,7 @@ told again until it has succeeded once.
   `FIREBASE_APP_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_PROJECT_ID`, see mobile/README.md);
   without them the app runs with push off. Firebase settings are not secrets but are
   kept with the release configuration, not in the code.
-- Before the Play Store: choose the final application id (now `in.dawabag.dawabag`; it
+- Before the Play Store: choose the final application id (now `com.dawabag.app` — Android forbids `in` as a package segment; it
   cannot change after the first upload), create the upload key (keep it off the
   repository: `android/key.properties` and `*.jks` are ignored), add release signing,
   then build with `flutter build appbundle --release`. iOS needs an Apple developer

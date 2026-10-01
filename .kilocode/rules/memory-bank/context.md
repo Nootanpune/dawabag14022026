@@ -12,7 +12,7 @@ the lawyer/CA sign-off.
 
 ## Done in Sprint 17 (installable mobile app)
 - Flutter 3.47.5 installed locally at /opt/flutter-sdk (not in the repo); android/ and ios/ generated
-  (org in.dawabag, app id in.dawabag.dawabag — owner to confirm before the first store upload).
+  (app id com.dawabag.app — `in.` is a Java keyword so in.dawabag.* is impossible; owner to confirm before the first store upload).
   Permissions: camera, mic, notifications, network; iOS usage texts; allowBackup=false; minSdk 24;
   desugaring for flutter_local_notifications.
 - Firebase optional: options from --dart-define (lib/config/firebase_config.dart); app starts without.

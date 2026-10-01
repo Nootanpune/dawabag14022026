@@ -1,4 +1,4 @@
-package `in`.dawabag.dawabag
+package com.dawabag.app
 
 import io.flutter.embedding.android.FlutterActivity
 
