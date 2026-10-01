@@ -52,7 +52,7 @@ export async function fulfilmentQueue(stage: QueueStage) {
 
 async function lockOwnShipment(client: PoolClient, shipmentId: string) {
   const s = (await client.query(
-    `SELECT s.id, s.status, s.order_id, o.status AS order_status, o.order_number, o.user_id
+    `SELECT s.id, s.status, s.order_id, s.courier_partner, s.awb_number, o.status AS order_status, o.order_number, o.user_id
      FROM order_shipments s JOIN orders o ON o.id = s.order_id
      WHERE s.id = $1 AND s.seller_type = 'dawabag' FOR UPDATE OF s`, [shipmentId])).rows[0];
   if (!s) throw new AppError('Shipment not found', 404);
@@ -74,10 +74,13 @@ export async function packShipment(shipmentId: string, userId: string) {
   });
 }
 
-export async function dispatchOwnShipment(shipmentId: string, courier: string, awb: string, userId: string, dispatch: DispatchRecord) {
+export async function dispatchOwnShipment(shipmentId: string, courierIn: string | undefined, awbIn: string | undefined, userId: string, dispatch: DispatchRecord) {
   return withTransaction(async (client) => {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'packed') throw new AppError('Pack the shipment before dispatch', 409);
+    // A shipment booked with the courier (courier.service) already has both
+    const courier = courierIn ?? s.courier_partner, awb = awbIn ?? s.awb_number;
+    if (!courier || !awb) throw new AppError('Enter the courier and AWB number, or book the courier first', 400);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
     // Reserved → shipped

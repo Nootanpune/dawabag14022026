@@ -1,3 +1,4 @@
+import { postBookCourier } from '../controllers/courier.controller';
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
@@ -16,6 +17,7 @@ router.post('/prescriptions/:id/verify', pharmacist, postVerify);
 router.post('/prescriptions/:id/reject', pharmacist, postReject);
 router.post('/prescriptions/:id/apply', pharmacist, postApply);
 router.post('/shipments/:id/pack', packer, postPack);
+router.post('/shipments/:id/book-courier', packer, postBookCourier);
 router.post('/shipments/:id/dispatch', packer, postDispatch);
 router.post('/shipments/:id/delivered', authorize('delivery', 'admin', 'super_admin'), postDelivered);
 router.get('/h1-register', authorize('pharmacist_rx', 'admin', 'super_admin'), getH1Register);

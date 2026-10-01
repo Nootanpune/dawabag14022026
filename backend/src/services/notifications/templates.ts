@@ -187,6 +187,19 @@ export function buildMessage(payload: NotificationPayload) {
         body: `${payload.expired} expired batch(es) were raised for write-off approval; ${payload.nearExpiry} batch(es) expire within ${payload.days} days. Open Admin → Stock.` },
       push: { title: 'Expiry watch', body: `${payload.expired} expired · ${payload.nearExpiry} near expiry` },
     },
+    // ── Sprint 8: courier tracking ──
+    out_for_delivery: {
+      sms: `Dawabag: Order ${on} is out for delivery today.${payload.codeNeeded ? ' Keep your delivery code ready (see the app).' : ''}`,
+      push: { title: 'Out for delivery', body: payload.codeNeeded ? `Order ${on} arrives today. Keep your delivery code ready.` : `Order ${on} arrives today.` },
+    },
+    courier_rx_delivered: {
+      email: { subject: `Confirm handover: order ${on}`, body: `The courier reports AWB ${payload.awbNumber} (order ${on}) delivered, but this prescription parcel needs the buyer's delivery code. Confirm with the buyer and record the handover in Admin → Deliveries.` },
+      push: { title: 'Confirm prescription handover', body: `Order ${on}: courier says delivered — confirm with the buyer` },
+    },
+    courier_rto: {
+      email: { subject: `Returning to origin: order ${on}`, body: `AWB ${payload.awbNumber} (order ${on}) is returning to us undelivered. Contact the buyer; returned medicines go to the destruction register, never back on sale.` },
+      push: { title: 'Parcel returning (RTO)', body: `Order ${on} — AWB ${payload.awbNumber}` },
+    },
     low_stock_digest: {
       email: {
         subject: `Low stock: ${payload.count} product(s) at or below reorder level`,

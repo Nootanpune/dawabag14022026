@@ -82,7 +82,7 @@ export async function checkHandover(shipmentId: string, input: HandoverInput, ac
   return { override: null };
 }
 
-export async function recordHandover(client: PoolClient, shipmentId: string, input: HandoverInput, override: string | null, userId: string) {
+export async function recordHandover(client: PoolClient, shipmentId: string, input: HandoverInput, override: string | null, userId: string | null) {
   await client.query(
     `UPDATE order_shipments SET received_by_name = $2, received_by_relation = $3, handover_override = $4, delivered_by = $5
      WHERE id = $1`,

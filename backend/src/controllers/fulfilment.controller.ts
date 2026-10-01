@@ -13,8 +13,8 @@ const uuid = z.string().uuid();
 
 // Sealed, tamper-evident pack (C-26)
 export const dispatchSchema = z.object({
-  courier_partner: z.string().trim().min(2).max(50),
-  awb_number: z.string().trim().min(3).max(100),
+  courier_partner: z.string().trim().min(2).max(50).optional(),   // optional when booked through the courier service
+  awb_number: z.string().trim().min(3).max(100).optional(),
   seal_number: z.string().trim().min(3).max(50),
   // Cold-chain shipments only (C-25)
   cold_chain_temp_c: z.number().min(-30).max(40).optional(),

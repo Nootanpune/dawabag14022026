@@ -35,7 +35,8 @@ export async function listPartnerShipments(vendorId: string, status?: string) {
     status ? [vendorId, status] : [vendorId]);
 }
 
-export async function dispatchShipment(vendorId: string, shipmentId: string, courier: string, awb: string, userId: string, dispatch: DispatchRecord) {
+export async function dispatchShipment(vendorId: string, shipmentId: string, courier: string | undefined, awb: string | undefined, userId: string, dispatch: DispatchRecord) {
+  if (!courier || !awb) throw new AppError('Enter the courier and AWB number', 400);
   return withTransaction(async (client) => {
     const s = (await client.query(
       `SELECT s.id, s.status, s.created_at, o.status AS order_status, o.id AS order_id
@@ -79,7 +80,7 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
 // Partner (own shipment) or admin (any) confirms delivery; only delivered
 // lines are settled.
 export async function markShipmentDelivered(
-  shipmentId: string, actor: { id: string; role: string }, vendorId?: string, handover: HandoverInput = {},
+  shipmentId: string, actor: { id: string | null; role: string }, vendorId?: string, handover: HandoverInput = {},
 ) {
   const userId = actor.id;
   // Ownership first: nobody can spend another seller's code attempts

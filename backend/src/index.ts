@@ -45,6 +45,7 @@ import catalogueRoutes from './routes/catalogue.routes';
 import accountsRoutes from './routes/accounts.routes';
 import purchasingRoutes from './routes/purchasing.routes';
 import stockControlRoutes from './routes/stockControl.routes';
+import courierRoutes from './routes/courier.routes';
 import eInvoiceRouter from './controllers/einvoice.controller';
 
 import { errorHandler } from './middleware/errorHandler';
@@ -146,6 +147,7 @@ app.use(`${api}/catalogue`, catalogueRoutes);
 app.use(`${api}/accounts`, accountsRoutes);
 app.use(`${api}/purchasing`, purchasingRoutes);
 app.use(`${api}/stock`, stockControlRoutes);
+app.use(`${api}/courier`, courierRoutes);
 app.use(`${api}/einvoice`, eInvoiceRouter);
 
 // ─── Error Handling ─────────────────────────────────────────────────────────

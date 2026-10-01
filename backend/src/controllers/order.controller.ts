@@ -8,6 +8,7 @@ import { queueNotification } from '../services/notification.service';
 import { logger } from '../config/logger';
 import { cancelOrder } from '../services/cancellation.service';
 import { handoverCode } from '../services/handover.service';
+import { trackingFor } from '../services/courier/courier.service';
 import { effectiveCustomerType, requiresPrescription } from '../utils/customerType';
 
 const CANCELLABLE = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing'];
@@ -91,7 +92,7 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     const shipments = await query<any>(
       `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.invoice_number, s.status,
               s.total_paise, s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at,
-              s.seal_number, s.handover_code_required, s.received_by_name, s.received_by_relation
+              s.seal_number, s.handover_code_required, s.received_by_name, s.received_by_relation, s.tracking_status, s.rto_at
        FROM order_shipments s LEFT JOIN vendors v ON v.id = s.partner_id
        WHERE s.order_id = $1 ORDER BY s.seller_type, v.name`, [id]);
 
@@ -100,6 +101,9 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
       s.handover_code = s.handover_code_required && s.status === 'dispatched' && orderResult.user_id === userId
         ? handoverCode(s.id, s.dispatched_at) : null;
     }
+
+    const tracking = await trackingFor(shipments.map((s: any) => s.id));
+    for (const s of shipments) s.tracking = tracking.filter((t: any) => t.shipment_id === s.id);
 
     const [creditNotes, refunds, returns] = await Promise.all([
       query(`SELECT id, credit_note_number, shipment_id, reason, total_paise, created_at FROM credit_notes WHERE order_id = $1 ORDER BY created_at`, [id]),
