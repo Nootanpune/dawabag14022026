@@ -2,13 +2,20 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–19 are done (Sprint 14 video calls wired on web and mobile) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–20 are done (Sprint 14 video calls wired on web and mobile) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprint 20 (critical journeys in the browser)
+- e2e: checkout to the payment step with C-35 disclosures (seller + licence, country of origin,
+  delivery charge, refund/return policy links); Schedule H order blocked at the prescription step
+  until a prescription is given; footer licence/grievance details; pharmacist lands on the queue.
+  29 browser tests pass locally. CI fixes: website built with NODE_ENV=production in the browser
+  job; file_picker 10 (6.x used the removed Flutter v1 plugin API and broke the APK build).
 
 ## Done in Sprints 18–19 (staging, browser tests, accessibility)
 - deploy/staging: compose stack behind Caddy (auto HTTPS), staging.env git-ignored, check.sh; CI job

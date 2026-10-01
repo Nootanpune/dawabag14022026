@@ -13,3 +13,9 @@ test('a buyer cannot open the admin area', async ({ page }) => {
   await page.goto('/admin');
   await expect(page).not.toHaveURL(/\/admin$/);
 });
+
+test('a pharmacist lands on the fulfilment queue', async ({ page }) => {
+  await signIn(page, 'pharmacist');
+  await expect(page).toHaveURL(/\/staff\//);
+  await expect(page.getByText(/prescription/i).first()).toBeVisible();
+});

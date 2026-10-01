@@ -2,7 +2,9 @@
 
 The Dawabag website in Chromium, desktop and phone sizes, against a running API:
 search, product page declarations (C-17), sign-in with an httpOnly session cookie,
-the server-held cart (seen again from a fresh browser), admin access, nothing kept in
+the server-held cart (seen again from a fresh browser), the checkout disclosures
+before payment (C-35), the prescription gate before payment (C-08), the footer's
+licence and grievance details (C-04, C-36), admin and pharmacist access, nothing kept in
 browser storage (standing rule), and WCAG 2.1 AA accessibility of the public pages
 (axe; serious and critical problems fail).
 

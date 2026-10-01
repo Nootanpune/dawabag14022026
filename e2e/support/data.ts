@@ -10,6 +10,7 @@ const consent = { accept_privacy_notice: true, age_confirmed: true };
 export const people = {
   admin: { customer_type: 'customer', full_name: 'E2E Admin', mobile: '9000001901', password: 'Passw0rd!', ...consent },
   buyer: { customer_type: 'customer', full_name: 'E2E Buyer', mobile: '9000001902', password: 'Passw0rd!', ...consent },
+  pharmacist: { customer_type: 'customer', full_name: 'E2E Pharmacist', mobile: '9000001903', password: 'Passw0rd!', ...consent },
 };
 
 export const db = () => new Client({ connectionString: process.env.DATABASE_URL });
@@ -28,6 +29,8 @@ export async function cleanup(c: Client) {
   const products = (await c.query(`SELECT id FROM products WHERE sku LIKE 'E2E-%'`)).rows.map((r) => r.id);
   const orders = (await c.query('SELECT id FROM orders WHERE user_id = ANY($1)', [ids])).rows.map((r) => r.id);
   await c.query("SET dawabag.maintenance = 'on'");
+  await c.query('DELETE FROM prescriptions WHERE user_id = ANY($1)', [ids]);
+  await c.query('DELETE FROM payments WHERE order_id = ANY($1)', [orders]);
   await c.query('DELETE FROM order_items WHERE order_id = ANY($1)', [orders]);
   await c.query('DELETE FROM order_shipments WHERE order_id = ANY($1)', [orders]);
   await c.query('UPDATE audit_logs SET performed_by = NULL WHERE performed_by = ANY($1)', [ids]);
