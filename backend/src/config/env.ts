@@ -17,8 +17,8 @@ const base = z.object({
   DB_USER: z.string().default('dawabag_user'),
   DB_PASSWORD: z.string().optional(),
   REDIS_URL: z.string().default('redis://localhost:6379'),
-  JWT_ACCESS_SECRET: z.string({ required_error: 'JWT_ACCESS_SECRET is required' }).min(16),
-  JWT_REFRESH_SECRET: z.string({ required_error: 'JWT_REFRESH_SECRET is required' }).min(16),
+  JWT_ACCESS_SECRET: z.string({ required_error: 'JWT_ACCESS_SECRET is required' }).min(16, 'JWT_ACCESS_SECRET must be at least 16 characters'),
+  JWT_REFRESH_SECRET: z.string({ required_error: 'JWT_REFRESH_SECRET is required' }).min(16, 'JWT_REFRESH_SECRET must be at least 16 characters'),
 });
 
 const INTEGRATIONS = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET', 'AWS_S3_BUCKET',
