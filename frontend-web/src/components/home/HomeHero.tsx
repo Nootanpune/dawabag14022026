@@ -1,17 +1,19 @@
 'use client';
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Search, X } from 'lucide-react';
 
 interface Props {
   query: string;
   onQueryChange: (q: string) => void;
   inputRef: RefObject<HTMLInputElement | null>;
+  /** A line under the search box (the free-delivery offer). */
+  note?: ReactNode;
 }
 
 export const HOME_SEARCH_ID = 'home-search';
 
 /** Headline and the main medicine search. */
-export default function HomeHero({ query, onQueryChange, inputRef }: Props) {
+export default function HomeHero({ query, onQueryChange, inputRef, note }: Props) {
   return (
     <section className="rounded-2xl bg-gradient-to-br from-brand-50 to-white border border-brand-100 px-4 py-6 sm:px-8 sm:py-8 mb-5">
       <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">
@@ -47,6 +49,7 @@ export default function HomeHero({ query, onQueryChange, inputRef }: Props) {
           </button>
         )}
       </div>
+      {note}
     </section>
   );
 }

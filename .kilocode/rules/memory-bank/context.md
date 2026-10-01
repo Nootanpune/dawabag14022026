@@ -10,6 +10,34 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 23 — search and free-delivery banner (2026-10-01, uncommitted)
+- Search (GET /products/search, response shape unchanged) forgives typos and finds
+  brands by generic name: `services/search/` — `searchText.ts` (normalise: lower case,
+  punctuation → space, ≤ 6 words; "required" words = ≥ 3 chars with a letter, strengths
+  like "650" only rank), `productSearchSql.ts` (each required word a substring of name or
+  generic, OR the old full-text match; typo pass adds `word <% column`), `productSearch.
+  service.ts` (pass 1 substring/full text; pass 2 trigram only when pass 1 finds nothing;
+  read-only transaction with seqscan/parallel off; ranks: name = / starts with query →
+  sum of per-word fit (substring 1, generic 0.9, else similarity) → in stock → name;
+  stock for matches only, prices/photo for the page only; window count; named statements).
+  C-10 Schedule X/NDPS still excluded. Controller only parses the request.
+- Migration 21: `pg_trgm` (warns instead of failing without permission; API checks
+  `pg_extension` every 5 min and falls back to substring search) + GIN trigram indexes on
+  lower(name), lower(generic_name) with fastupdate = off. Threshold
+  `pg_trgm.word_similarity_threshold = 0.5` set per connection in config/database.ts.
+- Load test (RUNBOOK 7d): equal-work search unchanged or faster; "para" 880 → 703 req/s
+  but now returns 50 results instead of none; category browse 724 → 1,021 req/s.
+- Free delivery: public `GET /api/v1/delivery/offer` → `{ free_delivery_above_paise }`
+  (null = off, Cache-Control no-store; routes/delivery.routes.ts). Web
+  `FreeDeliveryNote` under the home search (lib/shop/deliveryOffer.ts, gcTime 0); mobile
+  `widgets/home/free_delivery_note.dart` + `freeDeliveryAboveProvider` (autoDispose).
+  Shown only when the server returns a number.
+- Tests: `test/sprint23.smoke.mjs` (in `test:smoke`), jest `searchText.test.ts`, Flutter
+  `free_delivery_note_test.dart`, e2e typo search + free-delivery line (39 e2e now).
+- Seen while testing: an unhandled rejection in the notification dispatcher (FK
+  `notification_deliveries_notification_id_fkey` when notifications are deleted under
+  it) crashes the API process — not fixed here.
+
 ## Sprint 24 — trial server (2026-10-01, uncommitted)
 - Owner's live trial on one small server (DigitalOcean BLR1, Ubuntu 24.04, 4 GB), deployed
   by GitHub Actions; owner guide `deploy/trial/TRIAL.md` (7 steps; RUNBOOK 7e).

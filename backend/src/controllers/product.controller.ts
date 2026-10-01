@@ -8,8 +8,8 @@ import { assertBelowShelfMrp } from '../services/shelfMrp';
 import { productDetail } from '../services/productDetail.service';
 import { adminGetProduct, adminListProducts } from '../services/productAdmin.service';
 import { COPY_FIELDS, contentQueue, copyFlags, reviewContent } from '../services/productContent.service';
-import { partnerStockSql } from '../services/stock/partnerStock';
-import { approvedImageKeySql, withImageUrls } from '../services/productImage.service';
+import { withImageUrls } from '../services/productImage.service';
+import { searchCatalogue } from '../services/search/productSearch.service';
 
 // ─── Search Products ─────────────────────────────────────────────────────────
 export async function searchProducts(req: Request, res: Response, next: NextFunction) {
@@ -31,82 +31,10 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
       );
     }
 
-    // Schedule X and NDPS can never be sold online, so they are not listed (Rulebook C-10)
-    const conditions: string[] = [
-      'p.is_active = TRUE', 'p.deleted_at IS NULL',
-      "COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')",
-    ];
-    const params: any[] = [];
-    let paramIdx = 1;
-
-    if (q) {
-      conditions.push(`p.search_vector @@ plainto_tsquery('english', $${paramIdx})`);
-      params.push(q);
-      paramIdx++;
-    }
-
-    if (category) {
-      conditions.push(`p.category = $${paramIdx}`);
-      params.push(category);
-      paramIdx++;
-    }
-
-    if (schedule) {
-      conditions.push(`p.drug_schedule = $${paramIdx}`);
-      params.push(schedule);
-      paramIdx++;
-    }
-
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const orderClause = q
-      ? `ORDER BY ts_rank(p.search_vector, plainto_tsquery('english', $1)) DESC`
-      : 'ORDER BY p.name ASC';
-
-    // GAP-01 fix: return correct price + qty based on customer type
-    const customerType = req.user?.pricing_type ?? 'customer';
-    const displayPrice = customerType === 'b2b_retailer'
-      ? 'COALESCE(p.ptr_price_paise, p.offer_price_paise)'
-      : customerType === 'b2b_wholesaler'
-      ? 'COALESCE(p.pts_price_paise, p.offer_price_paise)'
-      : customerType === 'doc_hospital'
-      ? 'COALESCE(p.institutional_price_paise, p.offer_price_paise)'
-      : 'p.offer_price_paise';
-    const minQtyExpr = customerType === 'b2b_retailer'
-      ? 'COALESCE(p.min_order_qty_retailer, 1)'
-      : customerType === 'b2b_wholesaler'
-      ? 'COALESCE(p.min_order_qty_wholesaler, 10)'
-      : '1';
-    const maxQtyExpr = customerType === 'b2b_retailer'
-      ? 'COALESCE(p.max_qty_per_order_retailer, p.max_qty_per_order)'
-      : customerType === 'b2b_wholesaler'
-      ? 'COALESCE(p.max_qty_per_order_wholesaler, 9999)'
-      : 'p.max_qty_per_order';
-
-    const products = await query(
-      `SELECT p.id, p.name, p.generic_name, p.sku, p.category,
-              p.drug_schedule, p.telemedicine_list, p.marketed_by, p.mrp_paise,
-              p.offer_price_paise, p.cold_chain, p.s3_image_key, p.gst_rate,
-              ${approvedImageKeySql()} AS approved_image_key,
-              (${displayPrice}) AS display_price_paise,
-              (${minQtyExpr}) AS min_order_qty,
-              (${maxQtyExpr}) AS max_order_qty,
-              COALESCE(p.reorder_level_qty, 0) AS reorder_level_qty,
-              -- the most one seller can supply: Dawabag's batches or one partner's own ledger
-              GREATEST(COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0), ${partnerStockSql('p.id')}) AS stock_qty
-       FROM products p
-       LEFT JOIN inventory_batches b ON b.product_id = p.id
-         AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE
-       ${whereClause}
-       GROUP BY p.id
-       ${orderClause}
-       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
-      [...params, limit, offset]
-    );
-
-    const totalResult = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) FROM products p ${whereClause}`,
-      params
-    );
+    // Matching, ranking and the listing rules (C-10) live in services/search
+    const { products, total } = await searchCatalogue({
+      q, category, schedule, pricingType: req.user?.pricing_type ?? 'customer', limit, offset,
+    });
 
     res.json({
       success: true,
@@ -123,8 +51,8 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
         pagination: {
           page,
           limit,
-          total: parseInt(totalResult?.count || '0'),
-          pages: Math.ceil(parseInt(totalResult?.count || '0') / limit),
+          total,
+          pages: Math.ceil(total / limit),
         },
       },
     });

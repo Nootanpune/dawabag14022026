@@ -1,6 +1,9 @@
 import { Pool, PoolClient } from 'pg';
 import { logger } from './logger';
 
+/** Trigram word-similarity threshold for product search (Sprint 23). */
+export const SEARCH_WORD_SIMILARITY = 0.5;
+
 // Exported as a live binding: modules that import { pool } see it once connectDB() has run.
 export let pool: Pool;
 
@@ -16,8 +19,11 @@ export function connectDB(): Promise<void> {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
       ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-      // Business days are Indian days: CURRENT_DATE, ::date and date_trunc in IST
-      options: '-c timezone=Asia/Kolkata',
+      // Business days are Indian days: CURRENT_DATE, ::date and date_trunc in IST.
+      // Product search: how close a typed word must be to a catalogue word for the
+      // pg_trgm `<%` match (default 0.6 misses "amoxycillin" → Amoxicillin). Harmless
+      // when the extension is not installed (services/search/trigramSupport.ts).
+      options: `-c timezone=Asia/Kolkata -c pg_trgm.word_similarity_threshold=${SEARCH_WORD_SIMILARITY}`,
     });
 
     pool.connect((err, client, done) => {

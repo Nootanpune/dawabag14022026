@@ -395,6 +395,32 @@ simultaneous checkouts of one medicine failed with "Insufficient stock" (they sk
 the locked batch); allocation now waits for the lock (5 s limit, then "please try
 again") and takes locks in product order. Regression check: Sprint 5 smoke.
 
+**Sprint 23 (forgiving search), same machine and method, old and new builds run
+back to back against one otherwise idle database:**
+
+| Path | 10 users: before → after | 50 users: before → after |
+| --- | --- | --- |
+| Search "para" | 880 → 703 req/s, p50 10 → 13 ms | 910 → 784 req/s, p50 53 → 61 ms |
+| Category browse | 724 → 1,021 req/s | 742 → 866 req/s |
+| Product page, cart, checkout preview | unchanged (within ±10 %) | unchanged |
+
+The old search found **nothing** for "para" (full-text matching has no prefixes), so
+it was cheap; the new one returns the 50 Paracetamol products. Compared on equal
+work (search for "paracetamol", same 50 results, 10 users): 742 → 781 req/s. With a
+15,000-product catalogue where one word matches 1,250 products: "paracetamol" 321 →
+318 req/s (p50 30 ms); a misspelling that needs the typo pass ("paracetmol", 1,250
+results) 110 req/s, p50 87 ms; a word that matches nothing ~900 req/s either way.
+
+How search stays fast (services/search/): substring and full-text pass first, typo
+(trigram) pass only when that finds nothing; ranking and stock only for matches, prices
+and photos only for the page shown; named statements so Postgres plans each query shape
+once per connection (planning was half the time). After a large catalogue import run
+`VACUUM ANALYZE products` (autovacuum does it too, within minutes) so the trigram
+indexes' statistics are current. If pg_trgm could not be installed (migration 21 warns),
+search works without typo matching; to add it later, as a superuser:
+`CREATE EXTENSION pg_trgm;` then the two `CREATE INDEX` statements in
+`database/21_sprint23_search_trigram.sql` (the API notices within 5 minutes).
+
 ## 8. Before the first real customer
 
 0. `APP_ENV=production` on the production API (section 2); no trial or demo setting

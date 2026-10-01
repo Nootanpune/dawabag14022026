@@ -9,6 +9,7 @@ import Header from '@/components/layout/Header';
 import PinCodeBanner from '@/components/shop/PinCodeBanner';
 import TrustStrip from '@/components/home/TrustStrip';
 import HomeHero from '@/components/home/HomeHero';
+import FreeDeliveryNote from '@/components/home/FreeDeliveryNote';
 import PrescriptionCta from '@/components/home/PrescriptionCta';
 import CategoryTiles, { type Category } from '@/components/home/CategoryTiles';
 import ProductResults from '@/components/home/ProductResults';
@@ -79,7 +80,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-6xl mx-auto px-4 py-5 sm:py-6">
-        <HomeHero query={searchQuery} onQueryChange={setSearchQuery} inputRef={searchRef} />
+        <HomeHero query={searchQuery} onQueryChange={setSearchQuery} inputRef={searchRef} note={<FreeDeliveryNote />} />
         <TrustStrip />
         <PinCodeBanner pincode={pincode} onPincodeChange={setPincode} pincodeInfo={data?.pincode_info} />
         <PrescriptionCta />

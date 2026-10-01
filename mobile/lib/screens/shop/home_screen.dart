@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/catalog_provider.dart';
+import '../../providers/delivery_offer_provider.dart';
 import '../../widgets/cart_action_button.dart';
 import '../../widgets/home/category_tiles.dart';
 import '../../widgets/home/consult_doctor_tile.dart';
+import '../../widgets/home/free_delivery_note.dart';
 import '../../widgets/home/prescription_cta.dart';
 import '../../widgets/home/prescription_steps_sheet.dart';
 import '../../widgets/home/search_entry.dart';
@@ -57,6 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         color: AppTheme.brandGreen,
         onRefresh: () async {
           ref.invalidate(categoriesProvider);
+          ref.invalidate(freeDeliveryAboveProvider);
           return ref.refresh(productsProvider(queryKey).future);
         },
         child: CustomScrollView(
@@ -71,6 +74,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 SearchEntry(onTap: () => context.go('/search')),
+                const FreeDeliveryNote(),
                 const SizedBox(height: 10),
                 const TrustStrip(),
                 const SizedBox(height: 16),
