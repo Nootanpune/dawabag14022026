@@ -1,3 +1,4 @@
+import { getDeliveries } from '../controllers/device.controller';
 import { setPharmacistRegistration } from '../controllers/fulfilment.controller';
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -87,6 +88,7 @@ router.patch('/users/:userId/status', authenticate, authorize('super_admin'), as
 router.patch('/users/:userId/credit', authenticate, authorize('admin', 'super_admin'), setCreditLimit);
 router.get('/credit/open', authenticate, authorize('admin', 'super_admin'), listOpenCredit);
 router.get('/jobs', authenticate, authorize('admin', 'super_admin'), listJobs);
+router.get('/notification-deliveries', authenticate, authorize('admin', 'super_admin'), getDeliveries);
 router.post('/jobs/:name/run', authenticate, authorize('super_admin'), runJobNow);
 
 // ─── Sprint 3: marketplace, settlements, settings ───────────────────────────

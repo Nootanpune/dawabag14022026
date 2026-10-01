@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { deleteDevice, postDevice } from '../controllers/device.controller';
 import { getAddresses, postAddress, postDefaultAddress, putAddress, removeAddress } from '../controllers/address.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { query, queryOne } from '../config/database';
@@ -56,15 +57,10 @@ router.patch('/me', authenticate, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// PATCH /api/v1/users/me/fcm-token
-router.patch('/me/fcm-token', authenticate, async (req, res, next) => {
-  try {
-    const { fcm_token } = req.body;
-    if (!fcm_token) throw new AppError('FCM token required', 400);
-    await query('UPDATE users SET fcm_token = $1 WHERE id = $2', [fcm_token, req.user!.id]);
-    res.json({ success: true });
-  } catch (e) { next(e); }
-});
+// Push devices — controllers/device.controller.ts (PATCH fcm-token kept for older apps)
+router.patch('/me/fcm-token', authenticate, postDevice);
+router.post('/me/devices', authenticate, postDevice);
+router.delete('/me/devices', authenticate, deleteDevice);
 
 // GET /api/v1/users/me/patients
 router.get('/me/patients', authenticate, async (req, res, next) => {

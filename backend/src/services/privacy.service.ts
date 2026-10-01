@@ -128,6 +128,7 @@ async function anonymiseUser(client: PoolClient, userId: string) {
   await client.query(`UPDATE patients SET deleted_at = COALESCE(deleted_at, NOW()) WHERE owner_user_id = $1`, [userId]);
   await client.query(`UPDATE refill_subscriptions SET is_active = FALSE WHERE user_id = $1`, [userId]);
   await client.query(`DELETE FROM cart_items WHERE user_id = $1`, [userId]);
+  await client.query(`DELETE FROM user_devices WHERE user_id = $1`, [userId]);
   await client.query(`DELETE FROM carts WHERE user_id = $1`, [userId]);
   await client.query(
     `INSERT INTO consent_records (user_id, purpose, granted, policy_version) VALUES ($1, 'marketing', FALSE, $2)`,

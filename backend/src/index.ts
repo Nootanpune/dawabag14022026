@@ -12,6 +12,7 @@ import { connectDB, getDB } from './config/database';
 import { checkEnv } from './config/env';
 import { connectRedis, getRedis } from './config/redis';
 import { startScheduler, stopScheduler } from './jobs/scheduler';
+import { stopNotificationQueue } from './services/notification.service';
 
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -177,6 +178,7 @@ async function bootstrap() {
     const shutdown = (signal: string) => {
       logger.info(`${signal} received: shutting down`);
       stopScheduler();
+      void stopNotificationQueue();
       server.close(async () => {
         await getDB().end().catch(() => undefined);
         await getRedis().quit().catch(() => undefined);

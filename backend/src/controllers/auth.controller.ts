@@ -454,6 +454,10 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
       const decoded = await verifyAccessToken(access).catch(() => null);
       if (decoded) await blacklistToken(decoded.jti, 15 * 60);
     }
+    // This device stops receiving pushes for the account
+    if (typeof req.body?.fcm_token === 'string' && req.body.fcm_token) {
+      await query('DELETE FROM user_devices WHERE fcm_token = $1', [req.body.fcm_token]);
+    }
     clearSession(res);
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {

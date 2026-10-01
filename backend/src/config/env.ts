@@ -45,6 +45,7 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
     if (env.DISABLE_SCHEDULER === 'true') warnings.push('Scheduler disabled: licence, refill, settlement and reminder jobs will not run');
     if (env.AWS_REGION && env.AWS_REGION !== 'ap-south-1') errors.push('AWS_REGION must be ap-south-1 (data stays in India, C-44)');
   }
+  if (!env.FCM_SERVICE_ACCOUNT_JSON) warnings.push('Push notifications off: FCM_SERVICE_ACCOUNT_JSON not set');
   const missing = INTEGRATIONS.filter((k) => !env[k] || PLACEHOLDER.test(String(env[k])));
   if (missing.length) {
     const msg = `Not configured: ${missing.join(', ')}`;
