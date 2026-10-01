@@ -53,6 +53,10 @@ export function errorHandler(
   }
 
   // PostgreSQL errors
+  // Lock wait timed out (e.g. many checkouts of one medicine at once): ask to retry
+  if ((err as any).code === '55P03') {
+    return fail(503, 'We are busy right now. Please try again in a moment.');
+  }
   if ((err as any).code === '23505') {
     return fail(409, 'Duplicate entry. This record already exists.');
   }

@@ -54,8 +54,17 @@ export async function allocateAndReserve(
     maxDeliveryHours: Number(await getSetting('allocation.own_first_max_delivery_hours', 24, client)),
   });
 
-  const allocations: Allocation[] = [];
-  for (const line of params.lines) {
+  // Concurrent checkouts of the same medicine wait their turn for its batch row
+  // instead of skipping it (SKIP LOCKED made them fail with "Insufficient stock"
+  // while stock was plenty). Lines are locked in product order so two orders
+  // can never wait on each other; a bounded wait turns congestion into a clear
+  // retry message rather than a hung request.
+  await client.query("SET LOCAL lock_timeout = '5s'");
+  const order = params.lines.map((_, i) => i)
+    .sort((a, b) => params.lines[a].product_id.localeCompare(params.lines[b].product_id));
+  const allocations: Allocation[] = new Array(params.lines.length);
+  for (const i of order) {
+    const line = params.lines[i];
     const candidates = [
       ...(await ownCandidate(client, line, dawabagAt, buyerAt, !!pin?.cold_chain_available)),
       ...(await partnerCandidates(client, line, buyerAt)),
@@ -75,7 +84,7 @@ export async function allocateAndReserve(
       );
     }
 
-    allocations.push({
+    allocations[i] = {
       product_id: line.product_id,
       seller_type: chosen.sellerType,
       partner_id: chosen.partnerId,
@@ -83,7 +92,7 @@ export async function allocateAndReserve(
       partner_inventory_id: chosen.partnerInventoryId,
       partner_product_id: chosen.partnerProductId,
       note: describe(chosen, ownFirst),
-    });
+    };
   }
   return allocations;
 }
@@ -98,7 +107,7 @@ async function ownCandidate(
      WHERE product_id = $1 AND is_recalled = FALSE
        AND quantity_available - quantity_reserved >= $2
        AND expiry_date > CURRENT_DATE + ${MIN_SHELF_DAYS}
-     ORDER BY expiry_date ASC LIMIT 1 FOR UPDATE SKIP LOCKED`,
+     ORDER BY expiry_date ASC LIMIT 1 FOR UPDATE`,
     [line.product_id, line.quantity])).rows[0];
   if (!batch) return [];
   return [{
@@ -132,9 +141,9 @@ async function partnerCandidates(client: PoolClient, line: AllocationLine, buyer
 
   const candidates: Candidate[] = [];
   for (const r of rows) {
-    // Lock the chosen batch row; skip it if another order holds it right now
+    // Lock the batch row (waiting for any order holding it) and re-check the quantity
     const locked = (await client.query(
-      `SELECT id FROM partner_inventory WHERE id = $1 AND qty_available - qty_reserved >= $2 FOR UPDATE SKIP LOCKED`,
+      `SELECT id FROM partner_inventory WHERE id = $1 AND qty_available - qty_reserved >= $2 FOR UPDATE`,
       [r.inventory_id, line.quantity])).rows[0];
     if (!locked) continue;
     candidates.push({

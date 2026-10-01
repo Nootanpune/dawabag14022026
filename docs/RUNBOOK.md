@@ -332,6 +332,29 @@ ops log): `deploy/staging/restore.sh latest`, and once a year the oldest monthly
 as well; the counts must be plausible and the last migration must match the live one
 (or be the one deployed at that backup's date). A failed restore test is an incident.
 
+## 7d. Capacity (load test)
+
+`scripts/load-test.sh` (with `. scripts/dev-env.sh` and a running API) seeds 500
+throwaway products and measures the busiest customer paths with autocannon. Run it
+before and after changes that touch search, product pages, cart or checkout.
+
+Baseline, 1 Oct 2026, one 4-core machine, API compiled to JS, Postgres and Redis on
+the same machine, 15 s per run (requests/second, median and 99th-percentile latency):
+
+| Path | 10 users at once | 50 users at once |
+| --- | --- | --- |
+| Search | 824 req/s, 11 ms / 27 ms | 821 req/s, 59 ms / 85 ms |
+| Category browse | 734 req/s, 13 ms / 23 ms | 696 req/s, 70 ms / 105 ms |
+| Product page | 2,409 req/s, 3 ms / 9 ms | 2,705 req/s, 17 ms / 35 ms |
+| Cart | 892 req/s, 10 ms / 18 ms | 934 req/s, 51 ms / 74 ms |
+| Checkout preview, all buying the SAME batch | 98 req/s, 99 ms / 158 ms | 96 req/s, 512 ms / 611 ms |
+
+Checkout of one batch is serialised on purpose (each order must reserve its own
+units); different medicines check out in parallel. The first run found that
+simultaneous checkouts of one medicine failed with "Insufficient stock" (they skipped
+the locked batch); allocation now waits for the lock (5 s limit, then "please try
+again") and takes locks in product order. Regression check: Sprint 5 smoke.
+
 ## 8. Before the first real customer
 
 1. Legal settings (Admin → Settings): entity, drug licences, pharmacist-in-charge,

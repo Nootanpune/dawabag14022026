@@ -39,7 +39,7 @@ export async function seed() {
     const ids = (await c.query(
       `INSERT INTO products (name, generic_name, sku, category, drug_schedule, gst_rate, hsn_code, mrp_paise, offer_price_paise, max_qty_per_order,
                              net_quantity, manufacturer_name, manufacturer_address, country_of_origin, is_active)
-       SELECT $1::text[] [1 + (g % 10)] || ' ' || (100 + g) || ' mg', $1::text[] [1 + (g % 10)], 'LOAD-' || g, 'Load test', 'OTC', 12, '30049099',
+       SELECT ($1::text[])[1 + (g % 10)] || ' ' || (100 + g) || ' mg', ($1::text[])[1 + (g % 10)], 'LOAD-' || g, 'Load test', 'OTC', 12, '30049099',
               5000 + g * 10, 4500 + g * 10, 10, '10 tablets', 'Load Pharma Ltd', 'Nashik', 'India', TRUE
        FROM generate_series(1, 500) g RETURNING id`, [NAMES])).rows.map((x) => x.id);
     await c.query(`INSERT INTO inventory_batches (product_id, batch_number, quantity_available, purchase_price_paise, expiry_date)
