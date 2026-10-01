@@ -43,3 +43,11 @@ export function rupeesToPaise(rupees: string): number | null {
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.round(n * 100);
 }
+
+/** ₹ text for a *_paise value; accepts the string form Postgres uses for bigint sums. */
+export function formatPaise(paise: number | string | null | undefined): string {
+  if (paise == null || paise === '') return '—';
+  const n = Number(paise);
+  if (!Number.isFinite(n)) return '—';
+  return `₹${(n / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}

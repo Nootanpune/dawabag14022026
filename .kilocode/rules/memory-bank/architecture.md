@@ -95,3 +95,13 @@
   exceljs from memory. **Accounts:** `services/gstReports.service.ts` (`/accounts/reports/:name`),
   CSV via `utils/csv.ts` (formula-safe). **Incidents:** `services/incident.service.ts`
   (`/compliance/incidents`). Saved Rx reuse: `services/rxReuse.service.ts`.
+- **Purchasing (Sprint 7):** `services/purchasing/` — `supplierCheck` (approved, active, unexpired
+  drug licence), `purchaseOrder.service` (PO series, draft → sent → partially_received → received /
+  closed / cancelled), `goodsReceipt.service` (GRN series; the only way stock enters after go-live;
+  refuses short shelf life, printed MRP below any selling price, over-receipt, recalled batches;
+  repeat deliveries of a batch average its cost). Routes `/purchasing/*`. Receipts are final records.
+- **Stock control:** `services/stock/` — `adjustment.service` (approver ≠ requester, never below
+  reserved; expired/damaged/recalled write-offs form the destruction register), `stockCount.service`
+  (snapshot → count → second-person approval → count_variance adjustments), `batches.service`;
+  job `expiry_watch`. Routes `/stock/*`. Reports `purchase-register`, `stock-valuation`.
+- **Storage/email:** AWS SDK v3 (`@aws-sdk/client-s3`, presigner, `client-ses` via nodemailer).

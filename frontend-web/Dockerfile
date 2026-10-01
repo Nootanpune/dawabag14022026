@@ -1,5 +1,8 @@
 # Dawabag website — docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.in -t dawabag-web frontend-web
-FROM node:20-alpine AS build
+# Base image; on AWS use the same official image from ECR Public to avoid Docker Hub limits:
+#   --build-arg NODE_IMAGE=public.ecr.aws/docker/library/node:20-alpine
+ARG NODE_IMAGE=node:20-alpine
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL NEXT_TELEMETRY_DISABLED=1
@@ -10,7 +13,7 @@ RUN --mount=type=secret,id=ca,required=false \
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine
+FROM ${NODE_IMAGE}
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build /app/.next/standalone ./

@@ -1,7 +1,10 @@
 # Dawabag API — build from the repository root so the migrations are included:
 #   docker build -f backend/Dockerfile -t dawabag-api .
 # Behind a corporate proxy with its own CA, add: --secret id=ca,src=/path/ca.crt
-FROM node:20-alpine AS build
+# Base image; on AWS use the same official image from ECR Public to avoid Docker Hub limits:
+#   --build-arg NODE_IMAGE=public.ecr.aws/docker/library/node:20-alpine
+ARG NODE_IMAGE=node:20-alpine
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json ./
 RUN --mount=type=secret,id=ca,required=false \
@@ -11,7 +14,7 @@ COPY backend/tsconfig.json ./
 COPY backend/src ./src
 RUN npm run build
 
-FROM node:20-alpine
+FROM ${NODE_IMAGE}
 ENV NODE_ENV=production
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json ./
