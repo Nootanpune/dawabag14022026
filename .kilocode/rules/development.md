@@ -1,38 +1,17 @@
 # Development Rules
 
-## Critical Rules
-
-- **Package manager**: Use `bun` (not npm/yarn)
-- **Never run** `next dev` or `bun dev` - the sandbox handles this automatically
-- **Always commit and push** after completing changes:
-  ```bash
-  bun typecheck && bun lint && git add -A && git commit -m "descriptive message" && git push
-  ```
-
-## Commands
-
-| Command | Purpose |
-|---------|---------|
-| `bun install` | Install dependencies |
-| `bun build` | Build production app |
-| `bun lint` | Check code quality |
-| `bun typecheck` | Type checking |
-
-## Best Practices
-
-### React/Next.js
-- Use Server Components by default; add `"use client"` only when needed
-- Use `next/image` for optimized images
-- Use `next/link` for client-side navigation
-- Use `error.tsx` for error boundaries
-- Use `not-found.tsx` for 404 pages
-
-### API Routes
-- Return `NextResponse.json({ error: "..." }, { status: 500 })` on failure
-- Always include appropriate status codes
-- Handle errors gracefully
-
-### Code Quality
-- Run `bun typecheck` before committing
-- Run `bun lint` before committing
-- Write descriptive commit messages
+- **Server is the single source of truth (owner's standing rule).** Never add
+  localStorage/sessionStorage, zustand `persist`, IndexedDB, Hive,
+  shared_preferences, SQLite, or writes to local disk in any app or service.
+  Session credential only: web httpOnly cookie, mobile refresh token in the
+  keychain. Test/dev databases are servers the app talks to, not app storage.
+- **Modular code (owner's standing rule).** No monolithic single-file HTML apps
+  and no dumping new features into one large file; give each feature its own
+  route/controller/service or component/lib module.
+- Read `docs/DECISIONS.md` and the Compliance Rulebook before changing pricing,
+  prescriptions, KYC, invoices, marketplace or personal-data handling.
+- New schema changes go in a new numbered file in `database/` (05_..., 06_...);
+  keep migrations re-runnable (`IF NOT EXISTS`).
+- Before committing backend changes: `npx tsc --noEmit` and `npm test` in
+  `backend/`; for web changes `npx tsc --noEmit` in `frontend-web/`.
+- Never commit `.env` files or real credentials.

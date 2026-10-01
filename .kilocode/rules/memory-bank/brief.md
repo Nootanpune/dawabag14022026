@@ -1,48 +1,15 @@
-# Project Brief: Next.js Starter Template
+# Project Brief: Dawabag Online Pharmacy
 
-## Purpose
+Dawabag is an online pharmacy based in Nashik, Maharashtra, selling to four buyer
+types: B2C patients, B2B retailers (incl. hospital pharmacies), B2B wholesalers,
+and NMC-registered doctors, plus a marketplace of licensed partner pharmacies.
 
-This is a minimal Next.js starter template designed for AI-assisted development. It provides a clean foundation that can be extended to build any type of web application through interaction with an AI assistant.
+Source documents (in `docs/`): URS v3.1 FINAL, Customer Segmentation v2.2,
+Beta Deployment Guide, Project Resume Guide v2 (sprint plan). Owner decisions
+that override the URS are in `docs/DECISIONS.md`.
 
-## Target Users
-
-- Developers wanting a clean Next.js starting point
-- Users building applications through AI-assisted coding
-- Teams needing a standardized, modern Next.js setup
-
-## Core Use Case
-
-Users describe what they want to build to an AI assistant, which then expands this template by:
-
-1. Adding components and pages as needed
-2. Installing additional dependencies
-3. Setting up databases, authentication, etc. using recipes
-4. Customizing styling and branding
-
-## Key Requirements
-
-### Must Have
-
-- Modern Next.js 16 setup with App Router
-- TypeScript for type safety
-- Tailwind CSS 4 for styling
-- ESLint for code quality
-- Clean, minimal starting structure
-- Bun as package manager
-
-### Nice to Have
-
-- Recipe system for common additions (database, auth)
-- Memory bank for AI context persistence
-- Clear development guidelines
-
-## Success Metrics
-
-- Clean, zero-error TypeScript setup
-- Passing lint and type checks
-
-## Constraints
-
-- Minimal dependencies by default
-- Framework: Next.js 16 + React 19 + Tailwind CSS 4
-- Package manager: Bun
+Hard constraints:
+- Indian drug law (Drugs and Cosmetics Act/Rules, Pharmacy Act, NDPS), GST,
+  consumer e-commerce rules and the DPDP Act. The Dawabag Regulatory Compliance
+  Rulebook (rules C-01..C-46) must be followed; cite rule numbers in code comments.
+- Data stays in India (AWS ap-south-1).

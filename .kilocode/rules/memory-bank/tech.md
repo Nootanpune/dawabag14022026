@@ -1,143 +1,49 @@
-# Technical Context: Next.js Starter Template
+# Technical Context
 
-## Technology Stack
+| Part | Stack | Folder |
+| --- | --- | --- |
+| API | Node.js + TypeScript, Express, PostgreSQL (`pg`), Redis (ioredis, Bull), zod | `backend/` |
+| Web | Next.js 14 (App Router), Tailwind, zustand, axios | `frontend-web/` |
+| Mobile | Flutter (flutter_riverpod, dio, go_router, file_picker, flutter_secure_storage for the refresh token only) | `mobile/` |
+| DB schema | Plain SQL migrations, run in order | `database/01..06_*.sql` |
+| Jobs | node-cron (IST) + Redis lock, runs recorded in `job_runs` | `backend/src/jobs/` |
+| Integrations | Razorpay, MSG91, AWS S3/SES, FCM, IRIS IRP (e-invoice), Masters India GSTN, Surepass PAN | |
 
-| Technology   | Version | Purpose                         |
-| ------------ | ------- | ------------------------------- |
-| Next.js      | 16.x    | React framework with App Router |
-| React        | 19.x    | UI library                      |
-| TypeScript   | 5.9.x   | Type-safe JavaScript            |
-| Tailwind CSS | 4.x     | Utility-first CSS               |
-| Bun          | Latest  | Package manager & runtime       |
+Package manager: npm (backend and web each have their own package-lock.json).
 
-## Development Environment
-
-### Prerequisites
-
-- Bun installed (`curl -fsSL https://bun.sh/install | bash`)
-- Node.js 20+ (for compatibility)
-
-### Commands
-
+## Commands
 ```bash
-bun install        # Install dependencies
-bun dev            # Start dev server (http://localhost:3000)
-bun build          # Production build
-bun start          # Start production server
-bun lint           # Run ESLint
-bun typecheck      # Run TypeScript type checking
+# backend
+cd backend && npm install
+npx tsc --noEmit            # typecheck
+npm test                    # jest unit tests (src/**/*.test.ts)
+npm run dev                 # API on :4000 (needs Postgres + Redis + .env)
+npm run test:smoke          # Sprint 1–10 end-to-end checks against a running API (DISABLE_SCHEDULER=true).
+                            # Sprints 3, 5, 8–10 need fake providers: eval "$(node test/fakes/fake-env.mjs)" in the shell
+                            # that starts the API and runs the tests (MSG91, Google OAuth/FCM, Shiprocket, IRP, Razorpay fakes)
+                            # (API_URL, DATABASE_URL, REDIS_URL). Uploads need S3;
+                            # without it the tests expect 503 and seed document rows.
+# database
+for f in database/0*.sql; do psql -U dawabag_user -d dawabag -f "$f"; done
+# web
+cd frontend-web && npm install && npx tsc --noEmit
+NEXT_PUBLIC_API_URL=http://localhost:4000 npx next build
 ```
+Flutter is not installed in the cloud dev environment; mobile code cannot be compiled there.
 
-## Project Configuration
+## Environment
+See `backend/.env.example`. Documents go only to S3 (`AWS_S3_BUCKET`, optional
+`S3_ENDPOINT`); there is no local storage option. `DISABLE_SCHEDULER=true` turns
+off the cron jobs on an instance. Test databases/caches are throwaway servers.
+No MSG91 key → SMS is skipped with a warning (OTP is in Redis at `otp:<mobile>`).
 
-### Next.js Config (`next.config.ts`)
-
-- App Router enabled
-- Default settings for flexibility
-
-### TypeScript Config (`tsconfig.json`)
-
-- Strict mode enabled
-- Path alias: `@/*` → `src/*`
-- Target: ESNext
-
-### Tailwind CSS 4 (`postcss.config.mjs`)
-
-- Uses `@tailwindcss/postcss` plugin
-- CSS-first configuration (v4 style)
-
-### ESLint (`eslint.config.mjs`)
-
-- Uses `eslint-config-next`
-- Flat config format
-
-## Key Dependencies
-
-### Production Dependencies
-
-```json
-{
-  "next": "^16.1.3", // Framework
-  "react": "^19.2.3", // UI library
-  "react-dom": "^19.2.3" // React DOM
-}
-```
-
-### Dev Dependencies
-
-```json
-{
-  "typescript": "^5.9.3",
-  "@types/node": "^24.10.2",
-  "@types/react": "^19.2.7",
-  "@types/react-dom": "^19.2.3",
-  "@tailwindcss/postcss": "^4.1.17",
-  "tailwindcss": "^4.1.17",
-  "eslint": "^9.39.1",
-  "eslint-config-next": "^16.0.0"
-}
-```
-
-## File Structure
-
-```
-/
-├── .gitignore              # Git ignore rules
-├── package.json            # Dependencies and scripts
-├── bun.lock                # Bun lockfile
-├── next.config.ts          # Next.js configuration
-├── tsconfig.json           # TypeScript configuration
-├── postcss.config.mjs      # PostCSS (Tailwind) config
-├── eslint.config.mjs       # ESLint configuration
-├── public/                 # Static assets
-│   └── .gitkeep
-└── src/                    # Source code
-    └── app/                # Next.js App Router
-        ├── layout.tsx      # Root layout
-        ├── page.tsx        # Home page
-        ├── globals.css     # Global styles
-        └── favicon.ico     # Site icon
-```
-
-## Technical Constraints
-
-### Starting Point
-
-- Minimal structure - expand as needed
-- No database by default (use recipe to add)
-- No authentication by default (add when needed)
-
-### Browser Support
-
-- Modern browsers (ES2020+)
-- No IE11 support
-
-## Performance Considerations
-
-### Image Optimization
-
-- Use Next.js `Image` component for optimization
-- Place images in `public/` directory
-
-### Bundle Size
-
-- Tree-shaking enabled by default
-- Tailwind CSS purges unused styles
-
-### Core Web Vitals
-
-- Server Components reduce client JavaScript
-- Streaming and Suspense for better UX
-
-## Deployment
-
-### Build Output
-
-- Server-rendered pages by default
-- Can be configured for static export
-
-### Environment Variables
-
-- None required for base template
-- Add as needed for features
-- Use `.env.local` for local development
+- Sprint 13: `agora-token` (RTC tokens). Env `MSG91_WHATSAPP_NUMBER`; fake WhatsApp endpoint in `test/fakes/server.mjs`.
+- Sprint 15: `scripts/dev-env.sh` (source; throwaway dev/CI env + fake providers) and `scripts/dev-up.sh`
+  (Postgres, Redis without snapshots, role/db, migrations, API → /tmp/dawabag-api.log). CI:
+  `.github/workflows/ci.yml` (backend tsc, jest, migrations ×2, all smoke suites; web tsc, lint, build;
+  Node 20, postgres:16, redis:7 services). `X-Request-Id` middleware (`middleware/requestId.ts`);
+  job-failure alert `alertFirstFailure` in `jobs/scheduler.ts` (notification type `job_failed`).
+- Sprint 16: web on Next.js 15.5.27 + React 19 (next-themes 0.4, sonner 1.7, lucide-react 0.460; override
+  next>postcss ^8.5.28); backend without nodemailer (SES SendEmailCommand), uuid 11 forced via overrides;
+  npm audit 0 on both. CI jobs: backend, web, mobile (flutter analyze/test), images (docker build + /ready).
+  Migration 18: indexes for hot child lookups and batch-key expressions.

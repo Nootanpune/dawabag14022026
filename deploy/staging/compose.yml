@@ -1,0 +1,178 @@
+# Dawabag staging (or a small single-server beta): website, API, PostgreSQL and Redis
+# on one machine behind Caddy, which gets and renews HTTPS certificates itself.
+#
+#   cp deploy/staging/staging.env.example deploy/staging/staging.env   # fill it in
+#   docker compose -f deploy/staging/compose.yml --env-file deploy/staging/staging.env up -d --build
+#
+# Point DNS for WEB_DOMAIN and API_DOMAIN at the server first. Only ports 80 and 443
+# are open; the database and Redis are reachable only inside this stack. The API runs
+# in production mode and applies pending migrations on start. Production itself is the
+# AWS set-up in docs/RUNBOOK.md (RDS, ElastiCache, S3); this file is for staging.
+#
+# Trial server without AWS (deploy/trial/TRIAL.md): add `--profile objectstore` to run
+# the server's own S3-compatible object store (MinIO) — its data lives in the named
+# volume objectstore_data on this server, encrypted at rest; the browser reaches it only
+# through Caddy at FILES_DOMAIN, and only with signed links. Set in staging.env:
+#   S3_ENDPOINT=http://objectstore:9000  S3_PUBLIC_ENDPOINT=https://<FILES_DOMAIN>
+#   AWS_S3_BUCKET, AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (the store's own login),
+#   OBJECTSTORE_KMS_KEY (32 random bytes, base64)
+name: dawabag-staging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dawabag
+      POSTGRES_USER: dawabag_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in staging.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dawabag_user -d dawabag"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Cache, OTPs and job queues only — no snapshots; the database is the record
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file: staging.env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: dawabag
+      DB_USER: dawabag_user
+      REDIS_URL: redis://redis:6379
+      # One proxy (Caddy) in front: rate limits see the visitor's address
+      TRUST_PROXY_HOPS: 1
+      CORS_ORIGINS: https://${WEB_DOMAIN}
+      PUBLIC_WEB_URL: https://${WEB_DOMAIN}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  web:
+    build:
+      context: ../../frontend-web
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN:?set API_DOMAIN in staging.env}
+    restart: unless-stopped
+    depends_on: [api]
+
+  backup:
+    # Nightly pg_dump at BACKUP_AT (default 02:30 Asia/Kolkata; the container clock is UTC),
+    # streamed straight to the object store — no dump file on this machine. Restore and the
+    # quarterly restore test: deploy/staging/restore.sh; retention: backup-lifecycle.json
+    # (daily 35 days, first of the month 8 years, C-34). RUNBOOK 7c. Without a bucket it
+    # stays up, logs "backups are OFF", and check.sh skips the backup-age check.
+    build:
+      context: .
+      dockerfile: backup/Dockerfile
+    restart: unless-stopped
+    init: true        # stops promptly on `docker compose stop`
+    # Only what the backup needs (not the API's whole staging.env)
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: dawabag
+      PGUSER: dawabag_user
+      PGPASSWORD: ${DB_PASSWORD}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      # Bucket and keys: BACKUP_* when set, else the API's own S3 settings
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      BACKUP_AWS_ACCESS_KEY_ID: ${BACKUP_AWS_ACCESS_KEY_ID:-}
+      BACKUP_AWS_SECRET_ACCESS_KEY: ${BACKUP_AWS_SECRET_ACCESS_KEY:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      BACKUP_PREFIX: ${BACKUP_PREFIX:-backups/}
+      BACKUP_SSE: ${BACKUP_SSE:-AES256}
+      BACKUP_KMS_KEY_ID: ${BACKUP_KMS_KEY_ID:-}
+      BACKUP_AT: ${BACKUP_AT:-02:30}
+      BACKUP_PRUNE: ${BACKUP_PRUNE:-false}
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  objectstore:
+    # Trial / staging only (C-44: production documents go to AWS S3 in ap-south-1; the
+    # API warns about S3_ENDPOINT and APP_ENV=production refuses it). MinIO stopped
+    # publishing its own images in Oct 2025; this is the Alpine project's build of the
+    # last MinIO security release — override with OBJECTSTORE_IMAGE.
+    image: ${OBJECTSTORE_IMAGE:-alpine/minio:RELEASE.2025-10-15T17-29-55Z}
+    profiles: [objectstore]
+    restart: unless-stopped
+    # The image has no /data; /home/minio belongs to its unprivileged user, so the volume does too
+    command: ["server", "/home/minio/data", "--address", ":9000"]
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-}
+      # Links are signed for ap-south-1 (the API's AWS_REGION)
+      MINIO_SITE_REGION: ${AWS_REGION:-ap-south-1}
+      # Server-side encryption (SSE-S3, AES-256) with a key only this server holds (C-41)
+      MINIO_KMS_SECRET_KEY: dawabag-trial-key:${OBJECTSTORE_KMS_KEY:-}
+      MINIO_BROWSER: "off"
+    volumes:
+      - objectstore_data:/home/minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  objectstore-init:
+    # Once per start: creates the bucket (private, no public policy) and proves an
+    # encrypted write works. Reuses the backup image, which has the S3 client.
+    build:
+      context: .
+      dockerfile: backup/Dockerfile
+    profiles: [objectstore]
+    restart: "no"
+    command: ["node", "/app/backup/s3.mjs", "ensure-bucket"]
+    environment:
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    depends_on:
+      objectstore: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN:?set WEB_DOMAIN in staging.env}
+      API_DOMAIN: ${API_DOMAIN}
+      # Public address of the objectstore profile's store (signed links only); the
+      # default is a harmless plain-HTTP name nothing points at, so the site block parses
+      FILES_DOMAIN: ${FILES_DOMAIN:-http://files.localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      CADDY_GLOBAL_OPTIONS: ${CADDY_GLOBAL_OPTIONS:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data          # certificates (the server's own, renewed by Caddy)
+    depends_on: [api, web]
+
+volumes:
+  postgres_data:
+  caddy_data:
+  objectstore_data:   # the trial's object store (profile objectstore)

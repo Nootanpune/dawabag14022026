@@ -1,0 +1,46 @@
+'use client';
+import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { doctorKeys, fetchConsultation } from '@/lib/telemedicine/doctorApi';
+import { KIND_LABELS, MODE_LABELS, patientLine } from '@/lib/telemedicine/labels';
+import BackLink from '@/components/admin/BackLink';
+import PageHeader from '@/components/admin/PageHeader';
+import QueryState from '@/components/admin/QueryState';
+import PrescribeForm from '@/components/telemedicine/doctor/PrescribeForm';
+import { formatClockTime, formatDateIST } from '@/lib/dates';
+
+// Write the e-prescription for a consultation (C-23, C-24). The server returns it only to its doctor or patient.
+export default function PrescribePage() {
+  const { id } = useParams<{ id: string }>();
+  const { data: c, isLoading, error } = useQuery({ queryKey: doctorKeys.consultation(id), queryFn: () => fetchConsultation(id) });
+  return (
+    <div className="space-y-4">
+      <BackLink href="/doctor" label="Consultations" />
+      <QueryState isLoading={isLoading} error={error} isEmpty={!c} emptyText="Consultation not found" />
+      {c && (
+        <>
+          <PageHeader
+            title={`E-prescription for ${c.patient_name ?? 'patient'}`}
+            subtitle={`${patientLine(c.patient_age, c.patient_gender)} · ${formatDateIST(c.slot_date)} ${formatClockTime(c.slot_start, { zone: true })} · ${
+              MODE_LABELS[c.mode] ?? c.mode
+            } · ${KIND_LABELS[c.consult_kind] ?? c.consult_kind}`}
+          />
+          <p className="text-sm text-gray-600">
+            <span className="font-medium">Problem:</span> {c.chief_complaint}
+          </p>
+          {c.prescription_id ? (
+            <p className="text-sm text-gray-600">An e-prescription was already issued for this consultation.</p>
+          ) : c.status === 'cancelled' ? (
+            <p className="text-sm text-gray-600">This consultation was cancelled.</p>
+          ) : !['in_progress', 'completed'].includes(c.status) ? (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              Start the consultation first; a prescription is written during or after it.
+            </p>
+          ) : (
+            <PrescribeForm c={c} />
+          )}
+        </>
+      )}
+    </div>
+  );
+}

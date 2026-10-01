@@ -1,0 +1,10 @@
+{
+  "name": "dawabag-staging-backup",
+  "private": true,
+  "description": "Streams staging database dumps to and from the object store (deploy/staging/backup)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1144.0"
+  }
+}

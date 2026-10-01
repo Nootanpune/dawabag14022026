@@ -1,0 +1,104 @@
+// src/jobs/registry.ts — every scheduled job, its schedule (IST) and runner
+import { runDailyLicenceExpiryCheck, runMonthlyReVerification } from '../services/kyc.service';
+import { runCreditRemindersJob } from './creditReminders.job';
+import { runLowStockJob } from './lowStock.job';
+import { runSettlementJob } from './settlement.job';
+import { runRefillOrdersJob, runRefillRemindersJob } from './refill.job';
+import { runLicenceRegisterAlerts } from '../services/licence.service';
+import { runExpiryWatchJob } from './expiryWatch.job';
+import { runEinvoiceSweep } from '../services/einvoice/einvoice.service';
+import { runPaymentSweep } from '../services/payments/reconcile.service';
+import { runRetentionPurge } from '../services/retention.service';
+import { runRecallAlertWatch } from '../services/recallAlerts/alert.service';
+
+export interface JobDefinition {
+  name: string;
+  description: string;
+  cron: string;                              // Asia/Kolkata
+  run: () => Promise<Record<string, unknown>>;
+}
+
+export const JOBS: JobDefinition[] = [
+  {
+    name: 'recall_alert_watch',
+    description: 'Alert admins when a regulator recall alert passes its 4 hours with matches undecided (C-28)',
+    cron: '*/10 * * * *',                    // every 10 minutes
+    run: runRecallAlertWatch,
+  },
+  {
+    name: 'retention_purge',
+    description: 'Delete operational data past its retention period (setting retention.days; DPDP storage limitation, C-44)',
+    cron: '30 3 * * *',                      // daily 03:30
+    run: runRetentionPurge,
+  },
+  {
+    name: 'payment_reconcile',
+    description: 'Look up payments still open 10 minutes after checkout at Razorpay; record any captured (lost confirmations)',
+    cron: '*/15 * * * *',                    // every 15 minutes
+    run: runPaymentSweep,
+  },
+  {
+    name: 'einvoice_sweep',
+    description: 'Re-queue e-invoices still waiting for the IRP (C-31)',
+    cron: '*/15 * * * *',                    // every 15 minutes
+    run: runEinvoiceSweep,
+  },
+  {
+    name: 'licence_expiry',
+    description: 'Warn buyers before drug licence expiry; pause trade ordering on expiry (C-14)',
+    cron: '30 1 * * *',                      // daily 01:30
+    run: runDailyLicenceExpiryCheck,
+  },
+  {
+    name: 'gstin_recheck',
+    description: 'Re-verify GSTIN of approved B2B accounts; flag inactive ones (C-14)',
+    cron: '0 2 1 * *',                       // 1st of month 02:00
+    run: runMonthlyReVerification,
+  },
+  {
+    name: 'low_stock',
+    description: 'Record low-stock alerts and email the admin digest',
+    cron: '0 6 * * *',                       // daily 06:00
+    run: runLowStockJob,
+  },
+  {
+    name: 'credit_reminders',
+    description: 'Remind B2B buyers 3 days, 1 day and on the day credit is due',
+    cron: '0 9 * * *',                       // daily 09:00
+    run: runCreditRemindersJob,
+  },
+  {
+    name: 'partner_settlements',
+    description: 'Build last month\'s partner settlements: commission, fees, GST on fees, TCS, TDS (C-32)',
+    cron: '0 3 1 * *',                       // 1st of month 03:00
+    run: runSettlementJob,
+  },
+  {
+    name: 'refill_orders',
+    description: 'Place refill orders due today; charge active mandates (no prescription lines)',
+    cron: '0 7 * * *',                       // daily 07:00
+    run: runRefillOrdersJob,
+  },
+  {
+    name: 'refill_reminders',
+    description: 'Remind buyers before a refill (pre-debit notice for mandates)',
+    cron: '0 8 * * *',                       // daily 08:00
+    run: runRefillRemindersJob,
+  },
+  {
+    name: 'licence_register_alerts',
+    description: "Alert the renewal owner and admins 60, 30 and 7 days before Dawabag's own licences expire (C-07)",
+    cron: '15 9 * * *',                      // daily 09:15
+    run: runLicenceRegisterAlerts,
+  },
+  {
+    name: 'expiry_watch',
+    description: 'Raise expired stock for write-off (approved by a person) and send the near-expiry list',
+    cron: '45 5 * * *',                      // daily 05:45
+    run: runExpiryWatchJob,
+  },
+];
+
+export function findJob(name: string): JobDefinition | undefined {
+  return JOBS.find((j) => j.name === name);
+}

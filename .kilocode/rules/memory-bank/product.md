@@ -1,44 +1,15 @@
-# Product Context: Next.js Starter Template
+# Product Context
 
-## Why This Template Exists
+| Buyer type (`customer_type`) | Pricing column | KYC | Payment terms |
+| --- | --- | --- | --- |
+| `customer` (B2C) | `offer_price_paise` | none — active after OTP | prepaid |
+| `b2b_retailer` (DL 20/21, GST optional) | `ptr_price_paise` | admin review | prepaid → CAD → net 7/15/30 |
+| `b2b_wholesaler` (DL 20B/21B + GST) | `pts_price_paise` | admin review | prepaid → CAD → net 30/45/60 |
+| `doc_hospital` (NMC doctor, no GST) | `institutional_price_paise` | admin review | prepaid → net 7/15 |
 
-Starting a new Next.js project involves boilerplate setup, configuration decisions, and establishing patterns. This template provides a clean, opinionated starting point that eliminates setup friction and establishes best practices from the start. It's optimized for AI-assisted development, where an AI can quickly extend the template based on user requirements.
+Trade pricing, credit terms and the Schedule H/H1 prescription exemption apply
+only when `kyc_status = 'approved'`; until then the account is treated as B2C
+and cannot order. Schedule X and NDPS are never sold online.
 
-## Problems It Solves
-
-1. **Setup Time**: Eliminates boilerplate configuration (TypeScript, Tailwind, ESLint)
-2. **Decision Fatigue**: Pre-made choices for tooling and patterns
-3. **AI Context**: Memory bank provides persistent context for AI assistants
-4. **Extensibility**: Recipe system for adding common features
-5. **Consistency**: Standardized project structure and conventions
-
-## How It Should Work (User Flow)
-
-1. User starts with this template
-2. User describes what they want to build to AI assistant
-3. AI adds pages, components, and features as needed
-4. AI uses recipes for common additions (database, auth)
-5. User previews changes via hot reload
-6. Iterate until satisfied
-7. Deploy
-
-## Key User Experience Goals
-
-- **Zero to Feature Fast**: Get building immediately, no setup required
-- **AI-Friendly**: Memory bank and recipes make AI assistance effective
-- **Flexible Foundation**: Can become any type of application
-- **Best Practices Built-In**: TypeScript strict mode, ESLint, clean structure
-
-## What This Template Provides
-
-1. **Clean App Structure**: Single page ready for expansion
-2. **Type Safety**: Full TypeScript setup with strict mode
-3. **Modern Styling**: Tailwind CSS 4 ready to use
-4. **Code Quality**: ESLint configured
-5. **Extensibility**: Recipe system for common features
-
-## Integration Points
-
-- **Database**: Use add-database recipe for Drizzle + SQLite
-- **Styling**: Tailwind CSS pre-configured
-- **AI Assistance**: Memory bank for context persistence
+Registration is 4 steps: type → details (+ privacy consent, 18+, optional
+marketing) → documents (trade types) → OTP, then document upload.
