@@ -2,13 +2,27 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–13 are done (Sprint 14 video calls wired on web and mobile) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–14 are done (Sprint 14 video calls wired on web and mobile) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprint 14 (backend)
+- Regulator recall alerts (C-28): CDSCO NSQ / FDA / manufacturer lists uploaded (.xlsx/.csv in memory) or
+  typed in; batches matched on letters+digits against own and partner stock held or sold; each match
+  recalled or cleared with a note; 4-hour deadline, admin alerts at entry and when overdue
+  (job recall_alert_watch); receipts, partner listings and opening stock refused for a batch on an alert
+  until cleared for that product, and for a recalled batch always. Migration 17 (final records).
+- Security review of Sprints 12–13: 10 findings (5 medium) fixed with tests — riders: no order list or
+  invoices; consultation refunds settle only when processed (webhook + sweep retry); WhatsApp allow-list
+  (no health values); settlements respect the GST lock; courier-booking race; dispatch message after
+  commit; call tokens ≤ 30 min; cart purge progress; recall notices kept; consent notice language;
+  TRUST_PROXY_HOPS required in production.
+- Tests: Sprint 1–14 smoke 696 checks pass, jest 64. Note: the container restarted mid-sprint and the
+  local Postgres was recreated empty; all migrations 01–17 and suites ran green on it.
 
 ## Done in Sprint 13 (backend)
 - Own riders: dispatch to a rider (rider_id) or a courier (response carries the DWR AWB), reassign (packers see the deliver queue for it), rider run sheet
@@ -30,6 +44,24 @@ the lawyer/CA sign-off.
   video/audio and the server sent a token; token null keeps the "not set up" note; chat
   keeps the old text. useJoin keeps { id, info }. Patient + doctor both. Audio mode = mic
   only. C-23: patient and doctor only, nothing recorded; nothing stored in the browser.
+
+## Web Sprint 14 — recall alerts (tsc + next lint + next build pass)
+- /admin/recall-alerts (admin/super_admin; layout RequireAuth MANAGER_ROLES; nav "Recall
+  alerts" under Batch recalls): Open / All tabs, rows with source label, reference,
+  received + deadline (IST) and a live "Xh YYm left" / red "Overdue" badge computed from
+  due_at vs the clock (useNow, nothing stored), lines/matches/to decide/recalled/cleared.
+- "Upload list" (multipart .xlsx/.csv ≤ 5 MB; columns Drug name, Batch No., Manufacturer,
+  Reason) and "Type in alert" (editable rows) dialogs share AlertHeaderFields: source,
+  reference, received at as datetime-local read as India time → ISO with +05:30, not in the
+  future. Success → detail page; 422/400 show the server message.
+- /admin/recall-alerts/[id]: summary card + lines (matched first). Matches show our product,
+  maker, batch spellings, held/sold, decision; pending → Recall (confirm dialog naming
+  product, batches, units, buyers told to stop using it) or "Not this product" (note ≥ 5);
+  decided → who/when/notes + "View recall" (/admin/recalls/:id); 409 re-reads the alert.
+  Every line has "Clear a product refused at receipt" (recalls ProductPicker + note);
+  unmatched lines read "Not held".
+- GRN form: 409 "recall alert RA-…" shows RecallAlertBanner (link for admins).
+- Files: lib/recallAlerts/{api,types,labels,time}.ts, components/admin/recallAlerts/*.
 
 ## Mobile Sprint 14 — video calls (not compiled — no Flutter SDK here)
 - services/video_call_service.dart (ChangeNotifier over agora_rtc_engine 6.x: permissions

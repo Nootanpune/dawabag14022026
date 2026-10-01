@@ -19,11 +19,13 @@ import {
 import { formatPaise } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { isLockedPeriodError } from '@/lib/admin/accountsLock';
+import { isRecallAlertError } from '@/lib/recallAlerts/labels';
 import LockedPeriodBanner from '@/components/admin/accounts/LockedPeriodBanner';
 import CatalogueSearch from '@/components/admin/purchasing/CatalogueSearch';
 import ReceiptHeaderFields from './ReceiptHeaderFields';
 import ReceiptLineFields from './ReceiptLineFields';
 import ProblemList from './ProblemList';
+import RecallAlertBanner from './RecallAlertBanner';
 
 /**
  * Goods receipt against a PO (lines prefilled with what is still due) or
@@ -44,6 +46,8 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
   const [problems, setProblems] = useState<{ title: string; list: string[] }>({ title: '', list: [] });
   // Supplier invoice dated in a closed GST period (409, Sprint 13)
   const [lockedPeriod, setLockedPeriod] = useState('');
+  // Batch on a regulator recall alert not yet cleared for this product (409, C-28)
+  const [onAlert, setOnAlert] = useState(false);
 
   const save = useMutation({
     mutationFn: createReceipt,
@@ -56,6 +60,7 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
     onError: (err: any) => {
       const msg = getApiErrorMessage(err, 'Could not record the receipt');
       const status = err?.response?.status;
+      setOnAlert(status === 409 && isRecallAlertError(msg));
       if (isLockedPeriodError(msg)) {
         setProblems({ title: '', list: [] });
         return setLockedPeriod(msg);
@@ -75,6 +80,7 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
     if (list.length) return setProblems({ title: 'Fix these and save again', list });
     setProblems({ title: '', list: [] });
     setLockedPeriod('');
+    setOnAlert(false);
     save.mutate(receiptBody(header, lines, po?.id));
   };
 
@@ -111,6 +117,7 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
       </div>
       {lockedPeriod && <LockedPeriodBanner message={lockedPeriod} />}
       <ProblemList title={problems.title} problems={problems.list} />
+      {onAlert && <RecallAlertBanner />}
       <div className="flex justify-end">
         <button onClick={submit} disabled={save.isPending || !lines.length} className="btn-primary text-sm inline-flex items-center gap-2">
           {save.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Record receipt

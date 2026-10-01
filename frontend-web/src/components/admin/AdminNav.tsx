@@ -38,6 +38,7 @@ import {
   Receipt,
   Stethoscope,
   ListTree,
+  AlertOctagon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -63,6 +64,8 @@ const ITEMS = [
   { href: '/admin/kyc', label: 'KYC review', icon: ShieldCheck, roles: ADMIN_ROLES },
   { href: '/admin/grievances', label: 'Complaints', icon: MessageSquareWarning, roles: ADMIN_ROLES },
   { href: '/admin/recalls', label: 'Batch recalls', icon: ShieldAlert, roles: MANAGER_ROLES },
+  // Sprint 14 — regulator recall / NSQ alerts, 4-hour decision deadline (C-28)
+  { href: '/admin/recall-alerts', label: 'Recall alerts', icon: AlertOctagon, roles: MANAGER_ROLES },
   { href: '/admin/privacy', label: 'Data requests', icon: UserCog, roles: MANAGER_ROLES },
   { href: '/admin/vendors', label: 'Vendors', icon: Truck, roles: MANAGER_ROLES },
   { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },
