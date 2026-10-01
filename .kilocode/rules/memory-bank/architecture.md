@@ -127,3 +127,14 @@
 - **Purchase returns (Sprint 9, C-28):** `services/purchasing/purchaseReturn.service` — PRN series,
   approval by a second person applies `return_to_supplier` stock adjustments, dispatch reference,
   supplier credit note settles; report `purchase-returns`. Routes `/purchasing/returns/*`.
+- **Teleconsultation (Sprint 10, C-22..C-24):** `services/telemedicine/` — `rules` (pure TPG 2020
+  lists: first video O+A, first audio/text O, follow-up O+A+B; Schedule X/NDPS never;
+  unclassified refused), `doctor.service` (admin enable, registration, admin verification,
+  slots), `consultation.service` (book with consent, Razorpay fee + signed verify, join window,
+  cancel with gateway refund), `eprescription.service` (issue with frozen snapshots, final
+  trigger, public check by code, `useAtDawabag` → unverified `prescriptions` row, C-08),
+  `eprescriptionPdf` (on demand, QR to `PUBLIC_WEB_URL/eprescriptions/verify/<code>`).
+  Routes `/doctors/*`, `/consultations/*`, public `/eprescriptions/verify/:code`; product
+  `telemedicine_list` set via `POST /products/:id/telemedicine-list` (pharmacist).
+- **Razorpay test hook:** `RAZORPAY_BASE_URL` points the SDK's axios client at the fake gateway
+  (production refuses it); `validCheckoutSignature` in `razorpay.client`.

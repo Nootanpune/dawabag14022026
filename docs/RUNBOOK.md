@@ -60,6 +60,17 @@ registered when it is packed, and the parcel cannot be dispatched until its IRN 
 credit notes are registered against their invoice. The IRN and signed QR print on the
 invoice PDF. Problems appear in Admin → E-invoices: fix the data (usually a buyer GSTIN)
 and press Retry. Corrections are made by credit note; IRNs are never cancelled from here.
+**Teleconsultation (Telemedicine Practice Guidelines 2020, C-22..C-24).** Admin →
+Doctors: enable a registered account by mobile number; the doctor fills in council,
+registration number, qualification and year; check them on the NMC / State Medical
+Council register before approving (any later change needs approval again). A pharmacist
+classifies each medicine's telemedicine list (O, A, B or prohibited) — unclassified
+medicines cannot be prescribed; Schedule X and NDPS are always prohibited. Set
+`PUBLIC_WEB_URL` so the QR on e-prescriptions opens the public check page. The
+consultation fee is paid by Razorpay; patients may cancel up to two hours before the slot
+and are refunded in full. An e-prescription sent to Dawabag is verified by the
+pharmacist like any upload.
+
 Document numbers are at most 16 characters (CGST Rule 46): `DWB/2627/00012`,
 credit notes `DWBC/2627/00001`; partner prefixes are 2–4 characters.
 
