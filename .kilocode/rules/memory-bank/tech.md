@@ -43,3 +43,7 @@ No MSG91 key → SMS is skipped with a warning (OTP is in Redis at `otp:<mobile>
   `.github/workflows/ci.yml` (backend tsc, jest, migrations ×2, all smoke suites; web tsc, lint, build;
   Node 20, postgres:16, redis:7 services). `X-Request-Id` middleware (`middleware/requestId.ts`);
   job-failure alert `alertFirstFailure` in `jobs/scheduler.ts` (notification type `job_failed`).
+- Sprint 16: web on Next.js 15.5.27 + React 19 (next-themes 0.4, sonner 1.7, lucide-react 0.460; override
+  next>postcss ^8.5.28); backend without nodemailer (SES SendEmailCommand), uuid 11 forced via overrides;
+  npm audit 0 on both. CI jobs: backend, web, mobile (flutter analyze/test), images (docker build + /ready).
+  Migration 18: indexes for hot child lookups and batch-key expressions.

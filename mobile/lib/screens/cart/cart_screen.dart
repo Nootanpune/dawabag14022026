@@ -16,6 +16,13 @@ import 'widgets/cart_summary_card.dart';
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
 
+  // Waits for the server, then shows its refusal only if this screen is still open
+  Future<void> _run(BuildContext context, Future<String?> action) async {
+    final error = await action;
+    if (!context.mounted) return;
+    _showError(context, error);
+  }
+
   void _showError(BuildContext context, String? error) {
     if (error == null || !context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -84,7 +91,7 @@ class CartScreen extends ConsumerWidget {
         title: Text('Cart (${cart.itemCount})'),
         actions: [
           TextButton(
-            onPressed: busy ? null : () async => _showError(context, await notifier.clear()),
+            onPressed: busy ? null : () => _run(context, notifier.clear()),
             child: const Text('Clear', style: TextStyle(color: Colors.red, fontSize: 13)),
           ),
         ],
@@ -100,9 +107,8 @@ class CartScreen extends ConsumerWidget {
               CartLineCard(
                 line: line,
                 busy: busy,
-                onQuantityChange: (q) async =>
-                    _showError(context, await notifier.setQuantity(line.productId, q)),
-                onRemove: () async => _showError(context, await notifier.remove(line.productId)),
+                onQuantityChange: (q) => _run(context, notifier.setQuantity(line.productId, q)),
+                onRemove: () => _run(context, notifier.remove(line.productId)),
               ),
             const SizedBox(height: 12),
             if (cart.requiresPrescription) const CartPrescriptionNotice(),
@@ -110,7 +116,7 @@ class CartScreen extends ConsumerWidget {
               coupon: cart.coupon,
               busy: busy,
               onApply: notifier.applyCoupon,
-              onRemove: () async => _showError(context, await notifier.removeCoupon()),
+              onRemove: () => _run(context, notifier.removeCoupon()),
             ),
             const SizedBox(height: 12),
             CartSummaryCard(cart: cart),

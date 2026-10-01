@@ -1,6 +1,6 @@
-/// Refill subscription + payment mandate JSON from /api/v1/refills
-/// (Sprint 3 contract, section D). Plain value objects: the server is the
-/// only authority, these are rebuilt from every response.
+// Refill subscription + payment mandate JSON from /api/v1/refills
+// (Sprint 3 contract, section D). Plain value objects: the server is the
+// only authority, these are rebuilt from every response.
 
 int _asInt(Object? v, [int fallback = 0]) {
   if (v is int) return v;

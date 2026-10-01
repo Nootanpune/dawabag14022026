@@ -1,5 +1,5 @@
-/// Small JSON coercion helpers shared by the Sprint 4 models. The API is the
-/// only authority; models are rebuilt from every response.
+// Small JSON coercion helpers shared by the Sprint 4 models. The API is the
+// only authority; models are rebuilt from every response.
 
 int asInt(Object? v, [int fallback = 0]) {
   if (v is int) return v;

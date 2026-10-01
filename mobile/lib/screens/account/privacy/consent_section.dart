@@ -38,7 +38,7 @@ class ConsentSection extends StatelessWidget {
             SwitchListTile(
               value: consents.marketingGranted,
               onChanged: busy ? null : onMarketingChanged,
-              activeColor: AppTheme.brandGreen,
+              activeThumbColor: AppTheme.brandGreen,
               title: const Text('Offers and marketing messages', style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 marketing?.recordedAt != null
@@ -50,7 +50,7 @@ class ConsentSection extends StatelessWidget {
             SwitchListTile(
               value: consents.whatsappGranted,
               onChanged: busy ? null : onWhatsAppChanged,
-              activeColor: AppTheme.brandGreen,
+              activeThumbColor: AppTheme.brandGreen,
               title: const Text('Send order and refill updates on WhatsApp', style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 whatsapp?.recordedAt != null

@@ -1,5 +1,5 @@
-/// Order status → timeline position. Pure logic so any status the server
-/// sends (including ones added later) renders safely.
+// Order status → timeline position. Pure logic so any status the server
+// sends (including ones added later) renders safely.
 
 class TimelineStep {
   final String status;

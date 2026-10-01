@@ -193,7 +193,7 @@ class _AutoPayRow extends StatelessWidget {
         ),
         Switch(
           value: on,
-          activeColor: AppTheme.brandGreen,
+          activeThumbColor: AppTheme.brandGreen,
           onChanged: busy || (!on && !canTurnOn)
               ? null
               : (value) => onChanged(value ? activeMandates.first.id : null),

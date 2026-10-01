@@ -26,7 +26,6 @@ class ProductDetailScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (product) {
-          final cannotOrder = ['NDPS', 'Schedule X'].contains(product['drug_schedule']);
           final inStock = product['in_stock'] ?? false;
           return ListView(
             children: [

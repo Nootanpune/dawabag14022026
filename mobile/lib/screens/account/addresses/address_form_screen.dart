@@ -153,7 +153,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               onChanged: on ? (v) => setState(() => _isDefault = v) : null,
               title: const Text('Use as my default address', style: TextStyle(fontSize: 14)),
               contentPadding: EdgeInsets.zero,
-              activeColor: AppTheme.brandGreen,
+              activeThumbColor: AppTheme.brandGreen,
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),
