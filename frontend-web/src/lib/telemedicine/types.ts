@@ -113,6 +113,38 @@ export interface DoctorConsultation {
   prescription_id: string | null;
 }
 
+/** GET /doctors/me/slots?from&to — the doctor's own slots, booked and blocked ones included */
+export interface OwnSlot extends Slot {
+  is_booked: boolean;
+  is_blocked: boolean;
+  consultation_id: string | null;
+}
+
+/** GET /consultations/:id — for its patient or its doctor */
+export interface ConsultationDetail {
+  id: string;
+  mode: ConsultMode;
+  status: ConsultStatus;
+  consult_kind: ConsultKind;
+  fee_paise: number;
+  payment_status: PaymentStatus;
+  chief_complaint: string;
+  started_at: string | null;
+  ended_at: string | null;
+  doctor_id: string;
+  doctor_name: string;
+  qualification: string;
+  council: string;
+  nmc_reg_number: string;
+  slot_date: string | null;
+  slot_start: string | null;
+  slot_end: string | null;
+  patient_name: string | null;
+  patient_gender: string | null;
+  patient_age: number | null;
+  prescription_id: string | null;
+}
+
 /** GET /consultations/:id/join — the call client opens with these */
 export interface JoinInfo {
   channel: string;
@@ -214,7 +246,7 @@ export interface AdminDoctor extends Doctor {
   verified_by_name: string | null;
 }
 
-/** product search hit for the prescription form; telemedicine_list only when the API sends it */
+/** product search hit for the prescription form; telemedicine_list null = not yet classified by the pharmacist */
 export interface MedicineHit {
   id: string;
   name: string;

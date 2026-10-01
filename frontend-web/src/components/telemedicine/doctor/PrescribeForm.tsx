@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { doctorKeys, issuePrescription } from '@/lib/telemedicine/doctorApi';
 import { allowedListsText } from '@/lib/telemedicine/labels';
 import { buildPrescriptionBody, emptyRow, MAX_ITEMS, type MedicineRowValues } from '@/lib/telemedicine/prescriptionForm';
-import type { DoctorConsultation } from '@/lib/telemedicine/types';
+import type { ConsultationDetail } from '@/lib/telemedicine/types';
 import { getApiErrorLines } from '@/lib/apiErrors';
 import ErrorLines from '../common/ErrorLines';
 import MedicineRow from './MedicineRow';
@@ -17,7 +17,7 @@ import MedicineRow from './MedicineRow';
  * any medicine the guidelines do not allow for this consultation and lists each
  * one; the prescription is final once issued.
  */
-export default function PrescribeForm({ c }: { c: DoctorConsultation }) {
+export default function PrescribeForm({ c }: { c: Pick<ConsultationDetail, 'id' | 'mode' | 'consult_kind'> }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [diagnosis, setDiagnosis] = useState('');

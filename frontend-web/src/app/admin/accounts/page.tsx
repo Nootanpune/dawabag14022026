@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { accountsKeys, downloadReportCsv, fetchReport, fetchReportNames, lastMonth, periodError, REPORT_LABELS } from '@/lib/admin/accounts';
+import { accountsKeys, downloadReportCsv, fetchReport, fetchReportNames, lastMonth, periodError, REPORT_LABELS, REPORT_PERIOD_HINTS } from '@/lib/admin/accounts';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { normaliseBlobError } from '@/lib/download';
 import PageHeader from '@/components/admin/PageHeader';
@@ -40,7 +40,7 @@ export default function AccountsReportsPage() {
     <div>
       <PageHeader
         title="Accounts reports"
-        subtitle="GST registers and marketplace TCS / TDS for the accountant (up to 13 months at a time)"
+        subtitle="GST registers, marketplace TCS / TDS and Razorpay reconciliation for the accountant (up to 13 months at a time)"
         onRefresh={() => report.refetch()}
         refreshing={report.isFetching}
       />
@@ -59,6 +59,7 @@ export default function AccountsReportsPage() {
           downloading={downloading}
         />
       )}
+      {REPORT_PERIOD_HINTS[name] && <p className="text-xs text-gray-500 -mt-2 mb-3">{REPORT_PERIOD_HINTS[name]}</p>}
       {invalid ? (
         <p className="text-sm text-red-600">{invalid}</p>
       ) : (
@@ -72,7 +73,7 @@ export default function AccountsReportsPage() {
           {!!report.data?.rows.length && (
             <>
               <p className="text-xs text-gray-500 mb-2">{report.data.rows.length} row(s)</p>
-              <ReportTable rows={report.data.rows} />
+              <ReportTable report={name} rows={report.data.rows} />
             </>
           )}
         </>

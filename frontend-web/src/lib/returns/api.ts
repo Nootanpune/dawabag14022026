@@ -75,8 +75,15 @@ export interface Refund {
   gateway_refund_id: string | null;
   reference: string | null;
   failure_reason: string | null;
+  /** Times this leg was sent to Razorpay (present on the accounts list). */
+  gateway_attempts?: number;
   created_at: string;
   processed_at: string | null;
+}
+
+/** A pending gateway leg the gateway refused can be sent to Razorpay again (C-37). */
+export function canRetryGatewayRefund(r: Refund): boolean {
+  return r.method === 'gateway' && r.status === 'pending' && !!r.failure_reason;
 }
 
 export interface NewReturn {
@@ -148,6 +155,12 @@ export async function fetchAdminRefunds(status: string): Promise<Refund[]> {
 export async function markRefundProcessed(id: string, reference: string) {
   const { data } = await api.post(`/returns/refunds/admin/${id}/processed`, { reference });
   return data.data as { id: string; status: string };
+}
+
+/** POST /returns/refunds/admin/:id/retry — send a refused gateway leg again; 409 while it is still with the gateway. */
+export async function retryGatewayRefund(id: string) {
+  const { data } = await api.post(`/returns/refunds/admin/${id}/retry`);
+  return data.data as Pick<Refund, 'id' | 'status' | 'gateway_refund_id' | 'failure_reason'> & { gateway_attempts: number };
 }
 
 // ── Partner (read-only) ──

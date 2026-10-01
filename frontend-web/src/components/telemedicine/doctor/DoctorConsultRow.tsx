@@ -5,7 +5,7 @@ import { formatSlotTime, KIND_LABELS, MODE_LABELS, patientLine } from '@/lib/tel
 import type { DoctorConsultation } from '@/lib/telemedicine/types';
 
 /** One booked consultation on the doctor's day list. */
-export default function DoctorConsultRow({ c, date, actions }: { c: DoctorConsultation; date: string; actions: ReactNode }) {
+export default function DoctorConsultRow({ c, actions }: { c: DoctorConsultation; actions: ReactNode }) {
   const canPrescribe = ['in_progress', 'completed'].includes(c.status) && !c.prescription_id;
   return (
     <div className="card text-sm flex flex-wrap justify-between gap-3">
@@ -31,7 +31,7 @@ export default function DoctorConsultRow({ c, date, actions }: { c: DoctorConsul
       <div className="flex flex-wrap gap-2 items-start justify-end">
         {actions}
         {canPrescribe && (
-          <Link href={`/doctor/consultations/${c.id}/prescribe?date=${date}`} className="btn-primary text-xs py-1.5 px-3">
+          <Link href={`/doctor/consultations/${c.id}/prescribe`} className="btn-primary text-xs py-1.5 px-3">
             Write e-prescription
           </Link>
         )}

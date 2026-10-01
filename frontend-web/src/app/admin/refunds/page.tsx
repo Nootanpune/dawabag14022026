@@ -26,7 +26,7 @@ export default function AdminRefundsPage() {
     <div>
       <PageHeader
         title="Refunds"
-        subtitle="Gateway refunds are sent automatically; pay pending or failed ones by bank transfer and record the UTR"
+        subtitle="Gateway refunds go to Razorpay automatically. If Razorpay refused one, retry when the cause is fixed, or refund by bank transfer and record the UTR"
         onRefresh={() => refetch()}
         refreshing={isFetching}
       />

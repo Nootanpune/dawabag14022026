@@ -5,7 +5,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import ProfileStatus from '@/components/telemedicine/doctor/ProfileStatus';
 import AddSlotsForm from '@/components/telemedicine/doctor/AddSlotsForm';
-import OpenSlotsList from '@/components/telemedicine/doctor/OpenSlotsList';
+import MySlotsList from '@/components/telemedicine/doctor/MySlotsList';
 
 // Slots are offered only once the registration is verified (C-22; the server answers 403 before that)
 export default function DoctorSlotsPage() {
@@ -18,7 +18,7 @@ export default function DoctorSlotsPage() {
       {data?.is_verified && (
         <>
           <AddSlotsForm />
-          <OpenSlotsList doctorId={data.id} />
+          <MySlotsList />
         </>
       )}
     </div>

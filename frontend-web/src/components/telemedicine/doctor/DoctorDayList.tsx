@@ -15,7 +15,7 @@ import EndConsultDialog from './EndConsultDialog';
 const paidOrFree = (c: DoctorConsultation) => c.payment_status === 'paid' || c.payment_status === 'waived';
 
 /** Join (starts the consultation), end with notes, cancel with a reason — the patient's paid fee is refunded. */
-export default function DoctorDayList({ rows, date }: { rows: DoctorConsultation[]; date: string }) {
+export default function DoctorDayList({ rows }: { rows: DoctorConsultation[] }) {
   const queryClient = useQueryClient();
   const { join, room, closeRoom } = useJoin(doctorKeys.all);
   const [ending, setEnding] = useState<DoctorConsultation | null>(null);
@@ -46,7 +46,6 @@ export default function DoctorDayList({ rows, date }: { rows: DoctorConsultation
         <DoctorConsultRow
           key={c.id}
           c={c}
-          date={date}
           actions={
             <>
               {['booked', 'in_progress'].includes(c.status) && paidOrFree(c) && (

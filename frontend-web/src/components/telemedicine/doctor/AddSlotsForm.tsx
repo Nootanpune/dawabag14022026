@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { addSlots } from '@/lib/telemedicine/doctorApi';
+import { addSlots, doctorKeys } from '@/lib/telemedicine/doctorApi';
 import { teleKeys } from '@/lib/telemedicine/api';
 import { buildSlots, type SlotPlan } from '@/lib/telemedicine/slots';
 import { todayIST } from '@/lib/fulfilment/roles';
@@ -29,7 +29,10 @@ export default function AddSlotsForm() {
       toast.success(`${r.added} slot${r.added === 1 ? '' : 's'} added${r.skipped ? `, ${r.skipped} already existed` : ''}`);
     },
     onError: (err) => setErrors(getApiErrorLines(err, 'Could not add the slots')),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: teleKeys.all }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: teleKeys.all });
+      queryClient.invalidateQueries({ queryKey: doctorKeys.all });
+    },
   });
 
   const submit = () => {

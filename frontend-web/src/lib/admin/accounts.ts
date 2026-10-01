@@ -22,7 +22,27 @@ export const REPORT_LABELS: Record<string, string> = {
   'purchase-register': 'Purchase register',
   'purchase-returns': 'Purchase returns',
   'stock-valuation': 'Stock valuation',
+  'payment-reconciliation': 'Payment reconciliation (Razorpay)',
 };
+
+/** Reports the server limits to a shorter period; shown as a hint, the server's 400 is shown if exceeded. */
+export const REPORT_PERIOD_HINTS: Record<string, string> = {
+  'payment-reconciliation': 'Fetched live from Razorpay settlements: choose up to 31 days.',
+};
+
+// Razorpay settlement vs Dawabag ledger outcome per line
+const RECON_STATUS_TONE: Record<string, string> = {
+  matched: 'bg-green-50 text-green-700',
+  amount_mismatch: 'bg-red-50 text-red-700',
+  missing_in_dawabag: 'bg-red-50 text-red-700',
+  not_yet_settled: 'bg-gray-100 text-gray-600',
+};
+
+/** Badge classes for a cell, or '' for plain text (only the reconciliation status is colour-coded). */
+export function cellTone(report: string, col: string, value: unknown): string {
+  if (report !== 'payment-reconciliation' || col !== 'status') return '';
+  return RECON_STATUS_TONE[String(value)] ?? '';
+}
 
 export const accountsKeys = {
   names: ['accounts', 'reports'] as const,

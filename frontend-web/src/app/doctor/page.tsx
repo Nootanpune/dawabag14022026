@@ -33,7 +33,7 @@ export default function DoctorHomePage() {
       {verified && (
         <>
           <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText="No consultations on this day" />
-          {!!data?.length && <DoctorDayList rows={data} date={date} />}
+          {!!data?.length && <DoctorDayList rows={data} />}
         </>
       )}
     </div>

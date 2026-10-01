@@ -2,13 +2,21 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–9 are done on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–11 are done on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Web Sprint 11 (tsc + next lint + next build pass)
+- /admin/refunds: "Retry with Razorpay" on pending gateway refunds with a failure_reason
+  (POST /returns/refunds/admin/:id/retry; 409 texts shown), attempts count; UTR path kept.
+  /admin/accounts: 'payment-reconciliation' report (≤31 days hint, server 400 shown,
+  status colour-coded). Doctor: /doctor/slots lists own slots (GET /doctors/me/slots,
+  booked/blocked shown, Block only free); prescribe page loads GET /consultations/:id
+  (no ?date=); medicine search always shows the TPG list.
 
 ## Web Sprint 10 — teleconsultation (tsc + next lint + next build pass)
 - Patient: /consult (verified doctors with qualification, council, reg. no./year, fee),
@@ -53,6 +61,22 @@ the lawyer/CA sign-off.
   components/staff/purchaseReturns/*. Nav entry for STORE_ROLES.
 - Accounts: 'purchase-returns' report label. /staff/stock: "Recalled only" filter and
   paging from the server's total (fetchBatches now returns {batches,total}).
+
+## Done in Sprint 11 (payments end to end)
+- Migration 14. services/payments/{capture,checkout,webhook,reconcile}: one idempotent capture path
+  (verify, webhook, sweep) for mandates, consultation fees, orders and refill charges; webhooks
+  signed + de-duplicated (payment_webhook_events); refund.processed/failed, token.*; refund retry;
+  job payment_reconcile; report payment-reconciliation (live Razorpay settlements, ≤ 31 days).
+- Fixed: attaching a refill to a mandate always failed (untyped SQL parameter).
+- Tests: test/sprint11.smoke.mjs (35); sprints 3 and 5 now run against the fake Razorpay;
+  sprints 1–11 = 583 checks; jest 58.
+
+## Done in Sprint 10 (teleconsultation, TPG 2020)
+- Migration 13. Doctors verified against the council register; TPG medicine lists (O/A/B/
+  prohibited) set by pharmacists; consult modes, consent, first/follow-up; Razorpay fee and
+  refunds; e-prescriptions final, PDF on demand, public check code, sent to the pharmacist
+  unverified when the patient chooses Dawabag. Legacy monolithic route files replaced.
+- Tests: test/sprint10.smoke.mjs (65).
 
 ## Done in Sprint 9 (e-invoicing, document numbers, purchase returns)
 - Migration 12. Document numbers now fit CGST Rule 46's 16 characters: `DWB/2627/00012`,
@@ -239,7 +263,7 @@ the lawyer/CA sign-off.
   keychain, register screen split into screens/auth/register/ (not compiled).
 
 ## Known gaps
-- Refunds through Razorpay untested (no keys; legs wait for accounts). Replacement = new order.
+- Razorpay tested against a stand-in gateway only; run a live test-mode ₹1 payment, refund and mandate. Replacement = new order.
 - External penetration test pending (internal review done, 12 findings fixed).
 - Policy texts must be published by the owner.
 - WhatsApp channel not wired; GSTR-8 filing manual; Razorpay mandates untested.

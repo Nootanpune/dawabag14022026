@@ -6,7 +6,7 @@ import { doctorKeys, searchMedicines } from '@/lib/telemedicine/doctorApi';
 import { teleListShort } from '@/lib/telemedicine/labels';
 import type { MedicineHit } from '@/lib/telemedicine/types';
 
-/** Catalogue search for one prescription row; shows the TPG list when the API includes it (C-23). */
+/** Catalogue search for one prescription row; shows each medicine's TPG list (C-23). */
 export default function MedicineSearch({ onPick }: { onPick: (m: MedicineHit) => void }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
@@ -44,7 +44,7 @@ export default function MedicineSearch({ onPick }: { onPick: (m: MedicineHit) =>
                 {m.generic_name && <span className="text-gray-500"> · {m.generic_name}</span>}
                 <span className="block text-xs text-gray-400">
                   {m.drug_schedule ?? 'OTC'}
-                  {m.telemedicine_list !== undefined && ` · ${teleListShort(m.telemedicine_list)}`}
+                   · {teleListShort(m.telemedicine_list)}
                 </span>
               </button>
             </li>

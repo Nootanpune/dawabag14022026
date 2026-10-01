@@ -2,13 +2,15 @@
 // the council register before slots or prescriptions are allowed (C-22).
 import api from '../api';
 import type {
-  CancelResult, DoctorConsultation, DoctorProfile, IssuedPrescription, MedicineHit, NewSlot, PrescriptionInput, ProfileInput,
+  CancelResult, ConsultationDetail, DoctorConsultation, DoctorProfile, IssuedPrescription, MedicineHit, NewSlot, OwnSlot, PrescriptionInput, ProfileInput,
 } from './types';
 
 export const doctorKeys = {
   all: ['doctor-portal'] as const,
   profile: ['doctor-portal', 'profile'] as const,
   day: (date: string) => ['doctor-portal', 'day', date] as const,
+  slots: (from: string, to: string) => ['doctor-portal', 'slots', from, to] as const,
+  consultation: (id: string) => ['doctor-portal', 'consultation', id] as const,
   medicines: (q: string) => ['doctor-portal', 'medicines', q] as const,
 };
 
@@ -35,6 +37,12 @@ export async function addSlots(slots: NewSlot[]) {
   return data.data as { added: number; skipped: number };
 }
 
+/** The doctor's own slots in a date range, booked and blocked ones included (403 until verified). */
+export async function fetchMySlots(from: string, to: string): Promise<OwnSlot[]> {
+  const { data } = await api.get('/doctors/me/slots', { params: { from, to } });
+  return Array.isArray(data.data) ? data.data : [];
+}
+
 export async function blockSlot(slotId: string) {
   const { data } = await api.post(`/doctors/me/slots/${slotId}/block`);
   return data.data as { id: string; blocked: boolean };
@@ -43,6 +51,12 @@ export async function blockSlot(slotId: string) {
 export async function fetchDoctorDay(date: string): Promise<DoctorConsultation[]> {
   const { data } = await api.get('/consultations/doctor', { params: { date } });
   return Array.isArray(data.data) ? data.data : [];
+}
+
+/** One consultation; the server answers only for its patient or its doctor. */
+export async function fetchConsultation(id: string): Promise<ConsultationDetail> {
+  const { data } = await api.get(`/consultations/${id}`);
+  return data.data;
 }
 
 export async function endConsultation(id: string, notes?: string) {
@@ -61,7 +75,7 @@ export async function issuePrescription(consultationId: string, body: Prescripti
   return data.data;
 }
 
-/** Public catalogue search; the TPG list is shown when the API includes it. */
+/** Public catalogue search; each hit carries its TPG list (C-23). */
 export async function searchMedicines(q: string): Promise<MedicineHit[]> {
   const { data } = await api.get('/products/search', { params: { q, limit: 10 } });
   return data.data?.products ?? [];
