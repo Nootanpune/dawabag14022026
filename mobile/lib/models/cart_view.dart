@@ -8,6 +8,8 @@ class CartLine {
   final String? drugSchedule;
   final bool coldChain;
   final String? imageKey;
+  /// Signed short-lived link to the approved pack photo (C-19), or null.
+  final String? imageUrl;
   final int quantity;
   final int unitPricePaise;
   final int mrpPaise;
@@ -26,6 +28,7 @@ class CartLine {
     this.drugSchedule,
     this.coldChain = false,
     this.imageKey,
+    this.imageUrl,
     required this.quantity,
     required this.unitPricePaise,
     required this.mrpPaise,
@@ -45,6 +48,7 @@ class CartLine {
         drugSchedule: j['drug_schedule']?.toString(),
         coldChain: j['cold_chain'] == true,
         imageKey: j['image_key']?.toString(),
+        imageUrl: j['image_url']?.toString(),
         quantity: _int(j['quantity']),
         unitPricePaise: _int(j['unit_price_paise']),
         mrpPaise: _int(j['mrp_paise']),

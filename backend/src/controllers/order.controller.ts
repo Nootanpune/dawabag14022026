@@ -13,6 +13,7 @@ import { effectiveCustomerType, requiresPrescription } from '../utils/customerTy
 
 const CANCELLABLE = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing'];
 import { createOrderSchema, placeOrder } from '../services/orderPlacement.service';
+import { approvedImageKeySql, withImageUrls } from '../services/productImage.service';
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -66,8 +67,8 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     );
     if (!orderResult) throw new AppError('Order not found', 404);
 
-    const items = await query(
-      `SELECT oi.*, p.s3_image_key, p.drug_schedule,
+    const items = await withImageUrls(await query(
+      `SELECT oi.*, p.s3_image_key, ${approvedImageKeySql()} AS approved_image_key, p.drug_schedule,
               COALESCE(ib.batch_number, pi.batch_number) AS batch_number, COALESCE(ib.expiry_date, pi.expiry_date) AS batch_expiry,
               COALESCE((SELECT SUM(ri.quantity) FROM return_items ri JOIN return_requests rr ON rr.id = ri.return_id
                         WHERE ri.order_item_id = oi.id AND rr.status IN ('requested', 'approved', 'closed')), 0)::int AS returned_qty
@@ -78,7 +79,7 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
        LEFT JOIN partner_inventory pi ON pi.id = poi.partner_inv_id
        WHERE oi.order_id = $1`,
       [id]
-    );
+    ), 'approved_image_key');   // pack photo once approved (C-19)
 
     // Seller of record per shipment (C-05); partners shown by name
     const shipments = await query<any>(

@@ -8,6 +8,7 @@ import { listPartnerProducts, submitListing, upsertInventory } from '../services
 import { dispatchShipment, listPartnerShipments, markShipmentDelivered } from '../services/partnerFulfilment.service';
 import { getSettlement, listSettlements } from '../services/settlement.service';
 import { rejectionLabel } from '../utils/rejectionCodes';
+import { approvedImageKeySql, withImageUrls } from '../services/productImage.service';
 
 // GET /partner/products/:id/inventory — the listing's current batches
 export async function getInventory(req: Request, res: Response, next: NextFunction) {
@@ -42,13 +43,14 @@ export async function searchCatalogue(req: Request, res: Response, next: NextFun
     const rows = await query(
       `SELECT p.id, p.name, p.generic_name, p.sku, p.drug_schedule, p.mrp_paise, p.offer_price_paise,
               p.ptr_price_paise, p.pts_price_paise, p.institutional_price_paise, p.cold_chain,
+              ${approvedImageKeySql()} AS approved_image_key,
               EXISTS (SELECT 1 FROM partner_products pp WHERE pp.partner_id = $2 AND pp.product_id = p.id) AS already_listed
        FROM products p
        WHERE p.is_active = TRUE AND p.deleted_at IS NULL
          AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')
          AND (p.name ILIKE $1 OR p.generic_name ILIKE $1 OR p.sku ILIKE $1)
        ORDER BY p.name LIMIT 30`, [`%${q}%`, req.partner!.vendorId]);
-    res.json({ success: true, data: { products: rows } });
+    res.json({ success: true, data: { products: await withImageUrls(rows, 'approved_image_key') } });
   } catch (err) { next(err); }
 }
 

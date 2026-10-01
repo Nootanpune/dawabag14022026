@@ -3,6 +3,7 @@
 // all prices and copy status. The public endpoints never expose these fields.
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
+import { imageUrlFor, withImageUrls } from './productImage.service';
 
 export async function adminListProducts(q: string | undefined, page: number, limit: number, status?: 'active' | 'inactive') {
   const where = ['p.deleted_at IS NULL'];
@@ -14,16 +15,18 @@ export async function adminListProducts(q: string | undefined, page: number, lim
   const products = await query(
     `SELECT p.id, p.name, p.generic_name, p.sku, p.category, p.drug_schedule, p.telemedicine_list, p.mrp_paise, p.offer_price_paise,
             p.cold_chain, p.is_active, p.content_status, (p.manufacturer_address IS NOT NULL) AS has_declarations,
+            p.s3_image_key AS image_key,
             COALESCE((SELECT SUM(b.quantity_available - b.quantity_reserved) FROM inventory_batches b
                       WHERE b.product_id = p.id AND NOT b.is_recalled AND b.expiry_date > CURRENT_DATE + 30), 0)::int AS stock_qty
      FROM products p WHERE ${where.join(' AND ')}
      ORDER BY p.name LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
-  return { products: products.map((p: any) => ({ ...p, in_stock: p.stock_qty > 0 })), pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  // Staff see the current photo whatever its review state
+  return { products: (await withImageUrls(products, 'image_key')).map((p: any) => ({ ...p, in_stock: p.stock_qty > 0 })), pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
 }
 
 export async function adminGetProduct(id: string) {
   const p = await queryOne<any>(`SELECT * FROM products WHERE id = $1 AND deleted_at IS NULL`, [id]);
   if (!p) throw new AppError('Product not found', 404);
   delete p.search_vector;
-  return { ...p, price_paise: p.offer_price_paise };
+  return { ...p, price_paise: p.offer_price_paise, image_url: await imageUrlFor(p.s3_image_key) };
 }

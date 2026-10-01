@@ -29,6 +29,11 @@ export interface ProductDetail {
   /** null until a pharmacist approves the copy */
   description: string | null;
   content_reviewed: boolean;
+  /** signed short-lived link to the pack photo; customers get it only once approved (C-19), staff always */
+  image_url: string | null;
+  /** admin record only: the stored photo's object-store key and the copy/photo review state */
+  s3_image_key?: string | null;
+  content_status?: 'pending_review' | 'approved' | 'rejected';
   max_qty_per_order: number;
   in_stock: boolean;
   requires_prescription: boolean;
@@ -50,6 +55,8 @@ export interface ContentReviewItem {
   composition: string | null;
   storage_instructions: string | null;
   content_flags: ContentFlag[] | null;
+  /** the pack photo under review with the copy, if any */
+  image_url: string | null;
   updated_at: string;
 }
 

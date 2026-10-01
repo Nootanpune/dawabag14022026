@@ -8,6 +8,7 @@ import { BuyerType, priceField, requiresPrescription } from '../utils/customerTy
 import { evaluateCoupon } from './coupon.service';
 import { freeDeliveryAbovePaise, freeDeliveryProgress } from './delivery/freeDelivery';
 import { partnerStockSql } from './stock/partnerStock';
+import { approvedImageKeySql, imageUrlFor } from './productImage.service';
 
 const BLOCKED_SCHEDULES = ['Schedule X', 'NDPS'];
 
@@ -18,6 +19,7 @@ export interface CartLine {
   drug_schedule: string;
   cold_chain: boolean;
   image_key: string | null;
+  image_url: string | null;
   quantity: number;
   unit_price_paise: number;
   mrp_paise: number;
@@ -41,6 +43,7 @@ async function productRows(productIds: string[]) {
   if (!productIds.length) return [];
   return query<any>(
     `SELECT p.id, p.name, p.sku, p.drug_schedule, p.cold_chain, p.s3_image_key,
+            ${approvedImageKeySql()} AS approved_image_key,
             p.is_active, p.deleted_at, p.mrp_paise, p.offer_price_paise,
             COALESCE(p.ptr_price_paise, p.offer_price_paise) AS ptr_price_paise,
             COALESCE(p.pts_price_paise, p.offer_price_paise) AS pts_price_paise,
@@ -65,6 +68,8 @@ export async function getCart(userId: string, pricingType: BuyerType) {
   );
   const products = new Map((await productRows(rows.map((r) => r.product_id))).map((p) => [p.id, p]));
   const column = priceField(pricingType);
+  // Pack photos a customer may see (approved, C-19), signed once per product
+  const imageUrls = new Map(await Promise.all([...products.values()].map(async (p) => [p.id, await imageUrlFor(p.approved_image_key)] as const)));
 
   const items: CartLine[] = rows.map((r) => {
     const p = products.get(r.product_id);
@@ -77,7 +82,7 @@ export async function getCart(userId: string, pricingType: BuyerType) {
     else if (r.quantity > max) issue = `Maximum per order is ${max}`;
     return {
       product_id: p.id, name: p.name, sku: p.sku, drug_schedule: p.drug_schedule,
-      cold_chain: p.cold_chain, image_key: p.s3_image_key,
+      cold_chain: p.cold_chain, image_key: p.s3_image_key, image_url: imageUrls.get(p.id) ?? null,
       quantity: r.quantity, unit_price_paise: unit, mrp_paise: p.mrp_paise,
       line_subtotal_paise: unit * r.quantity, min_qty: min, max_qty: max,
       stock_qty: p.stock_qty, available: issue === null, issue,

@@ -12,6 +12,8 @@ interface Product {
   /** buyer-specific price from the server (offer / PTR / PTS / institutional) */
   display_price_paise: number;
   cold_chain: boolean; s3_image_key?: string; max_qty_per_order: number;
+  /** signed link to the pharmacist-approved pack photo (C-19), or null */
+  image_url?: string | null;
 }
 
 interface Props {
@@ -34,7 +36,7 @@ export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
     <div className="card hover:shadow-md transition-shadow flex flex-col">
       {/* Photo or initial + dosage-form tile; the name link below carries the accessible name */}
       <Link href={`/shop/${product.id}`} className="block mb-3" aria-hidden="true" tabIndex={-1}>
-        <ProductImage name={product.name} />
+        <ProductImage name={product.name} imageUrl={product.image_url} />
       </Link>
 
       {/* Info */}

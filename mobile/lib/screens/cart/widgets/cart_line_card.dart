@@ -35,7 +35,7 @@ class CartLineCard extends StatelessWidget {
               children: [
                 ProductImage(
                   name: line.name,
-                  imageUrl: ProductImage.imageUrlOf({'image_key': line.imageKey}),
+                  imageUrl: ProductImage.imageUrlOf({'image_url': line.imageUrl}),
                   width: 52,
                   height: 52,
                   compact: true,

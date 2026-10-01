@@ -19,3 +19,13 @@ test('a pharmacist lands on the fulfilment queue', async ({ page }) => {
   await expect(page).toHaveURL(/\/staff\//);
   await expect(page.getByText(/prescription/i).first()).toBeVisible();
 });
+
+test('an admin sees the pack photo panel; a non-image is refused before upload', async ({ page }) => {
+  await signIn(page, 'admin');
+  await page.goto(`/admin/products/${process.env.E2E_PRODUCT_ID}`);
+  const panel = page.getByRole('region', { name: 'Pack photo' });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Upload photo' })).toBeVisible();
+  await panel.getByLabel('Pack photo file').setInputFiles({ name: 'leaflet.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7') });
+  await expect(panel.getByRole('alert')).toHaveText(/JPEG, PNG or WebP/);
+});

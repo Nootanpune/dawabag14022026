@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../utils/dosage_form.dart';
 
-/// Product picture: the network image when the API gives an absolute image
-/// URL, otherwise a soft brand-tinted tile with the product's initial and a
-/// dosage-form label guessed from the name. Images are only held in Flutter's
-/// in-memory cache; nothing is written to the device.
+/// Product pack photo: the server's short-lived signed `image_url` (the photo
+/// lives only in the server object store, and customers get it only after a
+/// pharmacist approved it — C-19), otherwise — and while loading or on error —
+/// a soft brand-tinted tile with the product's initial and a dosage-form label
+/// guessed from the name. Images are only held in Flutter's in-memory cache;
+/// nothing is written to the device.
 class ProductImage extends StatelessWidget {
   final String name;
   final String? imageUrl;
@@ -26,8 +28,9 @@ class ProductImage extends StatelessWidget {
     this.compact = false,
   });
 
-  /// Reads the image URL from a product map (`image_url`, or `s3_image_key`
-  /// / `image_key` only when the server already sent a full http(s) URL).
+  /// Reads the photo link from a product map: the API's `image_url`, when it is
+  /// an http(s) URL. Object-store keys (`s3_image_key`, `image_key`) are never
+  /// fetched directly — the bucket is private.
   factory ProductImage.fromProduct(
     Map<String, dynamic> product, {
     Key? key,
@@ -48,10 +51,8 @@ class ProductImage extends StatelessWidget {
   }
 
   static String? imageUrlOf(Map<String, dynamic> product) {
-    for (final k in const ['image_url', 's3_image_key', 'image_key']) {
-      final v = product[k]?.toString().trim();
-      if (v != null && (v.startsWith('https://') || v.startsWith('http://'))) return v;
-    }
+    final v = product['image_url']?.toString().trim();
+    if (v != null && (v.startsWith('https://') || v.startsWith('http://'))) return v;
     return null;
   }
 
@@ -66,11 +67,17 @@ class ProductImage extends StatelessWidget {
         width: width,
         child: url == null
             ? placeholder
-            : Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => placeholder,
-                loadingBuilder: (_, child, progress) => progress == null ? child : placeholder,
+            : ColoredBox(
+                color: Colors.white,
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  semanticLabel: name,
+                  errorBuilder: (_, __, ___) => placeholder,
+                  // Placeholder until the first frame has arrived
+                  frameBuilder: (_, child, frame, wasSynchronouslyLoaded) =>
+                      frame == null && !wasSynchronouslyLoaded ? placeholder : child,
+                ),
               ),
       ),
     );

@@ -8,6 +8,7 @@ import { cacheGet, cacheSet } from '../config/redis';
 import { AppError } from '../utils/AppError';
 import { BuyerType, priceField } from '../utils/customerType';
 import { partnerNearestExpirySql, partnerStockSql } from './stock/partnerStock';
+import { imageUrlFor } from './productImage.service';
 
 const PUBLIC_FIELDS = ['id', 'name', 'generic_name', 'sku', 'category', 'drug_schedule', 'hsn_code', 'gst_rate',
   'marketed_by', 'composition', 'storage_instructions', 'cold_chain', 'mrp_paise', 's3_image_key',
@@ -37,6 +38,8 @@ export async function productDetail(productId: string, pricingType: BuyerType) {
     ...out,
     description: row.content_status === 'approved' ? row.description : null,
     content_reviewed: row.content_status === 'approved',
+    // The pack photo, like the copy, is shown only after pharmacist approval (C-19)
+    image_url: row.content_status === 'approved' ? await imageUrlFor(row.s3_image_key) : null,
     price_paise: price,
     offer_price_paise: price,   // kept for older clients
     stock_qty: Number(row.stock_qty),

@@ -7,6 +7,7 @@ import { productKeys, reviewContent, type ContentReviewItem } from '@/lib/produc
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { useAuthStore } from '@/store/authStore';
 import { formatDateTimeIST } from '@/lib/dates';
+import ProductImage from '@/components/shop/ProductImage';
 
 function Field({ label, value }: { label: string; value: string | null }) {
   return (
@@ -63,6 +64,14 @@ export default function ContentReviewCard({ p }: { p: ContentReviewItem }) {
               <span className="font-medium">{f.condition}</span> ({f.claim}): “{f.excerpt}”
             </p>
           ))}
+        </div>
+      )}
+      {p.image_url && (
+        <div className="flex gap-3 items-start">
+          <div className="w-40 shrink-0"><ProductImage name={p.name} imageUrl={p.image_url} size="lg" /></div>
+          <p className="text-xs text-gray-600">
+            Pack photo: approve only if it shows this exact product and pack, with no claims beyond the approved copy (C-19).
+          </p>
         </div>
       )}
       <Field label="Description" value={p.description} />

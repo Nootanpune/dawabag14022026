@@ -44,3 +44,14 @@ export async function putPrivateObject(
 export async function getPrivateObjectUrl(key: string, expiresSeconds = 300): Promise<string> {
   return getSignedUrl(getS3(), new GetObjectCommand({ Bucket: process.env.AWS_S3_BUCKET!, Key: key }), { expiresIn: expiresSeconds });
 }
+
+export const isObjectStoreConfigured = () => !!process.env.AWS_S3_BUCKET;
+
+// Short-lived link to a catalogue object (product pack photos). Public content,
+// not personal data, so no audit entry; the bucket itself stays private and the
+// link tells the browser it may cache the photo for as long as the link lives.
+export async function getCatalogueObjectUrl(key: string, expiresSeconds: number): Promise<string> {
+  return getSignedUrl(getS3(), new GetObjectCommand({
+    Bucket: process.env.AWS_S3_BUCKET!, Key: key, ResponseCacheControl: `private, max-age=${expiresSeconds}`,
+  }), { expiresIn: expiresSeconds });
+}

@@ -6,6 +6,7 @@ import { cacheDel } from '../config/redis';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { findRestrictedClaims } from '../utils/claimsCheck';
+import { withImageUrls } from './productImage.service';
 
 export const COPY_FIELDS = ['name', 'description', 'composition', 'storage_instructions'] as const;
 
@@ -13,12 +14,13 @@ export function copyFlags(p: Record<string, any>) {
   return findRestrictedClaims(p.name, p.description, p.composition, p.storage_instructions);
 }
 
+// The pack photo is reviewed with the copy: it must show the actual product (C-19)
 export async function contentQueue() {
-  return query(
+  return withImageUrls(await query(
     `SELECT id, sku, name, drug_schedule, description, composition, storage_instructions, content_status,
-            content_flags, updated_at
+            content_flags, updated_at, s3_image_key AS image_key
      FROM products WHERE content_status = 'pending_review' AND deleted_at IS NULL
-     ORDER BY updated_at LIMIT 200`);
+     ORDER BY updated_at LIMIT 200`), 'image_key');
 }
 
 export async function reviewContent(pharmacistId: string, productId: string, approve: boolean, notes: string) {

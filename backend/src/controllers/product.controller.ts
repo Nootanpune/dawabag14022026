@@ -9,6 +9,7 @@ import { productDetail } from '../services/productDetail.service';
 import { adminGetProduct, adminListProducts } from '../services/productAdmin.service';
 import { COPY_FIELDS, contentQueue, copyFlags, reviewContent } from '../services/productContent.service';
 import { partnerStockSql } from '../services/stock/partnerStock';
+import { approvedImageKeySql, withImageUrls } from '../services/productImage.service';
 
 // ─── Search Products ─────────────────────────────────────────────────────────
 export async function searchProducts(req: Request, res: Response, next: NextFunction) {
@@ -85,6 +86,7 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
       `SELECT p.id, p.name, p.generic_name, p.sku, p.category,
               p.drug_schedule, p.telemedicine_list, p.marketed_by, p.mrp_paise,
               p.offer_price_paise, p.cold_chain, p.s3_image_key, p.gst_rate,
+              ${approvedImageKeySql()} AS approved_image_key,
               (${displayPrice}) AS display_price_paise,
               (${minQtyExpr}) AS min_order_qty,
               (${maxQtyExpr}) AS max_order_qty,
@@ -109,7 +111,8 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
     res.json({
       success: true,
       data: {
-        products: products.map((p) => ({
+        // Pack photo only once the pharmacist approved it (C-19)
+        products: (await withImageUrls(products, 'approved_image_key')).map((p: any) => ({
           ...p,
           in_stock: parseInt(p.stock_qty) > 0,
           discount_pct: Math.round(

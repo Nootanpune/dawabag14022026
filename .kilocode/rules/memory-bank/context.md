@@ -10,6 +10,47 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 21 — product photos (2026-10-01, uncommitted)
+- Admin/super_admin `PUT /products/:id/image` (multipart `image`, JPEG/PNG/WebP,
+  ≤ 2 MB, type from magic bytes and must match the declared type —
+  `utils/imageCheck.ts`) → object store key `products/<id>/<uuid>.<ext>` (old objects
+  kept); `DELETE /products/:id/image` clears the key. Both audit-logged
+  (`product_image_set` / `product_image_removed`, C-46).
+- C-19: a new photo sets `content_status = 'pending_review'` (same pharmacist queue as
+  copy; the queue returns `image_url` and the web review card shows it). Customers get
+  `image_url` only when `content_status = 'approved'` (SQL `approvedImageKeySql()`);
+  staff (admin list/detail, queue) always see the current photo.
+- URLs: presigned S3 GET links (1 h, `response-cache-control` max-age 3600), reused
+  per key for 50 min from an in-process map (`services/productImage.service.ts`), so
+  browsers can cache; bucket stays private; no store → `image_url` null.
+  `image_url` on search, product detail, cart lines, order detail items, partner
+  catalogue search, admin list/detail. If a CSP is added, `img-src` must allow the
+  S3 host (or S3_ENDPOINT).
+- Web: `ProductImage` shows `image_url` (plain img, onError → placeholder); admin edit
+  page has `ProductPhotoPanel`. Mobile: `ProductImage.imageUrlOf` reads only
+  `image_url`; `CartLine.imageUrl`; frameBuilder/errorBuilder fall back to placeholder.
+- Tests: `test/sprint21.smoke.mjs` (in `test:smoke`; 503 path without a store, full
+  path with AWS_S3_BUCKET=dawabag-fake-bucket + S3_ENDPOINT=fakes); fake S3 now
+  refuses expired presigned links and echoes response-cache-control; jest
+  `imageCheck.test.ts`; Flutter widget tests; one e2e check of the admin panel.
+
+## Security review of Sprints 15–20 (2026-10-01, uncommitted)
+- `config/env.ts`: placeholder check also catches `change-me` (staging template values
+  were accepted as production JWT secrets/DB password); production refuses the fake
+  object store (bucket/keys "fake") and S3_ENDPOINT (only a warning with
+  ALLOW_MISSING_INTEGRATIONS=true, i.e. closed staging) — C-44.
+- `config/timezone.ts` imported first in index.ts pins the process to UTC (DATE columns
+  shifted a day on an IST host).
+- Notification email bodies are HTML-escaped in `notifications/dispatcher.ts`.
+- CI: `permissions: contents: read`; MOBILE_API_URL passed via env.
+- Staging Caddy: access logs redact e-prescription check codes; website sends
+  X-Frame-Options DENY + frame-ancestors 'none'; check.sh port checks fixed (the old
+  one passed even with 5432 open) and Redis/framing checks added.
+- Mobile `config/api_url.dart`: release builds refuse a non-https API_URL.
+- Open: website has no anti-framing/CSP headers outside staging Caddy (add in
+  next.config `headers()` or the production front door); release APK still signed
+  with debug keys (needs an upload key before Play).
+
 ## Sprint 20 — free delivery and partner stock (2026-10-01)
 - Free delivery for retail orders whose medicines (after coupon, before GST) reach
   `delivery.free_above_paise` (₹499; null = off; migration 20). Cart API returns

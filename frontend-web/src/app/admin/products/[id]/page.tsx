@@ -7,6 +7,7 @@ import BackLink from '@/components/admin/BackLink';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import ProductForm from '@/components/admin/products/ProductForm';
+import ProductPhotoPanel from '@/components/admin/products/ProductPhotoPanel';
 import { useProductSave } from '@/components/admin/products/useProductSave';
 
 export default function EditProductPage() {
@@ -32,6 +33,13 @@ export default function EditProductPage() {
               Product copy is waiting for pharmacist approval (C-19); the description is hidden until then — leave it blank to keep it.
             </p>
           )}
+          <ProductPhotoPanel
+            productId={id}
+            name={data.name}
+            imageUrl={data.image_url ?? null}
+            hasPhoto={!!data.s3_image_key}
+            contentStatus={data.content_status}
+          />
           <ProductForm
             initial={initial}
             editing

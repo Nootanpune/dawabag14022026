@@ -24,6 +24,8 @@ export interface AdminProductRow {
   has_declarations?: boolean;
   /** pharmacist's Telemedicine Practice Guidelines list (C-23); null until classified */
   telemedicine_list?: 'O' | 'A' | 'B' | 'prohibited' | null;
+  /** signed link to the current pack photo (any review state), or null */
+  image_url?: string | null;
 }
 
 export interface ProductPage {
@@ -68,4 +70,36 @@ export async function createProduct(body: ProductBody): Promise<{ id: string }> 
 
 export async function updateProduct(id: string, body: ProductBody): Promise<void> {
   await api.patch(`/products/${id}`, body);
+}
+
+// ─── Pack photo (stored only in the server object store) ─────────────────────
+export const PRODUCT_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const PRODUCT_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+
+export interface ProductPhotoResult {
+  id: string;
+  s3_image_key: string | null;
+  image_url: string | null;
+  content_status?: string;
+}
+
+/** Quick client check; the server checks the file's bytes again. Returns an error message or null. */
+export function productPhotoProblem(file: File): string | null {
+  if (!(PRODUCT_PHOTO_TYPES as readonly string[]).includes(file.type)) return 'Choose a JPEG, PNG or WebP photo';
+  if (file.size > PRODUCT_PHOTO_MAX_BYTES) return 'The photo must be 2 MB or smaller';
+  return null;
+}
+
+/** PUT /products/:id/image (multipart "image"). A new photo waits for pharmacist approval (C-19). */
+export async function uploadProductPhoto(id: string, file: File): Promise<ProductPhotoResult> {
+  const form = new FormData();
+  form.append('image', file);
+  const { data } = await api.put(`/products/${id}/image`, form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
+  return data.data;
+}
+
+/** DELETE /products/:id/image */
+export async function removeProductPhoto(id: string): Promise<ProductPhotoResult> {
+  const { data } = await api.delete(`/products/${id}/image`);
+  return data.data;
 }

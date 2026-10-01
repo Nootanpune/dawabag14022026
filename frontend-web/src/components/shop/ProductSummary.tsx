@@ -19,7 +19,7 @@ export default function ProductSummary({ p }: { p: ProductDetail }) {
   return (
     <div className="card">
       <div className="flex flex-col sm:flex-row gap-4">
-        <ProductImage name={p.name} size="lg" />
+        <ProductImage name={p.name} imageUrl={p.image_url} size="lg" />
         <div className="flex-1">
           <h1 className="text-xl font-semibold">{p.name}</h1>
           {p.generic_name && <p className="text-sm text-gray-500">{p.generic_name}</p>}

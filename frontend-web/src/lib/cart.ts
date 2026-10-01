@@ -8,6 +8,8 @@ export interface CartLine {
   drug_schedule: string;
   cold_chain: boolean;
   image_key: string | null;
+  /** signed link to the approved pack photo (C-19), or null */
+  image_url: string | null;
   quantity: number;
   unit_price_paise: number;
   mrp_paise: number;

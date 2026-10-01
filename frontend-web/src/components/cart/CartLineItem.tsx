@@ -18,7 +18,7 @@ export default function CartLineItem({ line, disabled, onQuantityChange }: Props
 
   return (
     <div className={cn('card flex gap-4', !line.available && 'border-red-200 bg-red-50/40')}>
-      <ProductImage name={line.name} size="sm" />
+      <ProductImage name={line.name} imageUrl={line.image_url} size="sm" />
       <div className="flex-1 min-w-0">
         <h3 className="font-medium text-sm line-clamp-2">{line.name}</h3>
         <p className="text-xs text-gray-400 mt-0.5">{line.sku}</p>
