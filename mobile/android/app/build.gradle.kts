@@ -1,7 +1,39 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Release signing with the Play upload key (docs/RUNBOOK.md 7b). The key and its
+// passwords come from the environment (CI: decoded from GitHub secrets into the runner's
+// temp dir) or from android/key.properties on a release machine — neither is committed
+// (.gitignore: key.properties, *.jks, *.keystore). Environment values win.
+//   ANDROID_KEYSTORE_PATH      storeFile      (absolute, or relative to mobile/android/)
+//   ANDROID_KEYSTORE_PASSWORD  storePassword
+//   ANDROID_KEY_ALIAS          keyAlias
+//   ANDROID_KEY_PASSWORD       keyPassword
+// Without them a release build stops with a clear message; it is never signed with the
+// debug key. Debug builds need none of this.
+val keyProperties = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.isFile) file.inputStream().use { load(it) }
+}
+val signingValue = { env: String, property: String ->
+    providers.environmentVariable(env).orNull?.takeIf { it.isNotBlank() }
+        ?: keyProperties.getProperty(property)?.takeIf { it.isNotBlank() }
+}
+val releaseStorePath = signingValue("ANDROID_KEYSTORE_PATH", "storeFile")
+val releaseStorePassword = signingValue("ANDROID_KEYSTORE_PASSWORD", "storePassword")
+val releaseKeyAlias = signingValue("ANDROID_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = signingValue("ANDROID_KEY_PASSWORD", "keyPassword")
+val releaseSigningProblems = buildList {
+    if (releaseStorePath == null) add("ANDROID_KEYSTORE_PATH (storeFile)")
+    else if (!rootProject.file(releaseStorePath).isFile) add("keystore file not found: ${rootProject.file(releaseStorePath)}")
+    if (releaseStorePassword == null) add("ANDROID_KEYSTORE_PASSWORD (storePassword)")
+    if (releaseKeyAlias == null) add("ANDROID_KEY_ALIAS (keyAlias)")
+    if (releaseKeyPassword == null) add("ANDROID_KEY_PASSWORD (keyPassword)")
 }
 
 android {
@@ -32,12 +64,38 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningProblems.isEmpty()) {
+            create("release") {
+                storeFile = rootProject.file(releaseStorePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // The upload key, or none at all (the check below then stops the build)
+            signingConfig = signingConfigs.findByName("release")
         }
+    }
+}
+
+// Fail fast, before anything compiles, when a release APK/AAB is asked for without the
+// upload key — instead of quietly producing an unsigned or debug-signed artefact.
+gradle.taskGraph.whenReady {
+    val releaseTask = Regex("^(assemble|bundle|package|sign)Release(Bundle)?$")
+    if (releaseSigningProblems.isNotEmpty() &&
+        allTasks.any { it.project.path == project.path && releaseTask.matches(it.name) }
+    ) {
+        throw GradleException(
+            "Release builds must be signed with the Play upload key, and it is not configured. " +
+                "Missing: ${releaseSigningProblems.joinToString("; ")}. Set these environment " +
+                "variables or fill mobile/android/key.properties (never commit it) — see " +
+                "docs/RUNBOOK.md section 7b. Debug builds (flutter build apk --debug) need no key."
+        )
     }
 }
 

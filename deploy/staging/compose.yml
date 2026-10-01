@@ -67,6 +67,42 @@ services:
     restart: unless-stopped
     depends_on: [api]
 
+  backup:
+    # Nightly pg_dump at BACKUP_AT (default 02:30 Asia/Kolkata; the container clock is UTC),
+    # streamed straight to the object store — no dump file on this machine. Restore and the
+    # quarterly restore test: deploy/staging/restore.sh; retention: backup-lifecycle.json
+    # (daily 35 days, first of the month 8 years, C-34). RUNBOOK 7c. Without a bucket it
+    # stays up, logs "backups are OFF", and check.sh skips the backup-age check.
+    build:
+      context: .
+      dockerfile: backup/Dockerfile
+    restart: unless-stopped
+    init: true        # stops promptly on `docker compose stop`
+    # Only what the backup needs (not the API's whole staging.env)
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: dawabag
+      PGUSER: dawabag_user
+      PGPASSWORD: ${DB_PASSWORD}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      # Bucket and keys: BACKUP_* when set, else the API's own S3 settings
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      BACKUP_AWS_ACCESS_KEY_ID: ${BACKUP_AWS_ACCESS_KEY_ID:-}
+      BACKUP_AWS_SECRET_ACCESS_KEY: ${BACKUP_AWS_SECRET_ACCESS_KEY:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      BACKUP_PREFIX: ${BACKUP_PREFIX:-backups/}
+      BACKUP_SSE: ${BACKUP_SSE:-AES256}
+      BACKUP_KMS_KEY_ID: ${BACKUP_KMS_KEY_ID:-}
+      BACKUP_AT: ${BACKUP_AT:-02:30}
+      BACKUP_PRUNE: ${BACKUP_PRUNE:-false}
+    depends_on:
+      postgres: { condition: service_healthy }
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped

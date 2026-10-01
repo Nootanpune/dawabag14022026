@@ -10,6 +10,48 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 22 — backups and release signing (2026-10-01, uncommitted)
+- Staging `backup` service (deploy/staging/backup/: Dockerfile node:20-alpine3.22 +
+  postgresql16-client, `backup.sh`, `lib.sh`, `s3.mjs` on @aws-sdk/client-s3 3.1144.0):
+  nightly at BACKUP_AT 02:30 Asia/Kolkata, `pg_dump -Fc` streamed by multipart upload to
+  S3 (SSE AES256), nothing on the host disk; object only committed if pg_dump exits 0.
+  Keys `backups/monthly/YYYY/MM/…` (first of IST month, 8 y, C-34) and `backups/daily/…`
+  (35 d) — lifecycle rule `deploy/staging/backup-lifecycle.json`, or BACKUP_PRUNE=true.
+  BACKUP_S3_BUCKET / BACKUP_S3_ENDPOINT / BACKUP_AWS_* else the API's AWS_S3_BUCKET etc.;
+  without a bucket the service idles and logs "backups are OFF". Failure → "BACKUP FAILED"
+  log line, non-zero exit, one retry; check.sh fails if the newest backup is > 26 h old
+  (skipped when no backup container / not configured).
+- `deploy/staging/restore.sh <key|latest> [--keep] [--into-live]`: streams into
+  `dawabag_restore_check`, counts users/orders/products + last migration, drops it;
+  `--into-live` needs no open connections + typed DB name, swaps by rename and keeps
+  `<db>_pre_restore_<time>`. Fake S3 (backend/test/fakes/s3.mjs) gained LIST, DELETE and
+  multipart for local tests. RUNBOOK 7c rewritten (procedure, quarterly restore test).
+- Android release signing: build.gradle.kts reads ANDROID_KEYSTORE_PATH /
+  _KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD (env, else android/key.properties);
+  missing → release tasks fail fast (taskGraph check), never debug-signed. CI mobile job:
+  if secrets ANDROID_KEYSTORE_BASE64 + passwords exist and vars.MOBILE_API_URL is https,
+  builds a signed AAB (build number = run number), artifact `dawabag-release-aab`, key in
+  RUNNER_TEMP deleted after; otherwise skipped with a notice. RUNBOOK 7b: keytool, secrets,
+  Play App Signing. Open: owner creates the upload key and the backup bucket.
+
+## Sprint 22 — bulk photo upload (2026-10-01, uncommitted)
+- Admin/super_admin `POST /products/images/bulk` (multipart `images`, ≤ 50 files, ≤ 60 MB
+  per request by Content-Length, 8 MB hard per-file multer cap; own rate limit
+  PHOTO_BULK_RATE_LIMIT_MAX, default 60/15 min). File name `<SKU>.<jpg|jpeg|png|webp>`
+  (`utils/skuFromFilename.ts`, case-insensitive SKU match; the extension is the declared
+  type, so bytes must match it). Each file goes through `setProductImage` (same key scheme,
+  checks, pending_review C-19, `product_image_set` audit C-46) plus one
+  `product_images_bulk` batch audit entry. Results per file `{file, sku, product_id?,
+  status: uploaded|skipped|failed, message}`: unknown SKU / duplicate in batch → skipped;
+  bad name / bad bytes / > 2 MB → failed. No store → 503 for the whole request.
+  Service `services/productImageBulk.service.ts`, controller `productImageBulk.controller.ts`.
+- Web `/admin/products/photos` (menu Catalogue & stock → Pack photos; "Photos" button on
+  Products): choose files / folder / drop → SKU mapping table with local checks → batches
+  of ≤ 50 files and ≤ 40 MB with progress → results table + link to the review queue.
+  `lib/admin/bulkPhotos/*`, `components/admin/products/bulk/*`; files only in React state.
+- Tests: `test/sprint22.smoke.mjs` (in `test:smoke`; 503 path by default, mixed batch with
+  the fake store), jest `skuFromFilename.test.ts`, one e2e check of the mapping table.
+
 ## Sprint 21 — security review, policies, headers (2026-10-01)
 - Security review of Sprints 15–20: 7 fixes (placeholder secrets refused in
   production, no S3_ENDPOINT/fake store in production, staging port check,

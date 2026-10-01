@@ -7,8 +7,9 @@ on:
   push:
   pull_request:
 
-# The jobs only read the code: the workflow token gets no write access (and fork pull
-# requests never see secrets; this workflow uses none)
+# The jobs only read the code: the workflow token gets no write access. The only secrets
+# are the optional Android upload key (mobile job, passed through env:, never pasted into
+# a script); fork pull requests never see them
 permissions:
   contents: read
 
@@ -165,6 +166,51 @@ jobs:
           name: dawabag-debug-apk
           path: mobile/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 14
+      # Signed release bundle for Google Play — only when the upload key is in the repository
+      # secrets (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+      # ANDROID_KEY_PASSWORD) and MOBILE_API_URL is https (docs/RUNBOOK.md 7b). Otherwise these
+      # steps are skipped and CI stays green. Fork pull requests never see the secrets.
+      - name: Release signing configured?
+        id: signing
+        env:
+          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+          MOBILE_API_URL: ${{ vars.MOBILE_API_URL }}
+        run: |
+          if [ "$HAS_KEYSTORE" != true ]; then
+            echo "::notice::No Android upload key in the repository secrets; release bundle not built (RUNBOOK 7b)"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$MOBILE_API_URL" != https://* ]]; then
+            echo "::notice::Release bundle skipped: the variable MOBILE_API_URL must be an https:// address for a release build"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build signed release bundle
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          MOBILE_API_URL: ${{ vars.MOBILE_API_URL }}
+        run: |
+          # The keystore exists only in the runner's temp dir, only for this step
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/dawabag-upload.jks"
+          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          # Play needs a new version code for every upload: the CI run number
+          flutter build appbundle --release --build-number="$GITHUB_RUN_NUMBER" --dart-define=API_URL="$MOBILE_API_URL"
+      - name: Remove the upload key
+        if: always() && steps.signing.outputs.enabled == 'true'
+        run: rm -f "$RUNNER_TEMP/dawabag-upload.jks"
+      - uses: actions/upload-artifact@v4
+        if: steps.signing.outputs.enabled == 'true'
+        with:
+          name: dawabag-release-aab
+          path: mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+          if-no-files-found: error
 
   staging:
     # The staging stack exactly as a server runs it (deploy/staging): both images built,

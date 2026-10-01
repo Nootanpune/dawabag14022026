@@ -174,7 +174,8 @@ skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
   reply (`request_id`), so a reference a user quotes from an error screen finds the
   request in CloudWatch.
 - Database: RDS automated backups with point-in-time recovery; keep monthly snapshots
-  for **8 years** (GST books 72 months, C-34). Test a restore every quarter.
+  for **8 years** (GST books 72 months, C-34). Test a restore every quarter. (Staging: nightly backups to the object store and
+  `restore.sh`, section 7c.)
 - Statutory records are final in the database: the H1 register, credit notes, audit
   and consent logs cannot be updated or deleted; invoice amounts cannot change.
   A retention purge after the legal period runs in a session that first executes
@@ -224,11 +225,41 @@ told again until it has succeeded once.
   `FIREBASE_APP_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_PROJECT_ID`, see mobile/README.md);
   without them the app runs with push off. Firebase settings are not secrets but are
   kept with the release configuration, not in the code.
-- Before the Play Store: choose the final application id (now `com.dawabag.app` — Android forbids `in` as a package segment; it
-  cannot change after the first upload), create the upload key (keep it off the
-  repository: `android/key.properties` and `*.jks` are ignored), add release signing,
-  then build with `flutter build appbundle --release`. iOS needs an Apple developer
-  account, a Mac and Xcode for signing.
+- Before the Play Store: confirm the final application id (now `com.dawabag.app` —
+  Android forbids `in` as a package segment; it cannot change after the first upload).
+  iOS needs an Apple developer account, a Mac and Xcode for signing.
+- Release signing. Release builds are signed only with the Play **upload key**; without
+  it `flutter build appbundle --release` (or `apk --release`) stops with a message
+  naming what is missing — it is never signed with the debug key. Debug builds need no
+  key. Create the key once, on a trusted machine, and keep it in the company password
+  manager (never in the repository — `key.properties`, `*.jks` and `*.keystore` are
+  ignored):
+
+  ```
+  keytool -genkeypair -v -keystore dawabag-upload.jks -storetype PKCS12 \
+    -keyalg RSA -keysize 4096 -validity 10000 -alias upload \
+    -dname "CN=Dawabag, O=<legal entity>, L=<city>, C=IN"
+  base64 -w0 dawabag-upload.jks > dawabag-upload.jks.b64   # for the GitHub secret; delete after pasting
+  ```
+
+  (PKCS12 uses one password for the store and the key: use it for both settings.)
+  GitHub → Settings → Secrets and variables → Actions: **secrets**
+  `ANDROID_KEYSTORE_BASE64` (the .b64 file's content), `ANDROID_KEYSTORE_PASSWORD`,
+  `ANDROID_KEY_ALIAS` (`upload`), `ANDROID_KEY_PASSWORD`; **variable** `MOBILE_API_URL`
+  must be the `https://` API address (a release build refuses plain http). CI then also
+  builds a signed bundle on every push — Actions → the run → Artifacts →
+  `dawabag-release-aab` (30 days; version code = the CI run number) — decoding the key
+  into the runner's temp directory and deleting it after the build. Without the secrets,
+  or with a non-https `MOBILE_API_URL`, those steps are skipped with a notice and CI stays
+  green. To build on a release machine instead, set `ANDROID_KEYSTORE_PATH`,
+  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` in the
+  environment, or put `storeFile`, `storePassword`, `keyAlias`, `keyPassword` in
+  `mobile/android/key.properties` (paths relative to `mobile/android/`).
+- Play Console: enable **Play App Signing** when creating the app and upload the first
+  bundle signed with this upload key; Google keeps the app signing key. A lost or leaked
+  upload key can then be replaced through Play support (Setup → App signing) without
+  losing the app — keep the key's password and owner on record, and rotate the GitHub
+  secrets when anyone with access leaves.
 - The app keeps nothing on the device except the sign-in token in the OS keychain;
   Android backups are switched off so no copy of app data leaves the phone.
 
@@ -249,11 +280,57 @@ ap-south-1) runs the whole stack from `deploy/staging/`:
 5. Set the GitHub variable `MOBILE_API_URL=https://api-staging.dawabag.in` so test APKs
    reach it.
 
-Update: `git pull` and the same `up -d --build`. The database lives in the
-`postgres_data` volume on that server: back it up with
-`docker compose … exec postgres pg_dump -U dawabag_user dawabag > dawabag-YYYYMMDD.sql` and
-keep the copy off the server. Staging holds test data only — never real patients.
-CI starts this exact stack on every push and runs the same checks.
+Update: `git pull` and the same `up -d --build`. Staging holds test data only — never
+real patients. CI starts this exact stack on every push and runs the same checks.
+
+**Backups (automatic).** The database lives in the `postgres_data` volume on that server;
+the `backup` service copies it to the object store every night. No dump is ever written
+to the server's disk: `pg_dump --format=custom` streams straight into S3 (multipart, with
+server-side encryption, C-41), and an object appears only when `pg_dump` succeeded.
+
+- Set up once: create a bucket for backups in ap-south-1 (public access blocked,
+  versioning on, default encryption on), an IAM user whose policy allows only
+  `s3:PutObject`, `s3:GetObject`, `s3:ListBucket`, `s3:AbortMultipartUpload` (and
+  `s3:DeleteObject` only if pruning from the script) on that bucket, and fill the
+  `BACKUP_*` lines in `staging.env` (see the example file; without `BACKUP_S3_BUCKET` it
+  uses the API's `AWS_S3_BUCKET` and keys). An S3-compatible store works with
+  `BACKUP_S3_ENDPOINT`. Then `docker compose … up -d --build backup` and
+  `docker compose … logs backup` shows "nightly backups at 02:30 Asia/Kolkata".
+- Schedule: `BACKUP_AT`, default 02:30 IST (the containers run in UTC; the schedule is
+  computed in Asia/Kolkata, i.e. 21:00 UTC). A backup now:
+  `docker compose … exec backup /app/backup/backup.sh run`.
+- Keys: `backups/monthly/YYYY/MM/dawabag-YYYYMMDD-HHMM.dump` for the first backup of each
+  IST month, `backups/daily/YYYY/MM/…` for every other night (times in IST).
+- Retention: daily backups 35 days, monthly backups **8 years** (GST books 72 months,
+  C-34; retention schedule C-44). Preferred — the bucket lifecycle rule committed in
+  `deploy/staging/backup-lifecycle.json` (it also moves monthly copies to Glacier
+  Instant Retrieval after 30 days and clears unfinished uploads):
+  `aws s3api put-bucket-lifecycle-configuration --bucket <bucket> --lifecycle-configuration file://deploy/staging/backup-lifecycle.json`.
+  If `BACKUP_PREFIX` is changed, change the two prefixes in that file to match. For a
+  store without lifecycle rules (or without the Glacier class — drop `Transitions`),
+  set `BACKUP_PRUNE=true`: after each good backup the script deletes daily objects older
+  than 35 days and monthly ones older than 2922 days.
+- Failures: a failed backup logs one line containing `BACKUP FAILED`, exits non-zero,
+  is retried once 20 minutes later, and the next night runs as usual. The staging check
+  catches a missed night: run on the server, `deploy/staging/check.sh` fails when the
+  newest backup is more than 26 hours old (skipped when backups are not configured or
+  no backup container runs on that machine; `CHECK_BACKUP=0` skips it). Run it daily
+  (e.g. host cron) and after every update.
+
+**Restore.** `deploy/staging/restore.sh latest` (or an S3 key) streams the dump into a new
+database `dawabag_restore_check`, prints row counts of users, orders and products and the
+last migration applied (next to the live database's), and drops the check database;
+`--keep` keeps it for inspection. It never touches the live database unless asked:
+`--into-live` restores and checks first, refuses while anything (the API) is connected
+to the live database, asks you to type its name, then swaps the restored copy in and
+keeps the old one as `dawabag_pre_restore_<time>` — drop that by hand once the API is
+verified. Steps: `docker compose … stop api` → `deploy/staging/restore.sh <key> --into-live`
+→ `docker compose … start api` → `check.sh`.
+
+**Quarterly restore test** (January, April, July, October; record the result in the
+ops log): `deploy/staging/restore.sh latest`, and once a year the oldest monthly backup
+as well; the counts must be plausible and the last migration must match the live one
+(or be the one deployed at that backup's date). A failed restore test is an incident.
 
 ## 8. Before the first real customer
 

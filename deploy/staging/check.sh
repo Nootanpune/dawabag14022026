@@ -31,4 +31,28 @@ check "Redis port not exposed" "$(closed 6379 && echo ok)" "port 6379 answers"
 xfo=$(c -D - -o /dev/null "$WEB/" | tr -d '\r' | grep -i '^x-frame-options')
 check "website cannot be framed by other sites" "$(echo "$xfo" | grep -qi deny && echo ok)" "${xfo:-missing}"
 
+# Newest database backup in the object store is under 26 hours old (nightly backup, C-34).
+# Asked through the stack's own backup container, so it runs on the staging server itself;
+# skipped when that container is not running here or has no bucket (backups off).
+# CHECK_BACKUP=0 skips it; BACKUP_LATEST_CMD replaces how the newest backup is found.
+if [ "${CHECK_BACKUP:-auto}" != 0 ]; then
+  here="$(cd "$(dirname "$0")" && pwd)"
+  dc=(docker compose -f "$here/compose.yml" --env-file "$here/staging.env")
+  if [ -n "${BACKUP_LATEST_CMD:-}" ]; then latest_cmd=(bash -c "$BACKUP_LATEST_CMD")
+  elif [ -f "$here/staging.env" ] && [ -n "$("${dc[@]}" ps -q backup 2>/dev/null)" ]; then
+    latest_cmd=("${dc[@]}" exec -T backup /app/backup/backup.sh latest)
+  else latest_cmd=(); fi
+  if [ ${#latest_cmd[@]} = 0 ]; then echo "  skip latest backup age — no backup container on this machine"
+  else
+    out=$("${latest_cmd[@]}" 2>&1); rc=$?
+    if [ $rc = 3 ]; then echo "  skip latest backup age — backups are not configured (BACKUP_S3_BUCKET)"
+    else
+      age=${out##* }
+      check "latest backup is under 26 hours old" \
+        "$([ $rc = 0 ] && [[ "$age" =~ ^[0-9]+$ ]] && [ "$age" -lt $((26 * 3600)) ] && echo ok)" \
+        "$([ $rc = 0 ] && echo "${out% *} is $((age / 3600)) h old" || echo "${out:-no backup found} (exit $rc)")"
+    fi
+  fi
+fi
+
 [ $fail = 0 ] && echo "Staging checks passed" || { echo "Staging checks FAILED"; exit 1; }
