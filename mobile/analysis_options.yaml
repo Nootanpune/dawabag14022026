@@ -1,0 +1,10 @@
+# Static analysis for the Dawabag app (run in CI: flutter analyze)
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: false
+  errors:
+    # Unused code is reported but does not fail the build
+    unused_import: warning
+    unused_local_variable: warning

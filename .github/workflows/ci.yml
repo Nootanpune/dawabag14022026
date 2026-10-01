@@ -42,6 +42,9 @@ jobs:
       - name: Install
         working-directory: backend
         run: npm ci --no-audit --no-fund
+      - name: Known vulnerabilities (high and critical fail the build)
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=high
       - name: Type check
         working-directory: backend
         run: npx tsc --noEmit -p .
@@ -75,6 +78,65 @@ jobs:
           cache: npm
           cache-dependency-path: frontend-web/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Known vulnerabilities (high and critical fail the build)
+        run: npm audit --omit=dev --audit-level=high
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run build
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+      - name: Analyze (errors fail the build)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test
+
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dawabag_user
+          POSTGRES_PASSWORD: dawabag_dev_only
+          POSTGRES_DB: dawabag
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U dawabag_user" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the API image
+        run: docker build -f backend/Dockerfile -t dawabag-api:ci .
+      - name: Build the web image
+        run: docker build -f frontend-web/Dockerfile -t dawabag-web:ci frontend-web
+      - name: API image migrates an empty database and answers /ready
+        run: |
+          docker run -d --name api --network host \
+            -e NODE_ENV=development -e PORT=4000 \
+            -e DB_HOST=127.0.0.1 -e DB_PORT=5432 -e DB_NAME=dawabag -e DB_USER=dawabag_user -e DB_PASSWORD=dawabag_dev_only \
+            -e DATABASE_URL=postgresql://dawabag_user:dawabag_dev_only@127.0.0.1:5432/dawabag \
+            -e REDIS_URL=redis://127.0.0.1:6379 -e DISABLE_SCHEDULER=true \
+            -e JWT_ACCESS_SECRET=ci-access-secret-0123456789abcdef0123456789 -e JWT_REFRESH_SECRET=ci-refresh-secret-0123456789abcdef012345678 \
+            dawabag-api:ci
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:4000/ready && exit 0; sleep 2; done
+          docker logs api | tail -80; exit 1
+      - name: Web image serves the home page
+        run: |
+          docker run -d --name web -p 3000:3000 dawabag-web:ci
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:3000/ && exit 0; sleep 2; done
+          docker logs web | tail -50; exit 1

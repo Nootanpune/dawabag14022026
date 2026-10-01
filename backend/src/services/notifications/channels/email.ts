@@ -1,18 +1,9 @@
-// Email through AWS SES (SDK v3) via nodemailer
-import nodemailer from 'nodemailer';
-import SESTransport from 'nodemailer/lib/ses-transport';
-import * as aws from '@aws-sdk/client-ses';
+// Email through the AWS SES API (SDK v3), called directly — no SMTP library in between
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { ChannelResult } from './result';
 
-let transporter: nodemailer.Transporter | null = null;
-
-function getTransporter(): nodemailer.Transporter {
-  if (!transporter) {
-    const ses = new aws.SESClient({ region: process.env.AWS_REGION || 'ap-south-1' });
-    transporter = nodemailer.createTransport({ SES: { ses, aws } } as unknown as SESTransport.Options);
-  }
-  return transporter;
-}
+let client: SESClient | null = null;
+const ses = () => (client ??= new SESClient({ region: process.env.AWS_REGION || 'ap-south-1' }));
 
 export const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
@@ -32,8 +23,13 @@ function wrap(subject: string, body: string): string {
 export async function sendEmailMessage(to: string, subject: string, htmlBody: string): Promise<ChannelResult> {
   if (!process.env.AWS_SES_FROM_EMAIL) return { status: 'skipped', detail: 'Email (SES) not configured' };
   try {
-    const info = await getTransporter().sendMail({ from: `Dawabag <${process.env.AWS_SES_FROM_EMAIL}>`, to, subject, html: wrap(subject, htmlBody) });
-    return { status: 'sent', ref: String(info.messageId ?? '') };
+    const oneLine = subject.replace(/[\r\n]+/g, ' ').slice(0, 200);     // no header injection through the subject
+    const out = await ses().send(new SendEmailCommand({
+      Source: `Dawabag <${process.env.AWS_SES_FROM_EMAIL}>`,
+      Destination: { ToAddresses: [to] },
+      Message: { Subject: { Data: oneLine, Charset: 'UTF-8' }, Body: { Html: { Data: wrap(oneLine, htmlBody), Charset: 'UTF-8' } } },
+    }));
+    return { status: 'sent', ref: String(out.MessageId ?? '') };
   } catch (err: any) {
     return { status: 'failed', detail: String(err?.message || err).slice(0, 500) };
   }
