@@ -21,7 +21,7 @@ export const ORDER_STATUS_LABELS: Record<string, { label: string; color: string 
   packing:          { label: 'Being packed',            color: 'text-indigo-600 bg-indigo-50' },
   packed:           { label: 'Packed',                  color: 'text-indigo-600 bg-indigo-50' },
   dispatched:       { label: 'Dispatched',              color: 'text-brand-600 bg-brand-50' },
-  delivered:        { label: 'Delivered',               color: 'text-green-600 bg-green-50' },
+  delivered:        { label: 'Delivered',               color: 'text-green-700 bg-green-50' },
   cancelled:        { label: 'Cancelled',               color: 'text-gray-600 bg-gray-100' },
   returned:         { label: 'Returned',                color: 'text-gray-600 bg-gray-100' },
 };

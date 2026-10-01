@@ -2,13 +2,24 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–17 are done (Sprint 14 video calls wired on web and mobile) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–19 are done (Sprint 14 video calls wired on web and mobile) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprints 18–19 (staging, browser tests, accessibility)
+- deploy/staging: compose stack behind Caddy (auto HTTPS), staging.env git-ignored, check.sh; CI job
+  "staging" starts it with Caddy's own CA and runs the checks (green on first run).
+- e2e/ (Playwright 1.56 + axe): 25 browser tests (desktop + phone) — search, product declarations,
+  httpOnly session cookie, server-held cart seen from a fresh browser, admin access/denial, no
+  localStorage/sessionStorage, WCAG 2.1 AA on public pages. CI job "browser".
+- Accessibility fixes: brand-600 #167A4C / 700 #105C38, gray-400 → #6B7280, text-green-600 → 700,
+  aria-labels on cart/account/sign-out icons and the password toggle.
+- Android: plugins compiled against SDK 36 (agora was on 31); app id com.dawabag.app.
+- dev-up.sh starts the API with setsid/disown (no longer hangs a piped shell).
 
 ## Done in Sprint 17 (installable mobile app)
 - Flutter 3.47.5 installed locally at /opt/flutter-sdk (not in the repo); android/ and ios/ generated

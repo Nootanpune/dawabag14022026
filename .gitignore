@@ -27,3 +27,7 @@ coverage/
 # redis snapshots from local runs
 *.rdb
 deploy/staging/staging.env
+
+# Browser test output
+e2e/test-results/
+e2e/playwright-report/

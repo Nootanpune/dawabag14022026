@@ -204,7 +204,9 @@ told again until it has succeeded once.
   runtime packages). When it fails, upgrade the package; do not silence the check. The
   web app runs Next.js 15.5 with React 19 (Next 14 no longer receives security fixes);
   email goes straight to the SES API (no SMTP library).
-- CI also analyses and unit-tests the Flutter app, and builds both Docker images: the
+- CI also drives the website in a real browser (e2e/, Playwright: search, product page,
+  sign-in cookie, server-held cart, admin access, no browser storage, WCAG 2.1 AA via
+  axe on the public pages), analyses and unit-tests the Flutter app, and builds both Docker images: the
   API image must migrate an empty database and answer `/ready`, the web image must
   serve the home page.
 - Indexes: migration 18 adds indexes for the busy lookups (shipment lines, recall

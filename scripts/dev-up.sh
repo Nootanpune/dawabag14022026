@@ -40,6 +40,10 @@ if curl -sf "$API_URL/health" >/dev/null 2>&1; then
   exit 0
 fi
 say "Starting the API at $API_URL (log: ${API_LOG:=/tmp/dawabag-api.log})"
-(cd "$ROOT/backend" && nohup npx ts-node --transpile-only src/index.ts </dev/null >"$API_LOG" 2>&1 &)
+cd "$ROOT/backend"
+# Fully detached from this script and its terminal: the script returns, the API keeps running
+setsid nohup npx ts-node --transpile-only src/index.ts </dev/null >"$API_LOG" 2>&1 &
+disown
+cd "$ROOT"
 for _ in $(seq 1 60); do curl -sf "$API_URL/health" >/dev/null 2>&1 && { say "API ready"; exit 0; }; sleep 1; done
 echo "API did not start; last log lines:" >&2; tail -30 "$API_LOG" >&2; exit 1

@@ -15,7 +15,7 @@ export default function OrderBillCard({ order }: { order: OrderDetail }) {
           <span>{formatPrice(order.shipping_paise)}</span>
         </div>
         {order.discount_paise > 0 && (
-          <div className="flex justify-between text-green-600">
+          <div className="flex justify-between text-green-700">
             <span>Discount</span>
             <span>–{formatPrice(order.discount_paise)}</span>
           </div>

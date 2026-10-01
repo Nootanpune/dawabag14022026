@@ -20,7 +20,7 @@ export default function CartSummary({ cart, onCheckout }: Props) {
           <span>{formatPrice(cart.subtotal_paise)}</span>
         </div>
         {cart.discount_paise > 0 && (
-          <div className="flex justify-between text-green-600">
+          <div className="flex justify-between text-green-700">
             <span>Discount{cart.coupon?.code ? ` (${cart.coupon.code})` : ''}</span>
             <span>–{formatPrice(cart.discount_paise)}</span>
           </div>

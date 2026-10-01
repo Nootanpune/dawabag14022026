@@ -21,11 +21,11 @@ export default function CheckoutStepIndicator({ step, showPrescription }: { step
           <div key={s.key} className="flex items-center flex-1">
             <div
               className={`flex items-center gap-2 text-sm font-medium
-                ${active ? 'text-brand-600' : done ? 'text-green-600' : 'text-gray-400'}`}
+                ${active ? 'text-brand-600' : done ? 'text-green-700' : 'text-gray-400'}`}
             >
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs
-                  ${active ? 'bg-brand-600 text-white' : done ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}
+                  ${active ? 'bg-brand-600 text-white' : done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
               >
                 {done ? '✓' : i + 1}
               </div>

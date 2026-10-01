@@ -65,7 +65,7 @@ export default function Header() {
         {/* Right actions */}
         <div className="flex items-center gap-3">
           {/* Cart */}
-          <Link href="/cart" className="relative p-2 hover:bg-gray-100 rounded-lg">
+          <Link href="/cart" aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'} className="relative p-2 hover:bg-gray-100 rounded-lg">
             <ShoppingCart className="w-5 h-5 text-gray-600" />
             {cartCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-600 text-white
@@ -78,12 +78,13 @@ export default function Header() {
           {/* Auth */}
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
-              <Link href="/account" className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-brand-600">
+              <Link href="/account" aria-label="My account" className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-brand-600">
                 <User className="w-4 h-4" />
                 <span className="hidden md:block">{user?.full_name?.split(' ')[0]}</span>
               </Link>
               <button
                 onClick={handleLogout}
+                aria-label="Sign out"
                 className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-red-500"
               >
                 <LogOut className="w-4 h-4" />

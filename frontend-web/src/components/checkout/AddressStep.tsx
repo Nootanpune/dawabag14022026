@@ -65,7 +65,7 @@ export default function AddressStep({ addresses, loading, selectedId, onSelect, 
           <span>{formatPrice(cart.subtotal_paise)}</span>
         </div>
         {cart.discount_paise > 0 && (
-          <div className="flex justify-between text-green-600">
+          <div className="flex justify-between text-green-700">
             <span>Discount</span>
             <span>–{formatPrice(cart.discount_paise)}</span>
           </div>

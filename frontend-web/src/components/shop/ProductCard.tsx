@@ -78,7 +78,7 @@ export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
             <span className="text-xs text-gray-400 line-through">{formatPrice(product.mrp_paise)}</span>
           )}
           {product.discount_pct > 0 && product.display_price_paise === product.offer_price_paise && (
-            <span className="text-xs font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+            <span className="text-xs font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
               {product.discount_pct}% off
             </span>
           )}
