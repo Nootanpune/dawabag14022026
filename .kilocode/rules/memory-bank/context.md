@@ -10,6 +10,51 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 24 — trial server (2026-10-01, uncommitted)
+- Owner's live trial on one small server (DigitalOcean BLR1, Ubuntu 24.04, 4 GB), deployed
+  by GitHub Actions; owner guide `deploy/trial/TRIAL.md` (7 steps; RUNBOOK 7e).
+- `deploy/trial/bootstrap-server.sh` (root, idempotent; `curl … | bash -s -- --email …`):
+  Docker apt repo + compose plugin, ufw 22/80/443, unattended-upgrades, 2 GB swap if
+  < 6 GB, `dawabag` user (docker group), sshd `00-dawabag-trial.conf` (no passwords);
+  prints TRIAL_SSH_HOST / _KNOWN_HOSTS / a fresh deploy key (printed once, not kept) and
+  TRIAL_ENV via `make-trial-env.sh <ip|domain> <email>` from `trial.env.example`
+  (sslip.io names `<ip-dashed>.sslip.io`, api., files.; random secrets; demo password
+  `Dwb-xxxx-xxxx-xxxx`). `deploy/trial/trial.sh up|ready|seed|unseed|backup-once|check|
+  status|logs|reset|down` runs on the server (reset keeps Caddy certs).
+- `.github/workflows/deploy-trial.yml`: workflow_dispatch (seed_demo, reset_data,
+  build_apk) + push to the trial branch only if vars.TRIAL_AUTODEPLOY == 'true';
+  secrets via env only, key in RUNNER_TEMP removed always, concurrency deploy-trial,
+  rsync (protects staging.env), check.sh on server and from outside; `android` job builds
+  a debug APK with API_URL=https://<API_DOMAIN> (app adds /api/v1) → `dawabag-trial-apk`.
+  actionlint 1.7.7 clean.
+- Compose profile `objectstore`: `alpine/minio:RELEASE.2025-10-15T17-29-55Z` (MinIO's own
+  images were withdrawn Oct 2025; override OBJECTSTORE_IMAGE), volume at /home/minio,
+  SSE-S3 via MINIO_KMS_SECRET_KEY=dawabag-trial-key:$OBJECTSTORE_KMS_KEY, region
+  ap-south-1; `objectstore-init` (backup image, `s3.mjs ensure-bucket`: create + encrypted
+  write check). Caddy `{$FILES_DOMAIN}` site: GET/HEAD only, X-Amz-Signature required,
+  signatures cut from access log, noindex (default `http://files.localhost` when unused).
+  Verified locally with the MinIO binary from that image + Caddy 2.10.2: signed link via
+  the public host 200 (SSE AES256), tampered/unsigned 403, PUT 405; backups dump/latest OK.
+- API: `APP_ENV` (development|test|staging|trial|production) in config/env.ts:
+  production refuses ALLOW_MISSING_INTEGRATIONS, S3_ENDPOINT, DEMO_SEED, TRIAL_DEMO_PASSWORD;
+  trial needs ALLOW_MISSING_INTEGRATIONS=true and no rzp_live_ key; DEMO_SEED /
+  TRIAL_DEMO_PASSWORD refused outside trial (in production). `S3_PUBLIC_ENDPOINT` (https,
+  only with S3_ENDPOINT): storage.service signs GET links with a separate client for that
+  host (`linkEndpoint`). `/legal/info` returns `trial: true` → web `TrialBanner` (layout)
+  "Trial / demo site" strip (C-04).
+- Demo seed `backend/src/scripts/demoSeed.ts` + `scripts/demo/*` (guard, catalogueData,
+  catalogue, packShot (zlib-only PNG "DEMO PACK" cartons), places, people, practice,
+  remove): refuses unless APP_ENV=trial && DEMO_SEED=true (+ strong TRIAL_DEMO_PASSWORD).
+  8 Nashik PINs (₹49, 24 h), premises, legal settings "DEMO — not a real licence";
+  42 generic medicines (DEMO-*, 8 categories, 1 H1 Cefixime, none X/NDPS, mostly 5% GST),
+  2 batches each 12–24 months, copy claims-checked and approved by the demo pharmacist
+  via reviewContent (C-19), pack shots via setProductImage when a store exists;
+  logins 9000090001–08 (customer, B2B retailer KYC approved, pharmacist_rx DEMO-MSPC-0001,
+  pharmacist_pack, delivery, super_admin, doctor via enableDoctor/saveProfile/decideDoctor
+  + 24 slots ₹300, partner with approved vendor DMOP + 6 live listings, CALD3 partner-only).
+  `--remove` refuses once demo orders/consultations/prescriptions exist. Run locally,
+  screenshots taken, removed again. Jest: guard, env APP_ENV, storage link, catalogue/PNG.
+
 ## Sprint 22 — backups and release signing (2026-10-01, uncommitted)
 - Staging `backup` service (deploy/staging/backup/: Dockerfile node:20-alpine3.22 +
   postgresql16-client, `backup.sh`, `lib.sh`, `s3.mjs` on @aws-sdk/client-s3 3.1144.0):

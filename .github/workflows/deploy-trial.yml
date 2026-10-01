@@ -1,0 +1,219 @@
+# Deploys the owner's TRIAL server (deploy/trial/TRIAL.md): the whole staging stack
+# (deploy/staging) plus its own object store on one small Ubuntu machine, reached by
+# SSH as the `dawabag` user that deploy/trial/bootstrap-server.sh created.
+#
+#   Actions → "Deploy trial server" → Run workflow   (tick "seed demo" the first time)
+#   Pushes to the trial branch deploy too, but only when the repository VARIABLE
+#   TRIAL_AUTODEPLOY is 'true'.
+#
+# Secrets (Settings → Secrets and variables → Actions): TRIAL_SSH_HOST, TRIAL_SSH_KEY,
+# TRIAL_ENV (the server's whole settings file), optional TRIAL_SSH_USER (default
+# dawabag) and TRIAL_SSH_KNOWN_HOSTS (else the host key is fetched on first contact,
+# with a warning). Secrets reach scripts only through env:, are never echoed, and the
+# SSH key exists only in the runner's temp directory during the run.
+name: Deploy trial server
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed_demo:
+        description: Load the demo data (medicines, stock, a login for every role). Safe to repeat.
+        type: boolean
+        default: false
+      reset_data:
+        description: DELETE all trial data first (orders, accounts, files) and start empty
+        type: boolean
+        default: false
+      build_apk:
+        description: Build the Android test app (APK) pointing at this trial server
+        type: boolean
+        default: true
+  push:
+    # The trial branch; deploys only when vars.TRIAL_AUTODEPLOY == 'true' (job condition below)
+    branches: [claude/dawabag-pharmacy-status-0h7mr3]
+
+permissions:
+  contents: read
+
+# Never two deploys to the one server at the same time; a newer one waits its turn
+concurrency:
+  group: deploy-trial
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || vars.TRIAL_AUTODEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SEED_DEMO: ${{ github.event_name == 'workflow_dispatch' && inputs.seed_demo }}
+      RESET_DATA: ${{ github.event_name == 'workflow_dispatch' && inputs.reset_data }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the trial settings
+        env:
+          TRIAL_SSH_HOST: ${{ secrets.TRIAL_SSH_HOST }}
+          TRIAL_SSH_KEY: ${{ secrets.TRIAL_SSH_KEY }}
+          TRIAL_ENV: ${{ secrets.TRIAL_ENV }}
+        run: |
+          missing=""
+          for s in TRIAL_SSH_HOST TRIAL_SSH_KEY TRIAL_ENV; do [ -n "${!s}" ] || missing="$missing $s"; done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing (deploy/trial/TRIAL.md, step 3)"; exit 1
+          fi
+          val() { printf '%s\n' "$TRIAL_ENV" | sed -n "s/^$1=//p" | tail -1 | tr -d '\r'; }
+          for k in APP_ENV WEB_DOMAIN API_DOMAIN DB_PASSWORD JWT_ACCESS_SECRET JWT_REFRESH_SECRET ACME_EMAIL; do
+            [ -n "$(val "$k")" ] || { echo "::error::TRIAL_ENV has no $k — regenerate it with deploy/trial/make-trial-env.sh"; exit 1; }
+          done
+          [ "$(val APP_ENV)" = trial ] || { echo "::error::TRIAL_ENV must contain APP_ENV=trial"; exit 1; }
+          if printf '%s\n' "$TRIAL_ENV" | grep -v '^#' | grep -qi 'change-me'; then
+            echo "::error::TRIAL_ENV still has change-me values — use the output of deploy/trial/make-trial-env.sh"; exit 1
+          fi
+          if [[ "$(val RAZORPAY_KEY_ID)" == rzp_live_* ]]; then
+            echo "::error::A trial must use Razorpay TEST keys (rzp_test_…), never live keys"; exit 1
+          fi
+          # Public names only (not secret) for the later steps
+          {
+            echo "WEB_DOMAIN=$(val WEB_DOMAIN)"
+            echo "API_DOMAIN=$(val API_DOMAIN)"
+            echo "FILES_DOMAIN=$(val FILES_DOMAIN)"
+          } >> "$GITHUB_ENV"
+
+      - name: SSH access (temporary)
+        env:
+          TRIAL_SSH_HOST: ${{ secrets.TRIAL_SSH_HOST }}
+          TRIAL_SSH_USER: ${{ secrets.TRIAL_SSH_USER }}
+          TRIAL_SSH_KEY: ${{ secrets.TRIAL_SSH_KEY }}
+          TRIAL_SSH_KNOWN_HOSTS: ${{ secrets.TRIAL_SSH_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          SSH_DIR="$RUNNER_TEMP/trial-ssh"
+          echo "SSH_DIR=$SSH_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$SSH_DIR"
+          printf '%s\n' "$TRIAL_SSH_KEY" | tr -d '\r' > "$SSH_DIR/key"
+          if [ -n "$TRIAL_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$TRIAL_SSH_KNOWN_HOSTS" | tr -d '\r' > "$SSH_DIR/known_hosts"
+          else
+            echo "::warning::TRIAL_SSH_KNOWN_HOSTS is not set: trusting the host key the server presents now. Add the secret (bootstrap-server.sh prints it) so a different machine is refused."
+            ssh-keyscan -T 20 -t ed25519,ecdsa,rsa "$TRIAL_SSH_HOST" > "$SSH_DIR/known_hosts" 2>/dev/null
+            [ -s "$SSH_DIR/known_hosts" ] || { echo "::error::Cannot reach the server on port 22"; exit 1; }
+          fi
+          cat > "$SSH_DIR/config" <<EOF
+          Host trial
+            HostName $TRIAL_SSH_HOST
+            User ${TRIAL_SSH_USER:-dawabag}
+            IdentityFile $SSH_DIR/key
+            IdentitiesOnly yes
+            UserKnownHostsFile $SSH_DIR/known_hosts
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ServerAliveInterval 30
+            ConnectTimeout 20
+          EOF
+          ssh -F "$SSH_DIR/config" trial 'docker compose version'
+
+      - name: Copy the code to the server
+        run: |
+          # The server's settings file is written below; never deleted or overwritten by the copy
+          rsync -az --delete -e "ssh -F $SSH_DIR/config" \
+            --filter='P deploy/staging/staging.env' \
+            --exclude=.git/ --exclude=node_modules/ --exclude=.next/ --exclude=dist/ --exclude=build/ --exclude=.dart_tool/ \
+            --exclude=journeys-out/ --exclude=/e2e/ --exclude=playwright-report/ --exclude=test-results/ --exclude='*.log' \
+            --exclude=deploy/staging/staging.env --exclude=backend/.env --exclude=dump.rdb \
+            ./ trial:dawabag/
+
+      - name: Write the server's settings (never printed)
+        env:
+          TRIAL_ENV: ${{ secrets.TRIAL_ENV }}
+        run: |
+          printf '%s\n' "$TRIAL_ENV" | tr -d '\r' \
+            | ssh -F "$SSH_DIR/config" trial 'umask 077 && cat > dawabag/deploy/staging/staging.env.new && mv dawabag/deploy/staging/staging.env.new dawabag/deploy/staging/staging.env'
+
+      - name: Start again from empty (only when "reset data" is ticked)
+        if: env.RESET_DATA == 'true'
+        run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh reset'
+
+      - name: Build and start (the API applies database migrations on start)
+        run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh up'
+
+      - name: Wait until the API is ready over HTTPS
+        run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh ready'
+
+      - name: Demo data
+        if: env.SEED_DEMO == 'true'
+        # Refused by the script itself unless the server runs with APP_ENV=trial (src/scripts/demo/guard.ts)
+        run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh seed'
+
+      - name: First backup (so the backup check has one to look at)
+        run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh backup-once'
+
+      - name: Checks on the server (HTTPS, headers, CORS, closed ports, backup age)
+        run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh check'
+
+      - name: Checks from outside (the firewall)
+        env:
+          CHECK_BACKUP: '0'
+        run: deploy/staging/check.sh
+
+      - name: Tidy old images
+        run: ssh -F "$SSH_DIR/config" trial 'docker image prune -f >/dev/null && df -h / | tail -1'
+
+      - name: Trial addresses
+        run: |
+          {
+            echo "## Dawabag trial is live"
+            echo ""
+            echo "| | Address |"
+            echo "| --- | --- |"
+            echo "| Website | https://$WEB_DOMAIN |"
+            echo "| API (app's server) | https://$API_DOMAIN |"
+            [ -n "$FILES_DOMAIN" ] && echo "| Files (signed links only) | https://$FILES_DOMAIN |"
+            echo "| Razorpay webhook URL | https://$API_DOMAIN/api/v1/payments/webhook |"
+            echo ""
+            echo "Demo logins: mobiles 9000090001–9000090008, password = TRIAL_DEMO_PASSWORD from your TRIAL_ENV (deploy/trial/TRIAL.md, step 5)."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Server logs
+        if: failure()
+        run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh status; bash dawabag/deploy/trial/trial.sh logs' || true
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/trial-ssh"
+
+  android:
+    # Debug APK whose server address is this trial's API (no MOBILE_API_URL needed)
+    if: github.event_name == 'workflow_dispatch' && inputs.build_apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trial API address
+        env:
+          TRIAL_ENV: ${{ secrets.TRIAL_ENV }}
+        run: |
+          api=$(printf '%s\n' "$TRIAL_ENV" | sed -n 's/^API_DOMAIN=//p' | tail -1 | tr -d '\r')
+          [ -n "$api" ] || { echo "::error::TRIAL_ENV has no API_DOMAIN"; exit 1; }
+          # The app adds /api/v1 itself (mobile/lib/services/api_service.dart)
+          echo "TRIAL_API_URL=https://$api" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build debug APK for the trial
+        run: flutter build apk --debug --dart-define=API_URL="$TRIAL_API_URL"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dawabag-trial-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error

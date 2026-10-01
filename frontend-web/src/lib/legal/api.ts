@@ -15,6 +15,8 @@ export interface LegalInfo {
   pharmacist_in_charge: { name: string; registration_no: string } | null;
   grievance_officer: { name: string; email: string; phone: string; address: string } | null;
   grievance_policy: { acknowledge_within_hours: number; resolve_within_days: number };
+  /** true on the owner's trial server (demo data, placeholder licences) */
+  trial?: boolean;
 }
 
 export const legalKeys = { info: ['legal', 'info'] as const };

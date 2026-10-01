@@ -42,3 +42,33 @@
 	}
 	reverse_proxy api:4000
 }
+
+# The server's own object store (trial: compose profile objectstore). Browsers reach it
+# only here, only to read, and only with a signed, short-lived link from the API (product
+# photos, a prescription a pharmacist opens — C-41). Signatures are cut from the access
+# log so a logged link cannot be replayed. Without the profile this name points nowhere.
+{$FILES_DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+	log {
+		output stdout
+		format filter {
+			request>uri query {
+				delete X-Amz-Signature
+				delete X-Amz-Credential
+			}
+		}
+	}
+	@write not method GET HEAD
+	respond @write "Read only" 405
+	@unsigned not query X-Amz-Signature=*
+	respond @unsigned "Signed links only" 403
+	# Caddy passes the Host header through unchanged, so the store checks the
+	# signature against the same public address the API signed for
+	reverse_proxy objectstore:9000
+}

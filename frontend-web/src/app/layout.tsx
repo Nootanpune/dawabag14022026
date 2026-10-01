@@ -4,6 +4,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { Toaster } from 'sonner';
 import SiteFooter from '@/components/legal/SiteFooter';
+import TrialBanner from '@/components/legal/TrialBanner';
 import BottomNav from '@/components/layout/BottomNav';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -24,6 +25,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased bg-gray-50`}>
         <Providers>
+          {/* Only on the owner's trial server (APP_ENV=trial): demo data, placeholder licences (C-04) */}
+          <TrialBanner />
           {children}
           {/* Licences + grievance officer on every public page, from the server (C-04, C-36) */}
           <SiteFooter />

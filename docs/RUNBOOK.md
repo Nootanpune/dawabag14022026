@@ -27,6 +27,14 @@ than 32 characters, if Razorpay / S3 / MSG91 / SES keys are missing, if
 `CORS_ORIGINS` is empty or `AWS_REGION` is not `ap-south-1`. The log says exactly
 what is wrong. Generate secrets with `openssl rand -hex 48`.
 
+`APP_ENV` names the deployment: set **`APP_ENV=production`** on the real production
+servers — the API then also refuses `ALLOW_MISSING_INTEGRATIONS`, `S3_ENDPOINT`,
+`DEMO_SEED` and `TRIAL_DEMO_PASSWORD` outright. Unset (or `staging`) keeps the staging
+rules; `trial` is only for the owner's demo server (section 7e) and needs
+`ALLOW_MISSING_INTEGRATIONS=true` and Razorpay test keys. `S3_PUBLIC_ENDPOINT` (with
+`S3_ENDPOINT` only) is the https address of a self-hosted store that browsers use;
+signed links are made for it while the API itself talks to `S3_ENDPOINT`.
+
 Razorpay: dashboard → Webhooks → URL `https://<api-domain>/api/v1/payments/webhook`,
 events `payment.captured`, `payment.failed`, `refund.processed`, `refund.failed`,
 `token.confirmed`, `token.rejected`, `token.cancelled`; copy the secret to
@@ -278,7 +286,9 @@ ap-south-1) runs the whole stack from `deploy/staging/`:
 4. `WEB_DOMAIN=… API_DOMAIN=… deploy/staging/check.sh` — HTTPS, redirects, HSTS, CORS,
    request ids, closed database port.
 5. Set the GitHub variable `MOBILE_API_URL=https://api-staging.dawabag.in` so test APKs
-   reach it.
+   reach it (the app adds `/api/v1` itself).
+
+The owner's one-click trial of this same stack is section 7e / `deploy/trial/TRIAL.md`.
 
 Update: `git pull` and the same `up -d --build`. Staging holds test data only — never
 real patients. CI starts this exact stack on every push and runs the same checks.
@@ -332,6 +342,36 @@ ops log): `deploy/staging/restore.sh latest`, and once a year the oldest monthly
 as well; the counts must be plausible and the last migration must match the live one
 (or be the one deployed at that backup's date). A failed restore test is an incident.
 
+## 7e. Owner's live trial (one server, deployed from GitHub)
+
+Owner-facing guide: **[deploy/trial/TRIAL.md](../deploy/trial/TRIAL.md)** — DigitalOcean
+Bangalore droplet (4 GB), one bootstrap command, four GitHub secrets, one click.
+
+- `deploy/trial/bootstrap-server.sh` (root, once, idempotent): Docker Engine + compose
+  plugin from Docker's apt repository, ufw (22, 80, 443 only), unattended security
+  upgrades, 2 GB swap under 6 GB RAM, `dawabag` deploy user (docker group, key only),
+  SSH password login off; prints `TRIAL_SSH_HOST`, `TRIAL_SSH_KNOWN_HOSTS`, a new deploy
+  key (`TRIAL_SSH_KEY`, printed once, not kept) and with `--email` a `TRIAL_ENV`
+  (`deploy/trial/make-trial-env.sh`: sslip.io names from the IP, random secrets).
+- `.github/workflows/deploy-trial.yml`: manual (inputs *seed demo*, *reset data*,
+  *build apk*), or on push to the trial branch when the variable `TRIAL_AUTODEPLOY` is
+  `true`. rsyncs the repository to `~/dawabag`, writes `deploy/staging/staging.env` from
+  `TRIAL_ENV`, then `deploy/trial/trial.sh up | ready | seed | backup-once | check` on the
+  server, and the staging checks again from outside. One deploy at a time; the key lives
+  in the runner's temp directory only. The *android* job builds a debug APK pointed at
+  the trial API (artifact `dawabag-trial-apk`).
+- The trial is the staging stack with `APP_ENV=trial` and the compose profile
+  `objectstore`: MinIO (`alpine/minio`, the last MinIO security release; MinIO stopped
+  publishing images in Oct 2025) with data in the `objectstore_data` volume, SSE-S3 with
+  `OBJECTSTORE_KMS_KEY`, bucket created by `objectstore-init` (`s3.mjs ensure-bucket`),
+  reachable from browsers only through Caddy at `FILES_DOMAIN` for signed GETs. Backups
+  go to the same store (`BACKUP_PRUNE=true`).
+- Demo data: `node dist/scripts/demoSeed.js` in the API container (`trial.sh seed`),
+  refused unless `APP_ENV=trial` and `DEMO_SEED=true`; upserts by SKU (`DEMO-…`), mobile
+  (`90000900xx`) and licence; `--remove` (`trial.sh unseed`) takes it out while no demo
+  order exists. Locally: `APP_ENV=trial DEMO_SEED=true TRIAL_DEMO_PASSWORD=… npx ts-node
+  --transpile-only src/scripts/demoSeed.ts [--remove]` in `backend/`.
+
 ## 7d. Capacity (load test)
 
 `scripts/load-test.sh` (with `. scripts/dev-env.sh` and a running API) seeds 500
@@ -357,6 +397,8 @@ again") and takes locks in product order. Regression check: Sprint 5 smoke.
 
 ## 8. Before the first real customer
 
+0. `APP_ENV=production` on the production API (section 2); no trial or demo setting
+   anywhere. Demo data (`DEMO-` products, `90000900xx` logins) never in production.
 1. Legal settings (Admin → Settings): entity, drug licences, pharmacist-in-charge,
    grievance officer. Licence register (Admin → Licences).
 2. Policies published (Admin → Policies) after the lawyer's review (C-39).

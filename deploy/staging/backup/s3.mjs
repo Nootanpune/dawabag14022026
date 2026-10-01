@@ -10,6 +10,9 @@
 //   node s3.mjs has <prefix>              exit 0 when any object starts with <prefix>
 //   node s3.mjs prune                     delete expired backups (only for stores
 //                                         without lifecycle rules; see RUNBOOK 7c)
+//   node s3.mjs ensure-bucket             create the bucket if missing (the trial's own
+//                                         object store, compose profile objectstore) and
+//                                         prove an encrypted write works there
 //
 // Settings (environment): BACKUP_S3_BUCKET (else AWS_S3_BUCKET), BACKUP_S3_ENDPOINT
 // (else S3_ENDPOINT; path-style, for S3-compatible stores), AWS_REGION,
@@ -21,8 +24,8 @@
 import { spawn } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import {
-  AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateMultipartUploadCommand,
-  DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command,
+  AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateBucketCommand, CreateMultipartUploadCommand,
+  DeleteObjectCommand, HeadBucketCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command,
   PutObjectCommand, S3Client, UploadPartCommand,
 } from '@aws-sdk/client-s3';
 
@@ -152,10 +155,28 @@ async function prune() {
   process.stdout.write(`pruned ${removed} object(s)\n`);
 }
 
+// The bucket stays private (no policy is set): the website gets only signed links
+async function ensureBucket() {
+  const s3 = client();
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: bucket }));
+    process.stdout.write(`bucket ${bucket} exists\n`);
+  } catch (e) {
+    if (e?.$metadata?.httpStatusCode !== 404 && e?.name !== 'NotFound' && e?.name !== 'NoSuchBucket') throw e;
+    await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+    process.stdout.write(`bucket ${bucket} created\n`);
+  }
+  // Server-side encryption must work here, as for every document (C-41)
+  const Key = '.objectstore-check';
+  await s3.send(new PutObjectCommand({ Bucket: bucket, Key, Body: 'ok', ...encryption() }));
+  await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key }));
+  process.stdout.write('encrypted write ok\n');
+}
+
 const [command, arg, ...rest] = process.argv.slice(2);
 const commands = {
   dump: () => dump(arg, rest[0] === '--' ? rest.slice(1) : rest),
-  get: () => get(arg), latest, has: () => has(arg), prune,
+  get: () => get(arg), latest, has: () => has(arg), prune, 'ensure-bucket': ensureBucket,
 };
-if (!commands[command]) fail('usage: s3.mjs dump|get|latest|has|prune …', 2);
+if (!commands[command]) fail('usage: s3.mjs dump|get|latest|has|prune|ensure-bucket …', 2);
 commands[command]().catch((e) => fail(e?.name === 'NoSuchKey' ? `no such object: ${arg}` : (e?.message || String(e))));

@@ -2,7 +2,16 @@
 // weak setting stops the server instead of failing on a customer's request.
 // Production refuses placeholder secrets and missing payment/SMS/storage keys
 // (set ALLOW_MISSING_INTEGRATIONS=true only for a closed staging environment).
+// APP_ENV names the deployment: unset (staging rules, as before), 'staging',
+// 'trial' (the owner's throwaway demo server, deploy/trial/TRIAL.md) or
+// 'production'. Trial-only behaviour (demo seed, a self-hosted object store) is
+// refused unless APP_ENV=trial, and APP_ENV=production refuses it outright.
 import { z } from 'zod';
+
+export const APP_ENVS = ['development', 'test', 'staging', 'trial', 'production'] as const;
+export type AppEnv = typeof APP_ENVS[number];
+/** The owner's demo server: demo data and placeholder legal details, never real customers. */
+export const isTrial = (env: NodeJS.ProcessEnv = process.env) => env.APP_ENV === 'trial';
 
 // Also the staging template's "change-me-…" values (deploy/staging/staging.env.example):
 // a stack started from the template unchanged would sign tokens with a published key
@@ -34,6 +43,22 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
   const parsed = base.safeParse(env);
   if (!parsed.success) errors.push(...parsed.error.issues.map((i) => i.message));
   const production = env.NODE_ENV === 'production';
+  const appEnv = env.APP_ENV;
+  if (appEnv && !(APP_ENVS as readonly string[]).includes(appEnv)) errors.push(`APP_ENV must be one of ${APP_ENVS.join(', ')}`);
+  // Real production: every integration real, no other object store, nothing trial-only
+  const realProduction = production && appEnv === 'production';
+  const trial = appEnv === 'trial';
+  if (realProduction && env.ALLOW_MISSING_INTEGRATIONS === 'true') errors.push('ALLOW_MISSING_INTEGRATIONS must not be set when APP_ENV=production');
+  if (trial) {
+    // A trial is a closed demo: placeholder licences (C-04) and demo stock, so it must
+    // never take real money — Razorpay test keys only (rzp_test_…)
+    if (env.ALLOW_MISSING_INTEGRATIONS !== 'true') errors.push('APP_ENV=trial needs ALLOW_MISSING_INTEGRATIONS=true (a closed trial, not production)');
+    if (/^rzp_live_/.test(String(env.RAZORPAY_KEY_ID ?? ''))) errors.push('APP_ENV=trial must use Razorpay test keys (rzp_test_…), never live keys');
+  } else {
+    // The demo seed and its shared password exist only on a trial server
+    if (env.DEMO_SEED === 'true') errors.push('DEMO_SEED is allowed only with APP_ENV=trial');
+    if (production && env.TRIAL_DEMO_PASSWORD) errors.push('TRIAL_DEMO_PASSWORD is allowed only with APP_ENV=trial');
+  }
 
   if (production) {
     for (const name of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const) {
@@ -62,7 +87,13 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
     // (backend/test/fakes/s3.mjs, scripts/record-journeys.sh) never.
     if (env.S3_ENDPOINT) {
       const msg = 'S3_ENDPOINT must not be set in production (documents go only to AWS S3 in ap-south-1)';
-      (env.ALLOW_MISSING_INTEGRATIONS === 'true' ? warnings : errors).push(msg);
+      (env.ALLOW_MISSING_INTEGRATIONS === 'true' && !realProduction ? warnings : errors).push(msg);
+    }
+    // Signed links for the browser name the store's public address (trial: Caddy at
+    // FILES_DOMAIN); only meaningful next to S3_ENDPOINT, and only over HTTPS (C-41)
+    if (env.S3_PUBLIC_ENDPOINT) {
+      if (!env.S3_ENDPOINT) errors.push('S3_PUBLIC_ENDPOINT is only for an S3-compatible store (S3_ENDPOINT); unset it for AWS S3');
+      else if (!/^https:\/\/[^/\s]+\/?$/.test(env.S3_PUBLIC_ENDPOINT)) errors.push('S3_PUBLIC_ENDPOINT must be an https:// origin (e.g. https://files.example.in)');
     }
     if (/fake/i.test(String(env.AWS_S3_BUCKET ?? '')) || /^fake$/i.test(String(env.AWS_ACCESS_KEY_ID ?? ''))) {
       errors.push('AWS_S3_BUCKET / AWS_ACCESS_KEY_ID are the test fakes; set the real bucket and keys');
