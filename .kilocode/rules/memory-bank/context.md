@@ -38,7 +38,16 @@ the lawyer/CA sign-off.
   `notification_deliveries_notification_id_fkey` when notifications are deleted under
   it) crashes the API process — not fixed here.
 
-## Sprint 24 — trial server (2026-10-01, uncommitted)
+## Sprint 24 — trial server (2026-10-01, merged to main via PR #1)
+- **Trial status (2026-10-01 evening):** server = the retired PharmaNetra legacy droplet
+  64.227.172.8 (owner's choice; Ubuntu 22.04, resized to 4 GB, snapshot taken first).
+  Old nginx (pharmanetra.pharmanetra.in, portal.dawabag.com certs) disabled; the old
+  PharmaNetra node app (127.0.0.1:3000) and PostgreSQL 14 left running untouched.
+  bootstrap-server.sh ran OK. Its output was pasted into chat, so the owner will clear
+  /home/dawabag/.ssh/authorized_keys and re-run with --new-deploy-key before adding the
+  4 GitHub secrets (none added yet), then Run workflow with seed demo. Trial URL
+  https://64-227-172-8.sslip.io. Razorpay test keys not yet provided. Owner has
+  dawabag.com (could use trial.dawabag.com later).
 - Owner's live trial on one small server (DigitalOcean BLR1, Ubuntu 24.04, 4 GB), deployed
   by GitHub Actions; owner guide `deploy/trial/TRIAL.md` (7 steps; RUNBOOK 7e).
 - `deploy/trial/bootstrap-server.sh` (root, idempotent; `curl … | bash -s -- --email …`):
