@@ -2,13 +2,22 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–11 are done on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–13 are done on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprint 13 (backend)
+- Own riders: dispatch to a rider (rider_id) or a courier, reassign, rider run sheet
+  (GET /fulfilment/my-run), delivered/invoice limited to the rider's own parcels, delivery
+  role 404 on orders — closes the Sprint 12 review item on delivery-staff scope (C-26, C-41).
+- Agora call tokens on join (uid, token, token_expires_in) — closes the video-token item (C-23).
+- GST period lock `accounts.locked_until` for GRNs and supplier credit notes (C-31).
+- WhatsApp through MSG91 templates after opt-in consent (`whatsapp` purpose).
+- Tests: Sprint 1–13 smoke 651 checks pass, jest 60, fresh-DB migrations 01–16 apply.
 
 ## Web Sprint 12 (tsc + next lint + next build pass)
 - Policies in en/mr/hi (C-40): /policies/:key switcher (?lang=, "Not yet available in …;
@@ -350,3 +359,4 @@ deployment per docs/Dawabag_Beta_Deployment_Guide.docx.
 | 2026-09-30 | Sprint 5: cancellation, returns, refunds, credit notes, checkout disclosure, policies, handover code, ADR, licences, addresses |
 | 2026-10-01 | Sprint 6: security fixes, deployability, catalogue import, final records, GST reports, saved Rx, cold chain, incidents |
 | 2026-10-01 | Sprint 7: purchasing, goods receipt, stock adjustments, destruction register, counts, expiry watch, AWS SDK v3 |
+| 2026-10-01 | Sprints 8–13: notifications, courier, e-invoicing, purchase returns, teleconsultation, payments, security review, languages, retention, riders, call tokens, GST lock, WhatsApp |

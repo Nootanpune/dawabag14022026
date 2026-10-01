@@ -151,3 +151,10 @@
   `telemedicine/consultationFee.service` (capture-checked fees, `refund_pending` refunds with
   gateway adoption), DB triggers/checks from the review (adjustments final, reserved stock,
   two-person counts and POs). Webhook dedupe key = sha256 of the signed body.
+- **Sprint 13:** `services/delivery/rider.service` (own riders: `order_shipments.rider_id`,
+  AWB `DWR`+seq at dispatch, reassign, `myRun` without medicine names, `ridesShipment` gate on
+  delivered/invoice; delivery role gets 404 on orders), `telemedicine/callToken` (Agora RTC
+  token via agora-token, null without certificate; returned by join), `accountsLock.assertOpenPeriod`
+  (setting `accounts.locked_until`; GRN supplier invoice date, supplier credit note date),
+  `notifications/channels/whatsapp` (MSG91 outbound templates from `whatsapp.templates`, only
+  with latest consent purpose `whatsapp`; PUT /privacy/consents/whatsapp). Migration 16.

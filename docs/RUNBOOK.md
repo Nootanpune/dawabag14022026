@@ -94,6 +94,22 @@ unused phones. The `retention_purge` job deletes older rows daily and audits the
 Statutory records (invoices, credit notes, H1, prescriptions, e-invoices, receipts,
 consent and audit logs) are never purged by it.
 
+**Own riders (C-26, C-41).** Give each rider a `delivery` login. At dispatch the packer
+picks either one of our riders or a courier; a rider shipment gets an AWB `DWR…`. A rider
+sees only their own run sheet (no medicine names) and only the invoices of parcels
+they carry; delivery staff cannot open orders. Reassign a dispatched parcel from the
+fulfilment queue if a rider is unavailable.
+
+**WhatsApp.** Set `MSG91_WHATSAPP_NUMBER` and map each notification type to an approved
+MSG91 template in Admin → Settings → `whatsapp.templates` (`name`, `language`, `vars`).
+Messages go only to customers who switched on WhatsApp updates (separate consent,
+withdrawable any time); others keep SMS and push.
+
+**GST period lock (C-31).** After filing GSTR-1/3B for a month, set Admin → Settings →
+`accounts.locked_until` to the last day of that month. Goods receipts and supplier
+credit notes dated on or before it are refused; correct a filed month in the next
+period's return.
+
 **Go-live switches.** Turn off `catalogue.opening_stock_open` once opening stock is in:
 afterwards stock enters only by goods receipt. Set `TRUST_PROXY_HOPS` to the number of
 proxies in front of the API (1 behind an AWS load balancer) so rate limits see real
@@ -162,6 +178,8 @@ can trigger one.
 7. DLT templates registered and mapped for at least otp, dispatched, out_for_delivery,
    delivered, order_cancelled and return_update; Firebase service account; Shiprocket
    API user, webhook and pickup address (section 2).
+8. Agora App ID and certificate; WhatsApp number and templates if WhatsApp is used;
+   rider logins for own delivery.
 
 ## 9. Incidents
 

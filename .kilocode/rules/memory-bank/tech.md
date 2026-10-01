@@ -36,3 +36,5 @@ See `backend/.env.example`. Documents go only to S3 (`AWS_S3_BUCKET`, optional
 `S3_ENDPOINT`); there is no local storage option. `DISABLE_SCHEDULER=true` turns
 off the cron jobs on an instance. Test databases/caches are throwaway servers.
 No MSG91 key → SMS is skipped with a warning (OTP is in Redis at `otp:<mobile>`).
+
+- Sprint 13: `agora-token` (RTC tokens). Env `MSG91_WHATSAPP_NUMBER`; fake WhatsApp endpoint in `test/fakes/server.mjs`.
