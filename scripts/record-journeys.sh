@@ -15,6 +15,9 @@ export AWS_ACCESS_KEY_ID=fake AWS_SECRET_ACCESS_KEY=fake
 pkill -f "ts-node --transpile-only src/inde[x]" 2>/dev/null || true
 sleep 1
 "$root/scripts/dev-up.sh"
+# Any website already on :3000 would answer instead of this build
+stop_web() { pkill -f "next-serve[r]" 2>/dev/null || true; pkill -f "next star[t]" 2>/dev/null || true; }
+stop_web
 cd "$root/frontend-web"
 NODE_ENV=production NEXT_PUBLIC_API_URL="$API_URL" npm run build >/tmp/dawabag-web-build.log 2>&1
 NODE_ENV=production PORT=3000 setsid nohup npm run start >/tmp/dawabag-web.log 2>&1 </dev/null &
@@ -23,6 +26,6 @@ curl -sf http://localhost:3000 >/dev/null || { echo "Website did not start:" >&2
 cd "$root/e2e"
 status=0
 JOURNEYS_OUT="$out" npx playwright test -c journeys/journeys.config.ts || status=$?
-pkill -x next-server 2>/dev/null || true
+stop_web
 echo "Journeys written to $out (steps.json + shots/)"
 exit $status
