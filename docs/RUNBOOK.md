@@ -51,6 +51,18 @@ non-prescription parcels; prescription parcels still need the buyer's delivery c
 (C-26) and admins get an alert to confirm. Returns to origin (RTO) alert admins once.
 `*_BASE_URL` / `GOOGLE_OAUTH_TOKEN_URL` are for tests only; production refuses them.
 
+**E-invoicing (IRP, C-31).** Needed once aggregate turnover crosses the e-invoicing
+threshold (confirm the current limit with the CA). Register for API access on the IRP
+(NIC or a private IRP), whitelist the server's outbound IP, and set the `IRP_*` keys.
+Fill Admin → Settings → legal entity (GSTIN, legal name, address) and the premises PIN
+code, then switch on `einvoice.enabled`. From then on every Dawabag B2B invoice is
+registered when it is packed, and the parcel cannot be dispatched until its IRN is back;
+credit notes are registered against their invoice. The IRN and signed QR print on the
+invoice PDF. Problems appear in Admin → E-invoices: fix the data (usually a buyer GSTIN)
+and press Retry. Corrections are made by credit note; IRNs are never cancelled from here.
+Document numbers are at most 16 characters (CGST Rule 46): `DWB/2627/00012`,
+credit notes `DWBC/2627/00001`; partner prefixes are 2–4 characters.
+
 ## 3. Build the images
 
 ```bash

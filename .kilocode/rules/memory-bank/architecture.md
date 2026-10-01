@@ -115,3 +115,15 @@
   order + AWB assign), `courier.service` (book, webhook updates, buyer tracking), `status` (pure:
   status normalising, IST timestamps). Routes `/fulfilment/shipments/:id/book-courier`,
   `/courier/shiprocket/webhook`. Provider URLs overridable by `*_BASE_URL` for tests only.
+- **E-invoicing (Sprint 9, C-31):** `services/einvoice/` — `irp.client` (common NIC API: RSA login,
+  AES-256-ECB SEK, token in memory, 1005 → re-login, 2150 duplicate → fetch existing IRN),
+  `payload` (pure; built from `invoiceData.loadInvoice/loadCreditNote`, the PDF's own source),
+  `einvoice.service` (table `einvoices` per INV/CRN document; created at pack, Bull queue
+  `einvoice` + `einvoice_sweep` job; dispatch gate `assertEinvoiceReady`, missing records made in
+  their own transaction by `prepareDispatchEinvoice`). Routes `/einvoices` (admin list, retry).
+  Setting `einvoice.enabled`. Registered rows are final (trigger `dawabag_einvoice_final`).
+- **Document numbers:** `next_invoice_number` returns `<prefix>/<2627>/<00001>` and raises above
+  16 characters (CGST Rule 46); credit notes print `<prefix>C`, series key unchanged.
+- **Purchase returns (Sprint 9, C-28):** `services/purchasing/purchaseReturn.service` — PRN series,
+  approval by a second person applies `return_to_supplier` stock adjustments, dispatch reference,
+  supplier credit note settles; report `purchase-returns`. Routes `/purchasing/returns/*`.

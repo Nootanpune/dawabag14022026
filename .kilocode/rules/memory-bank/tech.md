@@ -18,9 +18,9 @@ cd backend && npm install
 npx tsc --noEmit            # typecheck
 npm test                    # jest unit tests (src/**/*.test.ts)
 npm run dev                 # API on :4000 (needs Postgres + Redis + .env)
-npm run test:smoke          # Sprint 1–8 end-to-end checks against a running API (DISABLE_SCHEDULER=true).
-                            # Sprint 8 needs fake providers: eval "$(node test/sprint8/fake-env.mjs)" in the shell
-                            # that starts the API and runs the tests (MSG91, Google OAuth/FCM, Shiprocket fakes)
+npm run test:smoke          # Sprint 1–9 end-to-end checks against a running API (DISABLE_SCHEDULER=true).
+                            # Sprints 8–9 need fake providers: eval "$(node test/fakes/fake-env.mjs)" in the shell
+                            # that starts the API and runs the tests (MSG91, Google OAuth/FCM, Shiprocket, IRP fakes)
                             # (API_URL, DATABASE_URL, REDIS_URL). Uploads need S3;
                             # without it the tests expect 503 and seed document rows.
 # database
