@@ -119,12 +119,12 @@ export async function sendGatewayRefunds(ids: string[]): Promise<void> {
       const g: any = await getRazorpay().payments.refund(r.gateway_payment_id, { amount: r.amount_paise, speed: 'normal',
         notes: { refund_id: r.id, source: r.source } });
       await withTransaction(async (client) => {
-        await client.query(`UPDATE refunds SET gateway_refund_id = $2, failure_reason = NULL WHERE id = $1`, [id, g.id]);
+        await client.query(`UPDATE refunds SET gateway_refund_id = $2, failure_reason = NULL, gateway_attempts = gateway_attempts + 1 WHERE id = $1`, [id, g.id]);
         if (g.status === 'processed') await settleGatewayLeg(client, id);
       });
     } catch (e: any) {
       logger.error(`Gateway refund ${id} failed: ${e?.message || e}`);
-      await query(`UPDATE refunds SET failure_reason = $2 WHERE id = $1`, [id, String(e?.error?.description || e?.message || e).slice(0, 500)]);
+      await query(`UPDATE refunds SET failure_reason = $2, gateway_attempts = gateway_attempts + 1 WHERE id = $1`, [id, String(e?.error?.description || e?.message || e).slice(0, 500)]);
     }
   }
 }
@@ -167,4 +167,36 @@ export async function listRefunds(filter: { status?: string; userId?: string; or
             r.gateway_refund_id, r.reference, r.failure_reason, r.created_at, r.processed_at
      FROM refunds r JOIN orders o ON o.id = r.order_id
      ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY r.created_at DESC LIMIT 500`, params);
+}
+
+// Accounts: send a gateway leg again after the gateway refused it or reported it failed
+export async function retryGatewayRefund(userId: string, id: string) {
+  const r = await withTransaction(async (client) => {
+    const leg = (await client.query(`SELECT * FROM refunds WHERE id = $1 FOR UPDATE`, [id])).rows[0];
+    if (!leg) throw new AppError('Refund not found', 404);
+    if (leg.method !== 'gateway' || leg.status !== 'pending') throw new AppError('Only a pending gateway refund can be sent again', 409);
+    if (!leg.failure_reason) throw new AppError('This refund is still with the gateway; wait for its result', 409);
+    await client.query(`UPDATE refunds SET gateway_refund_id = NULL, failure_reason = NULL WHERE id = $1`, [id]);
+    await writeAuditTx(client, { userId: null, action: 'refund_retried', performedBy: userId, newValue: { refund_id: id, previous_failure: leg.failure_reason } });
+    return leg;
+  });
+  await sendGatewayRefunds([id]);
+  return (await query(`SELECT id, status, gateway_refund_id, failure_reason, gateway_attempts FROM refunds WHERE id = $1`, [id]))[0];
+}
+
+// Admin goodwill / other refund through the same ledger as cancellations and returns
+export async function adminRefund(userId: string, orderId: string, amountPaise: number | undefined, reason: string | undefined) {
+  const refund = await withTransaction(async (client) => {
+    // Lock first so two refunds on one order cannot both pass the check
+    const o = (await client.query('SELECT id FROM orders WHERE id = $1 FOR UPDATE', [orderId])).rows[0];
+    if (!o) throw new AppError('Order not found', 404);
+    const left = await refundableAmount(client, orderId);
+    const amount = amountPaise ?? left;
+    if (amount <= 0 || amount > left) throw new AppError(left === 0 ? 'Nothing is left to refund on this order' : `Refund must be between 1 and ${left} paise`, 400);
+    const r = await recordRefund(client, { orderId, amountPaise: amount, source: 'admin', userId });
+    await writeAuditTx(client, { userId: null, action: 'refund_initiated', performedBy: userId, newValue: { order_id: orderId, amount_paise: amount }, notes: reason });
+    return r;
+  });
+  await sendGatewayRefunds(refund.gatewayRefundIds);
+  return refund.legs;
 }

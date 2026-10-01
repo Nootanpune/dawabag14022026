@@ -7,6 +7,7 @@ import { runRefillOrdersJob, runRefillRemindersJob } from './refill.job';
 import { runLicenceRegisterAlerts } from '../services/licence.service';
 import { runExpiryWatchJob } from './expiryWatch.job';
 import { runEinvoiceSweep } from '../services/einvoice/einvoice.service';
+import { runPaymentSweep } from '../services/payments/reconcile.service';
 
 export interface JobDefinition {
   name: string;
@@ -16,6 +17,12 @@ export interface JobDefinition {
 }
 
 export const JOBS: JobDefinition[] = [
+  {
+    name: 'payment_reconcile',
+    description: 'Look up payments still open 10 minutes after checkout at Razorpay; record any captured (lost confirmations)',
+    cron: '*/15 * * * *',                    // every 15 minutes
+    run: runPaymentSweep,
+  },
   {
     name: 'einvoice_sweep',
     description: 'Re-queue e-invoices still waiting for the IRP (C-31)',

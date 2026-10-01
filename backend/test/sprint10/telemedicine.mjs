@@ -1,6 +1,6 @@
 // Teleconsultation under the Telemedicine Practice Guidelines 2020 (C-22, C-23, C-24)
 import { call, check, db, q } from '../sprint5/lib.mjs';
-import { checkoutPayment, razorpay } from '../fakes/razorpay.mjs';
+import { checkoutPayment, razorpay, sendWebhook } from '../fakes/razorpay.mjs';
 import { istSlot, login, people } from './fixtures.mjs';
 
 export async function runTelemedicine(ctx) {
@@ -168,6 +168,14 @@ export async function runTelemedicine(ctx) {
   r = await book(t.patient, slots.tomorrow);
   r = await call('POST', `/consultations/${r.json.data.id}/cancel`, { token: t.doctor, body: { reason: 'On leave' } });
   check('the doctor can cancel; unpaid means nothing to refund', r.status === 200 && r.json.data.refund === null, r.json);
+  r = await book(t.patient2, slots.tomorrow);
+  const c4 = r.json.data;
+  r = await call('POST', `/consultations/${c4.id}/pay`, { token: t.patient2 });
+  const pay4 = checkoutPayment(r.json.data.gateway_order_id);
+  r = await sendWebhook('payment.captured', { payment: { entity: razorpay.payments.get(pay4.razorpay_payment_id) } });
+  const c4row = (await q(`SELECT payment_status, gateway_payment_id FROM consultations WHERE id = $1`, [c4.id]))[0];
+  check('a fee confirmed only by the webhook (app closed) still marks the consultation paid', r.json.outcome === 'consultation paid'
+    && c4row.payment_status === 'paid' && c4row.gateway_payment_id === pay4.razorpay_payment_id, { out: r.json, c4row });
 
   r = await call('GET', `/consultations/doctor?date=${S.now1.slot_date}`, { token: t.doctor });
   check('doctor\'s day list with patient age and gender', r.json.data?.some((x) => x.id === c1.id && x.patient_gender === 'female' && x.prescription_id === rx1.id), r.json.data);

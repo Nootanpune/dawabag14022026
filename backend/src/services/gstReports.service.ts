@@ -4,6 +4,7 @@
 // GSTR-8 (TCS) and deducts TDS u/s 194-O on them from the settlements.
 // Amounts are paise; place of supply is the delivery address state.
 import { query } from '../config/database';
+import { settlementReconciliation } from './payments/reconcile.service';
 
 type Range = { from: string; to: string };
 
@@ -137,6 +138,7 @@ export const REPORTS = {
   'marketplace-tcs-tds': marketplaceTaxes,
   'purchase-register': purchaseRegister,
   'purchase-returns': purchaseReturnRegister,
+  'payment-reconciliation': settlementReconciliation,   // Razorpay settlements vs Dawabag, fetched live (≤ 31 days)
   'stock-valuation': stockValuation,
 } as const;
 export type ReportName = keyof typeof REPORTS;

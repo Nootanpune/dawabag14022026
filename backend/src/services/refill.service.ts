@@ -75,8 +75,8 @@ export async function updateSubscription(userId: string, id: string, changes: {
     }
     if (changes.mandate_id !== undefined) {
       await client.query(
-        `UPDATE refill_subscriptions SET mandate_id = $2, auto_charge = $2 IS NOT NULL,
-           auto_charge_consent_at = CASE WHEN $2 IS NOT NULL THEN NOW() ELSE NULL END WHERE id = $1`,
+        `UPDATE refill_subscriptions SET mandate_id = $2::uuid, auto_charge = $2::uuid IS NOT NULL,
+           auto_charge_consent_at = CASE WHEN $2::uuid IS NOT NULL THEN NOW() ELSE NULL END WHERE id = $1`,
         [id, changes.mandate_id]);
     }
     if (changes.items) {

@@ -4,16 +4,14 @@
 // payments apply: the buyer authorises once; each charge is preceded by a
 // pre-debit notice (our refill reminder); charges above the card/UPI
 // auto-debit limit need fresh authentication, so those refills get a pay link
-// instead. NOT exercised against Razorpay in this environment (no keys) —
-// test in Razorpay test mode before enabling.
+// instead. Exercised against the fake gateway (test/sprint11); confirm with
+// Razorpay test mode before going live.
 import { PoolClient } from 'pg';
-import { recordRefund, sendGatewayRefunds } from './refund.service';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { logger } from '../config/logger';
 import { writeAudit, writeAuditTx } from '../utils/audit';
 import { getRazorpay } from './razorpay.client';
-import { moveOrderToFulfilment } from './paymentCapture.service';
 
 // Per-charge limit without additional authentication — CA/Razorpay to confirm
 export const AUTO_DEBIT_LIMIT_PAISE = 15000_00;
@@ -67,7 +65,7 @@ export async function cancelMandate(userId: string, mandateId: string) {
 }
 
 // Charges a refill order on the buyer's active mandate. Capture is confirmed by
-// the payment.captured webhook (handleRecurringCapture).
+// the payment.captured webhook (payments/capture.service).
 export async function chargeOrderOnMandate(
   orderId: string, mandateId: string
 ): Promise<{ charged: boolean; reason?: string }> {
@@ -94,48 +92,38 @@ export async function chargeOrderOnMandate(
   return { charged: true };
 }
 
-// Webhook side: activates a mandate on its authorisation payment, and records
-// captured recurring charges against their order.
-export async function handleRecurringCapture(event: string, payload: any): Promise<void> {
-  if (event !== 'payment.captured') return;
-  const p = payload?.payment?.entity;
-  if (!p?.order_id) return;
+// Mandate side of a captured payment: the ₹1 authorisation that registers the token
+export async function activateMandateFromCapture(client: PoolClient, p: { order_id: string; token_id?: string }): Promise<boolean> {
+  const mandate = (await client.query(
+    `SELECT id, user_id FROM payment_mandates WHERE gateway_order_id = $1 FOR UPDATE`, [p.order_id])).rows[0];
+  if (!mandate) return false;
+  if (p.token_id) {
+    const r = await client.query(
+      `UPDATE payment_mandates SET status = 'active', gateway_token_id = $2, activated_at = NOW() WHERE id = $1 AND status = 'pending'`,
+      [mandate.id, p.token_id]);
+    if (r.rowCount) await writeAuditTx(client, { userId: mandate.user_id, action: 'mandate_activated', newValue: { mandate_id: mandate.id } });
+  }
+  return true;   // the authorisation payment is not an order payment
+}
 
-  const lateRefundIds = await withTransaction(async (client: PoolClient): Promise<string[]> => {
-    const mandate = (await client.query(
-      `SELECT id, user_id FROM payment_mandates WHERE gateway_order_id = $1 AND status = 'pending' FOR UPDATE`,
-      [p.order_id])).rows[0];
-    if (mandate) {
-      if (!p.token_id) return [];
-      await client.query(
-        `UPDATE payment_mandates SET status = 'active', gateway_token_id = $2, activated_at = NOW() WHERE id = $1`,
-        [mandate.id, p.token_id]);
-      await writeAuditTx(client, { userId: mandate.user_id, action: 'mandate_activated', newValue: { mandate_id: mandate.id } });
-      return [];
+// token.confirmed / token.rejected / token.cancelled webhooks (e-mandates confirm later than the payment)
+export async function applyTokenEvent(event: string, token: { id: string; customer_id?: string }): Promise<string> {
+  return withTransaction(async (client) => {
+    const m = (await client.query(
+      `SELECT id, user_id, status FROM payment_mandates
+       WHERE gateway_token_id = $1 OR (gateway_customer_id = $2 AND gateway_token_id IS NULL AND status = 'pending')
+       ORDER BY created_at DESC LIMIT 1 FOR UPDATE`, [token.id, token.customer_id ?? null])).rows[0];
+    if (!m) return 'no matching mandate';
+    if (event === 'token.confirmed') {
+      if (m.status !== 'pending') return `mandate already ${m.status}`;
+      await client.query(`UPDATE payment_mandates SET status = 'active', gateway_token_id = $2, activated_at = NOW() WHERE id = $1`, [m.id, token.id]);
+      await writeAuditTx(client, { userId: m.user_id, action: 'mandate_activated', newValue: { mandate_id: m.id } });
+      return 'mandate activated';
     }
-
-    const pay = (await client.query(
-      `SELECT order_id, amount_paise, status FROM payments WHERE gateway_order_id = $1 FOR UPDATE`, [p.order_id])).rows[0];
-    if (!pay || ['captured', 'partially_refunded', 'refunded'].includes(pay.status)) return [];
-    if (Number(p.amount) !== Number(pay.amount_paise)) {
-      logger.error(`Captured amount mismatch for gateway order ${p.order_id}`);
-      return [];
-    }
-    await client.query(
-      `UPDATE payments SET status = 'captured', gateway_payment_id = $2, method = $3, paid_at = NOW()
-       WHERE gateway_order_id = $1`, [p.order_id, p.id, p.method]);
-    // Money arriving for an order that was already cancelled goes straight back
-    const order = (await client.query('SELECT status FROM orders WHERE id = $1 FOR UPDATE', [pay.order_id])).rows[0];
-    if (!['pending_payment', 'payment_failed'].includes(order.status)) {
-      const back = await recordRefund(client, { orderId: pay.order_id, amountPaise: Number(p.amount), source: 'cancellation', userId: null });
-      await writeAuditTx(client, { userId: null, action: 'payment_after_close_refunded',
-        newValue: { order_id: pay.order_id, order_status: order.status, gateway_payment_id: p.id } });
-      return back.gatewayRefundIds;
-    }
-    const status = await moveOrderToFulfilment(client, pay.order_id);
-    await writeAuditTx(client, { userId: null, action: 'payment_captured_webhook',
-      newValue: { order_id: pay.order_id, gateway_payment_id: p.id, order_status: status } });
-    return [];
+    const status = event === 'token.rejected' ? 'failed' : 'cancelled';
+    await client.query(`UPDATE payment_mandates SET status = $2, cancelled_at = NOW() WHERE id = $1 AND status <> $2`, [m.id, status]);
+    await client.query(`UPDATE refill_subscriptions SET mandate_id = NULL, auto_charge = FALSE WHERE mandate_id = $1`, [m.id]);
+    await writeAuditTx(client, { userId: m.user_id, action: `mandate_${status}`, newValue: { mandate_id: m.id, event } });
+    return `mandate ${status}; refills switched to pay links`;
   });
-  await sendGatewayRefunds(lateRefundIds);
 }

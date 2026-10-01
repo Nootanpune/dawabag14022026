@@ -17,6 +17,7 @@ export async function cleanup() {
   await run('DELETE FROM prescriptions WHERE digital_prescription_id = ANY($1) OR user_id = ANY($2)', [rxIds, ids]);
   await run('DELETE FROM digital_prescription_items WHERE prescription_id = ANY($1)', [rxIds]);
   await run('DELETE FROM digital_prescriptions WHERE id = ANY($1)', [rxIds]);
+  await run(`DELETE FROM payment_webhook_events WHERE order_ref IN (SELECT gateway_order_id FROM consultations WHERE doctor_id = ANY($1))`, [doctorIds]);
   await run('DELETE FROM consultations WHERE doctor_id = ANY($1) OR patient_user_id = ANY($2)', [doctorIds, ids]);
   await run('DELETE FROM doctor_slots WHERE doctor_id = ANY($1)', [doctorIds]);
   await run('DELETE FROM doctor_profiles WHERE id = ANY($1)', [doctorIds]);

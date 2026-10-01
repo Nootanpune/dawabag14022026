@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { cancelOrder } from '../services/cancellation.service';
 import { RETURN_REASONS, createReturn, returnWindows, decideReturn, getReturn, listReturns, recordDisposition } from '../services/return.service';
-import { listRefunds, markRefundProcessed } from '../services/refund.service';
+import { listRefunds, markRefundProcessed, retryGatewayRefund } from '../services/refund.service';
 
 const uuid = z.string().uuid();
 export const STAFF_ROLES = ['admin', 'super_admin', 'pharmacist_rx', 'pharmacist_pack'];
@@ -86,4 +86,9 @@ export async function postRefundProcessed(req: Request, res: Response, next: Nex
 // GET /returns/windows — public; the time limits for reporting problems (C-37)
 export async function getReturnWindows(_req: Request, res: Response, next: NextFunction) {
   try { res.json({ success: true, data: await returnWindows() }); } catch (err) { next(err); }
+}
+
+// POST /returns/refunds/admin/:id/retry — send a refused or failed gateway refund again
+export async function postRefundRetry(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await retryGatewayRefund(req.user!.id, z.string().uuid().parse(req.params.id)) }); } catch (e) { next(e); }
 }
