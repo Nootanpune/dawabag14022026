@@ -97,8 +97,12 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
       if (existing && new Date(existing.expiry_date).toISOString().slice(0, 10) === l!.expiry_date
           && (existing.printed_mrp_paise == null || existing.printed_mrp_paise === l!.printed_mrp_paise)) {
         batchId = existing.id;
-        await client.query(`UPDATE inventory_batches SET quantity_available = quantity_available + $2, printed_mrp_paise = $3 WHERE id = $1`,
-          [batchId, units, l!.printed_mrp_paise]);
+        // Weighted-average cost across deliveries of the same batch (stock valuation)
+        await client.query(
+          `UPDATE inventory_batches SET printed_mrp_paise = $3,
+             purchase_price_paise = ROUND((quantity_available * purchase_price_paise + $2::int * $4::int)::numeric / (quantity_available + $2::int)),
+             quantity_available = quantity_available + $2
+           WHERE id = $1`, [batchId, units, l!.printed_mrp_paise, unitCost]);
       } else if (existing) {
         throw new AppError(`${l!.product.name} batch ${l!.batch_number} is already on the shelf with a different expiry or MRP; check the invoice`, 409);
       } else {
