@@ -266,7 +266,7 @@ the lawyer/CA sign-off.
 - Razorpay tested against a stand-in gateway only; run a live test-mode ₹1 payment, refund and mandate. Replacement = new order.
 - External penetration test pending (internal review done, 12 findings fixed).
 - Policy texts must be published by the owner.
-- WhatsApp channel not wired; GSTR-8 filing manual; Razorpay mandates untested.
+- WhatsApp channel not wired; GSTR-8 filing manual.
 
 ## Done in Sprint 1
 - Migrations fixed (02 view, 03 unique index) and 04 added (registration fields,
