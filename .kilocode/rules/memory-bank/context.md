@@ -10,6 +10,26 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 20 — owner choices and rehearsal R2 (2026-10-01)
+- Owner chose **Direction A (clinical trust)** and **rehearsal R2 (recorded journeys)**
+  from the design review (artifact "Dawabag Design Review").
+- `scripts/record-journeys.sh [out]` + `e2e/journeys/`: records customer (OTC and
+  Schedule H), pharmacist, packer, rider and admin journeys as captioned screenshots
+  (phone + laptop) through the real screens; Razorpay Checkout is stubbed onto the
+  fake gateway and prescription uploads use `backend/test/fakes/s3.mjs` (in-memory,
+  opt-in via S3_ENDPOINT — not in dev-env, sprint1 smoke expects 503 without S3).
+  Output (steps.json + shots) goes outside the repo. Published as "Dawabag Rehearsal R2".
+- Found by the rehearsal and fixed: pack/dispatch queue flagged OTC lines as awaiting
+  a prescription (`rx_cleared` now = prescription attached, or not Schedule H/H1, or a
+  KYC-approved trade buyer — same rule as payment capture); order confirmation now
+  shows total paid incl. delivery; phone search placeholder shortened.
+- e2e clean-up (`support/data.ts`) deletes by following foreign keys, so fully
+  fulfilled test orders are removed.
+- Gotchas: dev-env exports PORT=4000 (the API's) — start the website with PORT=3000;
+  stale `next-server` processes answer on :3000 with an old build; `pkill -f` patterns
+  must not match the calling shell's own command line.
+- Not yet recorded: doctor consultation, partner pharmacy, returns/refunds.
+
 ## Direction A — clinical trust redesign (mobile, 2026-10-01)
 - Theme: brand green aligned with the web (#167A4C / #105C38); Material 3 NavigationBar.
 - Customer shell tabs: Home, Search (`/search`, new), Orders, Account. Cart is now a
