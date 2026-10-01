@@ -126,7 +126,7 @@ test('record every journey', async ({ browser }) => {
       const r = await call('POST', `/fulfilment/prescriptions/${rx}/verify`, { prescriber_name: 'Dr. Asha Kulkarni', prescriber_reg_no: 'MMC-2011-4455',
         prescribed_on: todayIST(), patient_name: 'E2E Buyer', valid_days: 90, items: [{ product_id: rxId, prescribed_qty: 10 }] }, await token('pharmacist'));
       if (r.status >= 300) throw new Error(JSON.stringify(r.json));
-    });
+    }, page);
     await page.reload();
     await capture(page, { journey: 'Pharmacist', role: 'Pharmacist', device, title: 'Verified', caption: 'Verified. The order leaves the queue and moves to packing; the check is recorded against the pharmacist\'s registration.', note });
     await ctx.close();
@@ -159,17 +159,21 @@ test('record every journey', async ({ browser }) => {
         const card = page.locator('div', { hasText: num }).filter({ has: page.getByRole('button', { name: 'Dispatch', exact: true }) }).last();
         await card.getByRole('button', { name: 'Dispatch', exact: true }).click();
         await page.getByLabel('Our rider').check();
-        await page.getByLabel('Rider').selectOption({ label: /Journey Rider/ as any }).catch(async () => page.getByLabel('Rider').selectOption({ index: 1 }));
+        const riderSelect = page.locator('select').filter({ has: page.locator('option', { hasText: 'Journey Rider' }) });
+        await riderSelect.selectOption({ label: await riderSelect.locator('option', { hasText: 'Journey Rider' }).innerText() });
         await page.locator('input.font-mono').fill(`SEAL-R2-${i + 1}`);
         if (i === 0) await shot('Dispatch to our rider', 'Choosing our own rider (or a courier with AWB) and recording the seal number (C-26).');
         await page.getByRole('button', { name: 'Mark dispatched' }).click();
-        await page.waitForTimeout(1500);
+        await page.getByRole('button', { name: 'Done', exact: true }).waitFor();
+        if (i === 0) await shot('Run reference', 'Dispatched to our rider: the run reference stands in for a courier tracking number.');
+        await page.getByRole('button', { name: 'Done', exact: true }).click();
+        await page.waitForTimeout(1000);
       }, async () => {
         const c = db(); await c.connect();
         const rider = (await c.query(`SELECT id FROM users WHERE mobile = '9000001905'`)).rows[0].id; await c.end();
         const r = await call('POST', `/fulfilment/shipments/${sid}/dispatch`, { rider_id: rider, seal_number: `SEAL-R2-${i + 1}` }, await token('packer'));
         if (r.status >= 300) throw new Error(JSON.stringify(r.json));
-      });
+      }, page);
       if (i === 1) await shot('Dispatched', 'Both parcels are out with the rider; buyers are notified.', { note });
     }
     await ctx.close();
@@ -213,7 +217,7 @@ test('record every journey', async ({ browser }) => {
       }, async () => {
         const r = await call('POST', `/fulfilment/shipments/${sid}/delivered`, { received_by_name: 'E2E Buyer', received_by_relation: 'self', ...(i === 0 ? { code } : {}) }, await token('rider'));
         if (r.status >= 300) throw new Error(JSON.stringify(r.json));
-      });
+      }, page);
       if (i === 1) await shot('Run complete', 'Both parcels delivered; the run sheet is empty.', { note });
     }
     await ctx.close();

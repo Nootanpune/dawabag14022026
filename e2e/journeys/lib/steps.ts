@@ -22,8 +22,10 @@ export async function signIn(page: Page, who: keyof typeof everyone) {
 }
 
 /** Tries the action on screen; if the screen can't do it, the API does it and the step says so. */
-export async function onScreenOr(action: () => Promise<void>, viaApi: () => Promise<void>): Promise<string | undefined> {
+export async function onScreenOr(action: () => Promise<void>, viaApi: () => Promise<void>, page?: Page): Promise<string | undefined> {
   try { await action(); return undefined; } catch (e) {
+    console.log('On-screen step failed:', String(e).slice(0, 1500));
+    await page?.keyboard.press('Escape').catch(() => {});   // close a dialog left open
     await viaApi();
     return `Done through the API for this recording (on-screen step failed: ${String(e).split('\n')[0].slice(0, 140)})`;
   }

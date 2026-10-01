@@ -24,23 +24,39 @@ export async function call(method: string, path: string, body?: unknown, token?:
   return { status: res.status, json: await res.json().catch(() => ({})) as any };
 }
 
+// Deletes rows and, first, every row that points at them through a foreign key
+// (found from the database's own constraints), so orders that went through
+// prescription check, packing and delivery come out as cleanly as fresh ones
+async function removeRows(c: Client, table: string, ids: string[], depth = 0): Promise<void> {
+  if (!ids.length || depth > 8) return;
+  const fks = (await c.query(
+    `SELECT cl.relname AS child, a.attname AS col,
+            EXISTS (SELECT 1 FROM pg_attribute x WHERE x.attrelid = cl.oid AND x.attname = 'id' AND NOT x.attisdropped) AS has_id
+       FROM pg_constraint k
+       JOIN pg_class cl ON cl.oid = k.conrelid
+       JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = k.conkey[1]
+      WHERE k.contype = 'f' AND k.confrelid = $1::regclass AND array_length(k.conkey, 1) = 1`, [table])).rows;
+  for (const fk of fks) {
+    if (fk.child === table) continue;
+    if (fk.has_id) {
+      const childIds = (await c.query(`SELECT id::text FROM ${fk.child} WHERE ${fk.col} = ANY($1)`, [ids])).rows.map((r) => r.id);
+      await removeRows(c, fk.child, childIds, depth + 1);
+    } else {
+      await c.query(`DELETE FROM ${fk.child} WHERE ${fk.col} = ANY($1)`, [ids]);
+    }
+  }
+  await c.query(`DELETE FROM ${table} WHERE id = ANY($1)`, [ids]);
+}
+
 export async function cleanup(c: Client) {
-  const ids = (await c.query(`SELECT id FROM users WHERE mobile LIKE '90000019%'`)).rows.map((r) => r.id);
-  const products = (await c.query(`SELECT id FROM products WHERE sku LIKE 'E2E-%'`)).rows.map((r) => r.id);
-  const orders = (await c.query('SELECT id FROM orders WHERE user_id = ANY($1)', [ids])).rows.map((r) => r.id);
+  const ids = (await c.query(`SELECT id::text FROM users WHERE mobile LIKE '90000019%'`)).rows.map((r) => r.id);
+  const products = (await c.query(`SELECT id::text FROM products WHERE sku LIKE 'E2E-%'`)).rows.map((r) => r.id);
   await c.query("SET dawabag.maintenance = 'on'");
-  await c.query('DELETE FROM prescriptions WHERE user_id = ANY($1)', [ids]);
-  await c.query('DELETE FROM payments WHERE order_id = ANY($1)', [orders]);
-  await c.query('DELETE FROM order_items WHERE order_id = ANY($1)', [orders]);
-  await c.query('DELETE FROM order_shipments WHERE order_id = ANY($1)', [orders]);
+  // Keep the shared trail rows, just unlink them from the test people
   await c.query('UPDATE audit_logs SET performed_by = NULL WHERE performed_by = ANY($1)', [ids]);
   await c.query('UPDATE app_settings SET updated_by = NULL WHERE updated_by = ANY($1)', [ids]);
-  for (const t of ['notification_deliveries', 'user_devices', 'cart_items', 'carts', 'notifications', 'orders', 'addresses', 'consent_records', 'audit_logs', 'user_profiles']) {
-    await c.query(`DELETE FROM ${t} WHERE user_id = ANY($1)`, [ids]);
-  }
-  await c.query('DELETE FROM users WHERE id = ANY($1)', [ids]);
-  await c.query('DELETE FROM inventory_batches WHERE product_id = ANY($1)', [products]);
+  await removeRows(c, 'users', ids);
   await c.query(`DELETE FROM audit_logs WHERE new_value->>'product_id' = ANY($1::text[])`, [products]);
-  await c.query('DELETE FROM products WHERE id = ANY($1)', [products]);
+  await removeRows(c, 'products', products);
   await c.query('DELETE FROM pincode_serviceability WHERE pincode = $1', [PIN]);
 }

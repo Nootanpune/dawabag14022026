@@ -31,7 +31,7 @@ export default function HomeHero({ query, onQueryChange, inputRef }: Props) {
           type="search"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Search medicines, e.g. Dolo 650"
+          placeholder="Try Dolo 650 or paracetamol"
           autoComplete="off"
           className="w-full pl-12 pr-11 py-3.5 rounded-xl border border-gray-300 bg-white text-base
                      focus:outline-none focus:ring-2 focus:ring-brand-400 shadow-sm scroll-mt-24"

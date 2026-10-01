@@ -41,14 +41,19 @@ export async function fulfilmentQueue(stage: QueueStage) {
             a.full_name AS ship_to_name, a.city, a.pincode,
             json_agg(json_build_object('product_name', oi.product_name, 'quantity', oi.quantity,
               'batch_number', ib.batch_number, 'expiry_date', ib.expiry_date, 'rx_cleared',
-              oi.prescription_id IS NOT NULL) ORDER BY oi.product_name) AS lines
+              -- cleared: verified prescription, or none needed (not Schedule H/H1, or a
+              -- KYC-approved trade buyer) — the rule moveOrderToFulfilment applies (C-08)
+              oi.prescription_id IS NOT NULL OR p.drug_schedule NOT IN ('Schedule H', 'Schedule H1')
+                OR (u.customer_type <> 'customer' AND u.kyc_status = 'approved')) ORDER BY oi.product_name) AS lines
      FROM order_shipments s
      JOIN orders o ON o.id = s.order_id
      JOIN addresses a ON a.id = o.address_id
+     JOIN users u ON u.id = o.user_id
      JOIN order_items oi ON oi.shipment_id = s.id
+     JOIN products p ON p.id = oi.product_id
      LEFT JOIN inventory_batches ib ON ib.id = oi.batch_id
      WHERE s.seller_type = 'dawabag' AND s.status = $1 AND o.status = ANY($2::text[])
-     GROUP BY s.id, o.id, a.id ORDER BY s.created_at LIMIT 200`,
+     GROUP BY s.id, o.id, a.id, u.customer_type, u.kyc_status ORDER BY s.created_at LIMIT 200`,
     [shipmentStatus, READY]);
 }
 

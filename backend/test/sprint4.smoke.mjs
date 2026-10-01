@@ -128,6 +128,8 @@ async function main() {
   console.log('Pack, dispatch, H1 register (C-09)');
   r = await call('GET', '/fulfilment/queue?stage=pack', { token: t.packer });
   check('pack queue shows the shipment with batch', r.json.data?.items?.find((i) => i.shipment_id === s1)?.lines?.some((l) => l.batch_number === 'H1-B1'), r.json);
+  check('…and no line is flagged as awaiting a prescription: H1 verified, OTC needs none (C-08)',
+    r.json.data?.items?.find((i) => i.shipment_id === s1)?.lines?.every((l) => l.rx_cleared === true), r.json.data?.items?.find((i) => i.shipment_id === s1)?.lines);
   r = await call('POST', `/fulfilment/shipments/${s1}/dispatch`, { token: t.packer, body: { courier_partner: 'Delhivery', awb_number: 'S4AWB1', seal_number: 'SEAL-S4-1' } });
   check('dispatch before packing refused', r.status === 409, r.json);
   r = await call('POST', `/fulfilment/shipments/${s1}/pack`, { token: t.packer });
