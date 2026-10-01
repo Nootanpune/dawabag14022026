@@ -2,13 +2,43 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–8 are done on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–9 are done on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Web Sprint 9 — e-invoices and purchase returns (tsc + next lint + next build pass)
+- /admin/einvoices (admin, super_admin; AdminNav): "e-invoicing is off" banner (C-31),
+  pending/failed/generated tiles, status tabs, table (IRN shortened, full in title, ack,
+  IRP error), Retry on failed/pending rows. lib/einvoices/{api,types}.ts,
+  components/admin/einvoices/*.
+- Settings: einvoice.enabled as an on/off switch with a confirmation dialog (new
+  'boolean' setting kind, components/admin/settings/SettingSwitch.tsx; super_admin edits).
+- Dispatch dialog shows server refusals (409 IRN pending/failed) in a clear red box; pack
+  toast notes "registering the e-invoice (IRN)" when einvoice_required.
+- /staff/purchase-returns list, /new (supplier → its batches or "Recalled stock", free =
+  available − reserved, cost value, server 422 lines one per line) and /[id] (approve /
+  reject hidden for the requester, dispatch reference, supplier credit note with
+  short/over difference). lib/purchaseReturns/{api,types,labels,form}.ts,
+  components/staff/purchaseReturns/*. Nav entry for STORE_ROLES.
+- Accounts: 'purchase-returns' report label. /staff/stock: "Recalled only" filter and
+  paging from the server's total (fetchBatches now returns {batches,total}).
+
+## Done in Sprint 9 (e-invoicing, document numbers, purchase returns)
+- Migration 12. Document numbers now fit CGST Rule 46's 16 characters: `DWB/2627/00012`,
+  credit notes `DWBC/2627/00001`, PO/GRN/PRN likewise; counters continue (gap-free); the
+  function raises above 16; partner prefixes 2–4 chars.
+- E-invoicing (C-31) against the common IRP API: B2B Dawabag invoices registered at packing,
+  dispatch blocked until the IRN is back, credit notes registered against their invoice, IRN +
+  signed QR on the PDF, queue + sweep, Admin → E-invoices (retry). Off until einvoice.enabled.
+  The unused v2 per-order e_invoices code/table was retired.
+- Purchase returns (C-28): raise → second-person approval (stock out as return_to_supplier
+  adjustments) → dispatch reference → supplier credit note; report `purchase-returns`.
+- Tests: test/sprint9.smoke.mjs (52 checks) against test/fakes (shared fake providers incl. an
+  IRP with the real encryption); sprints 1–9 pass; jest 50.
 
 ## Done in Sprint 8 (delivery and communications)
 - Migration 11: user_devices (several phones per user), notification_deliveries (every

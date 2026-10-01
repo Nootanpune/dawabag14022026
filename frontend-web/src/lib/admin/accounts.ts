@@ -20,6 +20,7 @@ export const REPORT_LABELS: Record<string, string> = {
   'gstr1-summary': 'GSTR-1 summary',
   'marketplace-tcs-tds': 'Marketplace TCS / TDS',
   'purchase-register': 'Purchase register',
+  'purchase-returns': 'Purchase returns',
   'stock-valuation': 'Stock valuation',
 };
 

@@ -46,6 +46,8 @@ const TONES: Record<string, string> = {
   submitted: 'bg-amber-100 text-amber-800',
   near_expiry: 'bg-orange-100 text-orange-800',
   recalled: 'bg-red-100 text-red-800',
+  generated: 'bg-green-100 text-green-800',
+  settled: 'bg-green-100 text-green-800',
   'OUT OF STOCK':'bg-red-100 text-red-800',
   'REORDER NOW': 'bg-orange-100 text-orange-800',
   'LOW STOCK': 'bg-amber-100 text-amber-800',

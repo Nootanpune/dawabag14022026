@@ -16,8 +16,14 @@ export interface Batch {
   sku: string;
   drug_schedule: string | null;
   cold_chain: boolean;
+  vendor_id?: string | null;
   supplier_name: string | null;
   days_to_expiry: number;
+}
+
+export interface BatchPage {
+  batches: Batch[];
+  total: number;
 }
 
 export const ADJUSTMENT_REASONS = [

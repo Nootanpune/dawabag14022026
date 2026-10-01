@@ -7,6 +7,7 @@ import type {
   Adjustment,
   AdjustmentStatus,
   Batch,
+  BatchPage,
   DisposalMethod,
   ExpiryFilter,
   NewAdjustment,
@@ -15,7 +16,9 @@ import type {
 } from './types';
 
 export const stockControlKeys = {
-  batches: (q: string, expiry: ExpiryFilter | '', page: number) => ['stock', 'batches', q, expiry, page] as const,
+  batches: (q: string, expiry: ExpiryFilter | '', recalled: boolean, page: number) => ['stock', 'batches', q, expiry, recalled, page] as const,
+  /** a supplier's batches, or every recalled batch, for a purchase return (C-28) */
+  returnable: (vendorId: string, recalled: boolean) => ['stock', 'batches', 'returnable', vendorId, recalled] as const,
   adjustments: (status: AdjustmentStatus | '') => ['stock', 'adjustments', status] as const,
   destruction: (pending: boolean) => ['stock', 'adjustments', 'destruction', pending] as const,
   counts: ['stock', 'counts'] as const,
@@ -25,9 +28,19 @@ export const stockControlKeys = {
 const S = '/stock';
 export const BATCH_PAGE_SIZE = 50;
 
-export async function fetchBatches(q: string, expiry: ExpiryFilter | '', page: number): Promise<Batch[]> {
+/** One page of batches plus the server's total; recalled=true lists only recalled batches still in stock (C-28). */
+export async function fetchBatches(q: string, expiry: ExpiryFilter | '', recalled: boolean, page: number): Promise<BatchPage> {
   const { data } = await api.get(`${S}/batches`, {
-    params: { q: q || undefined, expiry: expiry || undefined, page, limit: BATCH_PAGE_SIZE },
+    params: { q: q || undefined, expiry: expiry || undefined, recalled: recalled ? 'true' : undefined, page, limit: BATCH_PAGE_SIZE },
+  });
+  const d = data.data ?? {};
+  return { batches: d.batches ?? [], total: Number(d.total ?? 0) };
+}
+
+/** Batches that can go back on a purchase return: this supplier's, or all recalled stock (up to 200). */
+export async function fetchReturnableBatches(vendorId: string, recalled: boolean): Promise<Batch[]> {
+  const { data } = await api.get(`${S}/batches`, {
+    params: recalled ? { recalled: 'true', limit: 200 } : { vendor_id: vendorId, limit: 200 },
   });
   return data.data?.batches ?? [];
 }

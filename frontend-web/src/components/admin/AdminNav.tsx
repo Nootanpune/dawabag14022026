@@ -34,6 +34,8 @@ import {
   Flame,
   ClipboardList,
   Bell,
+  PackageMinus,
+  Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -67,9 +69,13 @@ const ITEMS = [
   { href: '/staff/stock', label: 'Stock', icon: Boxes, roles: STORE_ROLES },
   { href: '/admin/stock-adjustments', label: 'Stock adjustments', icon: SlidersHorizontal, roles: MANAGER_ROLES },
   { href: '/staff/stock-counts', label: 'Stock counts', icon: ClipboardList, roles: STORE_ROLES },
+  // Sprint 9 — purchase returns to suppliers (C-28, two-person approval C-46)
+  { href: '/staff/purchase-returns', label: 'Purchase returns', icon: PackageMinus, roles: STORE_ROLES },
   { href: '/staff/destruction-register', label: 'Destruction register', icon: Flame, roles: STORE_ROLES },
   { href: '/admin/credit', label: 'Credit', icon: IndianRupee, roles: MANAGER_ROLES },
   { href: '/admin/accounts', label: 'Accounts', icon: Calculator, roles: MANAGER_ROLES },
+  // Sprint 9 — GST e-invoicing (IRN) for B2B invoices and credit notes (C-31)
+  { href: '/admin/einvoices', label: 'E-invoices', icon: Receipt, roles: MANAGER_ROLES },
   // Sprint 8 — SMS / email / push delivery log
   { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: MANAGER_ROLES },
   { href: '/admin/jobs', label: 'Jobs', icon: Timer, roles: MANAGER_ROLES },

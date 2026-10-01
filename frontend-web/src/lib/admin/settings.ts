@@ -14,7 +14,7 @@ export interface Premises {
 }
 
 /** How each server-known key is edited. The server validates ranges (PUT /admin/settings/:key). */
-export type SettingKind = 'paise' | 'int' | 'number' | 'premises' | 'choice' | 'text';
+export type SettingKind = 'paise' | 'int' | 'number' | 'premises' | 'choice' | 'text' | 'boolean';
 
 export interface SettingMeta {
   kind: SettingKind;
@@ -24,6 +24,8 @@ export interface SettingMeta {
   options?: { value: string; label: string }[];
   /** shown under the input, e.g. the allowed range */
   hint?: string;
+  /** 'boolean' only: what the confirmation dialog says before switching on / off */
+  confirm?: { on: string; off: string };
 }
 
 export const SETTING_KINDS: Record<string, SettingMeta> = {
@@ -47,6 +49,15 @@ export const SETTING_KINDS: Record<string, SettingMeta> = {
     ],
   },
   'courier.pickup_location': { kind: 'text', label: 'Shiprocket pickup location', hint: 'The pickup location name exactly as set up in Shiprocket' },
+  // Sprint 9 — GST e-invoicing (C-31): changes when B2B parcels may be dispatched
+  'einvoice.enabled': {
+    kind: 'boolean',
+    label: 'GST e-invoicing (IRN)',
+    confirm: {
+      on: 'Every new B2B invoice and credit note will be registered with the IRP, and a B2B parcel cannot be dispatched until its invoice IRN is generated. Switch on only once aggregate turnover has crossed the e-invoicing threshold and the legal entity GSTIN, address and premises PIN code are correct.',
+      off: 'New B2B invoices will no longer be registered with the IRP and dispatch will not wait for an IRN. Switch off only if Dawabag is below the e-invoicing threshold.',
+    },
+  },
 };
 
 /** Edited in its own section (table of DLT templates), not the generic list */

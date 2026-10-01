@@ -8,6 +8,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import SettingValue from '@/components/admin/settings/SettingValue';
 import SettingEditor from '@/components/admin/settings/SettingEditor';
+import SettingSwitch from '@/components/admin/settings/SettingSwitch';
 import DltTemplatesSection from '@/components/admin/settings/DltTemplatesSection';
 import LegalSettingsSection from '@/components/admin/legal/LegalSettingsSection';
 import PharmacistRegistrationSection from '@/components/admin/legal/PharmacistRegistrationSection';
@@ -51,7 +52,8 @@ export default function AdminSettingsPage() {
                   <span className="text-sm font-semibold">
                     <SettingValue kind={m?.kind} value={s.value} unit={m?.unit} options={m?.options} />
                   </span>
-                  {isSuperAdmin && m && (
+                  {m?.kind === 'boolean' && <SettingSwitch setting={s} meta={m} canEdit={isSuperAdmin} />}
+                  {isSuperAdmin && m && m.kind !== 'boolean' && (
                     <button onClick={() => setEditing(s)} className="btn-outline text-xs py-1.5 px-3">
                       Edit
                     </button>

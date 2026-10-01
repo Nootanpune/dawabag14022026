@@ -24,6 +24,8 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
   const [seal, setSeal] = useState('');
   const [cold, setCold] = useState({ temp: '', logger: '' });
   const [error, setError] = useState('');
+  // A refusal from the server (409: Rx not cleared, recalled batch, e-invoice IRN pending or failed — C-31)
+  const [refusal, setRefusal] = useState('');
 
   const dispatch = useMutation({
     mutationFn: () =>
@@ -39,7 +41,7 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
       toast.success(`${shipment.order_number} dispatched${r?.h1_register_rows ? ` · ${r.h1_register_rows} H1 register row(s)` : ''}`);
       onClose();
     },
-    onError: (err) => setError(getApiErrorMessage(err, 'Could not dispatch')),
+    onError: (err) => setRefusal(getApiErrorMessage(err, 'Could not dispatch')),
     onSettled: () => queryClient.invalidateQueries({ queryKey: fulfilmentKeys.all }),
   });
 
@@ -48,6 +50,7 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
     const e = dispatchError({ courier_partner: courier, awb_number: awb, seal_number: seal }, booked) || (shipment.cold_chain ? coldChainError(cold) : '');
     if (e) return setError(e);
     setError('');
+    setRefusal('');
     dispatch.mutate();
   };
 
@@ -70,6 +73,11 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
         <SealNumberField value={seal} onChange={setSeal} />
         {shipment.cold_chain && <ColdChainFields value={cold} onChange={setCold} />}
       </div>
+      {refusal && (
+        <p role="alert" className="mt-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg p-2.5">
+          {refusal}
+        </p>
+      )}
       <DialogActions onCancel={onClose} onConfirm={submit} confirmLabel="Mark dispatched" pending={dispatch.isPending} error={error} />
     </Modal>
   );

@@ -49,9 +49,10 @@ export async function applyPrescription(prescriptionId: string, orderId: string)
   return data.data as { lines_covered: number };
 }
 
+/** einvoice_required: a B2B invoice that must get its IRN before dispatch (C-31, Sprint 9). */
 export async function packShipment(shipmentId: string) {
   const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/pack`);
-  return data.data;
+  return data.data as { id: string; status: string; einvoice_required?: boolean };
 }
 
 /**
@@ -64,7 +65,10 @@ export async function bookCourier(shipmentId: string) {
   return data.data as { shipment_id: string; awb_number: string; courier_partner: string };
 }
 
-/** Seal number is required: every pack leaves tamper-evident (C-26). */
+/**
+ * Seal number is required: every pack leaves tamper-evident (C-26). A B2B parcel
+ * also waits for its e-invoice IRN (C-31): the server answers 409 with the reason.
+ */
 export async function dispatchOwnShipment(shipmentId: string, body: DispatchInput) {
   const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/dispatch`, body);
   return data.data as { h1_register_rows?: number };

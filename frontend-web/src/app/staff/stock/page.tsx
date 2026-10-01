@@ -9,6 +9,7 @@ import RequireAuth from '@/components/auth/RequireAuth';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import StatusTabs from '@/components/admin/StatusTabs';
+import Pager from '@/components/admin/Pager';
 import BatchTable from '@/components/staff/stock/BatchTable';
 import AdjustDialog from '@/components/staff/stock/AdjustDialog';
 import AdjustmentTable from '@/components/staff/stock/AdjustmentTable';
@@ -17,6 +18,7 @@ function StockScreen() {
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
   const [expiry, setExpiry] = useState<ExpiryFilter | ''>('');
+  const [recalled, setRecalled] = useState(false);
   const [page, setPage] = useState(1);
   const [adjusting, setAdjusting] = useState<Batch | null>(null);
   useEffect(() => {
@@ -27,9 +29,12 @@ function StockScreen() {
     return () => clearTimeout(t);
   }, [text]);
 
-  const batches = useQuery({ queryKey: stockControlKeys.batches(q, expiry, page), queryFn: () => fetchBatches(q, expiry, page) });
+  const batches = useQuery({
+    queryKey: stockControlKeys.batches(q, expiry, recalled, page),
+    queryFn: () => fetchBatches(q, expiry, recalled, page),
+  });
   const pending = useQuery({ queryKey: stockControlKeys.adjustments('requested'), queryFn: () => fetchAdjustments('requested') });
-  const rows = batches.data ?? [];
+  const rows = batches.data?.batches ?? [];
 
   return (
     <div>
@@ -50,24 +55,23 @@ function StockScreen() {
           setPage(1);
         }}
       />
-      <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Search product, SKU or batch" className="input mb-3 max-w-sm" />
+      <div className="flex flex-wrap items-center gap-4 mb-3">
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Search product, SKU or batch" className="input max-w-sm" />
+        <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={recalled}
+            onChange={(e) => {
+              setRecalled(e.target.checked);
+              setPage(1);
+            }}
+          />
+          Recalled only
+        </label>
+      </div>
       <QueryState isLoading={batches.isLoading} error={batches.error} isEmpty={!rows.length} emptyText="No batches match" />
       {!!rows.length && <BatchTable batches={rows} onAdjust={setAdjusting} />}
-      {(page > 1 || rows.length === BATCH_PAGE_SIZE) && (
-        <div className="flex justify-end items-center gap-2 mt-3 text-sm">
-          <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="btn-outline text-xs py-1 px-3 disabled:opacity-40">
-            Previous
-          </button>
-          <span className="text-gray-500">Page {page}</span>
-          <button
-            disabled={rows.length < BATCH_PAGE_SIZE}
-            onClick={() => setPage((p) => p + 1)}
-            className="btn-outline text-xs py-1 px-3 disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      {batches.data && <Pager page={page} limit={BATCH_PAGE_SIZE} total={batches.data.total} onPage={setPage} />}
 
       <h2 className="text-sm font-semibold text-gray-700 mt-8 mb-2">
         Adjustments awaiting approval{pending.data ? ` · ${pending.data.length}` : ''}

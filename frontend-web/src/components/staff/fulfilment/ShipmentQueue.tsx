@@ -42,7 +42,11 @@ export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
 
   const pack = useMutation({
     mutationFn: (s: QueueShipment) => packShipment(s.shipment_id),
-    onSuccess: (_r, s) => toast.success(`${s.order_number} packed`),
+    // B2B invoices are registered with the IRP before dispatch is allowed (C-31)
+    onSuccess: (r, s) =>
+      toast.success(`${s.order_number} packed`, {
+        description: r?.einvoice_required ? 'B2B invoice: registering the e-invoice (IRN) before dispatch' : undefined,
+      }),
     onError: (err) => toast.error(getApiErrorMessage(err, 'Could not update the shipment')),
     onSettled: () => queryClient.invalidateQueries({ queryKey: fulfilmentKeys.all }),
   });

@@ -7,6 +7,7 @@ export default function SettingValue({ kind, value, unit, options }: { kind?: Se
     const o = options?.find((x) => x.value === value);
     return <>{o ? o.label.split(' — ')[0] : String(value ?? '—')}</>;
   }
+  if (kind === 'boolean') return <>{value === true ? 'On' : 'Off'}</>;
   if (kind === 'paise' && typeof value === 'number') return <>{formatPrice(value)}</>;
   if (kind === 'premises' && value && typeof value === 'object') {
     const p = value as { pincode?: string; latitude?: number; longitude?: number };
