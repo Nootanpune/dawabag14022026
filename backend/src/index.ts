@@ -52,10 +52,13 @@ import einvoiceRoutes from './routes/einvoice.routes';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
+import { requestId } from './middleware/requestId';
 
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+app.use(requestId);
 
 // ─── Security Middleware ────────────────────────────────────────────────────
 app.use(helmet({
@@ -67,6 +70,7 @@ app.use(cors({
   origin: (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3000')
     .split(',').map((o) => o.trim()),
   credentials: true,
+  exposedHeaders: ['X-Request-Id'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Client'],
 }));
@@ -112,7 +116,8 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Access logs never carry an e-prescription check code
 morgan.token('url', (req: express.Request) => (req.originalUrl || req.url).replace(/(\/eprescriptions\/verify\/)[^/?]+/, '$1[code]'));
-app.use(morgan('combined', {
+morgan.token('rid', (req: express.Request) => req.id ?? '-');
+app.use(morgan(':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" rid=:rid', {
   stream: { write: (msg) => logger.http(msg.trim()) },
 }));
 

@@ -25,14 +25,16 @@ export function errorHandler(
   _next: NextFunction
 ) {
   logger.error(`${req.method} ${req.path} — ${err.message}`, {
+    request_id: req.id,
     stack: err.stack,
     body: redact(req.body),
     user: req.user?.id,
   });
 
   // Responses carry `message` (API contract) and `error` (older clients).
+  // request_id lets support find this failure in the logs
   const fail = (status: number, message: string, extra: object = {}) =>
-    res.status(status).json({ success: false, message, error: message, ...extra });
+    res.status(status).json({ success: false, message, error: message, request_id: req.id, ...extra });
 
   // Zod validation errors
   if (err instanceof ZodError) {

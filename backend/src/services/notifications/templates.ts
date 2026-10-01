@@ -182,6 +182,12 @@ export function buildMessage(payload: NotificationPayload) {
         body: `A security incident ${payload.incidentNo} was logged. If it is reportable, CERT-In must be informed by ${payload.dueAt}.` },
       push: { title: `Security incident ${payload.incidentNo}`, body: 'Report to CERT-In within 6 hours if reportable' },
     },
+    // ── Sprint 15: a scheduled job started failing (staff only) ──
+    job_failed: {
+      email: { subject: `Scheduled job ${payload.reportNo} is failing`,
+        body: `The scheduled job ${payload.reportNo} failed: ${payload.reason}. It retries on its schedule; check Admin → Jobs and the logs. You will not be told again until it has succeeded once.` },
+      push: { title: `Job ${payload.reportNo} failing`, body: String(payload.reason || '').slice(0, 100) },
+    },
     // ── Sprint 14: regulator recall alerts (C-28), staff only ──
     recall_alert: {
       email: { subject: `Recall alert ${payload.reportNo}: ${payload.count} product(s) to check`,

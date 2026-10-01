@@ -48,7 +48,7 @@ jobs:
       - name: Unit tests
         working-directory: backend
         run: npx jest --ci
-      - name: Migrations, API and end-to-end suites (Sprints 1–14)
+      - name: Migrations, API and end-to-end suites
         run: |
           . scripts/dev-env.sh
           scripts/dev-up.sh

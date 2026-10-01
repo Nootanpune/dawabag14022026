@@ -169,6 +169,10 @@ skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
 
 - Logs: JSON lines on stdout in production → CloudWatch Logs. Set retention to at
   least **180 days** (CERT-In, C-43).
+- Every request has an id (`X-Request-Id`, kept from the load balancer when it sends
+  one). It is on the access-log line (`rid=…`), on any error log line and in every error
+  reply (`request_id`), so a reference a user quotes from an error screen finds the
+  request in CloudWatch.
 - Database: RDS automated backups with point-in-time recovery; keep monthly snapshots
   for **8 years** (GST books 72 months, C-34). Test a restore every quarter.
 - Statutory records are final in the database: the H1 register, credit notes, audit
@@ -179,9 +183,22 @@ skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
 ## 7. Scheduled jobs
 
 Run inside the API (IST): licence expiry, GSTIN re-check, low stock, credit
-reminders, partner settlements, refills, licence register alerts. A Redis lock makes
-each run happen once even with several API instances. Admin → Jobs shows runs and
-can trigger one.
+reminders, partner settlements, refills, licence register alerts, payment and
+e-invoice sweeps, recall-alert watch, retention purge. A Redis lock makes each run
+happen once even with several API instances. Admin → Jobs shows runs and can trigger
+one. When a job fails after working, admins get one alert (email and push); they are not
+told again until it has succeeded once.
+
+## 7a. Development and CI
+
+- One command brings a fresh machine to a running, migrated API against the fake
+  providers: `. scripts/dev-env.sh && scripts/dev-up.sh`, then
+  `cd backend && npm run test:smoke` in the same shell. Redis runs without snapshots;
+  the values in `dev-env.sh` are throwaway and must never be used in production.
+- GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
+  backend type check and unit tests, migrations on an empty PostgreSQL 16 (twice, to
+  prove they re-run), every end-to-end suite against the fakes, and the web type check,
+  lint and build. Merge only when CI is green.
 
 ## 8. Before the first real customer
 

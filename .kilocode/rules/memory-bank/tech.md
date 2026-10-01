@@ -38,3 +38,8 @@ off the cron jobs on an instance. Test databases/caches are throwaway servers.
 No MSG91 key → SMS is skipped with a warning (OTP is in Redis at `otp:<mobile>`).
 
 - Sprint 13: `agora-token` (RTC tokens). Env `MSG91_WHATSAPP_NUMBER`; fake WhatsApp endpoint in `test/fakes/server.mjs`.
+- Sprint 15: `scripts/dev-env.sh` (source; throwaway dev/CI env + fake providers) and `scripts/dev-up.sh`
+  (Postgres, Redis without snapshots, role/db, migrations, API → /tmp/dawabag-api.log). CI:
+  `.github/workflows/ci.yml` (backend tsc, jest, migrations ×2, all smoke suites; web tsc, lint, build;
+  Node 20, postgres:16, redis:7 services). `X-Request-Id` middleware (`middleware/requestId.ts`);
+  job-failure alert `alertFirstFailure` in `jobs/scheduler.ts` (notification type `job_failed`).
