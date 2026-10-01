@@ -32,3 +32,15 @@ export function getApiFieldErrors(err: any): Record<string, string> {
   return out;
 }
 
+
+/** Every validation error from a 422 as "path: message" lines (nested settings objects). */
+export function getApiErrorList(err: any): string[] {
+  const errors = err?.response?.data?.errors;
+  if (!Array.isArray(errors)) return [];
+  return errors
+    .filter((e: any) => e?.message)
+    .map((e: any) => {
+      const path = Array.isArray(e.path) ? e.path.join('.') : String(e.path ?? '');
+      return path ? `${path}: ${e.message}` : String(e.message);
+    });
+}

@@ -14,8 +14,11 @@ import ColdChainFields from '@/components/delivery/ColdChainFields';
 // Dispatch writes the H1 register rows for prescription lines (C-09); the server
 // refuses (409) if a line is not Rx-cleared or its batch is recalled (C-28).
 // Every pack leaves sealed; the seal number is recorded (C-26).
+// A courier booked through the server already has an AWB: courier and AWB may then
+// be left blank and the server uses the stored ones (the seal is still required).
 export default function StaffDispatchDialog({ shipment, onClose }: { shipment: QueueShipment; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const booked = !!shipment.awb_number;
   const [courier, setCourier] = useState(shipment.courier_partner ?? '');
   const [awb, setAwb] = useState(shipment.awb_number ?? '');
   const [seal, setSeal] = useState('');
@@ -24,7 +27,14 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
 
   const dispatch = useMutation({
     mutationFn: () =>
-      dispatchOwnShipment(shipment.shipment_id, withColdChain({ courier_partner: courier.trim(), awb_number: awb.trim(), seal_number: seal.trim() }, shipment.cold_chain, cold)),
+      dispatchOwnShipment(
+        shipment.shipment_id,
+        withColdChain(
+          { courier_partner: courier.trim() || undefined, awb_number: awb.trim() || undefined, seal_number: seal.trim() },
+          shipment.cold_chain,
+          cold
+        )
+      ),
     onSuccess: (r) => {
       toast.success(`${shipment.order_number} dispatched${r?.h1_register_rows ? ` · ${r.h1_register_rows} H1 register row(s)` : ''}`);
       onClose();
@@ -35,7 +45,7 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
 
   const submit = () => {
     // Cold-chain packs need temperature (2–8 °C) and logger ID (C-25)
-    const e = dispatchError({ courier_partner: courier, awb_number: awb, seal_number: seal }) || (shipment.cold_chain ? coldChainError(cold) : '');
+    const e = dispatchError({ courier_partner: courier, awb_number: awb, seal_number: seal }, booked) || (shipment.cold_chain ? coldChainError(cold) : '');
     if (e) return setError(e);
     setError('');
     dispatch.mutate();
@@ -44,12 +54,17 @@ export default function StaffDispatchDialog({ shipment, onClose }: { shipment: Q
   return (
     <Modal title={`Dispatch ${shipment.order_number}`} onClose={onClose}>
       <div className="space-y-3 text-sm">
+        {booked && (
+          <p className="text-xs text-blue-800 bg-blue-50 rounded-lg p-2">
+            Booked with {shipment.courier_partner ?? 'the courier'} · AWB {shipment.awb_number}. Courier and AWB are optional; leave them as they are.
+          </p>
+        )}
         <label className="block">
-          <span className="block font-medium text-gray-700 mb-1">Courier</span>
-          <input value={courier} onChange={(e) => setCourier(e.target.value)} maxLength={50} className="input" autoFocus />
+          <span className="block font-medium text-gray-700 mb-1">Courier{booked ? ' (optional)' : ''}</span>
+          <input value={courier} onChange={(e) => setCourier(e.target.value)} maxLength={50} className="input" autoFocus={!booked} />
         </label>
         <label className="block">
-          <span className="block font-medium text-gray-700 mb-1">AWB / tracking number</span>
+          <span className="block font-medium text-gray-700 mb-1">AWB / tracking number{booked ? ' (optional)' : ''}</span>
           <input value={awb} onChange={(e) => setAwb(e.target.value)} maxLength={100} className="input" />
         </label>
         <SealNumberField value={seal} onChange={setSeal} />

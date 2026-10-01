@@ -10,6 +10,7 @@ import QueryState from '@/components/admin/QueryState';
 import StatusTabs from '@/components/admin/StatusTabs';
 import AdjustmentTable from '@/components/staff/stock/AdjustmentTable';
 import DisposalDialog from '@/components/staff/stock/DisposalDialog';
+import DestructionCsvButton from '@/components/staff/stock/DestructionCsvButton';
 
 const TABS = [
   { value: 'pending', label: 'Awaiting destruction' },
@@ -33,6 +34,7 @@ function DestructionRegister() {
         subtitle="Expired, damaged and recalled stock written off and awaiting or recorded as destroyed"
         onRefresh={() => refetch()}
         refreshing={isFetching}
+        actions={<DestructionCsvButton pending={pending} />}
       />
       <StatusTabs tabs={TABS} value={tab} onChange={setTab} />
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText={pending ? 'Nothing awaiting destruction' : 'No destructions recorded'} />

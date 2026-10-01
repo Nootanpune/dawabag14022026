@@ -10,6 +10,7 @@ export function toDraft(kind: SettingKind, value: unknown): Draft {
     const p = (value ?? {}) as Partial<Premises>;
     return { ...d, pincode: p.pincode ?? '', latitude: String(p.latitude ?? ''), longitude: String(p.longitude ?? '') };
   }
+  if (kind === 'choice' || kind === 'text') return { ...d, single: typeof value === 'string' ? value : '' };
   const n = Number(value);
   if (!Number.isFinite(n)) return d;
   return { ...d, single: kind === 'paise' ? (n / 100).toString() : String(n) };
@@ -26,6 +27,7 @@ export function fromDraft(kind: SettingKind, d: Draft): { value: unknown } | { e
     return { value: { pincode: d.pincode.trim(), latitude, longitude } };
   }
   if (d.single.trim() === '') return { error: 'Enter a value' };
+  if (kind === 'choice' || kind === 'text') return { value: d.single.trim() };
   if (kind === 'paise') {
     const paise = rupeesToPaise(d.single);
     return paise == null ? { error: 'Enter an amount in rupees' } : { value: paise };

@@ -12,6 +12,7 @@ import QueryState from '@/components/admin/QueryState';
 import HandoverDialog from '@/components/delivery/HandoverDialog';
 import StaffShipmentCard from './StaffShipmentCard';
 import StaffDispatchDialog from './StaffDispatchDialog';
+import BookCourierButton from './BookCourierButton';
 
 type ShipmentStage = Exclude<QueueStage, 'rx'>;
 
@@ -76,6 +77,7 @@ export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
             actionLabel={COPY[stage].action}
             onAction={() => onAction(s)}
             busy={pack.isPending && pack.variables?.shipment_id === s.shipment_id}
+            extra={stage === 'dispatch' && s.status === 'packed' && !s.awb_number ? <BookCourierButton shipment={s} /> : undefined}
           />
         ))}
       </div>

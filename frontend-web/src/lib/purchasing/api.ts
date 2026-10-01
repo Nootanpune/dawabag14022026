@@ -10,8 +10,9 @@ import type {
   PurchaseOrder,
   PurchaseOrderRow,
   Receipt,
+  ReceiptFilter,
+  ReceiptPage,
   ReceiptResult,
-  ReceiptRow,
   Supplier,
 } from './types';
 
@@ -20,7 +21,7 @@ export const purchasingKeys = {
   suppliers: ['admin', 'vendors', 'suppliers'] as const,
   orders: (status: PoStatus | '') => ['purchasing', 'orders', status] as const,
   order: (id: string) => ['purchasing', 'orders', 'one', id] as const,
-  receipts: (from: string, to: string) => ['purchasing', 'receipts', from, to] as const,
+  receipts: (f: ReceiptFilter) => ['purchasing', 'receipts', f.from, f.to, f.vendor_id, f.q, f.page, f.limit] as const,
   receipt: (id: string) => ['purchasing', 'receipts', 'one', id] as const,
 };
 
@@ -64,9 +65,20 @@ export async function closePurchaseOrder(id: string, reason: string) {
   await api.post(`${P}/purchase-orders/${id}/close`, { reason });
 }
 
-export async function fetchReceipts(from: string, to: string): Promise<ReceiptRow[]> {
-  const { data } = await api.get(`${P}/receipts`, { params: from && to ? { from, to } : undefined });
-  return data.data?.receipts ?? [];
+/** Paged, newest first; the server filters by receipt date, supplier and GRN / invoice number. */
+export async function fetchReceipts(f: ReceiptFilter): Promise<ReceiptPage> {
+  const { data } = await api.get(`${P}/receipts`, {
+    params: {
+      from: f.from || undefined,
+      to: f.to || undefined,
+      vendor_id: f.vendor_id || undefined,
+      q: f.q || undefined,
+      page: f.page,
+      limit: f.limit,
+    },
+  });
+  const d = data.data ?? {};
+  return { receipts: d.receipts ?? [], total: Number(d.total ?? 0), page: Number(d.page ?? f.page), limit: Number(d.limit ?? f.limit) };
 }
 
 export async function fetchReceipt(id: string): Promise<Receipt> {

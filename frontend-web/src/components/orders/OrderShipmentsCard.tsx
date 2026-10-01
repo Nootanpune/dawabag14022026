@@ -8,12 +8,13 @@ import StatusBadge from '@/components/admin/StatusBadge';
 import InvoiceDownloadButton from './InvoiceDownloadButton';
 import DeliveryCodeBanner from './DeliveryCodeBanner';
 import ReturnRequestDialog from './ReturnRequestDialog';
+import ShipmentTrackingTimeline from './ShipmentTrackingTimeline';
 
 function relationLabel(r: string | null) {
   return RECEIVER_RELATIONS.find((x) => x.value === r)?.label ?? r ?? '';
 }
 
-/** One block per seller of record (C-05, C-13) with seal, delivery code and handover (C-26) and returns (C-37). */
+/** One block per seller of record (C-05, C-13) with seal, delivery code and handover (C-26), courier tracking and returns (C-37). */
 export default function OrderShipmentsCard({ order }: { order: OrderDetail }) {
   const [returning, setReturning] = useState<OrderShipmentDetail | null>(null);
   if (!order.shipments?.length) return null;
@@ -47,6 +48,7 @@ export default function OrderShipmentsCard({ order }: { order: OrderDetail }) {
               </div>
             </div>
             {s.handover_code && <DeliveryCodeBanner code={s.handover_code} />}
+            <ShipmentTrackingTimeline shipment={s} />
             {s.status === 'dispatched' && s.seal_number && (
               <p className="text-xs text-gray-500 mt-1">Check the seal number on the pack matches before accepting it.</p>
             )}

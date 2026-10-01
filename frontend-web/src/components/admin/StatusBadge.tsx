@@ -39,6 +39,7 @@ const TONES: Record<string, string> = {
   overdue: 'bg-red-100 text-red-800',
   draft: 'bg-gray-100 text-gray-700',
   sent: 'bg-blue-100 text-blue-800',
+  skipped: 'bg-amber-100 text-amber-800',
   partially_received: 'bg-amber-100 text-amber-800',
   received: 'bg-green-100 text-green-800',
   open: 'bg-blue-100 text-blue-800',

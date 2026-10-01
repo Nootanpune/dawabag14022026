@@ -33,6 +33,7 @@ import {
   SlidersHorizontal,
   Flame,
   ClipboardList,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -69,6 +70,8 @@ const ITEMS = [
   { href: '/staff/destruction-register', label: 'Destruction register', icon: Flame, roles: STORE_ROLES },
   { href: '/admin/credit', label: 'Credit', icon: IndianRupee, roles: MANAGER_ROLES },
   { href: '/admin/accounts', label: 'Accounts', icon: Calculator, roles: MANAGER_ROLES },
+  // Sprint 8 — SMS / email / push delivery log
+  { href: '/admin/notifications', label: 'Notifications', icon: Bell, roles: MANAGER_ROLES },
   { href: '/admin/jobs', label: 'Jobs', icon: Timer, roles: MANAGER_ROLES },
   { href: '/admin/policies', label: 'Policies', icon: FileText, roles: MANAGER_ROLES },
   { href: '/admin/incidents', label: 'Security incidents', icon: Siren, roles: MANAGER_ROLES },

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { QueueShipment } from '@/lib/fulfilment/types';
 import { formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
@@ -10,10 +11,12 @@ interface Props {
   actionLabel: string;
   onAction: () => void;
   busy?: boolean;
+  /** extra buttons beside the main action (e.g. courier booking) */
+  extra?: ReactNode;
 }
 
 /** One Dawabag-own shipment in the pack / dispatch / deliver queue. */
-export default function StaffShipmentCard({ shipment: s, actionLabel, onAction, busy }: Props) {
+export default function StaffShipmentCard({ shipment: s, actionLabel, onAction, busy, extra }: Props) {
   const rxPending = s.lines.some((l) => !l.rx_cleared);
   return (
     <div className="card">
@@ -68,6 +71,7 @@ export default function StaffShipmentCard({ shipment: s, actionLabel, onAction, 
         <span className="text-sm font-semibold">{formatPrice(s.total_paise)}</span>
         <div className="flex items-center gap-2">
           {s.invoice_number && <InvoiceDownloadButton shipmentId={s.shipment_id} invoiceNumber={s.invoice_number} />}
+          {extra}
           <button onClick={onAction} disabled={busy} className="btn-primary text-xs py-1.5 px-3">
             {actionLabel}
           </button>

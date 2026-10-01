@@ -26,6 +26,13 @@ the lawyer/CA sign-off.
   Buyer order detail returns tracking_status, rto_at, tracking[].
 - Admin settings accept the Sprint 7/8 keys (were missing). Receipts list filters + paging;
   destruction register CSV. Production refuses the test-only *_BASE_URL overrides.
+- Web Sprint 8 (tsc, lint, next build pass): /admin/notifications (7-day per-channel
+  summary, status/channel filters, failed rows show the reason); settings: courier.provider,
+  courier.pickup_location, purchasing.min_shelf_life_days, stock.near_expiry_days editors
+  and a table editor for sms.dlt_templates (lib/admin/dltTemplates.ts); dispatch queue
+  "Book courier (Shiprocket)" and optional courier/AWB once booked; buyer order shows a
+  courier tracking timeline + RTO notice; /staff/receive filters (supplier, GRN/invoice
+  search, dates) with paging; destruction register "Download CSV" via downloadFromApi.
 - Tests: test/sprint8.smoke.mjs (51 checks) against one fake provider server
   (test/sprint8/fakes.mjs; env from fake-env.mjs); sprints 1–8 = 428 checks; jest 47.
 

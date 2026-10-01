@@ -14,9 +14,19 @@ export interface Premises {
 }
 
 /** How each server-known key is edited. The server validates ranges (PUT /admin/settings/:key). */
-export type SettingKind = 'paise' | 'int' | 'number' | 'premises';
+export type SettingKind = 'paise' | 'int' | 'number' | 'premises' | 'choice' | 'text';
 
-export const SETTING_KINDS: Record<string, { kind: SettingKind; label: string; unit?: string }> = {
+export interface SettingMeta {
+  kind: SettingKind;
+  label: string;
+  unit?: string;
+  /** 'choice' only: the values the server accepts */
+  options?: { value: string; label: string }[];
+  /** shown under the input, e.g. the allowed range */
+  hint?: string;
+}
+
+export const SETTING_KINDS: Record<string, SettingMeta> = {
   'allocation.own_first_min_order_paise': { kind: 'paise', label: 'Own-stock-first minimum order', unit: '₹' },
   'allocation.own_first_max_delivery_hours': { kind: 'int', label: 'Own-stock-first max delivery time', unit: 'hours' },
   'dawabag.premises': { kind: 'premises', label: 'Dawabag premises location' },
@@ -24,7 +34,23 @@ export const SETTING_KINDS: Record<string, { kind: SettingKind; label: string; u
   'marketplace.tds_pct': { kind: 'number', label: 'TDS on partner sales', unit: '%' },
   'marketplace.fee_gst_pct': { kind: 'number', label: 'GST on marketplace fees', unit: '%' },
   'refill.reminder_days_before': { kind: 'int', label: 'Refill reminder lead time', unit: 'days' },
+  // Sprint 7 — purchasing and stock (C-16, C-28)
+  'purchasing.min_shelf_life_days': { kind: 'int', label: 'Minimum shelf life on receipt', unit: 'days', hint: '30–730 days' },
+  'stock.near_expiry_days': { kind: 'int', label: 'Near-expiry warning', unit: 'days', hint: '15–365 days' },
+  // Sprint 8 — courier booking
+  'courier.provider': {
+    kind: 'choice',
+    label: 'Courier booking',
+    options: [
+      { value: 'manual', label: 'Manual — staff type the courier and AWB at dispatch' },
+      { value: 'shiprocket', label: 'Shiprocket — book from the dispatch queue' },
+    ],
+  },
+  'courier.pickup_location': { kind: 'text', label: 'Shiprocket pickup location', hint: 'The pickup location name exactly as set up in Shiprocket' },
 };
+
+/** Edited in its own section (table of DLT templates), not the generic list */
+export const DLT_TEMPLATES_KEY = 'sms.dlt_templates';
 
 export const settingsKeys = { all: ['admin', 'settings'] as const };
 

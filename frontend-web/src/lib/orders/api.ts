@@ -30,6 +30,22 @@ export interface OrderShipmentDetail {
   handover_code: string | null;
   received_by_name: string | null;
   received_by_relation: string | null;
+  /** latest courier scan, normalised by the server (Sprint 8); null before booking */
+  tracking_status?: TrackingStatus | null;
+  /** set when the courier returns the parcel to Dawabag undelivered */
+  rto_at?: string | null;
+  /** courier scans, oldest first */
+  tracking?: TrackingEvent[];
+}
+
+export type TrackingStatus = 'booked' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'rto';
+
+export interface TrackingEvent {
+  status: TrackingStatus | string;
+  /** the courier's own wording, e.g. "REACHED AT DESTINATION HUB" */
+  raw_status: string | null;
+  location: string | null;
+  event_time: string;
 }
 
 export interface OrderCreditNote {

@@ -91,6 +91,24 @@ export interface ReceiptRow {
   po_number: string | null;
 }
 
+/** GET /purchasing/receipts filters; '' means "any" */
+export interface ReceiptFilter {
+  from: string; // YYYY-MM-DD
+  to: string;
+  vendor_id: string;
+  /** GRN or supplier invoice number */
+  q: string;
+  page: number;
+  limit: number; // ≤ 200
+}
+
+export interface ReceiptPage {
+  receipts: ReceiptRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface ReceiptLine {
   id: string;
   product_name: string;

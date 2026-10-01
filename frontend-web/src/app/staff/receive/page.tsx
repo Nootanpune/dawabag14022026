@@ -1,26 +1,41 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { PackagePlus } from 'lucide-react';
 import { fetchPurchaseOrders, fetchReceipts, purchasingKeys } from '@/lib/purchasing/api';
 import { STORE_ROLES } from '@/lib/purchasing/roles';
+import type { ReceiptFilter } from '@/lib/purchasing/types';
 import { daysAgoIST, todayIST } from '@/lib/fulfilment/roles';
 import RequireAuth from '@/components/auth/RequireAuth';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import PoTable from '@/components/admin/purchasing/PoTable';
+import Pager from '@/components/admin/Pager';
 import ReceiptTable from '@/components/staff/receive/ReceiptTable';
+import ReceiptFilters from '@/components/staff/receive/ReceiptFilters';
+
+const RECEIPT_PAGE_SIZE = 50;
 
 function ReceiveScreen() {
-  const [from, setFrom] = useState(() => daysAgoIST(30));
-  const [to, setTo] = useState(todayIST);
+  const [filter, setFilter] = useState<ReceiptFilter>(() => ({
+    from: daysAgoIST(30),
+    to: todayIST(),
+    vendor_id: '',
+    q: '',
+    page: 1,
+    limit: RECEIPT_PAGE_SIZE,
+  }));
+  // any filter change goes back to page 1
+  const onFilter = useCallback((patch: Partial<ReceiptFilter>) => setFilter((f) => ({ ...f, ...patch, page: 1 })), []);
+  const badRange = !!filter.from && !!filter.to && filter.from > filter.to;
   const sent = useQuery({ queryKey: purchasingKeys.orders('sent'), queryFn: () => fetchPurchaseOrders('sent') });
   const part = useQuery({
     queryKey: purchasingKeys.orders('partially_received'),
     queryFn: () => fetchPurchaseOrders('partially_received'),
   });
-  const receipts = useQuery({ queryKey: purchasingKeys.receipts(from, to), queryFn: () => fetchReceipts(from, to), enabled: from <= to });
+  const receipts = useQuery({ queryKey: purchasingKeys.receipts(filter), queryFn: () => fetchReceipts(filter), enabled: !badRange });
+  const rows = receipts.data?.receipts ?? [];
   const open = [...(part.data ?? []), ...(sent.data ?? [])];
 
   return (
@@ -44,16 +59,19 @@ function ReceiveScreen() {
       <QueryState isLoading={sent.isLoading || part.isLoading} error={sent.error || part.error} isEmpty={!open.length} emptyText="No open purchase orders" />
       {!!open.length && <PoTable orders={open} hrefFor={(po) => `/staff/receive/new?po=${po.id}`} />}
 
-      <div className="flex flex-wrap items-end justify-between gap-3 mt-8 mb-2">
-        <h2 className="text-sm font-semibold text-gray-700">Goods receipts</h2>
-        <div className="flex items-center gap-2 text-sm">
-          <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="input w-auto" aria-label="From" />
-          <span className="text-gray-400">to</span>
-          <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="input w-auto" aria-label="To" />
-        </div>
-      </div>
-      <QueryState isLoading={receipts.isLoading} error={receipts.error} isEmpty={!receipts.data?.length} emptyText="No receipts in this period" />
-      {!!receipts.data?.length && <ReceiptTable receipts={receipts.data} />}
+      <h2 className="text-sm font-semibold text-gray-700 mt-8 mb-2">Goods receipts</h2>
+      <ReceiptFilters value={filter} onChange={onFilter} />
+      {badRange ? (
+        <p className="text-sm text-red-600">&quot;From&quot; must be on or before &quot;to&quot;</p>
+      ) : (
+        <>
+          <QueryState isLoading={receipts.isLoading} error={receipts.error} isEmpty={!rows.length} emptyText="No receipts match" />
+          {!!rows.length && <ReceiptTable receipts={rows} />}
+          {receipts.data && (
+            <Pager page={filter.page} limit={filter.limit} total={receipts.data.total} onPage={(page) => setFilter((f) => ({ ...f, page }))} />
+          )}
+        </>
+      )}
     </div>
   );
 }

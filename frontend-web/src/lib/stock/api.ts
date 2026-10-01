@@ -2,6 +2,7 @@
 // receipts needs a reason and a second person's approval (C-46); expired,
 // damaged and recalled write-offs form the destruction register (C-28, C-34).
 import api from '../api';
+import { downloadFromApi } from '../download';
 import type {
   Adjustment,
   AdjustmentStatus,
@@ -53,6 +54,14 @@ export async function recordDisposal(id: string, body: { method: DisposalMethod;
 export async function fetchDestructionRegister(pending: boolean): Promise<Adjustment[]> {
   const { data } = await api.get(`${S}/destruction-register`, { params: { pending: String(pending) } });
   return data.data?.entries ?? [];
+}
+
+/** CSV for the inspector (C-28, C-34), built by the server on each request and saved straight from the response. */
+export function downloadDestructionCsv(pending: boolean) {
+  return downloadFromApi(`${S}/destruction-register`, `destruction-register${pending ? '-pending' : ''}.csv`, {
+    format: 'csv',
+    ...(pending ? { pending: 'true' } : {}),
+  });
 }
 
 export async function fetchCounts(): Promise<StockCount[]> {

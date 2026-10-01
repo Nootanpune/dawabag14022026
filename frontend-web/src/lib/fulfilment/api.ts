@@ -54,6 +54,16 @@ export async function packShipment(shipmentId: string) {
   return data.data;
 }
 
+/**
+ * Book Dawabag's own packed shipment with Shiprocket (Sprint 8). The server
+ * refuses with 409 when booking is manual, the pack is not packed or already
+ * has an AWB, 503 when Shiprocket is not configured and 502 on a provider error.
+ */
+export async function bookCourier(shipmentId: string) {
+  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/book-courier`);
+  return data.data as { shipment_id: string; awb_number: string; courier_partner: string };
+}
+
 /** Seal number is required: every pack leaves tamper-evident (C-26). */
 export async function dispatchOwnShipment(shipmentId: string, body: DispatchInput) {
   const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/dispatch`, body);

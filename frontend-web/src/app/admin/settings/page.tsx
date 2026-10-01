@@ -1,13 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchSettings, SETTING_KINDS, settingsKeys, type AppSetting } from '@/lib/admin/settings';
+import { DLT_TEMPLATES_KEY, fetchSettings, SETTING_KINDS, settingsKeys, type AppSetting } from '@/lib/admin/settings';
 import { formatDateTimeIST } from '@/lib/admin/format';
 import { useAuthStore } from '@/store/authStore';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import SettingValue from '@/components/admin/settings/SettingValue';
 import SettingEditor from '@/components/admin/settings/SettingEditor';
+import DltTemplatesSection from '@/components/admin/settings/DltTemplatesSection';
 import LegalSettingsSection from '@/components/admin/legal/LegalSettingsSection';
 import PharmacistRegistrationSection from '@/components/admin/legal/PharmacistRegistrationSection';
 import { isLegalKey } from '@/lib/admin/legalSettings';
@@ -20,8 +21,8 @@ export default function AdminSettingsPage() {
     queryFn: fetchSettings,
   });
   const meta = editing ? SETTING_KINDS[editing.key] : undefined;
-  // legal.* objects get their own forms below
-  const rules = data?.filter((s) => !isLegalKey(s.key));
+  // legal.* objects and the SMS DLT templates get their own forms below
+  const rules = data?.filter((s) => !isLegalKey(s.key) && s.key !== DLT_TEMPLATES_KEY);
 
   return (
     <div>
@@ -48,7 +49,7 @@ export default function AdminSettingsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-semibold">
-                    <SettingValue kind={m?.kind} value={s.value} unit={m?.unit} />
+                    <SettingValue kind={m?.kind} value={s.value} unit={m?.unit} options={m?.options} />
                   </span>
                   {isSuperAdmin && m && (
                     <button onClick={() => setEditing(s)} className="btn-outline text-xs py-1.5 px-3">
@@ -61,10 +62,11 @@ export default function AdminSettingsPage() {
           })}
         </div>
       )}
+      {!!data?.length && <DltTemplatesSection setting={data.find((s) => s.key === DLT_TEMPLATES_KEY)} canEdit={isSuperAdmin} />}
       {!!data?.length && <LegalSettingsSection settings={data} canEdit={isSuperAdmin} />}
       <PharmacistRegistrationSection />
       {editing && meta && (
-        <SettingEditor setting={editing} kind={meta.kind} label={meta.label} unit={meta.unit} onClose={() => setEditing(null)} />
+        <SettingEditor setting={editing} meta={meta} onClose={() => setEditing(null)} />
       )}
     </div>
   );
