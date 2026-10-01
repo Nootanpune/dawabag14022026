@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/api_service.dart';
+import '../services/push_device_service.dart';
 import '../services/registration_api.dart';
 
 /// Signed-in account state, held in memory only. It comes from the auth
@@ -108,6 +109,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       error: null,
     );
     fetchMe();
+    // Push: register this device with the server (POST /users/me/devices).
+    PushDeviceService.register();
   }
 
   /// Builds the in-memory user map from an auth response `data`.
@@ -122,7 +125,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
-    await apiService.logout();
+    // The server forgets this device for push as part of logout.
+    final fcmToken = await PushDeviceService.currentToken();
+    await apiService.logout(fcmToken: fcmToken);
     if (mounted) state = const AuthState();
   }
 

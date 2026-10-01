@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../models/json_utils.dart';
+import '../../../models/shipment_tracking.dart';
 import '../../../services/api_service.dart';
 import '../../../services/invoice_api.dart';
 import '../../../utils/formatters.dart';
 import '../../../widgets/open_pdf_button.dart';
+import 'tracking_timeline.dart';
 
 /// One shipment: seller, tax invoice, status, seal number and who received
 /// it. With [orderId] it offers the invoice PDF (signed link, C-33) and,
@@ -39,6 +41,7 @@ class ShipmentTile extends StatelessWidget {
     final relation = _text('received_by_relation');
     final total = shipment['total_paise'];
     final detailed = orderId != null && id.isNotEmpty;
+    final tracking = ShipmentTracking.fromShipment(shipment);
     final grey = TextStyle(fontSize: 11, color: Colors.grey.shade600);
 
     return Column(
@@ -68,6 +71,12 @@ class ShipmentTile extends StatelessWidget {
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           ],
         ),
+        // Courier tracking timeline (Sprint 8), order detail only
+        if (detailed && tracking.hasData)
+          Padding(
+            padding: const EdgeInsets.only(left: 28, top: 8, bottom: 4),
+            child: TrackingTimeline(tracking: tracking),
+          ),
         if (detailed)
           Padding(
             padding: const EdgeInsets.only(left: 20),

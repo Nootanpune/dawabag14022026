@@ -202,6 +202,16 @@ Owner data and credentials (legal settings, licence register, policy texts, API 
 Razorpay, MSG91), lawyer/CA sign-off on the rulebook and Sprint 5 defaults, Flutter build,
 deployment per docs/Dawabag_Beta_Deployment_Guide.docx.
 
+## Mobile Sprint 8 — push devices, tracking, notification taps (not compiled)
+- services/push_device_service.dart + device_api.dart: POST /users/me/devices after every
+  sign-in (completeSignIn) and on FCM onTokenRefresh; logout sends fcm_token. The FCM token
+  is read live from FirebaseMessaging, never stored; no-op when Firebase is not initialised.
+- models/shipment_tracking.dart + screens/orders/widgets/tracking_timeline.dart: per-shipment
+  courier scans (newest highlighted, local time, location) and the RTO notice in ShipmentTile.
+- services/notification_tap_router.dart: push taps (type dispatched / out_for_delivery /
+  delivered / order_status / packed / payment_confirmed + order_id) open /orders/:id once
+  the router exists and the session is restored.
+
 ## Session history
 | Date | Change |
 | --- | --- |

@@ -154,15 +154,20 @@ class ApiService {
     }
   }
 
-  /// POST /auth/logout { refresh_token } with Authorization, then forget the
-  /// session locally (keychain entry deleted) even if the call fails.
-  Future<void> logout() async {
+  /// POST /auth/logout { refresh_token, fcm_token } with Authorization, then
+  /// forget the session locally (keychain entry deleted) even if the call
+  /// fails. [fcmToken] (read live from FirebaseMessaging, never stored) lets
+  /// the server forget this device for push.
+  Future<void> logout({String? fcmToken}) async {
     final refreshToken = await _sessionStore.readRefreshToken();
     final token = _accessToken;
     try {
       await _bare.post(
         '/auth/logout',
-        data: {if (refreshToken != null) 'refresh_token': refreshToken},
+        data: {
+          if (refreshToken != null) 'refresh_token': refreshToken,
+          if (fcmToken != null && fcmToken.isNotEmpty) 'fcm_token': fcmToken,
+        },
         options: Options(headers: {if (token != null) 'Authorization': 'Bearer $token'}),
       );
     } catch (_) {}

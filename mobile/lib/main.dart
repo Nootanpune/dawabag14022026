@@ -6,7 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'config/router.dart';
 import 'config/theme.dart';
+import 'providers/auth_provider.dart';
 import 'services/notification_service.dart';
+import 'services/notification_tap_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,12 +28,29 @@ void main() async {
   runApp(const ProviderScope(child: DawabagApp()));
 }
 
-class DawabagApp extends ConsumerWidget {
+class DawabagApp extends ConsumerStatefulWidget {
   const DawabagApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DawabagApp> createState() => _DawabagAppState();
+}
+
+class _DawabagAppState extends ConsumerState<DawabagApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Notification taps open the order only once the session is restored.
+    ref.listenManual<bool>(
+      authProvider.select((s) => s.isAuthenticated),
+      (_, signedIn) => NotificationTapRouter.setSignedIn(signedIn),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    NotificationTapRouter.attach(router);
 
     return MaterialApp.router(
       title: 'Dawabag',
