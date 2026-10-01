@@ -24,7 +24,8 @@ export async function customerEveryday(browser: Browser, story: Story) {
     await shot('Home page', 'First visit, signed out. Trust badges, search, prescription upload and categories are the first things a visitor sees.');
     await page.getByRole('searchbox').or(page.getByLabel(/search medicines/i)).first().fill('Paracetamol');
     await page.waitForTimeout(1200);
-    await shot('Search', 'Searching by name. Results show price, MRP and discount; products without photos get a placeholder with the initial and dosage form.');
+    await page.getByText(/Results for/).first().scrollIntoViewIfNeeded().catch(() => {});
+    await shot('Search', 'Searching by name. Results show the approved pack photo, price, MRP and discount; a product without a photo gets a placeholder with its initial and dosage form.');
     await page.goto(`/shop/${pid}`);
     await shot('Product page', 'Product details and the legally required declarations (C-17). Empty fields are hidden.', { fullPage: device === 'laptop' });
     await signIn(page, 'buyer');

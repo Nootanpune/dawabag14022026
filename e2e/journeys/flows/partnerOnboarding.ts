@@ -23,13 +23,12 @@ const listingId = async () => (await dbRow(`SELECT pp.id FROM partner_products p
 
 /** The product the partner will list (already in Dawabag's catalogue) and the partner's application on file */
 async function partnerSetup() {
-  const p = await apiAs('admin', 'POST', '/products', {
+  await apiAs('admin', 'POST', '/products', {
     name: ORS.name, sku: ORS.sku, category: 'Hydration', drug_schedule: 'OTC', gst_rate: 12, hsn_code: '30049099',
     mrp_paise: 2500, offer_price_paise: 2200, max_qty_per_order: 10, net_quantity: '21.8 g sachet',
     manufacturer_name: 'E2E Pharma Ltd', manufacturer_address: 'Plot 19, MIDC Satpur, Nashik 422007', country_of_origin: 'India',
   });
-  await dbRow(`INSERT INTO inventory_batches (product_id, batch_number, quantity_available, purchase_price_paise, expiry_date)
-               VALUES ($1, 'E2E-B3', 20, 1500, CURRENT_DATE + 500)`, [p.id]);
+  // No Dawabag stock: only the partner holds it, and partner stock counts (owner decision 1 Oct 2026)
   await dbRow(`INSERT INTO vendors (name, drug_license_no, gst_number, contact_name, contact_mobile, address_line1, city, state, pincode,
                  latitude, longitude, vendor_type, approval_status)
                VALUES ($1, $2, '27AAJFL1234K1Z3', 'Journey Partner Owner', $3, '21 Lake Road', 'Nashik', 'Maharashtra', $4,

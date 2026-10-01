@@ -7,6 +7,7 @@ import { test } from '@playwright/test';
 import { writeManifest } from './lib/recorder';
 import { startFakeProviders } from './lib/fakes';
 import { setUpStaff } from './lib/people';
+import { addPackPhotos } from './lib/photos';
 import { newStory } from './lib/story';
 import { customerDelivered, customerEveryday, customerOutForDelivery, customerPrescription } from './flows/customerOrder';
 import { pharmacist } from './flows/pharmacist';
@@ -24,6 +25,10 @@ test.setTimeout(20 * 60_000);
 test('record every journey', async ({ browser }) => {
   await startFakeProviders();
   await setUpStaff();
+  await addPackPhotos(browser, [
+    { id: process.env.E2E_PRODUCT_ID!, name: 'Paracetamol', strength: '500 mg · 15 tablets', tint: '#2E7DBF' },
+    { id: process.env.E2E_RX_PRODUCT_ID!, name: 'Amoxicillin', strength: '500 mg · 10 capsules', tint: '#C2410C' },
+  ]);
   const story = newStory();
   try {
     await customerEveryday(browser, story);

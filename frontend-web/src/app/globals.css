@@ -39,3 +39,10 @@
     @apply text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium;
   }
 }
+
+/* Search boxes have their own clear button; hide the browser's built-in one */
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
