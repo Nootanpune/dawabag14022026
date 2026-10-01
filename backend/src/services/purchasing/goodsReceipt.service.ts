@@ -10,6 +10,7 @@ import { writeAuditTx } from '../../utils/audit';
 import { getSetting } from '../settings.service';
 import { sameState } from '../shipment.service';
 import { assertSupplierCanSupply } from './supplierCheck';
+import { assertOpenPeriod } from '../accountsLock';
 
 export interface GrnLineInput {
   po_item_id?: string; product_id: string; batch_number: string; expiry_date: string; manufactured_date?: string;
@@ -31,6 +32,7 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
   const minShelf = Number(await getSetting('purchasing.min_shelf_life_days', 180));
   return withTransaction(async (client) => {
     const supplier = await assertSupplierCanSupply(client, input.vendor_id);
+    await assertOpenPeriod(input.supplier_invoice_date, 'A supplier invoice', client);
     // Without a purchase order there is no second person behind the purchase: admins only (C-46)
     if (!input.po_id && !['admin', 'super_admin'].includes(role)) {
       throw new AppError('Receive against an approved purchase order, or ask an admin to receive goods that were not ordered', 403);

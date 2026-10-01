@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import {
-  createDataRequest, exportUserData, listMyDataRequests, getConsents, handleDataRequest, listDataRequests, setMarketingConsent,
+  createDataRequest, exportUserData, listMyDataRequests, getConsents, handleDataRequest, listDataRequests, setMarketingConsent, setConsent,
 } from '../services/privacy.service';
 import { writeAudit } from '../utils/audit';
 
@@ -15,6 +15,14 @@ export async function putMarketingConsent(req: Request, res: Response, next: Nex
     const { granted } = z.object({ granted: z.boolean() }).parse(req.body);
     const data = await setMarketingConsent(req.user!.id, granted, req.ip || null, req.get('user-agent')?.slice(0, 500) || null);
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+// PUT /privacy/consents/whatsapp { granted } — order updates on WhatsApp, opt-in only
+export async function putWhatsAppConsent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { granted } = z.object({ granted: z.boolean() }).parse(req.body);
+    res.json({ success: true, data: await setConsent(req.user!.id, 'whatsapp', granted, req.ip || null, req.get('user-agent')?.slice(0, 500) || null) });
   } catch (err) { next(err); }
 }
 

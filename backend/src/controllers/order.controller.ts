@@ -49,12 +49,9 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     const { id } = req.params;
     const userId  = req.user!.id;
     const isAdmin = ['admin','super_admin','pharmacist_rx','pharmacist_pack'].includes(req.user!.role);
-    // Delivery staff see only orders that are out for delivery
-    if (req.user!.role === 'delivery') {
-      const out = await queryOne(`SELECT 1 FROM order_shipments WHERE order_id = $1 AND status = 'dispatched'`, [id]);
-      if (!out) throw new AppError('Order not found', 404);
-    }
-    const canSeeAll = isAdmin || req.user!.role === 'delivery';
+    // Riders use their run sheet (/fulfilment/my-run); orders are not theirs to read (C-41)
+    if (req.user!.role === 'delivery') throw new AppError('Order not found', 404);
+    const canSeeAll = isAdmin;
 
     const orderResult = await queryOne<any>(
       `SELECT o.*, a.address_line1, a.city, a.state, a.pincode,

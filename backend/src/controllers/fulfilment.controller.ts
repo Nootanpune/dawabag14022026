@@ -1,6 +1,7 @@
 // src/controllers/fulfilment.controller.ts — staff fulfilment (Sprint 4)
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { listRiders, myRun, reassignRider, ridesShipment } from '../services/delivery/rider.service';
 import { query } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAudit } from '../utils/audit';
@@ -14,6 +15,7 @@ const uuid = z.string().uuid();
 // Sealed, tamper-evident pack (C-26)
 export const dispatchSchema = z.object({
   courier_partner: z.string().trim().min(2).max(50).optional(),   // optional when booked through the courier service
+  rider_id: z.string().uuid().optional(),                         // Dawabag's own rider instead of a courier
   awb_number: z.string().trim().min(3).max(100).optional(),
   seal_number: z.string().trim().min(3).max(50),
   // Cold-chain shipments only (C-25)
@@ -41,6 +43,8 @@ export async function getQueue(req: Request, res: Response, next: NextFunction) 
   try {
     const stage = z.enum(['rx', 'pack', 'dispatch', 'deliver']).parse(req.query.stage);
     if (!STAGE_ROLES[stage].includes(req.user!.role)) throw new AppError('Access denied', 403);
+    // Riders get their own run sheet, never the whole delivery queue
+    if (req.user!.role === 'delivery') return res.json({ success: true, data: { stage, items: await myRun(req.user!.id) } });
     res.json({ success: true, data: { stage, items: await fulfilmentQueue(stage) } });
   } catch (err) { next(err); }
 }
@@ -81,14 +85,18 @@ export async function postPack(req: Request, res: Response, next: NextFunction) 
 
 export async function postDispatch(req: Request, res: Response, next: NextFunction) {
   try {
-    const { courier_partner, awb_number, ...record } = dispatchSchema.parse(req.body);
-    res.json({ success: true, data: await dispatchOwnShipment(uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, record) });
+    const { courier_partner, awb_number, rider_id, ...record } = dispatchSchema.parse(req.body);
+    if (rider_id && (courier_partner || awb_number)) throw new AppError('Choose a rider or a courier, not both', 400);
+    res.json({ success: true, data: await dispatchOwnShipment(uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, record, rider_id) });
   } catch (err) { next(err); }
 }
 
 export async function postDelivered(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json({ success: true, data: await markShipmentDelivered(uuid.parse(req.params.id), req.user!, undefined, handoverSchema.parse(req.body ?? {})) });
+    const id = uuid.parse(req.params.id);
+    // A rider closes only the parcels assigned to them
+    if (req.user!.role === 'delivery' && !(await ridesShipment(req.user!.id, id))) throw new AppError('Shipment not found', 404);
+    res.json({ success: true, data: await markShipmentDelivered(id, req.user!, undefined, handoverSchema.parse(req.body ?? {})) });
   } catch (err) { next(err); }
 }
 
@@ -124,5 +132,19 @@ export async function setPharmacistRegistration(req: Request, res: Response, nex
     if (!r.length) throw new AppError('Pharmacist account not found', 404);
     await writeAudit({ userId, action: 'pharmacist_registration_set', performedBy: req.user!.id, newValue: { pharmacist_reg_no } });
     res.json({ success: true, data: { user_id: userId, pharmacist_reg_no } });
+  } catch (err) { next(err); }
+}
+
+// GET /fulfilment/riders — for dispatch; GET /fulfilment/my-run — the rider's parcels
+export async function getRiders(_req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await listRiders() }); } catch (err) { next(err); }
+}
+export async function getMyRun(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await myRun(req.user!.id) }); } catch (err) { next(err); }
+}
+export async function postReassignRider(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { rider_id } = z.object({ rider_id: z.string().uuid() }).parse(req.body);
+    res.json({ success: true, data: await reassignRider(req.user!.id, uuid.parse(req.params.id), rider_id) });
   } catch (err) { next(err); }
 }

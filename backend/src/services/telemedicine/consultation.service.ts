@@ -10,6 +10,7 @@ import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
 import { getSetting } from '../settings.service';
 import { refundConsultationFee } from './consultationFee.service';
+import { rtcToken } from './callToken';
 import { ConsultMode, consultKind } from './rules';
 import { verifiedDoctorId } from './doctor.service';
 
@@ -72,7 +73,11 @@ export async function joinConsultation(userId: string, id: string) {
   if (!['paid', 'waived'].includes(c.payment_status)) throw new AppError('Pay the consultation fee to join', 402);
   if (Number(c.minutes_to_start) > JOIN_EARLY_MIN) throw new AppError(`The consultation opens ${JOIN_EARLY_MIN} minutes before the slot`, 409);
   if (c.status === 'booked' && isDoctor) await query(`UPDATE consultations SET status = 'in_progress', started_at = NOW() WHERE id = $1 AND status = 'booked'`, [id]);
-  return { channel: c.agora_channel, mode: c.type, app_id: process.env.AGORA_APP_ID ?? null, role: isDoctor ? 'doctor' : 'patient' };
+  // A token for this channel and this person only, valid until an hour after the slot ends:
+  // the channel name alone never lets anyone in (security review)
+  const validFor = Math.max(60, Math.round((60 - Number(c.minutes_after_end)) * 60));
+  return { channel: c.agora_channel, mode: c.type, app_id: process.env.AGORA_APP_ID ?? null, role: isDoctor ? 'doctor' : 'patient',
+    uid: userId, token: rtcToken(c.agora_channel, userId, validFor), token_expires_in: validFor };
 }
 
 export async function endConsultation(userId: string, id: string, notes: string | undefined) {

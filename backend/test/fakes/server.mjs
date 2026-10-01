@@ -29,6 +29,12 @@ function route(req, body) {
   const fromIrp = irpRoute(req, body) ?? razorpayRoute(req, body);
   if (fromIrp) return fromIrp;
   const url = req.url;
+  if (url === '/api/v5/whatsapp/whatsapp-outbound-message/bulk/') {
+    if (req.headers.authkey !== process.env.MSG91_AUTH_KEY) return [401, { status: 'fail', message: 'bad authkey' }];
+    const b = JSON.parse(body);
+    if (b.integrated_number !== process.env.MSG91_WHATSAPP_NUMBER) return [400, { status: 'fail', message: 'unknown integrated number' }];
+    return [200, { status: 'success', request_id: `wa-req-${seen.length}` }];
+  }
   if (url === '/api/v5/flow/') {
     if (req.headers.authkey !== process.env.MSG91_AUTH_KEY) return [401, { type: 'error', message: 'bad authkey' }];
     return [200, { type: 'success', message: `msg91-req-${seen.length}` }];

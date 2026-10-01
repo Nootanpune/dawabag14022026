@@ -10,6 +10,7 @@ import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
 import { assertNoRecalledLines } from './recall.service';
 import { DispatchRecord, handoverCode, prepareHandover } from './handover.service';
 import { queueNotification } from './notification.service';
+import { assignAtDispatch } from './delivery/rider.service';
 import { assertEinvoiceReady, ensureInvoiceEinvoice, prepareDispatchEinvoice } from './einvoice/einvoice.service';
 
 // Orders ready for fulfilment: paid (packing), prescription-verified, or on credit (confirmed)
@@ -77,13 +78,15 @@ export async function packShipment(shipmentId: string, userId: string) {
   });
 }
 
-export async function dispatchOwnShipment(shipmentId: string, courierIn: string | undefined, awbIn: string | undefined, userId: string, dispatch: DispatchRecord) {
+export async function dispatchOwnShipment(shipmentId: string, courierIn: string | undefined, awbIn: string | undefined, userId: string, dispatch: DispatchRecord, riderId?: string) {
   await prepareDispatchEinvoice(shipmentId);
   return withTransaction(async (client) => {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'packed') throw new AppError('Pack the shipment before dispatch', 409);
-    // A shipment booked with the courier (courier.service) already has both
-    const courier = courierIn ?? s.courier_partner, awb = awbIn ?? s.awb_number;
+    // A shipment booked with the courier (courier.service) already has both; a rider gets a run reference
+    if (riderId && s.awb_number) throw new AppError('This shipment is booked with a courier', 409);
+    const own = riderId ? await assignAtDispatch(client, shipmentId, riderId, userId) : null;
+    const courier = own?.courier ?? courierIn ?? s.courier_partner, awb = own?.awb ?? awbIn ?? s.awb_number;
     if (!courier || !awb) throw new AppError('Enter the courier and AWB number, or book the courier first', 400);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);

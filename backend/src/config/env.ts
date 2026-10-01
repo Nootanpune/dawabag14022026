@@ -48,6 +48,7 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
   if (!env.FCM_SERVICE_ACCOUNT_JSON) warnings.push('Push notifications off: FCM_SERVICE_ACCOUNT_JSON not set');
   const irp = ['IRP_BASE_URL', 'IRP_CLIENT_ID', 'IRP_CLIENT_SECRET', 'IRP_USERNAME', 'IRP_PASSWORD', 'IRP_PUBLIC_KEY'];
   if (irp.some((k) => env[k]) && irp.some((k) => !env[k])) warnings.push(`E-invoicing incomplete: set all of ${irp.join(', ')}`);
+  if (env.AGORA_APP_ID && !env.AGORA_APP_CERTIFICATE) (production ? errors : warnings).push('AGORA_APP_CERTIFICATE must be set: calls need signed tokens');
   if (env.SHIPROCKET_EMAIL && !env.SHIPROCKET_WEBHOOK_TOKEN) warnings.push('Shiprocket tracking updates refused: SHIPROCKET_WEBHOOK_TOKEN not set');
   if (production) {
     const overridden = ['MSG91_BASE_URL', 'GOOGLE_OAUTH_TOKEN_URL', 'FCM_BASE_URL', 'SHIPROCKET_BASE_URL', 'RAZORPAY_BASE_URL'].filter((k) => env[k]);

@@ -16,7 +16,8 @@ const account = {
 const irp = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const env = {
   FAKE_PROVIDERS_PORT: port,
-  MSG91_AUTH_KEY: 'fake-msg91-key', MSG91_BASE_URL: base,
+  MSG91_AUTH_KEY: 'fake-msg91-key', MSG91_BASE_URL: base, MSG91_WHATSAPP_NUMBER: '919000000000',
+  AGORA_APP_ID: crypto.randomBytes(16).toString('hex'), AGORA_APP_CERTIFICATE: crypto.randomBytes(16).toString('hex'),
   FCM_SERVICE_ACCOUNT_JSON: Buffer.from(JSON.stringify(account)).toString('base64'),
   GOOGLE_OAUTH_TOKEN_URL: `${base}/token`, FCM_BASE_URL: base,
   SHIPROCKET_EMAIL: 'api@dawabag.test', SHIPROCKET_PASSWORD: 'fake-password', SHIPROCKET_BASE_URL: base,

@@ -29,10 +29,15 @@ export async function getConsents(userId: string) {
 }
 
 export async function setMarketingConsent(userId: string, granted: boolean, ip: string | null, agent: string | null) {
+  return setConsent(userId, 'marketing', granted, ip, agent);
+}
+
+// Optional purposes the buyer can switch on and off at any time (DPDP s.6(4))
+export async function setConsent(userId: string, purpose: 'marketing' | 'whatsapp', granted: boolean, ip: string | null, agent: string | null) {
   const notice = await noticeFor(userId);
   await query(
     `INSERT INTO consent_records (user_id, purpose, granted, policy_version, notice_language, ip_address, user_agent)
-     VALUES ($1, 'marketing', $2, $3, $4, $5, $6)`, [userId, granted, notice.version, notice.language, ip, agent]);
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`, [userId, purpose, granted, notice.version, notice.language, ip, agent]);
   return getConsents(userId);
 }
 

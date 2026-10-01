@@ -10,6 +10,7 @@ import { writeAuditTx } from '../../utils/audit';
 import { sameState } from '../shipment.service';
 import { applyAdjustment, createAdjustment } from '../stock/adjustment.service';
 import { dawabagState } from './goodsReceipt.service';
+import { assertOpenPeriod } from '../accountsLock';
 
 export const RETURN_REASONS = ['recalled', 'expired', 'near_expiry', 'damaged', 'excess', 'wrong_item'] as const;
 export interface ReturnInput { vendor_id: string; reason: typeof RETURN_REASONS[number]; notes: string; lines: { batch_id: string; quantity: number }[] }
@@ -103,6 +104,7 @@ export async function settleReturn(userId: string, id: string, cn: { number: str
     const r = await lockReturn(client, id);
     if (r.status !== 'dispatched') throw new AppError('Record the supplier credit note after the goods are dispatched', 409);
     if (cn.date < new Date(r.dispatched_at).toISOString().slice(0, 10)) throw new AppError('Credit note date is before the goods left', 400);
+    await assertOpenPeriod(cn.date, 'A supplier credit note', client);
     await client.query(
       `UPDATE purchase_returns SET status = 'settled', supplier_credit_note_no = $2, supplier_credit_note_date = $3, supplier_credit_paise = $4,
          settled_by = $5, settled_at = NOW() WHERE id = $1`, [id, cn.number, cn.date, cn.amount_paise, userId]);
