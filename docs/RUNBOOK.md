@@ -83,6 +83,22 @@ pharmacist like any upload.
 Document numbers are at most 16 characters (CGST Rule 46): `DWB/2627/00012`,
 credit notes `DWBC/2627/00001`; partner prefixes are 2–4 characters.
 
+**Languages (C-40).** Publish each policy in English first (Admin → Policies), then its
+Marathi and Hindi translations of the same version. Readers get their language when the
+translation of the current version exists, otherwise English (marked as such). Consent
+records the notice version and the language shown.
+
+**Retention (C-44).** Admin → Settings → retention: days to keep delivery logs, inbox
+notifications, payment webhook records (at least 180), job history, untouched carts and
+unused phones. The `retention_purge` job deletes older rows daily and audits the counts.
+Statutory records (invoices, credit notes, H1, prescriptions, e-invoices, receipts,
+consent and audit logs) are never purged by it.
+
+**Go-live switches.** Turn off `catalogue.opening_stock_open` once opening stock is in:
+afterwards stock enters only by goods receipt. Set `TRUST_PROXY_HOPS` to the number of
+proxies in front of the API (1 behind an AWS load balancer) so rate limits see real
+client addresses.
+
 ## 3. Build the images
 
 ```bash

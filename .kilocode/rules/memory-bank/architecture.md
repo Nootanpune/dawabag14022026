@@ -145,3 +145,9 @@
   no action, failure deletes the row so Razorpay retries; payment.*, refund.*, token.*),
   `reconcile` (job `payment_reconcile`; report `payment-reconciliation` fetched live from
   `settlements/recon/combined`). Refund legs: `retryGatewayRefund`, `gateway_attempts`.
+- **Sprint 12 hardening:** `policy.service` languages (en master, mr/hi translations of the same
+  version; `privacyNoticeRef` for consent), `retention.service` + job `retention_purge`
+  (setting `retention.days`), `shelfMrp.assertBelowShelfMrp` (C-16 after receipt),
+  `telemedicine/consultationFee.service` (capture-checked fees, `refund_pending` refunds with
+  gateway adoption), DB triggers/checks from the review (adjustments final, reserved stock,
+  two-person counts and POs). Webhook dedupe key = sha256 of the signed body.
