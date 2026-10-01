@@ -1,19 +1,22 @@
-import Link from 'next/link';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, LogIn } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 
 export default function EmptyCart({ signedIn }: { signedIn: boolean }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
-      <ShoppingBag className="w-16 h-16 text-gray-300 mb-4" />
-      <h2 className="text-xl font-semibold text-gray-600 mb-2">
-        {signedIn ? 'Your cart is empty' : 'Sign in to see your cart'}
-      </h2>
-      <p className="text-sm text-gray-400 mb-6">
-        {signedIn ? 'Browse medicines and add them to your cart' : 'Your cart is saved to your Dawabag account'}
-      </p>
-      <Link href={signedIn ? '/' : '/auth/login'} className="btn-primary">
-        {signedIn ? 'Browse medicines' : 'Sign in'}
-      </Link>
-    </div>
+  return signedIn ? (
+    <EmptyState
+      icon={ShoppingBag}
+      as="h1"
+      title="Your cart is empty"
+      hint="Search for a medicine by brand or generic name and add it here. Have a prescription? You upload it at checkout."
+      action={{ label: 'Browse medicines', href: '/' }}
+    />
+  ) : (
+    <EmptyState
+      icon={LogIn}
+      as="h1"
+      title="Sign in to see your cart"
+      hint="Your cart is kept in your Dawabag account, so it is the same on every device."
+      action={{ label: 'Sign in', href: '/auth/login' }}
+    />
   );
 }

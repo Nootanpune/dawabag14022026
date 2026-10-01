@@ -10,6 +10,39 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Direction A — clinical trust redesign (mobile, 2026-10-01)
+- Theme: brand green aligned with the web (#167A4C / #105C38); Material 3 NavigationBar.
+- Customer shell tabs: Home, Search (`/search`, new), Orders, Account. Cart is now a
+  full-screen route opened from the app-bar cart icon (`widgets/cart_action_button.dart`).
+- Home (`screens/shop/home_screen.dart` + `widgets/home/*`): search entry (opens Search),
+  trust strip, prescription CTA (sheet explaining the existing checkout prescription step,
+  C-08 — no standalone upload endpoint exists), "Consult a doctor" (/doctors), server
+  category tiles (filter), product grid, compact expandable "Licences, pharmacist &
+  grievance officer" tile (`widgets/legal/legal_summary_tile.dart`, C-04/C-36).
+- `providers/catalog_provider.dart` holds product search/categories; pincode is memory-only.
+- `widgets/product_image.dart` (network image only if the API sends a full URL — today it
+  sends only `s3_image_key`, so placeholders show) + `utils/dosage_form.dart`.
+- Product page shows C-17 declarations, hiding empty rows; description only when approved.
+- `widgets/empty_state.dart` used by cart, orders, search. Cart names the delivery charge as
+  "shown at checkout" (cart API has no delivery figure; no consumer free-delivery threshold).
+
+## Direction A — clinical trust redesign (web, 2026-10-01)
+- Home (`app/page.tsx` + `components/home/*`): HomeHero search ("Search medicines, e.g.
+  Dolo 650", `?focus=search`), TrustStrip (licence badge → /legal), PrescriptionCta (links
+  /cart — upload happens at checkout, C-08), Consult a doctor, CategoryTiles (replaced
+  CategoryChips), ProductResults (skeletons + EmptyState).
+- `components/shop/ProductImage.tsx` + `lib/shop/dosageForm.ts` replace the 💊 emoji
+  (API exposes only `s3_image_key`, so the initial + dosage-form tile shows).
+- Product page: empty declaration rows hidden; "awaiting pharmacist review" only for staff.
+- `components/layout/BottomNav.tsx` (phones; not in portals/checkout or for staff roles);
+  `lib/layout/portalPaths.ts`. Footer hidden in /admin /staff /partner /doctor; phones get a
+  one-line licence summary + `<details>` with LegalBlocks (C-04/C-36). Toaster top-center
+  below the header.
+- Cart: `DeliveryChargeLine` shows the server's pincode shipping charge for the default
+  address (from /products/search pincode_info), else "Shown at checkout"; none for B2B.
+- Admin menu: seven sections in `lib/admin/navSections.ts`, collapsible, with a filter.
+- `components/ui/EmptyState.tsx` used by cart, orders, home results.
+
 ## Sprint 20 — IST everywhere (web, mobile)
 - Owner rule: every date/time shown or computed is India Standard Time (Asia/Kolkata,
   UTC+05:30, no DST), whatever the viewer's device/browser zone.

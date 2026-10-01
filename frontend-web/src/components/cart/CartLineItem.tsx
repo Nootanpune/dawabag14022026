@@ -3,6 +3,7 @@ import { Trash2, Plus, Minus, AlertTriangle, Snowflake } from 'lucide-react';
 import { formatPrice, cn } from '@/lib/utils';
 import type { CartLine } from '@/lib/cart';
 import { scheduleBadge } from '@/lib/drugSchedule';
+import ProductImage from '@/components/shop/ProductImage';
 
 interface Props {
   line: CartLine;
@@ -17,9 +18,7 @@ export default function CartLineItem({ line, disabled, onQuantityChange }: Props
 
   return (
     <div className={cn('card flex gap-4', !line.available && 'border-red-200 bg-red-50/40')}>
-      <div className="w-16 h-16 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
-        <span className="text-2xl">💊</span>
-      </div>
+      <ProductImage name={line.name} size="sm" />
       <div className="flex-1 min-w-0">
         <h3 className="font-medium text-sm line-clamp-2">{line.name}</h3>
         <p className="text-xs text-gray-400 mt-0.5">{line.sku}</p>

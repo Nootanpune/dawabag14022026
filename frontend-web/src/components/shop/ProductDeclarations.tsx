@@ -2,10 +2,12 @@ import type { ProductDetail } from '@/lib/products/api';
 import { formatPrice } from '@/lib/utils';
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
+  // Empty declarations are left out rather than shown as a dash; MRP always has a value (C-17)
+  if (!value || !String(value).trim()) return null;
   return (
     <div className="flex gap-3 py-1.5 border-b border-gray-50 last:border-0">
       <dt className="w-40 shrink-0 text-gray-500">{label}</dt>
-      <dd className="text-gray-800">{value && String(value).trim() ? value : '—'}</dd>
+      <dd className="text-gray-800">{value}</dd>
     </div>
   );
 }

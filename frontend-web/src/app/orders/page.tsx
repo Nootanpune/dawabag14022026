@@ -6,6 +6,7 @@ import api from '@/lib/api';
 import { formatPrice, ORDER_STATUS_LABELS } from '@/lib/utils';
 import Header from '@/components/layout/Header';
 import { formatDateIST } from '@/lib/dates';
+import EmptyState from '@/components/ui/EmptyState';
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function OrdersPage() {
       <div className="max-w-3xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-semibold">My orders</h1>
-          <button onClick={() => refetch()} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
+          <button onClick={() => refetch()} aria-label="Refresh orders" className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
@@ -34,12 +35,12 @@ export default function OrdersPage() {
             <Loader2 className="w-8 h-8 animate-spin text-gray-300" />
           </div>
         ) : !data?.orders?.length ? (
-          <div className="text-center py-20">
-            <Package className="w-14 h-14 text-gray-200 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">No orders yet</p>
-            <p className="text-sm text-gray-400 mt-1 mb-6">Your order history will appear here</p>
-            <button onClick={() => router.push('/')} className="btn-primary">Browse medicines</button>
-          </div>
+          <EmptyState
+            icon={Package}
+            title="No orders yet"
+            hint="When you order medicines, you can track them and download invoices here."
+            action={{ label: 'Browse medicines', href: '/' }}
+          />
         ) : (
           <div className="space-y-3">
             {data.orders.map((order: any) => {

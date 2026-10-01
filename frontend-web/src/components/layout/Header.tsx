@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { ShoppingCart, User, LogOut, ClipboardList, Home, Stethoscope } from 'lucide-react';
+import { ShoppingCart, User, LogOut, ClipboardList, Home, Stethoscope, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useCart } from '@/hooks/useCart';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { staffHome } from '@/lib/fulfilment/roles';
 
@@ -13,6 +14,14 @@ export default function Header() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const cartCount = isAuthenticated ? cart?.item_count ?? 0 : 0;
+  const pathname = usePathname() ?? '';
+  const navLink = (href: string) => {
+    const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+    return {
+      'aria-current': active ? ('page' as const) : undefined,
+      className: cn('flex items-center gap-1 hover:text-brand-700', active && 'text-brand-700'),
+    };
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -21,28 +30,34 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-50 shadow-sm">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">D</span>
+          <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center">
+            <span className="text-white font-bold">D</span>
           </div>
-          <span className="text-xl font-bold text-brand-600 tracking-tight">dawabag</span>
+          <span className="leading-tight">
+            <span className="block text-xl font-bold text-brand-700 tracking-tight">dawabag</span>
+            {/* Licence details are in the footer and on /legal (C-04) */}
+            <span className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-gray-600">
+              <ShieldCheck className="w-3 h-3 text-brand-600" aria-hidden="true" /> Licensed online pharmacy
+            </span>
+          </span>
         </Link>
 
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-          <Link href="/" className="hover:text-brand-600 flex items-center gap-1">
+          <Link href="/" {...navLink('/')}>
             <Home className="w-4 h-4" /> Home
           </Link>
-          <Link href="/consult" className="hover:text-brand-600 flex items-center gap-1">
+          <Link href="/consult" {...navLink('/consult')}>
             <Stethoscope className="w-4 h-4" /> Consult a doctor
           </Link>
           {/* Riders have no orders of their own and cannot open buyers' orders (Sprint 13, C-41) */}
           {isAuthenticated && user?.role !== 'delivery' && (
-            <Link href="/orders" className="hover:text-brand-600 flex items-center gap-1">
+            <Link href="/orders" {...navLink('/orders')}>
               <ClipboardList className="w-4 h-4" /> Orders
             </Link>
           )}

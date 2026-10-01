@@ -49,7 +49,7 @@ export default function AdminShell({ children, section = 'Admin', homeHref = '/a
         </div>
       </header>
       <div className="max-w-7xl mx-auto px-4 py-4 md:py-6 flex flex-col md:flex-row gap-4 md:gap-6">
-        <aside className="md:w-48 shrink-0">
+        <aside className="md:w-56 shrink-0">
           <AdminNav />
         </aside>
         <main className="flex-1 min-w-0">{children}</main>

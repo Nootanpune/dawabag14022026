@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ShoppingCart, Snowflake, Loader2 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import { scheduleBadge } from '@/lib/drugSchedule';
+import ProductImage from './ProductImage';
 
 interface Product {
   id: string; name: string; generic_name?: string; sku: string;
@@ -31,11 +32,9 @@ export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
 
   return (
     <div className="card hover:shadow-md transition-shadow flex flex-col">
-      {/* Image placeholder */}
-      <Link href={`/shop/${product.id}`} className="block mb-3">
-        <div className="w-full h-28 rounded-lg bg-brand-50 flex items-center justify-center">
-          <span className="text-4xl">💊</span>
-        </div>
+      {/* Photo or initial + dosage-form tile; the name link below carries the accessible name */}
+      <Link href={`/shop/${product.id}`} className="block mb-3" aria-hidden="true" tabIndex={-1}>
+        <ProductImage name={product.name} />
       </Link>
 
       {/* Info */}
@@ -51,7 +50,7 @@ export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
 
         {/* Badges */}
         <div className="flex flex-wrap gap-1 mb-3">
-          {/* Schedule badge only for scheduled drugs — none for OTC */}
+          {/* Schedule badge only for scheduled drugs — none for OTC (C-08 Rx schedules) */}
           {scheduleBadge(product.drug_schedule) && (
             <span className={scheduleColors[product.drug_schedule] || 'badge-schedule-h'}>
               {scheduleBadge(product.drug_schedule)}

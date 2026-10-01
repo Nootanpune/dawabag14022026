@@ -3,7 +3,7 @@ import { expectNoBrowserStorage } from '../support/helpers';
 
 test('home page searches the catalogue', async ({ page }) => {
   await page.goto('/');
-  await page.getByPlaceholder(/Search by brand name or generic name/).fill('E2E Paracetamol');
+  await page.getByRole('searchbox', { name: 'Search medicines' }).fill('E2E Paracetamol');
   await expect(page.getByText('E2E Paracetamol 500').first()).toBeVisible();
   await expectNoBrowserStorage(page);
 });
@@ -23,4 +23,16 @@ test('policies are listed and open', async ({ page }) => {
 test('unknown pages say so', async ({ page }) => {
   const res = await page.goto('/no-such-page');
   expect(res?.status()).toBe(404);
+});
+
+test('the footer licence, pharmacist and grievance details are reachable (C-04, C-36)', async ({ page }, info) => {
+  await page.goto('/');
+  const footer = page.getByRole('contentinfo');
+  // Phones show a one-line summary; the full details open from the footer
+  if (info.project.name === 'phone') {
+    await footer.getByText('Licences, pharmacist & grievance officer').click();
+  }
+  await expect(footer.getByText('Grievance officer', { exact: true })).toBeVisible();
+  await expect(footer.getByText('Pharmacist in charge', { exact: true })).toBeVisible();
+  await expect(footer.getByText('Drug licences', { exact: true })).toBeVisible();
 });
