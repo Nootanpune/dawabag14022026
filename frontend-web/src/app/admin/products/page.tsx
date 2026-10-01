@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Plus, Upload } from 'lucide-react';
+import { Images, Plus, Upload } from 'lucide-react';
 import { adminProductKeys, fetchAdminProducts } from '@/lib/admin/products';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
@@ -38,6 +38,9 @@ export default function AdminProductsPage() {
           <>
             <Link href="/admin/catalogue-import" className="btn-outline text-sm inline-flex items-center gap-1">
               <Upload className="w-4 h-4" /> Import
+            </Link>
+            <Link href="/admin/products/photos" className="btn-outline text-sm inline-flex items-center gap-1">
+              <Images className="w-4 h-4" /> Photos
             </Link>
             <Link href="/admin/products/new" className="btn-primary text-sm inline-flex items-center gap-1">
               <Plus className="w-4 h-4" /> Add product

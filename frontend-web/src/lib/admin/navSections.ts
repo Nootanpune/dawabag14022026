@@ -39,6 +39,7 @@ import {
   Stethoscope,
   ListTree,
   AlertOctagon,
+  Images,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
@@ -76,6 +77,8 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/admin/products', label: 'Products', icon: Package, roles: MANAGER_ROLES },
       { href: '/admin/catalogue-import', label: 'Catalogue import', icon: FileSpreadsheet, roles: MANAGER_ROLES },
+      // Sprint 22 — bulk pack photos by SKU; each photo goes to pharmacist review (C-19)
+      { href: '/admin/products/photos', label: 'Pack photos', icon: Images, roles: MANAGER_ROLES },
       { href: '/staff/content-review', label: 'Product copy', icon: ClipboardCheck, roles: PHARMACIST_ROLES },
       { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },
       { href: '/admin/stock', label: 'Low stock', icon: PackageX, roles: MANAGER_ROLES },
