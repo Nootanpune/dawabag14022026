@@ -3,55 +3,60 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Upload, CheckCircle2, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import {
+  fetchMyPrescriptions,
+  isReusable,
+  offerSavedPrescription,
+  prescriptionKeys,
+  uploadPrescription,
+} from '@/lib/prescriptions/api';
+import SavedPrescriptionList from './SavedPrescriptionList';
 
 interface Props {
   orderId: string;
   onDone: () => void;
 }
 
+// Prescription for Schedule H / H1 lines (C-08): upload a new one, or offer a saved
+// verified one. Either way a pharmacist checks it before anything is dispensed.
 export default function PrescriptionStep({ orderId, onDone }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  const { data: rxData } = useQuery({
-    queryKey: ['prescriptions'],
-    queryFn: async () => {
-      const { data } = await api.get('/prescriptions/my');
-      return data.data as any[];
-    },
-  });
-  const validSaved = (rxData ?? []).filter((r) => r.status === 'verified' && new Date(r.valid_until) > new Date());
+  const { data: rxData } = useQuery({ queryKey: prescriptionKeys.mine, queryFn: fetchMyPrescriptions });
+  const reusable = (rxData ?? []).filter((r) => isReusable(r));
 
   const handleContinue = async () => {
     if (!file && !savedId) {
-      toast.error('Please upload a prescription or select a saved one');
+      setError('Upload a prescription or choose a saved one');
       return;
     }
-    if (file) {
-      setUploading(true);
-      try {
-        const form = new FormData();
-        form.append('prescription', file);
-        form.append('order_id', orderId);
-        await api.post('/prescriptions/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    setBusy(true);
+    setError('');
+    try {
+      if (file) {
+        await uploadPrescription(file, orderId);
         toast.success('Prescription uploaded');
-      } catch (err) {
-        toast.error(getApiErrorMessage(err, 'Upload failed'));
-        return;
-      } finally {
-        setUploading(false);
+      } else if (savedId) {
+        await offerSavedPrescription(savedId, orderId);
+        toast.success('Saved prescription sent to our pharmacist');
       }
+      onDone();
+    } catch (err) {
+      // e.g. "This prescription does not cover: …" or "This prescription has expired"
+      setError(getApiErrorMessage(err, file ? 'Upload failed' : 'Could not use this prescription'));
+    } finally {
+      setBusy(false);
     }
-    onDone();
   };
 
   return (
     <div className="card">
       <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
-        <Upload className="w-5 h-5 text-brand-600" /> Upload prescription
+        <Upload className="w-5 h-5 text-brand-600" /> Prescription
       </h2>
       <p className="text-sm text-gray-500 mb-5">One or more medicines require a valid doctor&apos;s prescription.</p>
 
@@ -81,44 +86,35 @@ export default function PrescriptionStep({ orderId, onDone }: Props) {
           onChange={(e) => {
             setFile(e.target.files?.[0] || null);
             setSavedId(null);
+            setError('');
           }}
         />
       </label>
 
-      {validSaved.length > 0 && (
-        <div className="mt-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">Or use a saved prescription</p>
-          {validSaved.map((rx) => (
-            <button
-              key={rx.id}
-              onClick={() => {
-                setSavedId(rx.id);
-                setFile(null);
-              }}
-              className={`w-full text-left p-3 rounded-xl border-2 transition-colors mb-2
-                ${savedId === rx.id ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-brand-300'}`}
-            >
-              <p className="text-sm font-medium text-brand-700">
-                {rx.doctor_name ? `Dr. ${rx.doctor_name}` : 'Uploaded prescription'}
-              </p>
-              <p className="text-xs text-gray-500">
-                Valid until {new Date(rx.valid_until).toLocaleDateString('en-IN')}
-              </p>
-            </button>
-          ))}
-        </div>
+      {reusable.length > 0 && (
+        <SavedPrescriptionList
+          prescriptions={reusable}
+          selectedId={savedId}
+          onSelect={(id) => {
+            setSavedId(id);
+            setFile(null);
+            setError('');
+          }}
+        />
       )}
 
       <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-        Our pharmacist will call to verify your prescription before dispatch.
+        Our pharmacist will verify your prescription before dispatch.
       </div>
+
+      {error && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
 
       <button
         onClick={handleContinue}
-        disabled={uploading || (!file && !savedId)}
+        disabled={busy || (!file && !savedId)}
         className="btn-primary w-full mt-5 py-3 flex items-center justify-center gap-2"
       >
-        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
         Continue to payment <ChevronRight className="w-4 h-4" />
       </button>
     </div>

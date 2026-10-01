@@ -17,6 +17,8 @@ export interface RxQueueItem {
   buyer_name: string | null;
   customer_type: string;
   prescriptions: QueuePrescription[] | null;
+  /** saved, verified prescription the buyer offered at checkout (C-08); pharmacist applies it */
+  requested_prescription_id?: string | null;
 }
 
 export interface QueueShipmentLine {

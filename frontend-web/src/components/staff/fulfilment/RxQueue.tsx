@@ -9,6 +9,7 @@ import QueryState from '@/components/admin/QueryState';
 import StatusBadge from '@/components/admin/StatusBadge';
 import RxReviewDialog from './RxReviewDialog';
 import ApplyRxDialog from './ApplyRxDialog';
+import OfferedRxNotice from './OfferedRxNotice';
 
 /** Orders waiting for a pharmacist's prescription decision (C-08). */
 export default function RxQueue() {
@@ -34,6 +35,9 @@ export default function RxQueue() {
                 Use existing prescription
               </button>
             </div>
+            {item.requested_prescription_id && (
+              <OfferedRxNotice item={{ ...item, requested_prescription_id: item.requested_prescription_id }} />
+            )}
             <ul className="mt-3 divide-y divide-gray-100 text-sm">
               {(item.prescriptions ?? []).map((rx) => (
                 <li key={rx.prescription_id} className="py-2 flex flex-wrap items-center justify-between gap-2">
@@ -49,7 +53,7 @@ export default function RxQueue() {
                   )}
                 </li>
               ))}
-              {!item.prescriptions?.length && (
+              {!item.prescriptions?.length && !item.requested_prescription_id && (
                 <li className="py-2 text-xs text-gray-500">No prescription uploaded for this order yet.</li>
               )}
             </ul>

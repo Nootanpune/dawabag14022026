@@ -22,6 +22,10 @@ import {
   Send,
   ClipboardCheck,
   HeartPulse,
+  Package,
+  FileSpreadsheet,
+  Calculator,
+  Siren,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -44,10 +48,14 @@ const ITEMS = [
   { href: '/admin/vendors', label: 'Vendors', icon: Truck, roles: MANAGER_ROLES },
   { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },
   { href: '/admin/settlements', label: 'Settlements', icon: Wallet, roles: MANAGER_ROLES },
+  { href: '/admin/products', label: 'Products', icon: Package, roles: MANAGER_ROLES },
+  { href: '/admin/catalogue-import', label: 'Catalogue import', icon: FileSpreadsheet, roles: MANAGER_ROLES },
   { href: '/admin/stock', label: 'Low stock', icon: PackageX, roles: MANAGER_ROLES },
   { href: '/admin/credit', label: 'Credit', icon: IndianRupee, roles: MANAGER_ROLES },
+  { href: '/admin/accounts', label: 'Accounts', icon: Calculator, roles: MANAGER_ROLES },
   { href: '/admin/jobs', label: 'Jobs', icon: Timer, roles: MANAGER_ROLES },
   { href: '/admin/policies', label: 'Policies', icon: FileText, roles: MANAGER_ROLES },
+  { href: '/admin/incidents', label: 'Security incidents', icon: Siren, roles: MANAGER_ROLES },
   { href: '/admin/licences', label: 'Licences', icon: BadgeCheck, roles: MANAGER_ROLES },
   { href: '/admin/settings', label: 'Settings', icon: Settings, roles: MANAGER_ROLES },
 ];

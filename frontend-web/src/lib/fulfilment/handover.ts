@@ -14,6 +14,30 @@ export interface DispatchInput {
   courier_partner: string;
   awb_number: string;
   seal_number: string;
+  /** cold-chain shipments only: pack temperature at dispatch, must be 2–8 °C (C-25) */
+  cold_chain_temp_c?: number;
+  /** cold-chain shipments only: temperature data logger / validated pack id (C-25) */
+  cold_chain_logger_id?: string;
+}
+
+export interface ColdChainValues {
+  temp: string;
+  logger: string;
+}
+
+/** Mirrors the server's cold-chain dispatch check (C-25); '' when fine. */
+export function coldChainError(v: ColdChainValues): string {
+  const t = Number(v.temp.replace(',', '.'));
+  if (!v.temp.trim() || !Number.isFinite(t)) return 'Enter the pack temperature in °C';
+  if (t < 2 || t > 8) return `Pack is at ${t} °C; refrigerated items must leave at 2–8 °C`;
+  if (v.logger.trim().length < 2) return 'Enter the temperature logger / pack ID';
+  return '';
+}
+
+/** Adds the cold-chain fields to a dispatch body when the shipment is cold-chain. */
+export function withColdChain(body: DispatchInput, coldChain: boolean, v: ColdChainValues): DispatchInput {
+  if (!coldChain) return body;
+  return { ...body, cold_chain_temp_c: Number(v.temp.replace(',', '.')), cold_chain_logger_id: v.logger.trim() };
 }
 
 export interface HandoverInput {

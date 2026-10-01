@@ -78,3 +78,20 @@
   reports and licence register under `/compliance` (job `licence_register_alerts`), addresses in
   `services/address.service.ts` (a used address is retired and copied on edit), signed 5-minute
   document links `utils/signedLink.ts` (`/invoices/.../link`).
+- **Operations (Sprint 6):** logs to stdout only (`config/logger.ts`); start-up config checks
+  `config/env.ts` (production refuses weak/placeholder secrets and missing keys); `/health` and
+  `/ready`; graceful SIGTERM. Migrations: `src/db/migrate.ts` + `schema_migrations` (checksums,
+  advisory lock, `--status`, `--baseline NN`); the Docker image runs it before the API. Images:
+  `backend/Dockerfile` (build from repo root), `frontend-web/Dockerfile` (standalone). Runbook:
+  `docs/RUNBOOK.md`.
+- **Final records:** triggers in migration 09 block UPDATE/DELETE on h1_register, credit_notes,
+  credit_note_items, audit_logs, consent_records and on invoice amounts/lines
+  (order_shipments, order_items). Bypass only with `SET dawabag.maintenance = 'on'` (tests, purges).
+- **Money rules:** `refund.service.refundableAmount` (paid − refunded, under the order lock) caps
+  every refund; `PATCH /orders/:id/status` is admin cancel only; placement takes the PIN code from
+  the buyer's own address, rejects repeated products, caps wallet at the payable, counts coupon
+  use atomically (`coupon_redemptions`, `coupons.per_user_limit`).
+- **Catalogue import:** `services/catalogueImport/{parse,validate,apply}.ts` (`/catalogue/import/*`),
+  exceljs from memory. **Accounts:** `services/gstReports.service.ts` (`/accounts/reports/:name`),
+  CSV via `utils/csv.ts` (formula-safe). **Incidents:** `services/incident.service.ts`
+  (`/compliance/incidents`). Saved Rx reuse: `services/rxReuse.service.ts`.
