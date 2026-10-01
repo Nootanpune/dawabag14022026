@@ -12,6 +12,7 @@ import { getSetting } from '../settings.service';
 import { queueNotification } from '../notification.service';
 import { verifiedDoctorId } from './doctor.service';
 import { ConsultKind, refusal } from './rules';
+import { todayIST } from '../../utils/ist';
 
 export interface IssueInput {
   diagnosis: string; advice?: string; new_condition?: boolean;
@@ -98,7 +99,7 @@ export async function verifyByCode(code: string) {
   await writeAudit({ userId: null, action: 'eprescription_checked_by_code', performedBy: null, newValue: { prescription_id: rx.id } });
   const initials = String(rx.patient_name || '').split(/\s+/).filter(Boolean).map((w: string) => `${w[0]}.`).join(' ');
   return {
-    valid: new Date(rx.valid_until) >= new Date(new Date().toISOString().slice(0, 10)),
+    valid: new Date(rx.valid_until) >= new Date(todayIST()),
     issued_at: rx.issued_at, valid_until: rx.valid_until, consult_mode: rx.consult_mode,
     doctor: { name: rx.doctor_name, qualification: rx.doctor_qualification, registration_no: rx.doctor_reg_no, council: rx.doctor_council },
     patient: { initials, age: rx.patient_age, gender: rx.patient_gender },
@@ -112,7 +113,7 @@ export async function useAtDawabag(userId: string, id: string, orderId?: string)
   return withTransaction(async (client) => {
     const rx = (await client.query(`SELECT * FROM digital_prescriptions WHERE id = $1 AND patient_user_id = $2`, [id, userId])).rows[0];
     if (!rx) throw new AppError('Prescription not found', 404);
-    if (new Date(rx.valid_until) < new Date(new Date().toISOString().slice(0, 10))) throw new AppError('This e-prescription has expired', 409);
+    if (new Date(rx.valid_until) < new Date(todayIST())) throw new AppError('This e-prescription has expired', 409);
     if (orderId) {
       const o = (await client.query(`SELECT status FROM orders WHERE id = $1 AND user_id = $2 FOR UPDATE`, [orderId, userId])).rows[0];
       if (!o) throw new AppError('Order not found', 404);

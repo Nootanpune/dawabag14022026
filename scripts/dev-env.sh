@@ -4,6 +4,8 @@
 # the in-process fakes (backend/test/fakes); nothing real is called. Production
 # configuration lives in the deployment's secret store, never here.
 export NODE_ENV="${NODE_ENV:-development}"
+# API process in UTC (dates shown in IST by the code; DB sessions use Asia/Kolkata)
+export TZ=UTC
 export PORT="${PORT:-4000}"
 export DB_HOST="${DB_HOST:-127.0.0.1}" DB_PORT="${DB_PORT:-5432}"
 export DB_NAME="${DB_NAME:-dawabag}" DB_USER="${DB_USER:-dawabag_user}" DB_PASSWORD="${DB_PASSWORD:-dawabag_dev_only}"

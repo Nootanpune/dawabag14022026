@@ -11,6 +11,7 @@ import { issueCreditNote } from './creditNote.service';
 import { queueNotification } from './notification.service';
 import { recordRefund, refundableAmount, sendGatewayRefunds } from './refund.service';
 import { getSetting } from './settings.service';
+import { istYear } from '../utils/ist';
 
 export const RETURN_REASONS = ['damaged', 'wrong_item', 'missing_item', 'expired', 'near_expiry', 'quality_issue', 'recalled'] as const;
 export type ReturnReason = typeof RETURN_REASONS[number];
@@ -72,7 +73,7 @@ export async function createReturn(userId: string, input: ReturnInput) {
     }
 
     const seq = (await client.query(`SELECT nextval('return_no_seq') AS n`)).rows[0].n;
-    const returnNo = `RET-${new Date().getFullYear()}-${String(seq).padStart(6, '0')}`;
+    const returnNo = `RET-${istYear()}-${String(seq).padStart(6, '0')}`;
     const r = (await client.query(
       `INSERT INTO return_requests (return_no, order_id, shipment_id, user_id, reason, description)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, return_no, status, created_at`,

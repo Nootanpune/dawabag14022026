@@ -5,6 +5,7 @@ import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { queueNotification } from './notification.service';
+import { istYear } from '../utils/ist';
 
 export const ACK_HOURS = 48;
 export const RESOLVE_DAYS = 30;
@@ -22,7 +23,7 @@ export async function createGrievance(userId: string, input: { category: string;
       if (!o) throw new AppError('Order not found', 404);
     }
     const seq = (await client.query(`SELECT nextval('grievance_ticket_seq') AS n`)).rows[0].n;
-    const ticketNo = `GRV-${new Date().getFullYear()}-${String(seq).padStart(6, '0')}`;
+    const ticketNo = `GRV-${istYear()}-${String(seq).padStart(6, '0')}`;
     const g = (await client.query(
       `INSERT INTO grievances (ticket_no, user_id, order_id, category, subject, description)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, ticket_no, status, created_at`,

@@ -6,6 +6,7 @@ import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { queueNotification } from './notification.service';
+import { istYear } from '../utils/ist';
 
 export const SERIOUSNESS = ['non_serious', 'hospitalised', 'life_threatening', 'disability', 'death', 'other_serious'] as const;
 export const OUTCOMES = ['recovered', 'recovering', 'not_recovered', 'fatal', 'unknown'] as const;
@@ -34,7 +35,7 @@ export async function createAdr(userId: string, input: AdrInput) {
       if (!o) throw new AppError('Order not found', 404);
     }
     const seq = (await client.query(`SELECT nextval('adr_report_seq') AS n`)).rows[0].n;
-    const reportNo = `ADR-${new Date().getFullYear()}-${String(seq).padStart(6, '0')}`;
+    const reportNo = `ADR-${istYear()}-${String(seq).padStart(6, '0')}`;
     const r = (await client.query(
       `INSERT INTO adverse_event_reports (report_no, user_id, order_id, product_id, batch_number, patient_initials,
          patient_age_years, patient_gender, reaction, onset_date, seriousness, outcome)

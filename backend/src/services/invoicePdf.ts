@@ -2,6 +2,7 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import { InvoiceData } from './invoiceData.service';
+import { formatDateIST } from '../utils/ist';
 
 const rs = (p: number) => `Rs. ${(p / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -18,7 +19,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
     const isCredit = d.title === 'CREDIT NOTE';
     doc.font('Helvetica-Bold').fontSize(16).text(d.title ?? 'TAX INVOICE', { align: 'center' });
     doc.moveDown(0.3).font('Helvetica').fontSize(9)
-      .text(`${isCredit ? 'Credit note' : 'Invoice'} No: ${d.invoiceNumber}    Date: ${new Date(d.invoiceDate).toLocaleDateString('en-IN')}    Order: ${d.orderNumber}`, { align: 'center' });
+      .text(`${isCredit ? 'Credit note' : 'Invoice'} No: ${d.invoiceNumber}    Date: ${formatDateIST(d.invoiceDate)}    Order: ${d.orderNumber}`, { align: 'center' });
     if (d.againstInvoice) doc.text(`Against tax invoice: ${d.againstInvoice}`, { align: 'center' });
     if (d.einvoice) {
       doc.fontSize(7.5).text(`IRN: ${d.einvoice.irn}`, { align: 'center' })

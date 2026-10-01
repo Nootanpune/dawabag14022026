@@ -11,6 +11,7 @@ import { generateSettlements, getSettlement, listSettlements, markSettlementPaid
 import { listSettings } from '../services/settings.service';
 import { REJECTION_CODES } from '../utils/rejectionCodes';
 import { WHATSAPP_TYPES, WHATSAPP_VARS } from '../services/notifications/channels/whatsapp';
+import { todayIST } from '../utils/ist';
 
 export async function getRejectionCodes(_req: Request, res: Response) {
   res.json({ success: true, data: { codes: Object.entries(REJECTION_CODES).map(([code, v]) => ({ code, ...v })) } });
@@ -152,7 +153,7 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'purchasing.min_shelf_life_days': z.number().int().min(30).max(730),
   'stock.near_expiry_days': z.number().int().min(15).max(365),
   // Sprint 13 — GST period lock: a past date (or null to open), never in the future
-  'accounts.locked_until': z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((d) => d < new Date().toISOString().slice(0, 10), 'Lock only past dates').nullable(),
+  'accounts.locked_until': z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((d) => d < todayIST(), 'Lock only past dates').nullable(),
   // Sprint 13 — WhatsApp templates approved by Meta, per message type
   // (order and account updates only, no health details — C-41)
   'whatsapp.templates': z.record(z.enum(WHATSAPP_TYPES), z.object({

@@ -6,6 +6,7 @@ import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { queueNotification } from './notification.service';
+import { istYear } from '../utils/ist';
 
 export const CATEGORIES = ['data_breach', 'unauthorised_access', 'malware', 'phishing', 'service_outage', 'payment_fraud', 'lost_device', 'other'] as const;
 export const SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
@@ -22,7 +23,7 @@ export async function createIncident(adminId: string, input: {
   if (new Date(input.detected_at).getTime() > Date.now() + 60_000) throw new AppError('Detection time cannot be in the future', 400);
   return withTransaction(async (client) => {
     const n = (await client.query(`SELECT nextval('security_incident_seq') AS n`)).rows[0].n;
-    const no = `SEC-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`;
+    const no = `SEC-${istYear()}-${String(n).padStart(4, '0')}`;
     const row = (await client.query(
       `INSERT INTO security_incidents (incident_no, title, category, severity, description, personal_data_affected, detected_at, reported_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, incident_no, detected_at, detected_at + INTERVAL '6 hours' AS cert_in_due_at`,

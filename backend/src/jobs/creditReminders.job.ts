@@ -4,6 +4,7 @@
 // needs a WhatsApp Business provider and is not wired yet.
 import { query } from '../config/database';
 import { queueNotification } from '../services/notification.service';
+import { formatDateIST } from '../utils/ist';
 
 const STAGES = [3, 1, 0];
 
@@ -37,7 +38,7 @@ export async function runCreditRemindersJob() {
       userId: o.user_id, type: 'credit_due',
       orderId: o.id, orderNumber: o.order_number,
       amountPaise: o.total_paise, daysBefore: o.days_before,
-      dueDate: new Date(o.credit_due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      dueDate: formatDateIST(o.credit_due_date),
     });
   }
   return { reminders_sent: sent };

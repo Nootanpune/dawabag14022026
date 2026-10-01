@@ -12,6 +12,7 @@ import { queueNotification } from './notification.service';
 import { placeOrder } from './orderPlacement.service';
 import { chargeOrderOnMandate } from './mandate.service';
 import { getSetting } from './settings.service';
+import { formatDateIST } from '../utils/ist';
 
 export async function createSubscription(userId: string, orderId: string, frequencyDays: number) {
   return withTransaction(async (client) => {
@@ -198,5 +199,5 @@ export async function runDueRefills() {
 }
 
 function fmt(d: Date | string): string {
-  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return formatDateIST(d);
 }

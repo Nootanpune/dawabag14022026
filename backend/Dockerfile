@@ -16,6 +16,9 @@ RUN npm run build
 
 FROM ${NODE_IMAGE}
 ENV NODE_ENV=production
+# The process runs in UTC so DATE columns parse the same everywhere; every date a
+# person sees, and every business day, is computed in IST (src/utils/ist.ts, DB sessions)
+ENV TZ=UTC
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json ./
 RUN --mount=type=secret,id=ca,required=false \

@@ -4,6 +4,7 @@ import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
 import { applyAdjustment, createAdjustment } from './adjustment.service';
+import { istYear } from '../../utils/ist';
 
 export async function startCount(userId: string, scope: { label: string; product_ids?: string[]; storage_location?: string }) {
   return withTransaction(async (client) => {
@@ -14,7 +15,7 @@ export async function startCount(userId: string, scope: { label: string; product
     const batches = (await client.query(`SELECT b.id, b.quantity_available FROM inventory_batches b WHERE ${where.join(' AND ')} LIMIT 2000`, params)).rows;
     if (!batches.length) throw new AppError('No stock matches this count', 400);
     const n = (await client.query(`SELECT nextval('stock_count_seq') AS n`)).rows[0].n;
-    const no = `CNT-${new Date().getFullYear()}-${String(n).padStart(5, '0')}`;
+    const no = `CNT-${istYear()}-${String(n).padStart(5, '0')}`;
     const c = (await client.query(`INSERT INTO stock_counts (count_no, scope, counted_by) VALUES ($1, $2, $3) RETURNING id, count_no, status`,
       [no, scope.label, userId])).rows[0];
     for (const b of batches) {

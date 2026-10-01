@@ -2,6 +2,7 @@
 // product API: prices ≤ MRP and MRP ≤ NPPA ceiling (C-16), pre-packed goods
 // declarations (C-17), Schedule X / NDPS never sold online, no expired stock.
 import { Row } from './parse';
+import { todayIST } from '../../utils/ist';
 
 export interface ProductRecord {
   sku: string; name: string; generic_name: string | null; category: string; drug_schedule: string;
@@ -121,7 +122,7 @@ export function checkBatch(r: Row, today = new Date()): Checked<BatchRecord> {
   if (qty === null || !Number.isInteger(qty) || qty <= 0) errors.push('Quantity must be a whole number above 0');
   if (!expiry) errors.push('Expiry date must be MM/YYYY');
   if (cost === null || Number.isNaN(cost) || cost < 0) errors.push('Purchase price is required');
-  const iso = today.toISOString().slice(0, 10);
+  const iso = todayIST(today);                   // expiry judged against India's date
   if (expiry && expiry <= iso) errors.push(`Batch expired on ${expiry}; do not bring expired stock into the system`);
   else if (expiry) {
     const days = (Date.parse(expiry) - Date.parse(iso)) / 864e5;

@@ -12,6 +12,7 @@ import { sameState } from '../shipment.service';
 import { assertSupplierCanSupply } from './supplierCheck';
 import { assertOpenPeriod } from '../accountsLock';
 import { assertBatchReceivable } from '../recallAlerts/receiptGate';
+import { todayIST } from '../../utils/ist';
 
 export interface GrnLineInput {
   po_item_id?: string; product_id: string; batch_number: string; expiry_date: string; manufactured_date?: string;
@@ -53,7 +54,7 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
       `SELECT id, name, drug_schedule, gst_rate, ${PRICE_COLS.join(', ')} FROM products WHERE id = ANY($1::uuid[])`,
       [input.lines.map((l) => l.product_id)])).rows.map((p: any) => [p.id, p]));
     const interState = !sameState(await dawabagState(client), supplier.state);
-    const today = new Date(new Date().toISOString().slice(0, 10));
+    const today = new Date(todayIST());
 
     const errors: string[] = [];
     const priced = input.lines.map((l, i) => {

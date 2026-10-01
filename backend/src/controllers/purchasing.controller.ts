@@ -8,6 +8,7 @@ import {
   approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, createPurchaseOrder, getPurchaseOrder, listPurchaseOrders,
 } from '../services/purchasing/purchaseOrder.service';
 import { getGoodsReceipt, listGoodsReceipts, receiveGoods } from '../services/purchasing/goodsReceipt.service';
+import { todayIST } from '../utils/ist';
 
 const uuid = z.string().uuid();
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -84,7 +85,7 @@ export async function postGoodsReceipt(req: Request, res: Response, next: NextFu
         free_quantity: z.number().int().min(0).max(1_000_000).optional(), unit_cost_paise: paise, printed_mrp_paise: paise.refine((v) => v > 0, 'MRP is required'),
       })).min(1).max(300),
     }).parse(req.body);
-    if (d.supplier_invoice_date > new Date().toISOString().slice(0, 10)) throw new AppError('Supplier invoice date is in the future', 400);
+    if (d.supplier_invoice_date > todayIST()) throw new AppError('Supplier invoice date is in the future', 400);
     res.status(201).json({ success: true, data: await receiveGoods(req.user!.id, req.user!.role, d) });
   } catch (e) { next(e); }
 }

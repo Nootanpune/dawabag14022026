@@ -9,6 +9,7 @@ import { AppError } from '../utils/AppError';
 import { writeAudit } from '../utils/audit';
 import { isBuyerType, requiredKycDocuments } from '../utils/customerType';
 import { queueNotification } from './notification.service';
+import { formatDateIST } from '../utils/ist';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface GSTINVerificationResult {
@@ -693,7 +694,7 @@ export async function runMonthlyReVerification(): Promise<{ checked: number; fla
 }
 
 function formatDate(d: Date | string): string {
-  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return formatDateIST(d);
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────

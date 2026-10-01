@@ -6,6 +6,7 @@ import { PoolClient } from 'pg';
 import { query, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
+import { istYear } from '../../utils/ist';
 
 export const REASONS = ['damaged', 'expired', 'recalled', 'count_variance', 'theft_loss', 'found', 'return_to_supplier', 'sample'] as const;
 export type Reason = typeof REASONS[number];
@@ -20,7 +21,7 @@ export async function createAdjustment(client: PoolClient, by: string | null, a:
     throw new AppError(`Only ${b.quantity_available - b.quantity_reserved} unit(s) are free to adjust (the rest are reserved for orders)`, 409);
   }
   const n = (await client.query(`SELECT nextval('stock_adjustment_seq') AS n`)).rows[0].n;
-  const no = `ADJ-${new Date().getFullYear()}-${String(n).padStart(6, '0')}`;
+  const no = `ADJ-${istYear()}-${String(n).padStart(6, '0')}`;
   return (await client.query(
     `INSERT INTO stock_adjustments (adjustment_no, batch_id, quantity_delta, reason, notes, requested_by, stock_count_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, adjustment_no, status`,

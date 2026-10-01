@@ -16,6 +16,8 @@ export function connectDB(): Promise<void> {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
       ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      // Business days are Indian days: CURRENT_DATE, ::date and date_trunc in IST
+      options: '-c timezone=Asia/Kolkata',
     });
 
     pool.connect((err, client, done) => {

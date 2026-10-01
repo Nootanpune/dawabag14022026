@@ -9,6 +9,7 @@ import { writeAuditTx } from '../utils/audit';
 import { getSetting } from './settings.service';
 import { assertOpenPeriod } from './accountsLock';
 import { computeSettlement } from './settlementMath';
+import { istMonth, istYear } from '../utils/ist';
 
 const DEFAULT_COMMISSION_PCT = 8;
 const DEFAULT_FINDING_FEE_PAISE = 1500;
@@ -155,9 +156,10 @@ export async function markSettlementPaid(id: string, paymentMode: string, utr: s
 }
 
 // Previous calendar month, for the scheduled job
-export function previousMonth(today = new Date()): { from: string; to: string } {
-  const first = new Date(Date.UTC(today.getFullYear(), today.getMonth() - 1, 1));
-  const last = new Date(Date.UTC(today.getFullYear(), today.getMonth(), 0));
+export function previousMonth(now = new Date()): { from: string; to: string } {
+  const y = istYear(now), m = istMonth(now) - 1;                  // the month before this Indian month
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const last = new Date(Date.UTC(y, m, 0));
   return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10) };
 }
 

@@ -7,6 +7,7 @@ import {
 import { confirmPayment, startPayment } from '../services/telemedicine/consultationFee.service';
 import { issuePrescription, loadPrescription, useAtDawabag, verifyByCode } from '../services/telemedicine/eprescription.service';
 import { renderEprescriptionPdf } from '../services/telemedicine/eprescriptionPdf';
+import { todayIST } from '../utils/ist';
 
 const uuid = z.string().uuid();
 const id = (req: Request) => uuid.parse(req.params.id);
@@ -24,7 +25,7 @@ export const postBook = wrap(async (req, res) => {
 });
 export const getMine = wrap(async (req, res) => res.json({ success: true, data: await myConsultations(req.user!.id) }));
 export const getDoctorDay = wrap(async (req, res) => {
-  const { date } = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(new Date().toISOString().slice(0, 10)) }).parse(req.query);
+  const { date } = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(() => todayIST()) }).parse(req.query);
   res.json({ success: true, data: await doctorConsultations(req.user!.id, date) });
 });
 export const postPay = wrap(async (req, res) => res.json({ success: true, data: await startPayment(req.user!.id, id(req)) }));
