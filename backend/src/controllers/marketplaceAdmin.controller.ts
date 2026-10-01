@@ -147,6 +147,16 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'legal.pharmacist_in_charge': z.object({ name: z.string().max(200), registration_no: z.string().max(60) }).strict(),
   'legal.grievance_officer': z.object({ name: z.string().max(200), email: z.union([z.string().email(), z.literal('')]),
     phone: z.string().max(20), address: z.string().max(500) }).strict(),
+  // Sprint 7 — purchasing and stock (C-16, C-28)
+  'purchasing.min_shelf_life_days': z.number().int().min(30).max(730),
+  'stock.near_expiry_days': z.number().int().min(15).max(365),
+  // Sprint 8 — courier and DLT SMS templates (TRAI: only registered templates are delivered)
+  'courier.provider': z.enum(['manual', 'shiprocket']),
+  'courier.pickup_location': z.string().trim().min(1).max(100),
+  'sms.dlt_templates': z.record(z.string().regex(/^[a-z_]{2,40}$/), z.object({
+    template_id: z.string().trim().min(1).max(60),
+    vars: z.record(z.string().regex(/^[A-Za-z0-9_]{1,30}$/), z.string().regex(/^[a-z_]{2,30}$/)).optional(),
+  }).strict()),
 };
 
 export async function getSettings(_req: Request, res: Response, next: NextFunction) {

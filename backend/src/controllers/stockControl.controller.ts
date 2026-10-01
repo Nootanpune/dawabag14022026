@@ -1,6 +1,7 @@
 // src/controllers/stockControl.controller.ts — batches, adjustments, destruction register, stock counts
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { toCsv } from '../utils/csv';
 import { listBatches } from '../services/stock/batches.service';
 import { getSetting } from '../services/settings.service';
 import { REASONS, decideAdjustment, destructionRegister, listAdjustments, recordDisposal, requestAdjustment } from '../services/stock/adjustment.service';
@@ -49,7 +50,17 @@ export async function postDisposal(req: Request, res: Response, next: NextFuncti
   } catch (e) { next(e); }
 }
 export async function getDestructionRegister(req: Request, res: Response, next: NextFunction) {
-  try { res.json({ success: true, data: { entries: await destructionRegister(req.query.pending === 'true') } }); } catch (e) { next(e); }
+  try {
+    const entries = await destructionRegister(req.query.pending === 'true');
+    if (req.query.format !== 'csv') return res.json({ success: true, data: { entries } });
+    // Destruction register for the inspector (Drugs Rules; C-28, C-34)
+    const cols = ['adjustment_no', 'product_name', 'sku', 'drug_schedule', 'batch_number', 'expiry_date', 'quantity_delta', 'reason', 'value_paise',
+      'requested_by_name', 'approved_by_name', 'decided_at', 'disposal_method', 'disposal_reference', 'disposal_witness', 'disposed_at'];
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="destruction-register${req.query.pending === 'true' ? '-pending' : ''}.csv"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(toCsv(cols, entries as Record<string, unknown>[]));
+  } catch (e) { next(e); }
 }
 
 export async function postCount(req: Request, res: Response, next: NextFunction) {

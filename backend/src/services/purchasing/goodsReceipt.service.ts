@@ -133,12 +133,25 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
   });
 }
 
-export async function listGoodsReceipts(from?: string, to?: string) {
-  return query(
+export interface GrnFilter { from?: string; to?: string; vendor_id?: string; q?: string; page: number; limit: number }
+
+// Receipts by receipt date, supplier, or GRN / supplier invoice number; paged
+export async function listGoodsReceipts(f: GrnFilter) {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  const add = (sql: string, v: unknown) => { params.push(v); where.push(sql.replace('?', `$${params.length}`)); };
+  if (f.from) add('g.created_at::date >= ?', f.from);
+  if (f.to) add('g.created_at::date <= ?', f.to);
+  if (f.vendor_id) add('g.vendor_id = ?', f.vendor_id);
+  if (f.q) { params.push(`%${f.q}%`); where.push(`(g.grn_number ILIKE $${params.length} OR g.supplier_invoice_no ILIKE $${params.length})`); }
+  const w = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const total = (await queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM goods_receipts g ${w}`, params))!.n;
+  const receipts = await query(
     `SELECT g.id, g.grn_number, g.supplier_invoice_no, g.supplier_invoice_date, g.total_paise, g.created_at,
             v.name AS supplier_name, po.po_number
      FROM goods_receipts g JOIN vendors v ON v.id = g.vendor_id LEFT JOIN purchase_orders po ON po.id = g.po_id
-     ${from && to ? 'WHERE g.created_at::date BETWEEN $1 AND $2' : ''} ORDER BY g.created_at DESC LIMIT 300`, from && to ? [from, to] : []);
+     ${w} ORDER BY g.created_at DESC LIMIT ${f.limit} OFFSET ${(f.page - 1) * f.limit}`, params);
+  return { receipts, total, page: f.page, limit: f.limit };
 }
 
 export async function getGoodsReceipt(id: string) {

@@ -90,8 +90,12 @@ export async function postGoodsReceipt(req: Request, res: Response, next: NextFu
 }
 export async function getGoodsReceipts(req: Request, res: Response, next: NextFunction) {
   try {
-    const q = z.object({ from: date.optional(), to: date.optional() }).parse(req.query);
-    res.json({ success: true, data: { receipts: await listGoodsReceipts(q.from, q.to) } });
+    const f = z.object({
+      from: date.optional(), to: date.optional(), vendor_id: z.string().uuid().optional(), q: z.string().trim().min(1).max(60).optional(),
+      page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(200).default(50),
+    }).parse(req.query);
+    if (f.from && f.to && f.from > f.to) throw new AppError('from must be on or before to', 400);
+    res.json({ success: true, data: await listGoodsReceipts(f) });
   } catch (e) { next(e); }
 }
 export async function getOneGoodsReceipt(req: Request, res: Response, next: NextFunction) {

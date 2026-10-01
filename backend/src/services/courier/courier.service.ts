@@ -9,6 +9,7 @@ import { getSetting } from '../settings.service';
 import { queueNotification } from '../notification.service';
 import { markShipmentDelivered } from '../partnerFulfilment.service';
 import { createShipment, shiprocketConfigured } from './shiprocket.client';
+import { courierTime, normaliseStatus } from './status';
 
 export async function bookCourier(userId: string, shipmentId: string) {
   if ((await getSetting('courier.provider', 'manual')) !== 'shiprocket') throw new AppError('Courier booking is manual; enter the courier and AWB at dispatch', 409);
@@ -40,16 +41,6 @@ export async function bookCourier(userId: string, shipmentId: string) {
   });
 }
 
-export function normaliseStatus(raw: string): string {
-  const s = raw.toUpperCase();
-  if (s.includes('RTO')) return 'rto';
-  if (s.includes('OUT FOR DELIVERY')) return 'out_for_delivery';
-  if (/^DELIVERED$/.test(s.trim())) return 'delivered';
-  if (/UNDELIVERED|LOST|DAMAGE|CANCEL|DESTROYED|EXCEPTION/.test(s)) return 'exception';
-  if (/PICKED UP|PICKUP DONE|SHIPPED/.test(s)) return 'picked_up';
-  return 'in_transit';
-}
-
 export function webhookAuthorised(given: string | undefined): boolean {
   const want = process.env.SHIPROCKET_WEBHOOK_TOKEN;
   if (!want || !given) return false;
@@ -64,7 +55,7 @@ export async function applyTrackingUpdate(p: { awb: string; current_status: stri
      FROM order_shipments s JOIN orders o ON o.id = s.order_id WHERE s.awb_number = $1`, [p.awb]);
   if (!s) return { ignored: 'unknown AWB' };
   const status = normaliseStatus(p.current_status);
-  const at = p.current_timestamp && !Number.isNaN(Date.parse(p.current_timestamp)) ? new Date(p.current_timestamp) : new Date();
+  const at = courierTime(p.current_timestamp) ?? new Date();
   const ins = await query(
     `INSERT INTO shipment_tracking_events (shipment_id, status, raw_status, location, event_time) VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (shipment_id, raw_status, event_time) DO NOTHING RETURNING id`,
@@ -81,8 +72,9 @@ export async function applyTrackingUpdate(p: { awb: string; current_status: stri
       await alertAdmins('courier_rx_delivered', { orderNumber: s.order_number, awbNumber: p.awb });
     }
   } else if (status === 'rto') {
-    await query(`UPDATE order_shipments SET rto_at = COALESCE(rto_at, NOW()) WHERE id = $1`, [s.id]);
-    await alertAdmins('courier_rto', { orderNumber: s.order_number, awbNumber: p.awb });
+    // Alert once per parcel, however many RTO scans follow
+    const first = await query(`UPDATE order_shipments SET rto_at = NOW() WHERE id = $1 AND rto_at IS NULL RETURNING id`, [s.id]);
+    if (first.length) await alertAdmins('courier_rto', { orderNumber: s.order_number, awbNumber: p.awb });
   }
   return { status };
 }
