@@ -12,7 +12,6 @@ dependencies:
 
   # State management
   flutter_riverpod: ^2.4.9
-  riverpod_annotation: ^2.3.3
 
   # HTTP & API
   dio: ^5.4.0
@@ -28,8 +27,6 @@ dependencies:
 
   # UI
   google_fonts: ^6.1.0
-  shimmer: ^3.0.0
-  lottie: ^3.0.0
   image_picker: ^1.0.7
   file_picker: ^6.1.1
 
@@ -41,32 +38,20 @@ dependencies:
   firebase_messaging: ^14.7.10
   flutter_local_notifications: ^16.3.0
 
-  # Camera
-  camera: ^0.10.5+9
 
   # Video consultation (Agora)
   agora_rtc_engine: ^6.3.0
 
-  # Maps
-  google_maps_flutter: ^2.5.3
 
   # Utils
   intl: ^0.19.0
   url_launcher: ^6.2.4
-  share_plus: ^7.2.1
   permission_handler: ^11.2.0
-  connectivity_plus: ^5.0.2
-  package_info_plus: ^5.0.1
-  local_auth: ^2.1.7
-  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  riverpod_generator: ^2.3.9
-  build_runner: ^2.4.7
-  json_serializable: ^6.7.1
 
 flutter:
   uses-material-design: true

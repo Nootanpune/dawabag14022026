@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -6,7 +7,7 @@ import 'push_device_service.dart';
 
 class NotificationService {
   static final _localNotifications = FlutterLocalNotificationsPlugin();
-  static final _messaging = FirebaseMessaging.instance;
+  static FirebaseMessaging get _messaging => FirebaseMessaging.instance;
 
   static Future<void> init() async {
     // Request permission
@@ -75,7 +76,7 @@ class NotificationService {
     PushDeviceService.listenForTokenRefresh();
   }
 
-  static Future<String?> getToken() => _messaging.getToken();
+  static Future<String?> getToken() async => Firebase.apps.isEmpty ? null : _messaging.getToken();
 }
 
 @pragma('vm:entry-point')

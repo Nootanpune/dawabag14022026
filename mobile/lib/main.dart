@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_core/firebase_core.dart';
 
+import 'config/firebase_config.dart';
 import 'config/router.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
@@ -18,11 +18,8 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Firebase init
-  await Firebase.initializeApp();
-
-  // Notifications
-  await NotificationService.init();
+  // Push notifications only when Firebase is configured for this build
+  if (await startFirebase()) await NotificationService.init();
 
   runApp(const ProviderScope(child: DawabagApp()));
 }
