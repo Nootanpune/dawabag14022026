@@ -10,7 +10,20 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
-## Sprint 21 — product photos (2026-10-01, uncommitted)
+## Sprint 21 — security review, policies, headers (2026-10-01)
+- Security review of Sprints 15–20: 7 fixes (placeholder secrets refused in
+  production, no S3_ENDPOINT/fake store in production, staging port check,
+  Caddy log redaction of e-Rx codes, email body escaping, CI permissions,
+  UTC pinned in code via config/timezone.ts, mobile release requires https).
+  Open: Android release signing key (owner).
+- Website sends X-Frame-Options DENY / frame-ancestors 'none', nosniff,
+  referrer and permissions policy from next.config headers() (no full CSP yet:
+  signed photo links' host varies).
+- Policy drafts (Claude Docs, for lawyer review, not yet published): Shipping v1
+  and Cancellation, Returns and Refunds v1.
+- Recorder uploads sample pack photos and has them approved; R2 page republished.
+
+## Sprint 21 — product photos (2026-10-01)
 - Admin/super_admin `PUT /products/:id/image` (multipart `image`, JPEG/PNG/WebP,
   ≤ 2 MB, type from magic bytes and must match the declared type —
   `utils/imageCheck.ts`) → object store key `products/<id>/<uuid>.<ext>` (old objects
