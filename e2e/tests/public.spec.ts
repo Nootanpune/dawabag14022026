@@ -36,3 +36,11 @@ test('the footer licence, pharmacist and grievance details are reachable (C-04, 
   await expect(footer.getByText('Pharmacist in charge', { exact: true })).toBeVisible();
   await expect(footer.getByText('Drug licences', { exact: true })).toBeVisible();
 });
+
+test('pages refuse to be framed by other sites and send basic security headers', async ({ request }) => {
+  const res = await request.get('/');
+  const h = res.headers();
+  expect(h['x-frame-options']).toBe('DENY');
+  expect(h['content-security-policy']).toContain("frame-ancestors 'none'");
+  expect(h['x-content-type-options']).toBe('nosniff');
+});
