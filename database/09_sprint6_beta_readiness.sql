@@ -78,3 +78,37 @@ DROP TRIGGER IF EXISTS order_items_amounts_final ON order_items;
 CREATE TRIGGER order_items_amounts_final BEFORE UPDATE OR DELETE ON order_items
   FOR EACH ROW WHEN (OLD.shipment_id IS NOT NULL)
   EXECUTE FUNCTION dawabag_line_amounts_final();
+
+-- ── Saved prescription offered for an order (C-08) ───────────────────────────
+-- The buyer points an order at a verified prescription; a pharmacist still decides.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS requested_prescription_id UUID REFERENCES prescriptions(id);
+
+-- ── Cold-chain dispatch record (C-25) ────────────────────────────────────────
+ALTER TABLE order_shipments
+  ADD COLUMN IF NOT EXISTS cold_chain_temp_c     NUMERIC(4,1),
+  ADD COLUMN IF NOT EXISTS cold_chain_logger_id  VARCHAR(60);
+
+-- ── Security incident register (C-43): CERT-In within 6 hours ────────────────
+CREATE SEQUENCE IF NOT EXISTS security_incident_seq;
+CREATE TABLE IF NOT EXISTS security_incidents (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  incident_no            VARCHAR(20) NOT NULL UNIQUE,
+  title                  VARCHAR(200) NOT NULL,
+  category               VARCHAR(30) NOT NULL CHECK (category IN (
+                           'data_breach', 'unauthorised_access', 'malware', 'phishing', 'service_outage',
+                           'payment_fraud', 'lost_device', 'other')),
+  severity               VARCHAR(10) NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+  description            TEXT NOT NULL,
+  personal_data_affected BOOLEAN NOT NULL DEFAULT FALSE,
+  detected_at            TIMESTAMPTZ NOT NULL,
+  status                 VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'contained', 'closed')),
+  cert_in_reported_at    TIMESTAMPTZ,
+  cert_in_reference      VARCHAR(100),
+  dpb_notified_at        TIMESTAMPTZ,      -- Data Protection Board
+  users_notified_at      TIMESTAMPTZ,
+  actions_taken          TEXT,
+  reported_by            UUID NOT NULL REFERENCES users(id),
+  closed_at              TIMESTAMPTZ,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

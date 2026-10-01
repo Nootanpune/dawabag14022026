@@ -6,7 +6,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
 import { assertNoRecalledLines } from './recall.service';
-import { HandoverInput, checkHandover, handoverCode, prepareHandover, recordHandover } from './handover.service';
+import { DispatchRecord, HandoverInput, checkHandover, handoverCode, prepareHandover, recordHandover } from './handover.service';
 import { queueNotification } from './notification.service';
 import { syncOrderStatus } from './fulfilment.service';
 
@@ -35,7 +35,7 @@ export async function listPartnerShipments(vendorId: string, status?: string) {
     status ? [vendorId, status] : [vendorId]);
 }
 
-export async function dispatchShipment(vendorId: string, shipmentId: string, courier: string, awb: string, userId: string, sealNumber: string) {
+export async function dispatchShipment(vendorId: string, shipmentId: string, courier: string, awb: string, userId: string, dispatch: DispatchRecord) {
   return withTransaction(async (client) => {
     const s = (await client.query(
       `SELECT s.id, s.status, s.created_at, o.status AS order_status, o.id AS order_id
@@ -63,10 +63,10 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
     await client.query(
       `UPDATE order_shipments SET status = 'dispatched', courier_partner = $2, awb_number = $3, dispatched_at = NOW()
        WHERE id = $1`, [shipmentId, courier, awb]);
-    const codeNeeded = await prepareHandover(client, shipmentId, s.order_id, sealNumber);
+    const codeNeeded = await prepareHandover(client, shipmentId, s.order_id, dispatch);
     await syncOrderStatus(client, s.order_id);
     await writeAuditTx(client, { userId, action: 'partner_shipment_dispatched', performedBy: userId,
-      newValue: { shipment_id: shipmentId, order_id: s.order_id, courier, awb, seal_number: sealNumber } });
+      newValue: { shipment_id: shipmentId, order_id: s.order_id, courier, awb, ...dispatch } });
     const o = (await client.query(
       `SELECT o.user_id, o.order_number, s.dispatched_at FROM orders o JOIN order_shipments s ON s.order_id = o.id WHERE s.id = $1`,
       [shipmentId])).rows[0];

@@ -8,7 +8,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
 import { assertNoRecalledLines } from './recall.service';
-import { handoverCode, prepareHandover } from './handover.service';
+import { DispatchRecord, handoverCode, prepareHandover } from './handover.service';
 import { queueNotification } from './notification.service';
 
 // Orders ready for fulfilment: paid (packing), prescription-verified, or on credit (confirmed)
@@ -20,6 +20,7 @@ export async function fulfilmentQueue(stage: QueueStage) {
   if (stage === 'rx') {
     return query(
       `SELECT o.id AS order_id, o.order_number, o.status, o.created_at, up.full_name AS buyer_name, u.customer_type,
+              o.requested_prescription_id,   -- saved prescription the buyer offered (apply it after checking)
               json_agg(json_build_object('prescription_id', rx.id, 'status', rx.status, 'uploaded_at', rx.created_at,
                 'file_type', rx.file_type) ORDER BY rx.created_at) FILTER (WHERE rx.id IS NOT NULL) AS prescriptions
        FROM orders o JOIN users u ON u.id = o.user_id
@@ -70,7 +71,7 @@ export async function packShipment(shipmentId: string, userId: string) {
   });
 }
 
-export async function dispatchOwnShipment(shipmentId: string, courier: string, awb: string, userId: string, sealNumber: string) {
+export async function dispatchOwnShipment(shipmentId: string, courier: string, awb: string, userId: string, dispatch: DispatchRecord) {
   return withTransaction(async (client) => {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'packed') throw new AppError('Pack the shipment before dispatch', 409);
@@ -86,7 +87,7 @@ export async function dispatchOwnShipment(shipmentId: string, courier: string, a
     await client.query(
       `UPDATE order_shipments SET status = 'dispatched', courier_partner = $2, awb_number = $3, dispatched_at = NOW() WHERE id = $1`,
       [shipmentId, courier, awb]);
-    const codeNeeded = await prepareHandover(client, shipmentId, s.order_id, sealNumber);
+    const codeNeeded = await prepareHandover(client, shipmentId, s.order_id, dispatch);
     await syncOrderStatus(client, s.order_id);
     await writeAuditTx(client, { userId: s.user_id, action: 'shipment_dispatched', performedBy: userId,
       newValue: { shipment_id: shipmentId, courier, awb, h1_register_rows: h1 } });

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { query } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAudit } from '../utils/audit';
+import { toCsv } from '../utils/csv';
 import { fulfilmentQueue, packShipment, dispatchOwnShipment, QueueStage } from '../services/fulfilment.service';
 import { markShipmentDelivered } from '../services/partnerFulfilment.service';
 import { applyPrescriptionToOrder, rejectPrescription, verifyPrescription } from '../services/rxVerification.service';
@@ -15,6 +16,9 @@ export const dispatchSchema = z.object({
   courier_partner: z.string().trim().min(2).max(50),
   awb_number: z.string().trim().min(3).max(100),
   seal_number: z.string().trim().min(3).max(50),
+  // Cold-chain shipments only (C-25)
+  cold_chain_temp_c: z.number().min(-30).max(40).optional(),
+  cold_chain_logger_id: z.string().trim().min(2).max(60).optional(),
 });
 // Handover to the patient or an adult at the address (C-26)
 export const handoverSchema = z.object({
@@ -77,8 +81,8 @@ export async function postPack(req: Request, res: Response, next: NextFunction) 
 
 export async function postDispatch(req: Request, res: Response, next: NextFunction) {
   try {
-    const { courier_partner, awb_number, seal_number } = dispatchSchema.parse(req.body);
-    res.json({ success: true, data: await dispatchOwnShipment(uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, seal_number) });
+    const { courier_partner, awb_number, ...record } = dispatchSchema.parse(req.body);
+    res.json({ success: true, data: await dispatchOwnShipment(uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, record) });
   } catch (err) { next(err); }
 }
 
@@ -104,13 +108,9 @@ export async function getH1Register(req: Request, res: Response, next: NextFunct
 
     const cols = ['dispensed_at', 'seller_type', 'partner_name', 'order_number', 'product_name', 'batch_number', 'quantity',
       'patient_name', 'patient_address', 'prescriber_name', 'prescriber_reg_no', 'pharmacist_name', 'pharmacist_reg_no'];
-    const cell = (v: unknown) => {
-      const t = v instanceof Date ? v.toISOString() : v == null ? '' : String(v);
-      return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
-    };
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="h1-register-${from}-to-${to}.csv"`);
-    res.send([cols.join(','), ...rows.map((r) => cols.map((c) => cell(r[c])).join(','))].join('\n'));
+    res.send(toCsv(cols, rows));
   } catch (err) { next(err); }
 }
 

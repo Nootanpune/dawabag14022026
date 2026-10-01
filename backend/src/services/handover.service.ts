@@ -27,8 +27,26 @@ export function handoverCode(shipmentId: string, dispatchedAt: Date | string): s
   return String(mac.readUInt32BE(0) % 1_000_000).padStart(6, '0');
 }
 
-// At dispatch: record the seal and whether a code is needed
-export async function prepareHandover(client: PoolClient, shipmentId: string, orderId: string, sealNumber: string) {
+export interface DispatchRecord {
+  seal_number: string;
+  cold_chain_temp_c?: number;     // pack temperature at dispatch, cold-chain shipments only (C-25)
+  cold_chain_logger_id?: string;  // temperature data logger / validated pack id
+}
+
+// At dispatch: record the seal, the cold-chain reading, and whether a code is needed
+export async function prepareHandover(client: PoolClient, shipmentId: string, orderId: string, d: DispatchRecord) {
+  const sealNumber = d.seal_number;
+  const cold = (await client.query('SELECT cold_chain FROM order_shipments WHERE id = $1', [shipmentId])).rows[0]?.cold_chain;
+  if (cold) {
+    if (d.cold_chain_temp_c === undefined || !d.cold_chain_logger_id) {
+      throw new AppError('Cold-chain shipment: record the pack temperature and the data-logger id', 400);
+    }
+    if (d.cold_chain_temp_c < 2 || d.cold_chain_temp_c > 8) {
+      throw new AppError(`Pack is at ${d.cold_chain_temp_c} °C; refrigerated items must leave at 2–8 °C`, 409);
+    }
+    await client.query('UPDATE order_shipments SET cold_chain_temp_c = $2, cold_chain_logger_id = $3 WHERE id = $1',
+      [shipmentId, d.cold_chain_temp_c, d.cold_chain_logger_id]);
+  }
   const scope = String(await getSetting('delivery.handover_code_scope', 'rx_only'));
   const required = scope === 'all'
     || (scope === 'rx_only' && (await rxRequiredLines(client, orderId)).some((l) => l.shipment_id === shipmentId));

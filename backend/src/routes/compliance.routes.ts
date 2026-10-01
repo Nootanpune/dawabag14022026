@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
-  getAllAdr, getLicences, getMyAdr, getOneAdr, patchAdr, postAdr, postLicence, putLicence,
+  getAllAdr, getIncidents, getLicences, getOneIncident, patchIncident, postIncident, getMyAdr, getOneAdr, patchAdr, postAdr, postLicence, putLicence,
 } from '../controllers/compliance.controller';
 
 // Side-effect reports (C-29) and the licence register (C-07) — /api/v1/compliance/*
@@ -19,5 +19,9 @@ router.get('/adverse-events/:id', getOneAdr);
 router.get('/licences', admin, getLicences);
 router.post('/licences', admin, postLicence);
 router.put('/licences/:id', admin, putLicence);
+router.get('/incidents', admin, getIncidents);
+router.post('/incidents', admin, postIncident);
+router.get('/incidents/:id', admin, getOneIncident);
+router.patch('/incidents/:id', admin, patchIncident);
 
 export default router;

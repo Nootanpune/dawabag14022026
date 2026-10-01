@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { OUTCOMES, SERIOUSNESS, createAdr, getAdr, listAdr, reviewAdr } from '../services/adverseEvent.service';
 import { LICENCE_TYPES, listLicences, saveLicence } from '../services/licence.service';
+import { CATEGORIES, SEVERITIES, createIncident, getIncident, listIncidents, updateIncident } from '../services/incident.service';
 
 const uuid = z.string().uuid();
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -62,4 +63,35 @@ export async function postLicence(req: Request, res: Response, next: NextFunctio
 }
 export async function putLicence(req: Request, res: Response, next: NextFunction) {
   try { res.json({ success: true, data: await saveLicence(req.user!.id, licenceSchema.parse(req.body), uuid.parse(req.params.id)) }); } catch (e) { next(e); }
+}
+
+// Security incidents (C-43)
+const isoTime = z.string().datetime({ offset: true });
+export async function postIncident(req: Request, res: Response, next: NextFunction) {
+  try {
+    const d = z.object({
+      title: z.string().trim().min(5).max(200), category: z.enum(CATEGORIES), severity: z.enum(SEVERITIES),
+      description: z.string().trim().min(10).max(10000), personal_data_affected: z.boolean(), detected_at: isoTime,
+    }).parse(req.body);
+    res.status(201).json({ success: true, data: await createIncident(req.user!.id, d) });
+  } catch (e) { next(e); }
+}
+export async function getIncidents(req: Request, res: Response, next: NextFunction) {
+  try {
+    const status = z.enum(['open', 'contained', 'closed']).optional().parse(req.query.status);
+    res.json({ success: true, data: { incidents: await listIncidents(status) } });
+  } catch (e) { next(e); }
+}
+export async function getOneIncident(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await getIncident(uuid.parse(req.params.id)) }); } catch (e) { next(e); }
+}
+export async function patchIncident(req: Request, res: Response, next: NextFunction) {
+  try {
+    const d = z.object({
+      status: z.enum(['open', 'contained', 'closed']).optional(), cert_in_reported_at: isoTime.optional(),
+      cert_in_reference: z.string().trim().min(3).max(100).optional(), dpb_notified_at: isoTime.optional(),
+      users_notified_at: isoTime.optional(), actions_taken: z.string().trim().min(10).max(10000).optional(),
+    }).strict().parse(req.body);
+    res.json({ success: true, data: await updateIncident(req.user!.id, uuid.parse(req.params.id), d) });
+  } catch (e) { next(e); }
 }

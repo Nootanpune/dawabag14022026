@@ -1,4 +1,6 @@
+import { requestPrescriptionReuse } from '../services/rxReuse.service';
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
@@ -149,4 +151,13 @@ export async function getPendingRxQueue(req: Request, res: Response, next: NextF
   } catch (error) {
     next(error);
   }
+}
+
+// POST /prescriptions/:prescriptionId/use-for-order { order_id } — offer a saved, verified
+// prescription for an order; the pharmacist confirms it (C-08)
+export async function postUseForOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { order_id } = z.object({ order_id: z.string().uuid() }).parse(req.body);
+    res.json({ success: true, data: await requestPrescriptionReuse(req.user!.id, z.string().uuid().parse(req.params.prescriptionId), order_id) });
+  } catch (err) { next(err); }
 }

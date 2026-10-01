@@ -104,8 +104,8 @@ export async function getShipments(req: Request, res: Response, next: NextFuncti
 
 export async function postDispatch(req: Request, res: Response, next: NextFunction) {
   try {
-    const { courier_partner, awb_number, seal_number } = dispatchSchema.parse(req.body);
-    res.json({ success: true, data: await dispatchShipment(req.partner!.vendorId, uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, seal_number) });
+    const { courier_partner, awb_number, ...record } = dispatchSchema.parse(req.body);
+    res.json({ success: true, data: await dispatchShipment(req.partner!.vendorId, uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, record) });
   } catch (err) { next(err); }
 }
 

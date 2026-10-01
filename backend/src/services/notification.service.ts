@@ -259,6 +259,11 @@ function buildMessage(payload: NotificationPayload) {
       push: { title: 'Serious side-effect report', body: `${payload.reportNo}: ${payload.productName}. Review and forward to PvPI within 15 days.` },
       email: { subject: `Serious side-effect report ${payload.reportNo}`, body: `A serious suspected reaction to ${payload.productName} was reported (${payload.reportNo}). Review it and forward it to PvPI within 15 days.` },
     },
+    security_incident: {
+      email: { subject: `Security incident ${payload.incidentNo} (${payload.severity})`,
+        body: `A security incident ${payload.incidentNo} was logged. If it is reportable, CERT-In must be informed by ${payload.dueAt}.` },
+      push: { title: `Security incident ${payload.incidentNo}`, body: 'Report to CERT-In within 6 hours if reportable' },
+    },
     low_stock_digest: {
       email: {
         subject: `Low stock: ${payload.count} product(s) at or below reorder level`,
