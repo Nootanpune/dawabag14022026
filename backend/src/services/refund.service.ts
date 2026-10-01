@@ -164,7 +164,7 @@ export async function listRefunds(filter: { status?: string; userId?: string; or
   if (filter.orderId) { params.push(filter.orderId); where.push(`r.order_id = $${params.length}`); }
   return query(
     `SELECT r.id, r.order_id, o.order_number, r.return_id, r.source, r.method, r.amount_paise, r.status,
-            r.gateway_refund_id, r.reference, r.failure_reason, r.created_at, r.processed_at
+            r.gateway_refund_id, r.gateway_attempts, r.reference, r.failure_reason, r.created_at, r.processed_at
      FROM refunds r JOIN orders o ON o.id = r.order_id
      ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY r.created_at DESC LIMIT 500`, params);
 }
