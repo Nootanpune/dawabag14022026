@@ -12,7 +12,7 @@ export async function adminListProducts(q: string | undefined, page: number, lim
   const total = Number((await queryOne<{ n: string }>(`SELECT COUNT(*) AS n FROM products p WHERE ${where.join(' AND ')}`, params))?.n ?? 0);
   params.push(limit, (page - 1) * limit);
   const products = await query(
-    `SELECT p.id, p.name, p.generic_name, p.sku, p.category, p.drug_schedule, p.mrp_paise, p.offer_price_paise,
+    `SELECT p.id, p.name, p.generic_name, p.sku, p.category, p.drug_schedule, p.telemedicine_list, p.mrp_paise, p.offer_price_paise,
             p.cold_chain, p.is_active, p.content_status, (p.manufacturer_address IS NOT NULL) AS has_declarations,
             COALESCE((SELECT SUM(b.quantity_available - b.quantity_reserved) FROM inventory_batches b
                       WHERE b.product_id = p.id AND NOT b.is_recalled AND b.expiry_date > CURRENT_DATE + 30), 0)::int AS stock_qty

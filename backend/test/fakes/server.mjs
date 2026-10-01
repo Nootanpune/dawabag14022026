@@ -1,8 +1,9 @@
 // One throwaway HTTP server playing MSG91 (flow API), Google OAuth + FCM HTTP v1,
-// Shiprocket and the GST IRP (irp.mjs). Every request is recorded in memory.
+// Shiprocket, the GST IRP (irp.mjs) and Razorpay (razorpay.mjs). Every request is recorded in memory.
 import crypto from 'crypto';
 import http from 'http';
 import { irpRoute } from './irp.mjs';
+import { razorpayRoute } from './razorpay.mjs';
 
 export const seen = [];
 const ACCESS = 'fake-google-access-token';
@@ -25,7 +26,7 @@ function jwtValid(assertion) {
 }
 
 function route(req, body) {
-  const fromIrp = irpRoute(req, body);
+  const fromIrp = irpRoute(req, body) ?? razorpayRoute(req, body);
   if (fromIrp) return fromIrp;
   const url = req.url;
   if (url === '/api/v5/flow/') {

@@ -81,8 +81,8 @@ export async function getPrescriptionUrl(req: Request, res: Response, next: Next
     const userId = req.user!.id;
     const userRole = req.user!.role;
 
-    const prescription = await queryOne<{ s3_key: string; user_id: string }>(
-      'SELECT s3_key, user_id FROM prescriptions WHERE id = $1',
+    const prescription = await queryOne<{ s3_key: string | null; user_id: string; digital_prescription_id: string | null }>(
+      'SELECT s3_key, user_id, digital_prescription_id FROM prescriptions WHERE id = $1',
       [prescriptionId]
     );
 
@@ -93,6 +93,11 @@ export async function getPrescriptionUrl(req: Request, res: Response, next: Next
     const isPharmacist = userRole === 'pharmacist_rx';
     if (!isOwner && !isPharmacist) throw new AppError('Access denied', 403);
 
+    // A Dawabag e-prescription has no upload: its PDF is rendered on demand (C-24)
+    if (!prescription.s3_key) {
+      return res.json({ success: true, data: { digital: true, eprescription_id: prescription.digital_prescription_id,
+        pdf_path: `/consultations/prescriptions/${prescription.digital_prescription_id}/pdf` } });
+    }
     const url = await getPrivateObjectUrl(prescription.s3_key, 300);
     await writeAudit({ userId: prescription.user_id, action: 'prescription_viewed', performedBy: userId,
       newValue: { prescription_id: prescriptionId }, ip: req.ip });

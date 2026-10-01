@@ -187,6 +187,11 @@ export function buildMessage(payload: NotificationPayload) {
         body: `${payload.expired} expired batch(es) were raised for write-off approval; ${payload.nearExpiry} batch(es) expire within ${payload.days} days. Open Admin → Stock.` },
       push: { title: 'Expiry watch', body: `${payload.expired} expired · ${payload.nearExpiry} near expiry` },
     },
+    // ── Sprint 10: teleconsultation ──
+    eprescription_issued: {
+      sms: `Dawabag: Your doctor has issued your e-prescription (check code ${payload.reportNo}). Buy the medicines from any pharmacy you choose.`,
+      push: { title: 'E-prescription ready', body: 'Download it from your consultations. You may use any pharmacy.' },
+    },
     // ── Sprint 8: courier tracking ──
     out_for_delivery: {
       sms: `Dawabag: Order ${on} is out for delivery today.${payload.codeNeeded ? ' Keep your delivery code ready (see the app).' : ''}`,

@@ -304,3 +304,18 @@ export async function getAdminProducts(req: Request, res: Response, next: NextFu
 export async function getAdminProduct(req: Request, res: Response, next: NextFunction) {
   try { res.json({ success: true, data: await adminGetProduct(z.string().uuid().parse(req.params.productId)) }); } catch (error) { next(error); }
 }
+
+// POST /products/:productId/telemedicine-list — the pharmacist's classification under the
+// Telemedicine Practice Guidelines 2020 (C-23). Schedule X / NDPS stay prohibited (database trigger).
+export async function setTelemedicineList(req: Request, res: Response, next: NextFunction) {
+  try {
+    const d = z.object({ list: z.enum(['O', 'A', 'B', 'prohibited']), notes: z.string().trim().min(3).max(500) }).parse(req.body);
+    const id = z.string().uuid().parse(req.params.productId);
+    const before = await queryOne<{ telemedicine_list: string | null }>('SELECT telemedicine_list FROM products WHERE id = $1', [id]);
+    if (!before) throw new AppError('Product not found', 404);
+    const after = await queryOne<{ telemedicine_list: string }>('UPDATE products SET telemedicine_list = $2, updated_at = NOW() WHERE id = $1 RETURNING telemedicine_list', [id, d.list]);
+    await writeAudit({ userId: null, action: 'telemedicine_list_set', performedBy: req.user!.id,
+      oldValue: { product_id: id, list: before.telemedicine_list }, newValue: { product_id: id, list: after!.telemedicine_list }, notes: d.notes });
+    res.json({ success: true, data: { id, telemedicine_list: after!.telemedicine_list } });
+  } catch (err) { next(err); }
+}

@@ -8,6 +8,7 @@
 // Test data: mobiles 90000002xx, SKU prefix S3-, vendors named 'S3 %', pincodes
 // 4999xx. Cleaned up before and after. NEVER point it at a production database.
 import { createRequire } from 'module';
+import { startFakes } from './fakes/server.mjs';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const Redis = require('ioredis');
@@ -95,7 +96,9 @@ async function signUp(p) {
 }
 const login = async (p) => (await call('POST', '/auth/login', { body: { mobile: p.mobile, password: p.password } })).json.data?.access_token;
 
+let fakes;
 async function main() {
+  fakes = await startFakes();   // fake Razorpay for mandates (test/fakes)
   await db.connect();
   // Test clean-up may delete final records (H1, credit notes, audit); the API never sets this
   await db.query("SET dawabag.maintenance = 'on'");
@@ -301,7 +304,8 @@ async function main() {
   r = await call('GET', '/refills', { token: buyer });
   check('refill list shows items and next date', r.json.data?.refills?.[0]?.items?.[0]?.quantity === 3, r.json);
   r = await call('POST', '/refills/mandates', { token: buyer, body: { max_amount_paise: 500000, method: 'upi' } });
-  check('mandate setup needs Razorpay keys (503 here)', r.status === 503, r.json);
+  check('mandate setup returns the recurring checkout (Razorpay customer + ₹1 authorisation order)', r.status === 201
+    && r.json.data?.recurring === '1' && /^cust_/.test(r.json.data.customer_id || '') && /^order_/.test(r.json.data.razorpay_order_id || ''), r.json);
 
   console.log('Payment hardening');
   r = await call('POST', '/payments/webhook', { body: { event: 'payment.captured', payload: { payment: { entity: { order_id: 'x' } } } } });
@@ -316,6 +320,7 @@ async function main() {
   await cleanup();
   await db.end();
   redis.disconnect();
+  fakes.close();
   console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');
   process.exit(failures ? 1 : 0);
 }

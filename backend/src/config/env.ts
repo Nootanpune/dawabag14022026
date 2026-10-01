@@ -50,7 +50,7 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
   if (irp.some((k) => env[k]) && irp.some((k) => !env[k])) warnings.push(`E-invoicing incomplete: set all of ${irp.join(', ')}`);
   if (env.SHIPROCKET_EMAIL && !env.SHIPROCKET_WEBHOOK_TOKEN) warnings.push('Shiprocket tracking updates refused: SHIPROCKET_WEBHOOK_TOKEN not set');
   if (production) {
-    const overridden = ['MSG91_BASE_URL', 'GOOGLE_OAUTH_TOKEN_URL', 'FCM_BASE_URL', 'SHIPROCKET_BASE_URL'].filter((k) => env[k]);
+    const overridden = ['MSG91_BASE_URL', 'GOOGLE_OAUTH_TOKEN_URL', 'FCM_BASE_URL', 'SHIPROCKET_BASE_URL', 'RAZORPAY_BASE_URL'].filter((k) => env[k]);
     if (overridden.length) errors.push(`${overridden.join(', ')} must not be set in production (test-only provider addresses)`);
   }
   const missing = INTEGRATIONS.filter((k) => !env[k] || PLACEHOLDER.test(String(env[k])));

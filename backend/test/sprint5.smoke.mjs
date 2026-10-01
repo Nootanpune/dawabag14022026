@@ -6,14 +6,18 @@
 //   API_URL=http://localhost:4000 DATABASE_URL=postgresql://... REDIS_URL=redis://... \
 //     node test/sprint5.smoke.mjs
 //
-// Needs DISABLE_SCHEDULER=true and no Razorpay keys on the API. Test data is
-// cleaned up before and after. NEVER point it at a production database.
+// Needs DISABLE_SCHEDULER=true and the fake providers (eval "$(node test/fakes/fake-env.mjs)"):
+// gateway refunds go to the fake Razorpay. Test data is cleaned up before and
+// after. NEVER point it at a production database.
 import { db, redis, state } from './sprint5/lib.mjs';
+import { startFakes } from './fakes/server.mjs';
 import { cleanup, setup } from './sprint5/fixtures.mjs';
 import { runCompliance } from './sprint5/compliance.mjs';
 import { runAftercare } from './sprint5/aftercare.mjs';
 
+let fakes;
 async function main() {
+  fakes = await startFakes();
   await db.connect();
   // Test clean-up may delete final records (H1, credit notes, audit); the API never sets this
   await db.query("SET dawabag.maintenance = 'on'");
@@ -27,4 +31,4 @@ async function main() {
 
 main()
   .catch((e) => { state.failures++; console.error(e); })
-  .finally(async () => { await db.end(); redis.disconnect(); process.exit(state.failures ? 1 : 0); });
+  .finally(async () => { fakes?.close(); await db.end(); redis.disconnect(); process.exit(state.failures ? 1 : 0); });

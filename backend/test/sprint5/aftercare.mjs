@@ -3,10 +3,11 @@ import { call, check, q } from './lib.mjs';
 import { PIN } from './fixtures.mjs';
 
 let payCounter = 0;
-async function markPaid(orderId, amount) {
+// A payment id containing FAIL is one the (fake) gateway refuses to refund
+async function markPaid(orderId, amount, tag = '') {
   payCounter++;
   await q(`INSERT INTO payments (order_id, gateway_order_id, gateway_payment_id, status, amount_paise, paid_at)
-           VALUES ($1, $2, $3, 'captured', $4, NOW())`, [orderId, `order_S5_${payCounter}_${Date.now()}`, `pay_S5_${payCounter}_${Date.now()}`, amount]);
+           VALUES ($1, $2, $3, 'captured', $4, NOW())`, [orderId, `order_S5_${payCounter}_${Date.now()}`, `pay_S5${tag}_${payCounter}_${Date.now()}`, amount]);
   await q(`UPDATE orders SET status = 'packing' WHERE id = $1`, [orderId]);
 }
 
@@ -19,7 +20,7 @@ export async function runAftercare({ t, P, addr, ids }) {
   let r = await order([{ product_id: P.own, quantity: 2 }], { wallet_amount_paise: 3000 });
   const o1 = r.json.data?.order;
   check('order placed with wallet part-payment', r.status === 201 && !!o1, r.json);
-  await markPaid(o1.id, o1.total_paise);
+  await markPaid(o1.id, o1.total_paise, 'FAIL');
   const reservedBefore = (await q(`SELECT quantity_reserved FROM inventory_batches WHERE product_id = $1`, [P.own]))[0].quantity_reserved;
   r = await call('POST', `/orders/${o1.id}/cancel`, { token: t.trader, body: { reason: 'Not mine' } });
   check("another buyer cannot cancel the order", r.status === 404, r.json);
@@ -33,7 +34,7 @@ export async function runAftercare({ t, P, addr, ids }) {
   const wallet = (await q(`SELECT wallet_balance_paise FROM user_profiles WHERE user_id = $1`, [ids.buyer]))[0].wallet_balance_paise;
   check('wallet part refunded to the wallet', wallet === 5000, wallet);
   const gw = (await q(`SELECT id, failure_reason FROM refunds WHERE order_id = $1 AND method = 'gateway'`, [o1.id]))[0];
-  check('gateway refund waits for accounts when Razorpay is not configured', /not configured/.test(gw?.failure_reason || ''), gw);
+  check('a refund the gateway refuses waits for accounts, with the reason', /fully refunded/.test(gw?.failure_reason || ''), gw);
   r = await call('POST', `/orders/${o1.id}/cancel`, { token: t.buyer, body: { reason: 'again' } });
   check('cannot cancel twice', r.status === 409, r.json);
   r = await call('POST', `/returns/refunds/admin/${gw.id}/processed`, { token: t.buyer, body: { reference: 'UTR123' } });

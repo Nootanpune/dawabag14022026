@@ -1,5 +1,5 @@
 // Prints the environment for running the API and the smoke tests against throwaway
-// fake providers (MSG91, Google OAuth + FCM, Shiprocket, the GST IRP) on one local
+// fake providers (MSG91, Google OAuth + FCM, Shiprocket, the GST IRP, Razorpay) on one local
 // port. Fresh RSA keys stand in for the Firebase service account and the IRP's key
 // pair. Nothing is written to disk.
 //
@@ -24,6 +24,8 @@ const env = {
   IRP_BASE_URL: base, IRP_CLIENT_ID: 'fake-irp-client', IRP_CLIENT_SECRET: 'fake-irp-secret',
   IRP_USERNAME: 'dawabag_api', IRP_PASSWORD: 'fake-irp-password',
   IRP_PUBLIC_KEY: irp.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+  RAZORPAY_KEY_ID: 'rzp_test_fake', RAZORPAY_KEY_SECRET: crypto.randomBytes(12).toString('hex'),
+  RAZORPAY_WEBHOOK_SECRET: crypto.randomBytes(12).toString('hex'), RAZORPAY_BASE_URL: base,
   FAKE_IRP_PRIVATE_KEY: irp.privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64'),   // the fake's half only
 };
 for (const [k, v] of Object.entries(env)) console.log(`export ${k}='${v}'`);

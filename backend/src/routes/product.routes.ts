@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  searchProducts, getProductDetail, getCategories, createProduct, updateProduct, getContentQueue, postContentReview,
+  searchProducts, getProductDetail, getCategories, createProduct, updateProduct, getContentQueue, postContentReview, setTelemedicineList,
   getAdminProducts, getAdminProduct,
 } from '../controllers/product.controller';
 import { authenticate, authorize, optionalAuth } from '../middleware/auth.middleware';
@@ -16,5 +16,6 @@ router.post('/:productId/content-review', authenticate, authorize('pharmacist_rx
 router.get('/:productId', optionalAuth, getProductDetail);
 router.post('/', authenticate, authorize('admin', 'super_admin'), createProduct);
 router.patch('/:productId', authenticate, authorize('admin', 'super_admin'), updateProduct);
+router.post('/:productId/telemedicine-list', authenticate, authorize('pharmacist_rx', 'admin', 'super_admin'), setTelemedicineList);   // C-23
 
 export default router;
