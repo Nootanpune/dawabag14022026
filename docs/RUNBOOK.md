@@ -37,6 +37,8 @@ Enable automatic capture.
 docker build -f backend/Dockerfile -t dawabag-api .
 docker build --build-arg NEXT_PUBLIC_API_URL=https://api.dawabag.in -t dawabag-web frontend-web
 # behind a proxy with its own CA:  --secret id=ca,src=/path/ca.crt  (and --network host if the proxy is on localhost)
+# Docker Hub rate limits: take the same official image from ECR Public
+#   --build-arg NODE_IMAGE=public.ecr.aws/docker/library/node:20-alpine
 ```
 
 Local run of the whole stack: `docker compose up -d --build` (see `docker-compose.yml`).
