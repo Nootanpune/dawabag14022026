@@ -115,41 +115,32 @@ jobs:
           path: mobile/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 14
 
-  images:
+  staging:
+    # The staging stack exactly as a server runs it (deploy/staging): both images built,
+    # migrations on an empty database, Caddy with its own CA in front, checked over HTTPS
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: dawabag_user
-          POSTGRES_PASSWORD: dawabag_dev_only
-          POSTGRES_DB: dawabag
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U dawabag_user" --health-interval 5s --health-timeout 5s --health-retries 20
-      redis:
-        image: redis:7
-        ports: ['6379:6379']
+    env:
+      WEB_DOMAIN: www.dawabag.test
+      API_DOMAIN: api.dawabag.test
+      CURL_EXTRA: >-
+        -k --resolve www.dawabag.test:443:127.0.0.1 --resolve api.dawabag.test:443:127.0.0.1
+        --resolve www.dawabag.test:80:127.0.0.1 --resolve api.dawabag.test:5432:127.0.0.1
     steps:
       - uses: actions/checkout@v4
-      - name: Build the API image
-        run: docker build -f backend/Dockerfile -t dawabag-api:ci .
-      - name: Build the web image
-        run: docker build -f frontend-web/Dockerfile -t dawabag-web:ci frontend-web
-      - name: API image migrates an empty database and answers /ready
+      - name: Throwaway staging settings
         run: |
-          docker run -d --name api --network host \
-            -e NODE_ENV=development -e PORT=4000 \
-            -e DB_HOST=127.0.0.1 -e DB_PORT=5432 -e DB_NAME=dawabag -e DB_USER=dawabag_user -e DB_PASSWORD=dawabag_dev_only \
-            -e DATABASE_URL=postgresql://dawabag_user:dawabag_dev_only@127.0.0.1:5432/dawabag \
-            -e REDIS_URL=redis://127.0.0.1:6379 -e DISABLE_SCHEDULER=true \
-            -e JWT_ACCESS_SECRET=ci-access-secret-0123456789abcdef0123456789 -e JWT_REFRESH_SECRET=ci-refresh-secret-0123456789abcdef012345678 \
-            dawabag-api:ci
-          for i in $(seq 1 60); do curl -sf http://127.0.0.1:4000/ready && exit 0; sleep 2; done
-          docker logs api | tail -80; exit 1
-      - name: Web image serves the home page
+          cp deploy/staging/staging.env.example deploy/staging/staging.env
+          r() { openssl rand -hex 24; }
+          sed -i "s/^WEB_DOMAIN=.*/WEB_DOMAIN=$WEB_DOMAIN/; s/^API_DOMAIN=.*/API_DOMAIN=$API_DOMAIN/" deploy/staging/staging.env
+          sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$(r)/; s/^JWT_ACCESS_SECRET=.*/JWT_ACCESS_SECRET=$(r)/; s/^JWT_REFRESH_SECRET=.*/JWT_REFRESH_SECRET=$(r)/" deploy/staging/staging.env
+          echo "CADDY_GLOBAL_OPTIONS=local_certs" >> deploy/staging/staging.env
+      - name: Build and start the stack
+        run: docker compose -f deploy/staging/compose.yml --env-file deploy/staging/staging.env up -d --build --wait --wait-timeout 300
+      - name: Checks through the front door
         run: |
-          docker run -d --name web -p 3000:3000 dawabag-web:ci
-          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:3000/ && exit 0; sleep 2; done
-          docker logs web | tail -50; exit 1
+          for i in $(seq 1 30); do curl -sf $CURL_EXTRA https://$API_DOMAIN/ready >/dev/null && break; sleep 2; done
+          deploy/staging/check.sh
+      - name: Stack logs
+        if: failure()
+        run: docker compose -f deploy/staging/compose.yml --env-file deploy/staging/staging.env logs --tail 80

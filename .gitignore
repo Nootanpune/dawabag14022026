@@ -26,3 +26,4 @@ coverage/
 
 # redis snapshots from local runs
 *.rdb
+deploy/staging/staging.env

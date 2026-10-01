@@ -1,0 +1,33 @@
+# Dawabag staging front door. Certificates come from Let's Encrypt automatically once
+# DNS points here; CADDY_GLOBAL_OPTIONS=local_certs uses Caddy's own CA (CI, tests).
+{
+	{$CADDY_GLOBAL_OPTIONS}
+	email {$ACME_EMAIL:admin@localhost}
+}
+
+(common) {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	log {
+		output stdout
+	}
+}
+
+{$WEB_DOMAIN} {
+	import common
+	reverse_proxy web:3000
+}
+
+{$API_DOMAIN} {
+	import common
+	# Large enough for prescription and KYC uploads (the API checks its own limits)
+	request_body {
+		max_size 12MB
+	}
+	reverse_proxy api:4000
+}

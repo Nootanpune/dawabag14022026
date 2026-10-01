@@ -230,6 +230,29 @@ told again until it has succeeded once.
 - The app keeps nothing on the device except the sign-in token in the OS keychain;
   Android backups are switched off so no copy of app data leaves the phone.
 
+## 7c. Staging server (single machine)
+
+For beta testers and the mobile app's test builds, one Linux server (2 vCPU, 4 GB, in
+ap-south-1) runs the whole stack from `deploy/staging/`:
+
+1. Install Docker; point DNS for the website and API names (e.g. `staging.dawabag.in`,
+   `api-staging.dawabag.in`) at the server; open only ports 80 and 443.
+2. `cp deploy/staging/staging.env.example deploy/staging/staging.env` and fill it in
+   (long random `DB_PASSWORD` and JWT secrets; test-mode Razorpay/MSG91 keys). The file
+   stays on the server only (git ignores it).
+3. `docker compose -f deploy/staging/compose.yml --env-file deploy/staging/staging.env up -d --build`
+   — Caddy obtains HTTPS certificates by itself; the API migrates the database on start.
+4. `WEB_DOMAIN=… API_DOMAIN=… deploy/staging/check.sh` — HTTPS, redirects, HSTS, CORS,
+   request ids, closed database port.
+5. Set the GitHub variable `MOBILE_API_URL=https://api-staging.dawabag.in` so test APKs
+   reach it.
+
+Update: `git pull` and the same `up -d --build`. The database lives in the
+`postgres_data` volume on that server: back it up with
+`docker compose … exec postgres pg_dump -U dawabag_user dawabag > dawabag-YYYYMMDD.sql` and
+keep the copy off the server. Staging holds test data only — never real patients.
+CI starts this exact stack on every push and runs the same checks.
+
 ## 8. Before the first real customer
 
 1. Legal settings (Admin → Settings): entity, drug licences, pharmacist-in-charge,

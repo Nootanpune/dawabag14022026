@@ -1,0 +1,86 @@
+# Dawabag staging (or a small single-server beta): website, API, PostgreSQL and Redis
+# on one machine behind Caddy, which gets and renews HTTPS certificates itself.
+#
+#   cp deploy/staging/staging.env.example deploy/staging/staging.env   # fill it in
+#   docker compose -f deploy/staging/compose.yml --env-file deploy/staging/staging.env up -d --build
+#
+# Point DNS for WEB_DOMAIN and API_DOMAIN at the server first. Only ports 80 and 443
+# are open; the database and Redis are reachable only inside this stack. The API runs
+# in production mode and applies pending migrations on start. Production itself is the
+# AWS set-up in docs/RUNBOOK.md (RDS, ElastiCache, S3); this file is for staging.
+name: dawabag-staging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dawabag
+      POSTGRES_USER: dawabag_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in staging.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dawabag_user -d dawabag"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Cache, OTPs and job queues only — no snapshots; the database is the record
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file: staging.env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: dawabag
+      DB_USER: dawabag_user
+      REDIS_URL: redis://redis:6379
+      # One proxy (Caddy) in front: rate limits see the visitor's address
+      TRUST_PROXY_HOPS: 1
+      CORS_ORIGINS: https://${WEB_DOMAIN}
+      PUBLIC_WEB_URL: https://${WEB_DOMAIN}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  web:
+    build:
+      context: ../../frontend-web
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN:?set API_DOMAIN in staging.env}
+    restart: unless-stopped
+    depends_on: [api]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN:?set WEB_DOMAIN in staging.env}
+      API_DOMAIN: ${API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      CADDY_GLOBAL_OPTIONS: ${CADDY_GLOBAL_OPTIONS:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data          # certificates (the server's own, renewed by Caddy)
+    depends_on: [api, web]
+
+volumes:
+  postgres_data:
+  caddy_data:
