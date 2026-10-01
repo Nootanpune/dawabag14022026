@@ -138,3 +138,10 @@
   `telemedicine_list` set via `POST /products/:id/telemedicine-list` (pharmacist).
 - **Razorpay test hook:** `RAZORPAY_BASE_URL` points the SDK's axios client at the fake gateway
   (production refuses it); `validCheckoutSignature` in `razorpay.client`.
+- **Payments (Sprint 11):** `services/payments/` — `capture` (`applyCapture`: one idempotent path for
+  checkout verify, webhook and sweep; mandate ₹1 authorisation → consultation fee → order/refill
+  payment; late money for closed orders refunded), `checkout` (create order, signed verify,
+  capture of authorised payments), `webhook` (event id → `payment_webhook_events`, duplicate =
+  no action, failure deletes the row so Razorpay retries; payment.*, refund.*, token.*),
+  `reconcile` (job `payment_reconcile`; report `payment-reconciliation` fetched live from
+  `settlements/recon/combined`). Refund legs: `retryGatewayRefund`, `gateway_attempts`.

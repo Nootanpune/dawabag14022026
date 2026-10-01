@@ -28,8 +28,17 @@ than 32 characters, if Razorpay / S3 / MSG91 / SES keys are missing, if
 what is wrong. Generate secrets with `openssl rand -hex 48`.
 
 Razorpay: dashboard → Webhooks → URL `https://<api-domain>/api/v1/payments/webhook`,
-events `payment.*` and `refund.*`, copy the secret to `RAZORPAY_WEBHOOK_SECRET`.
-Enable automatic capture.
+events `payment.captured`, `payment.failed`, `refund.processed`, `refund.failed`,
+`token.confirmed`, `token.rejected`, `token.cancelled`; copy the secret to
+`RAZORPAY_WEBHOOK_SECRET`. Enable automatic capture. Each event is acted on once (retries
+are recognised by event id). Payments whose app confirmation and webhook were both lost
+are picked up by the `payment_reconcile` job every 15 minutes. A refund the gateway
+refuses or fails stays pending with the reason in Admin → Refunds: fix the cause and
+press Retry, or refund by bank transfer and mark it processed with the UTR. The CA's
+`payment-reconciliation` report (Accounts, up to 31 days) matches Razorpay's settlement
+lines — fees, GST on fees, UTR — to Dawabag's payments and refunds and flags anything
+missing or different. Before going live, run one real ₹1 payment, refund and mandate in
+Razorpay test mode.
 
 **SMS (MSG91, DLT).** Indian operators deliver only templates registered on DLT
 (TRAI). Register each message in the DLT portal and MSG91, then map it in Admin →
