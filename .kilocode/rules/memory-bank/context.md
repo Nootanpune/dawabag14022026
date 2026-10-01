@@ -10,6 +10,15 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 20 — free delivery and partner stock (2026-10-01)
+- Free delivery for retail orders whose medicines (after coupon, before GST) reach
+  `delivery.free_above_paise` (₹499; null = off; migration 20). Cart API returns
+  `free_delivery {above_paise, remaining_paise}`; web/mobile show a progress line.
+  Shipping policy v1 drafted as a Claude Doc for lawyer review (not yet published).
+- Partner stock counts towards availability but stays in `partner_inventory`:
+  `services/stock/partnerStock.ts` (read-only SQL, same eligibility as allocation);
+  search, product page and cart use GREATEST(own, best single partner).
+
 ## Sprint 20 — owner choices and rehearsal R2 (2026-10-01)
 - Owner chose **Direction A (clinical trust)** and **rehearsal R2 (recorded journeys)**
   from the design review (artifact "Dawabag Design Review").

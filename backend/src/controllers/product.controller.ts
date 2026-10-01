@@ -8,6 +8,7 @@ import { assertBelowShelfMrp } from '../services/shelfMrp';
 import { productDetail } from '../services/productDetail.service';
 import { adminGetProduct, adminListProducts } from '../services/productAdmin.service';
 import { COPY_FIELDS, contentQueue, copyFlags, reviewContent } from '../services/productContent.service';
+import { partnerStockSql } from '../services/stock/partnerStock';
 
 // ─── Search Products ─────────────────────────────────────────────────────────
 export async function searchProducts(req: Request, res: Response, next: NextFunction) {
@@ -88,7 +89,8 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
               (${minQtyExpr}) AS min_order_qty,
               (${maxQtyExpr}) AS max_order_qty,
               COALESCE(p.reorder_level_qty, 0) AS reorder_level_qty,
-              COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0) AS stock_qty
+              -- the most one seller can supply: Dawabag's batches or one partner's own ledger
+              GREATEST(COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0), ${partnerStockSql('p.id')}) AS stock_qty
        FROM products p
        LEFT JOIN inventory_batches b ON b.product_id = p.id
          AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE

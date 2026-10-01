@@ -7,6 +7,7 @@ import { queryOne } from '../config/database';
 import { cacheGet, cacheSet } from '../config/redis';
 import { AppError } from '../utils/AppError';
 import { BuyerType, priceField } from '../utils/customerType';
+import { partnerNearestExpirySql, partnerStockSql } from './stock/partnerStock';
 
 const PUBLIC_FIELDS = ['id', 'name', 'generic_name', 'sku', 'category', 'drug_schedule', 'hsn_code', 'gst_rate',
   'marketed_by', 'composition', 'storage_instructions', 'cold_chain', 'mrp_paise', 's3_image_key',
@@ -18,8 +19,9 @@ export async function productDetail(productId: string, pricingType: BuyerType) {
   if (!row) {
     row = await queryOne(
       `SELECT p.*,
-              COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0) AS stock_qty,
-              MIN(b.expiry_date) AS nearest_expiry
+              -- the most one seller can supply: Dawabag's batches or one partner's own ledger
+              GREATEST(COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0), ${partnerStockSql('p.id')}) AS stock_qty,
+              LEAST(MIN(b.expiry_date), ${partnerNearestExpirySql('p.id')}) AS nearest_expiry
        FROM products p
        LEFT JOIN inventory_batches b ON b.product_id = p.id
          AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE AND b.quantity_available > b.quantity_reserved

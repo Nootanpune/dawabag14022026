@@ -7,6 +7,7 @@ import { AppError } from '../utils/AppError';
 import { BuyerType, priceField, requiresPrescription } from '../utils/customerType';
 import { evaluateCoupon } from './coupon.service';
 import { freeDeliveryAbovePaise, freeDeliveryProgress } from './delivery/freeDelivery';
+import { partnerStockSql } from './stock/partnerStock';
 
 const BLOCKED_SCHEDULES = ['Schedule X', 'NDPS'];
 
@@ -46,8 +47,9 @@ async function productRows(productIds: string[]) {
             COALESCE(p.institutional_price_paise, p.offer_price_paise) AS institutional_price_paise,
             p.max_qty_per_order, p.min_order_qty_retailer, p.min_order_qty_wholesaler,
             p.max_qty_per_order_retailer, p.max_qty_per_order_wholesaler,
-            COALESCE(SUM(b.quantity_available - b.quantity_reserved)
-              FILTER (WHERE b.expiry_date > CURRENT_DATE + 30 AND NOT b.is_recalled), 0)::int AS stock_qty
+            -- the most one seller can supply: Dawabag's batches or one partner's own ledger
+            GREATEST(COALESCE(SUM(b.quantity_available - b.quantity_reserved)
+              FILTER (WHERE b.expiry_date > CURRENT_DATE + 30 AND NOT b.is_recalled), 0)::int, ${partnerStockSql('p.id')}) AS stock_qty
      FROM products p
      LEFT JOIN inventory_batches b ON b.product_id = p.id
      WHERE p.id = ANY($1::uuid[])
