@@ -93,7 +93,7 @@ export async function getPrescriptionUrl(req: Request, res: Response, next: Next
     const isPharmacist = userRole === 'pharmacist_rx';
     if (!isOwner && !isPharmacist) throw new AppError('Access denied', 403);
 
-    const url = getPrivateObjectUrl(prescription.s3_key, 300);
+    const url = await getPrivateObjectUrl(prescription.s3_key, 300);
     await writeAudit({ userId: prescription.user_id, action: 'prescription_viewed', performedBy: userId,
       newValue: { prescription_id: prescriptionId }, ip: req.ip });
 

@@ -96,11 +96,34 @@ export async function marketplaceTaxes({ from, to }: Range) {
      WHERE sb.period_to BETWEEN $1 AND $2 ORDER BY v.name, sb.period_to`, [from, to]);
 }
 
+// Purchase register (input tax): one row per goods receipt against a supplier invoice
+export async function purchaseRegister({ from, to }: Range) {
+  return query(
+    `SELECT g.grn_number, g.created_at::date AS received_on, g.supplier_invoice_no, g.supplier_invoice_date,
+            v.name AS supplier_name, g.supplier_gstin, v.state AS supplier_state, g.supplier_dl_no,
+            g.taxable_paise, g.cgst_paise, g.sgst_paise, g.igst_paise, g.total_paise, po.po_number
+     FROM goods_receipts g JOIN vendors v ON v.id = g.vendor_id LEFT JOIN purchase_orders po ON po.id = g.po_id
+     WHERE g.supplier_invoice_date BETWEEN $1 AND $2 ORDER BY g.supplier_invoice_date, g.grn_number`, [from, to]);
+}
+
+// Stock valuation at cost, today (the period is ignored); expired and recalled shown separately
+export async function stockValuation(_: Range) {
+  return query(
+    `SELECT p.sku, p.name AS product_name, b.batch_number, b.expiry_date, b.quantity_available AS quantity,
+            b.purchase_price_paise AS unit_cost_paise, (b.quantity_available * b.purchase_price_paise)::bigint AS value_paise,
+            CASE WHEN b.is_recalled THEN 'recalled' WHEN b.expiry_date <= CURRENT_DATE THEN 'expired'
+                 WHEN b.expiry_date <= CURRENT_DATE + 30 THEN 'not_sellable' ELSE 'sellable' END AS stock_status
+     FROM inventory_batches b JOIN products p ON p.id = b.product_id
+     WHERE b.quantity_available > 0 ORDER BY p.name, b.expiry_date`);
+}
+
 export const REPORTS = {
   'sales-register': salesRegister,
   'credit-notes': creditNoteRegister,
   'hsn-summary': hsnSummary,
   'gstr1-summary': gstr1Summary,
   'marketplace-tcs-tds': marketplaceTaxes,
+  'purchase-register': purchaseRegister,
+  'stock-valuation': stockValuation,
 } as const;
 export type ReportName = keyof typeof REPORTS;

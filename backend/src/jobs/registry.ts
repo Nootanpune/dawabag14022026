@@ -5,6 +5,7 @@ import { runLowStockJob } from './lowStock.job';
 import { runSettlementJob } from './settlement.job';
 import { runRefillOrdersJob, runRefillRemindersJob } from './refill.job';
 import { runLicenceRegisterAlerts } from '../services/licence.service';
+import { runExpiryWatchJob } from './expiryWatch.job';
 
 export interface JobDefinition {
   name: string;
@@ -61,6 +62,12 @@ export const JOBS: JobDefinition[] = [
     description: "Alert the renewal owner and admins 60, 30 and 7 days before Dawabag's own licences expire (C-07)",
     cron: '15 9 * * *',                      // daily 09:15
     run: runLicenceRegisterAlerts,
+  },
+  {
+    name: 'expiry_watch',
+    description: 'Raise expired stock for write-off (approved by a person) and send the near-expiry list',
+    cron: '45 5 * * *',                      // daily 05:45
+    run: runExpiryWatchJob,
   },
 ];
 

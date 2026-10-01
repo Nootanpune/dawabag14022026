@@ -3,23 +3,20 @@
 // object store — S3 in ap-south-1 with AES-256 server-side encryption. There is
 // no local-disk fallback: the server is the single source of truth
 // (docs/DECISIONS.md). S3_ENDPOINT allows an S3-compatible staging store.
-import AWS from 'aws-sdk';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AppError } from '../utils/AppError';
 
-let s3: AWS.S3 | null = null;
+let s3: S3Client | null = null;
 
-function getS3(): AWS.S3 {
+function getS3(): S3Client {
   if (!process.env.AWS_S3_BUCKET) {
     throw new AppError('Document storage is not configured. Please try again later.', 503);
   }
   if (!s3) {
-    s3 = new AWS.S3({
+    s3 = new S3Client({
       region: process.env.AWS_REGION || 'ap-south-1',
-      ...(process.env.S3_ENDPOINT && {
-        endpoint: process.env.S3_ENDPOINT,
-        s3ForcePathStyle: true,
-      }),
-      signatureVersion: 'v4',
+      ...(process.env.S3_ENDPOINT && { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true }),
     });
   }
   return s3;
@@ -31,23 +28,19 @@ export async function putPrivateObject(
   contentType: string,
   metadata: Record<string, string> = {}
 ): Promise<string> {
-  await getS3().upload({
+  await getS3().send(new PutObjectCommand({
     Bucket: process.env.AWS_S3_BUCKET!,
     Key: key,
     Body: body,
     ContentType: contentType,
     ServerSideEncryption: 'AES256',
     Metadata: metadata,
-  }).promise();
+  }));
   return key;
 }
 
 // Short-lived link for staff to view a private document (Rulebook C-41).
 // Callers must audit-log every call.
-export function getPrivateObjectUrl(key: string, expiresSeconds = 300): string {
-  return getS3().getSignedUrl('getObject', {
-    Bucket: process.env.AWS_S3_BUCKET!,
-    Key: key,
-    Expires: expiresSeconds,
-  });
+export async function getPrivateObjectUrl(key: string, expiresSeconds = 300): Promise<string> {
+  return getSignedUrl(getS3(), new GetObjectCommand({ Bucket: process.env.AWS_S3_BUCKET!, Key: key }), { expiresIn: expiresSeconds });
 }

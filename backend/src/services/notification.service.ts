@@ -4,7 +4,7 @@ import { query } from '../config/database';
 import { logger } from '../config/logger';
 import nodemailer from 'nodemailer';
 import SESTransport from 'nodemailer/lib/ses-transport';
-import AWS from 'aws-sdk';
+import * as aws from '@aws-sdk/client-ses';
 
 // ─── Queue Setup ──────────────────────────────────────────────────────────────
 let notificationQueue: Bull.Queue;
@@ -264,6 +264,11 @@ function buildMessage(payload: NotificationPayload) {
         body: `A security incident ${payload.incidentNo} was logged. If it is reportable, CERT-In must be informed by ${payload.dueAt}.` },
       push: { title: `Security incident ${payload.incidentNo}`, body: 'Report to CERT-In within 6 hours if reportable' },
     },
+    expiry_watch: {
+      email: { subject: `Expiry watch: ${payload.expired} expired, ${payload.nearExpiry} near expiry`,
+        body: `${payload.expired} expired batch(es) were raised for write-off approval; ${payload.nearExpiry} batch(es) expire within ${payload.days} days. Open Admin → Stock.` },
+      push: { title: 'Expiry watch', body: `${payload.expired} expired · ${payload.nearExpiry} near expiry` },
+    },
     low_stock_digest: {
       email: {
         subject: `Low stock: ${payload.count} product(s) at or below reorder level`,
@@ -316,10 +321,11 @@ let transporter: nodemailer.Transporter;
 
 function getTransporter(): nodemailer.Transporter {
   if (!transporter) {
-    const ses = new AWS.SES({ region: process.env.AWS_REGION });
+    // nodemailer's SES transport with AWS SDK v3 (raw email via SendRawEmailCommand)
+    const ses = new aws.SESClient({ region: process.env.AWS_REGION || 'ap-south-1' });
     transporter = nodemailer.createTransport({
-      SES: { ses, aws: AWS },
-    } as SESTransport.Options);
+      SES: { ses, aws },
+    } as unknown as SESTransport.Options);
   }
   return transporter;
 }

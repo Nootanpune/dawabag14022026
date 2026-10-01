@@ -70,7 +70,7 @@ export async function getDocumentUrl(req: Request, res: Response, next: NextFunc
       [documentId]
     );
     if (!doc) throw new AppError('Document not found', 404);
-    const url = getPrivateObjectUrl(doc.storage_key, 300);
+    const url = await getPrivateObjectUrl(doc.storage_key, 300);
     await writeAudit({
       userId: doc.user_id, action: 'kyc_document_viewed', performedBy: req.user!.id,
       newValue: { document_id: documentId, document_type: doc.document_type }, ip: req.ip,
