@@ -37,6 +37,11 @@ export async function runTelemedicine(ctx) {
   check('changing the registration number needs checking again', r.status === 404, r.status);
   await call('PUT', '/doctors/me/profile', { token: t.doctor, body: profile });
   await call('POST', `/doctors/${docId}/verify`, { token: t.admin, body: { approve: true, notes: 'Rechecked' } });
+  const d2 = (await q(`SELECT id FROM doctor_profiles WHERE full_name = 'Dr Unchecked'`))[0].id;
+  await call('POST', `/doctors/${d2}/verify`, { token: t.admin, body: { approve: false, notes: 'Number not on the register' } });
+  await call('PUT', '/doctors/me/profile', { token: t.doctor2, body: { ...profile, full_name: 'Dr Unchecked', nmc_reg_number: 'MMC-2015-0100' } });
+  r = await call('GET', '/doctors/me/profile', { token: t.doctor2 });
+  check('a rejected doctor who corrects the details goes back to the checking queue', r.json.data?.is_verified === false && r.json.data.rejection_reason === null, r.json.data);
   r = await call('GET', '/doctors/admin/list?status=pending', { token: t.admin });
   check('admin queue lists doctors awaiting checking', r.json.data?.doctors?.some((d) => d.full_name === 'Dr Unchecked'), r.json.data);
 
@@ -179,6 +184,12 @@ export async function runTelemedicine(ctx) {
 
   r = await call('GET', `/consultations/doctor?date=${S.now1.slot_date}`, { token: t.doctor });
   check('doctor\'s day list with patient age and gender', r.json.data?.some((x) => x.id === c1.id && x.patient_gender === 'female' && x.prescription_id === rx1.id), r.json.data);
+  r = await call('GET', `/consultations/${c1.id}`, { token: t.doctor });
+  check('one consultation for its doctor, with the patient\'s details', r.json.data?.patient_gender === 'female' && r.json.data.prescription_id === rx1.id, r.json.data);
+  r = await call('GET', `/consultations/${c1.id}`, { token: t.patient2 });
+  check('…not for anyone else', r.status === 404, r.status);
+  r = await call('GET', `/doctors/me/slots?from=${S.now1.slot_date}&to=${S.tomorrow.slot_date}`, { token: t.doctor });
+  check("the doctor's own slots include booked ones", r.json.data?.some((x) => x.id === slots.now1 && x.is_booked && x.consultation_id === c1.id), r.json.data?.length);
   r = await call('GET', '/consultations/my', { token: t.patient });
   check('patient\'s list shows the doctor\'s registration and the e-prescription', r.json.data?.some((x) => x.id === c1.id && x.nmc_reg_number === profile.nmc_reg_number && x.prescription_id === rx1.id), r.json.data);
 }

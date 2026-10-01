@@ -44,3 +44,20 @@ export function getApiErrorList(err: any): string[] {
       return path ? `${path}: ${e.message}` : String(e.message);
     });
 }
+
+/**
+ * An error as separate lines for display: every validation message from a 422
+ * `errors` array, otherwise the message split where the server joined several
+ * problems with '; ' (e.g. the medicines a teleconsultation may not prescribe, C-23).
+ */
+export function getApiErrorLines(err: any, fallback = 'Something went wrong'): string[] {
+  const errors = err?.response?.data?.errors;
+  if (Array.isArray(errors) && errors.length) {
+    const lines = errors.map((e: any) => e?.message).filter(Boolean).map(String);
+    if (lines.length) return lines;
+  }
+  return getApiErrorMessage(err, fallback)
+    .split('; ')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}

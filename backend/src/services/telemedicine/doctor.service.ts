@@ -42,7 +42,8 @@ export async function saveProfile(userId: string, p: ProfileInput) {
          council = EXCLUDED.council, nmc_reg_number = EXCLUDED.nmc_reg_number, registration_year = EXCLUDED.registration_year,
          speciality = EXCLUDED.speciality, clinic_name = EXCLUDED.clinic_name, consultation_fee_paise = EXCLUDED.consultation_fee_paise,
          bio = EXCLUDED.bio, languages_spoken = EXCLUDED.languages_spoken, updated_at = NOW(),
-         -- registration details changed: check again
+         -- registration details changed: check again (a resubmission clears an earlier rejection)
+         rejection_reason = CASE WHEN doctor_profiles.is_verified THEN doctor_profiles.rejection_reason ELSE NULL END,
          is_verified = doctor_profiles.is_verified AND doctor_profiles.nmc_reg_number = EXCLUDED.nmc_reg_number
            AND doctor_profiles.council = EXCLUDED.council AND doctor_profiles.full_name = EXCLUDED.full_name
            AND doctor_profiles.qualification = EXCLUDED.qualification
@@ -126,4 +127,12 @@ export async function openSlots(doctorId: string, date: string) {
   return query(`SELECT id, slot_date, slot_start, slot_end FROM doctor_slots
                 WHERE doctor_id = $1 AND slot_date = $2 AND NOT is_blocked AND NOT is_booked
                   AND (slot_date + slot_start) > (NOW() AT TIME ZONE 'Asia/Kolkata') ORDER BY slot_start`, [doctorId, date]);
+}
+
+// The doctor's own slots in a date range, booked ones included
+export async function mySlots(userId: string, from: string, to: string) {
+  const doctorId = await verifiedDoctorId(userId);
+  return query(`SELECT s.id, s.slot_date, s.slot_start, s.slot_end, s.is_booked, s.is_blocked, c.id AS consultation_id
+                FROM doctor_slots s LEFT JOIN consultations c ON c.slot_id = s.id AND c.status <> 'cancelled'
+                WHERE s.doctor_id = $1 AND s.slot_date BETWEEN $2 AND $3 ORDER BY s.slot_date, s.slot_start LIMIT 500`, [doctorId, from, to]);
 }

@@ -81,7 +81,7 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
 
     const products = await query(
       `SELECT p.id, p.name, p.generic_name, p.sku, p.category,
-              p.drug_schedule, p.marketed_by, p.mrp_paise,
+              p.drug_schedule, p.telemedicine_list, p.marketed_by, p.mrp_paise,
               p.offer_price_paise, p.cold_chain, p.s3_image_key, p.gst_rate,
               (${displayPrice}) AS display_price_paise,
               (${minQtyExpr}) AS min_order_qty,

@@ -10,6 +10,33 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Web Sprint 10 — teleconsultation (tsc + next lint + next build pass)
+- Patient: /consult (verified doctors with qualification, council, reg. no./year, fee),
+  /consult/[doctorId] (date + open slots, mode, chief complaint, TPG consent checkbox →
+  book → Razorpay checkout.js, same script as order payment; no patients picker exists on
+  web so no family member yet), /account/consultations (pay / join / cancel with refund
+  toast / view Rx), /account/consultations/prescriptions/[id] (details, PDF via
+  downloadFromApi, public check link, optional "Order these at Dawabag" → /use with "You may
+  buy these medicines from any pharmacy", C-24). Join shows channel/mode/app_id; no Agora SDK yet.
+- Public /eprescriptions/verify and /verify/[code]: valid/expired banner, doctor + registration,
+  patient initials/age/gender, medicines.
+- Doctor portal (role doctor; DoctorShell/DoctorNav, Header link now /doctor): /doctor (day list,
+  join/end with notes/cancel, write/view Rx), /doctor/profile (registration form + status /
+  rejection reason), /doctor/slots (date range × daily window × slot length × weekdays, ≤200
+  per request; free slots with Block), /doctor/consultations/[id]/prescribe?date= (diagnosis,
+  advice, new-condition toggle on follow-ups, 1–20 medicine rows via /products/search, server
+  422 refusals one per line), /doctor/prescriptions/[id].
+- Admin /admin/doctors (enable by mobile, status tabs, verify/reject with notes 3–1000) and
+  /staff/telemedicine-lists (pharmacist_rx/admin: set List O/A/B/prohibited + notes; Schedule X /
+  NDPS forced prohibited); both in AdminNav. Admin product table shows the tele list.
+- Staff Rx viewer: /prescriptions/:id/url {digital, pdf_path} → DigitalRxViewer shows the PDF
+  in memory (blob URL) via the authenticated client + download.
+- lib/telemedicine/{types,api,doctorApi,adminApi,labels,slots,profileForm,prescriptionForm,
+  razorpay,roles}.ts; components/telemedicine/{common,patient,doctor,admin,public}/*,
+  components/staff/telemedicine/*; getApiErrorLines() in lib/apiErrors.ts; fetchApiBlob() in
+  lib/download.ts. Public product search does not return telemedicine_list, so the prescribe
+  form shows it only when present.
+
 ## Web Sprint 9 — e-invoices and purchase returns (tsc + next lint + next build pass)
 - /admin/einvoices (admin, super_admin; AdminNav): "e-invoicing is off" banner (C-31),
   pending/failed/generated tiles, status tabs, table (IRN shortened, full in title, ack,
@@ -248,6 +275,25 @@ deployment per docs/Dawabag_Beta_Deployment_Guide.docx.
 - services/notification_tap_router.dart: push taps (type dispatched / out_for_delivery /
   delivered / order_status / packed / payment_confirmed + order_id) open /orders/:id once
   the router exists and the session is restored.
+
+## Mobile Sprint 10 — patient teleconsultation (not compiled — no Flutter SDK here)
+- /doctors (public directory, speciality filter, paging; qualification + council + reg. no.
+  on every card, TPG 2020 / C-22), /doctors/:id (profile + 14-day slot picker, IST),
+  /consultations/book (mode chips, chief complaint 3–1000, consent text = web's
+  TPG_CONSENT_TEXT), /consultations (status/payment chips; pay, join, cancel with reason,
+  e-prescription), /consultations/:id/join (mode + channel; no Agora SDK yet — note says the
+  call client opens there), /consultations/prescriptions/:id (TPG format, check code, "You
+  may buy these medicines from any pharmacy", optional "Order at Dawabag" → /use; PDF is
+  web-only, no file writes).
+- Fee payment: screens/consultations/consult_payment.dart mirrors CheckoutRazorpay
+  (POST /consultations/:id/pay → Razorpay sheet → /pay/verify). Nothing stored locally.
+- New: models/doctor.dart, consultation.dart, eprescription.dart; services/doctor_api.dart,
+  consultation_api.dart; providers/doctor_provider.dart, consultation_provider.dart;
+  utils/consult_format.dart; api_utils.apiDataList for list envelopes. '/consultations'
+  added to protected routes; Account → My consultations wired.
+- Open: booking is always for the account holder (no patient-profile picker in the app
+  yet); slot_date is read as an IST calendar day whether the API sends a date or an ISO
+  timestamp.
 
 ## Session history
 | Date | Change |

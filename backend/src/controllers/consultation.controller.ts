@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import {
-  bookConsultation, cancelConsultation, confirmPayment, doctorConsultations, endConsultation, joinConsultation, myConsultations, startPayment,
+  bookConsultation, cancelConsultation, getConsultation, confirmPayment, doctorConsultations, endConsultation, joinConsultation, myConsultations, startPayment,
 } from '../services/telemedicine/consultation.service';
 import { issuePrescription, loadPrescription, useAtDawabag, verifyByCode } from '../services/telemedicine/eprescription.service';
 import { renderEprescriptionPdf } from '../services/telemedicine/eprescriptionPdf';
@@ -31,6 +31,7 @@ export const postPayVerify = wrap(async (req, res) => {
   const p = z.object({ razorpay_order_id: z.string().min(5), razorpay_payment_id: z.string().min(5), razorpay_signature: z.string().min(10) }).parse(req.body);
   res.json({ success: true, data: await confirmPayment(req.user!.id, id(req), p) });
 });
+export const getOne = wrap(async (req, res) => res.json({ success: true, data: await getConsultation(req.user!.id, id(req)) }));
 export const getJoin = wrap(async (req, res) => res.json({ success: true, data: await joinConsultation(req.user!.id, id(req)) }));
 export const postEnd = wrap(async (req, res) => {
   const { notes } = z.object({ notes: z.string().trim().max(5000).optional() }).parse(req.body ?? {});

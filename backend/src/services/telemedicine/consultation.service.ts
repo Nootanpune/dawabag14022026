@@ -145,3 +145,18 @@ export async function doctorConsultations(userId: string, date: string) {
      LEFT JOIN user_profiles up ON up.user_id = c.patient_user_id LEFT JOIN digital_prescriptions rx ON rx.consultation_id = c.id
      WHERE c.doctor_id = $1 AND s.slot_date = $2 AND c.status <> 'cancelled' ORDER BY s.slot_start`, [doctorId, date]);
 }
+
+// One consultation, for its patient or its doctor
+export async function getConsultation(userId: string, id: string) {
+  const c = await queryOne<any>(
+    `SELECT c.id, c.type AS mode, c.status, c.consult_kind, c.fee_paise, c.payment_status, c.chief_complaint, c.started_at, c.ended_at,
+            c.patient_user_id, dp.user_id AS doctor_user_id, dp.id AS doctor_id, dp.full_name AS doctor_name, dp.qualification, dp.council, dp.nmc_reg_number,
+            s.slot_date, s.slot_start, s.slot_end, COALESCE(pt.full_name, up.full_name) AS patient_name, COALESCE(pt.gender, up.gender) AS patient_gender,
+            date_part('year', age(COALESCE(pt.date_of_birth, up.date_of_birth)))::int AS patient_age, rx.id AS prescription_id
+     FROM consultations c JOIN doctor_profiles dp ON dp.id = c.doctor_id LEFT JOIN doctor_slots s ON s.id = c.slot_id
+     LEFT JOIN patients pt ON pt.id = c.patient_id LEFT JOIN user_profiles up ON up.user_id = c.patient_user_id
+     LEFT JOIN digital_prescriptions rx ON rx.consultation_id = c.id WHERE c.id = $1`, [id]);
+  if (!c || (c.patient_user_id !== userId && c.doctor_user_id !== userId)) throw new AppError('Consultation not found', 404);
+  const { patient_user_id, doctor_user_id, ...rest } = c;
+  return rest;
+}

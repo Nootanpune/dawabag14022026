@@ -22,6 +22,8 @@ export interface AdminProductRow {
   is_active?: boolean;
   content_status?: string;
   has_declarations?: boolean;
+  /** pharmacist's Telemedicine Practice Guidelines list (C-23); null until classified */
+  telemedicine_list?: 'O' | 'A' | 'B' | 'prohibited' | null;
 }
 
 export interface ProductPage {

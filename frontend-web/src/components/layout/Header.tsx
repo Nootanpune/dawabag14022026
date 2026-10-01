@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { ShoppingCart, User, LogOut, ClipboardList, Home } from 'lucide-react';
+import { ShoppingCart, User, LogOut, ClipboardList, Home, Stethoscope } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useCart } from '@/hooks/useCart';
 import { useRouter } from 'next/navigation';
@@ -36,6 +36,9 @@ export default function Header() {
           <Link href="/" className="hover:text-brand-600 flex items-center gap-1">
             <Home className="w-4 h-4" /> Home
           </Link>
+          <Link href="/consult" className="hover:text-brand-600 flex items-center gap-1">
+            <Stethoscope className="w-4 h-4" /> Consult a doctor
+          </Link>
           {isAuthenticated && (
             <Link href="/orders" className="hover:text-brand-600 flex items-center gap-1">
               <ClipboardList className="w-4 h-4" /> Orders
@@ -51,7 +54,7 @@ export default function Header() {
             <Link href="/partner" className="hover:text-brand-600">Partner portal</Link>
           ) : null}
           {user?.role === 'doctor' ? (
-            <Link href="/doctor/dashboard" className="hover:text-brand-600">My Portal</Link>
+            <Link href="/doctor" className="hover:text-brand-600">My Portal</Link>
           ) : null}
         </nav>
 

@@ -28,10 +28,21 @@ export async function fetchStaffOrder(orderId: string): Promise<StaffOrder> {
   return data.data;
 }
 
-/** Signed, short-lived view URL. Each call is audited on the server (C-41). */
-export async function fetchPrescriptionUrl(prescriptionId: string): Promise<string> {
+/**
+ * How to show a prescription: an uploaded file has a signed, short-lived view URL;
+ * a Dawabag e-prescription from a teleconsultation (Sprint 10, C-24) has no file
+ * and is opened as its PDF through the authenticated client. Each call is audited
+ * on the server (C-41).
+ */
+export type PrescriptionSource =
+  | { kind: 'file'; url: string }
+  | { kind: 'digital'; eprescriptionId: string; pdfPath: string };
+
+export async function fetchPrescriptionUrl(prescriptionId: string): Promise<PrescriptionSource> {
   const { data } = await api.get(`/prescriptions/${prescriptionId}/url`);
-  return data.data.url;
+  const d = data.data;
+  if (d?.digital) return { kind: 'digital', eprescriptionId: d.eprescription_id, pdfPath: d.pdf_path };
+  return { kind: 'file', url: d.url };
 }
 
 export async function verifyPrescription(prescriptionId: string, body: VerifyRxInput) {

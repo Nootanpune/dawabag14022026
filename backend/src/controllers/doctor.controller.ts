@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import {
-  addSlots, blockSlot, decideDoctor, enableDoctor, getPublicDoctor, listDoctorsForAdmin, listPublicDoctors, myProfile, openSlots, saveProfile,
+  addSlots, blockSlot, mySlots, decideDoctor, enableDoctor, getPublicDoctor, listDoctorsForAdmin, listPublicDoctors, myProfile, openSlots, saveProfile,
 } from '../services/telemedicine/doctor.service';
 
 const uuid = z.string().uuid();
@@ -65,5 +65,11 @@ export async function postVerifyDoctor(req: Request, res: Response, next: NextFu
   try {
     const d = z.object({ approve: z.boolean(), notes: z.string().trim().min(3).max(1000) }).parse(req.body);
     res.json({ success: true, data: await decideDoctor(req.user!.id, uuid.parse(req.params.doctorId), d.approve, d.notes) });
+  } catch (e) { next(e); }
+}
+export async function getMySlots(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q = z.object({ from: date, to: date }).parse(req.query);
+    res.json({ success: true, data: await mySlots(req.user!.id, q.from, q.to) });
   } catch (e) { next(e); }
 }

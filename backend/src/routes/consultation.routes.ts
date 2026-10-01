@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
-  getDoctorDay, getJoin, getMine, getPrescription, getPrescriptionPdf, postBook, postCancel, postEnd, postPay, postPayVerify,
+  getDoctorDay, getJoin, getOne, getMine, getPrescription, getPrescriptionPdf, postBook, postCancel, postEnd, postPay, postPayVerify,
   postPrescription, postUseAtDawabag,
 } from '../controllers/consultation.controller';
 
@@ -14,6 +14,7 @@ router.get('/doctor', authorize('doctor'), getDoctorDay);
 router.get('/prescriptions/:id', getPrescription);
 router.get('/prescriptions/:id/pdf', getPrescriptionPdf);
 router.post('/prescriptions/:id/use', postUseAtDawabag);
+router.get('/:id', getOne);
 router.post('/:id/pay', postPay);
 router.post('/:id/pay/verify', postPayVerify);
 router.get('/:id/join', getJoin);

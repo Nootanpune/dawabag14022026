@@ -3,14 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { fetchPrescriptionUrl, fulfilmentKeys } from '@/lib/fulfilment/api';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import DigitalRxViewer from './DigitalRxViewer';
 
 /**
- * Shows the uploaded prescription from a short-lived signed URL. Every URL
+ * Shows the uploaded prescription from a short-lived signed URL, or a Dawabag
+ * e-prescription (teleconsultation, Sprint 10) as its PDF. Every URL
  * request is audited server-side (C-41), so it is fetched once per open and
  * not retried or refetched in the background.
  */
 export default function PrescriptionViewer({ prescriptionId, fileType }: { prescriptionId: string; fileType: string | null }) {
-  const { data: url, isLoading, error, refetch } = useQuery({
+  const { data: source, isLoading, error, refetch } = useQuery({
     queryKey: fulfilmentKeys.rxUrl(prescriptionId),
     queryFn: () => fetchPrescriptionUrl(prescriptionId),
     staleTime: 4 * 60 * 1000, // signed URL lives 5 minutes
@@ -26,7 +28,7 @@ export default function PrescriptionViewer({ prescriptionId, fileType }: { presc
       </div>
     );
   }
-  if (error || !url) {
+  if (error || !source) {
     return (
       <div className="h-40 flex flex-col items-center justify-center gap-2 bg-red-50 rounded-lg text-sm text-red-700">
         {getApiErrorMessage(error, 'Could not open the prescription')}
@@ -37,6 +39,9 @@ export default function PrescriptionViewer({ prescriptionId, fileType }: { presc
     );
   }
 
+  if (source.kind === 'digital') return <DigitalRxViewer eprescriptionId={source.eprescriptionId} pdfPath={source.pdfPath} />;
+
+  const { url } = source;
   const isPdf = (fileType ?? '').toLowerCase().includes('pdf');
   return (
     <div>

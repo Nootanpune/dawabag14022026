@@ -36,12 +36,15 @@ import {
   Bell,
   PackageMinus,
   Receipt,
+  Stethoscope,
+  ListTree,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_ROLES } from '@/lib/fulfilment/roles';
 import { STORE_ROLES } from '@/lib/purchasing/roles';
+import { DOCTOR_ADMIN_ROLES, TELE_LIST_ROLES } from '@/lib/telemedicine/roles';
 
 const ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, roles: MANAGER_ROLES },
@@ -52,6 +55,9 @@ const ITEMS = [
   { href: '/admin/refunds', label: 'Refunds', icon: Banknote, roles: MANAGER_ROLES },
   { href: '/staff/content-review', label: 'Product copy', icon: ClipboardCheck, roles: PHARMACIST_ROLES },
   { href: '/staff/adverse-events', label: 'Side effects', icon: HeartPulse, roles: PHARMACIST_ROLES },
+  // Sprint 10 — teleconsultation: doctor registration checks (C-22) and TPG medicine lists (C-23)
+  { href: '/admin/doctors', label: 'Doctors', icon: Stethoscope, roles: DOCTOR_ADMIN_ROLES },
+  { href: '/staff/telemedicine-lists', label: 'Telemedicine lists', icon: ListTree, roles: TELE_LIST_ROLES },
   { href: '/admin/kyc', label: 'KYC review', icon: ShieldCheck, roles: ADMIN_ROLES },
   { href: '/admin/grievances', label: 'Complaints', icon: MessageSquareWarning, roles: ADMIN_ROLES },
   { href: '/admin/recalls', label: 'Batch recalls', icon: ShieldAlert, roles: MANAGER_ROLES },

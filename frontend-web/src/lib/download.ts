@@ -28,6 +28,12 @@ export async function downloadFromApi(path: string, fallbackName: string, params
   }
 }
 
+/** GET `path` (relative to /api/v1) as an in-memory Blob, e.g. to preview a PDF. Nothing is written to disk. */
+export async function fetchApiBlob(path: string): Promise<Blob> {
+  const res = await api.get(path, { responseType: 'blob', timeout: 60000 });
+  return res.data as Blob;
+}
+
 /** Error bodies of blob requests arrive as Blobs; turn them back into JSON for getApiErrorMessage. */
 export async function normaliseBlobError(err: any): Promise<any> {
   const data = err?.response?.data;

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { ClipboardList, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText } from 'lucide-react';
+import { ClipboardList, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText, Stethoscope } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 
@@ -9,6 +9,7 @@ const LINKS = [
   { href: '/account/addresses', label: 'Saved addresses', icon: MapPin },
   { href: '/account/returns', label: 'Returns & refunds', icon: Undo2 },
   { href: '/account/refills', label: 'Refills & automatic payment', icon: Repeat },
+  { href: '/account/consultations', label: 'Doctor consultations', icon: Stethoscope },
   { href: '/account/side-effects', label: 'Side-effect reports', icon: HeartPulse },
   { href: '/account/complaints', label: 'Complaints', icon: MessageSquareWarning },
   { href: '/account/privacy', label: 'Privacy and your data', icon: ShieldCheck },
