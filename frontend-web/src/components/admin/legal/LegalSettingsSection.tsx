@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import type { AppSetting } from '@/lib/admin/settings';
 import { LEGAL_SETTINGS, type LegalSettingDef } from '@/lib/admin/legalSettings';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import LegalSettingEditor from './LegalSettingEditor';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Legal details for the footer / invoices (C-04, C-36); super admin edits. */
 export default function LegalSettingsSection({ settings, canEdit }: { settings: AppSetting[]; canEdit: boolean }) {

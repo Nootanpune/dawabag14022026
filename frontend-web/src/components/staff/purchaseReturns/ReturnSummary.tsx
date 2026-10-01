@@ -1,7 +1,8 @@
 import type { PurchaseReturn } from '@/lib/purchaseReturns/types';
 import { RETURN_REASON_LABELS } from '@/lib/purchaseReturns/labels';
-import { formatDateIST, formatDateTimeIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 /** Header card: supplier, money, and the trail requested → decided → dispatched → settled (C-28, C-46). */
 export default function ReturnSummary({ r }: { r: PurchaseReturn }) {

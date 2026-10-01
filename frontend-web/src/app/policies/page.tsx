@@ -2,9 +2,9 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPolicies, LANGUAGE_LABELS, POLICY_KEYS, POLICY_LABELS, policyKeys } from '@/lib/legal/policies';
-import { formatDateIST } from '@/lib/admin/format';
 import Header from '@/components/layout/Header';
 import QueryState from '@/components/admin/QueryState';
+import { formatDateIST } from '@/lib/dates';
 
 // Index of published policies (C-39)
 export default function PoliciesIndexPage() {

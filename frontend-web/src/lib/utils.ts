@@ -2,12 +2,6 @@ export function formatPrice(paise: number): string {
   return `₹${(paise / 100).toFixed(2)}`;
 }
 
-export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  });
-}
-
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }

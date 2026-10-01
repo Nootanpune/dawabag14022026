@@ -41,21 +41,6 @@ export const REVIEW_TABS: readonly { value: DoctorReviewStatus | ''; label: stri
   { value: '', label: 'All' },
 ];
 
-/** '14:30:00' → '2:30 pm' */
-export function formatSlotTime(t: string | null | undefined): string {
-  if (!t) return '—';
-  const [h, m] = t.split(':').map(Number);
-  const suffix = h >= 12 ? 'pm' : 'am';
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${suffix}`;
-}
-
-/** 'YYYY-MM-DD' (or ISO date) → '3 Oct 2026', read as a calendar date (no time-zone shift). */
-export function formatSlotDate(d: string | null | undefined): string {
-  if (!d) return '—';
-  const [y, mo, day] = d.slice(0, 10).split('-').map(Number);
-  return new Date(Date.UTC(y, mo - 1, day)).toLocaleDateString('en-IN', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
-}
-
 export function patientLine(age: number | null | undefined, gender: string | null | undefined): string {
   const parts = [age != null ? `${age} y` : null, gender ? gender : null].filter(Boolean);
   return parts.length ? parts.join(' · ') : 'age / gender not given';

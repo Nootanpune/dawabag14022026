@@ -4,11 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { FileDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadH1Csv, fetchH1Register, fulfilmentKeys } from '@/lib/fulfilment/api';
-import { daysAgoIST, todayIST } from '@/lib/fulfilment/roles';
 import { normaliseBlobError } from '@/lib/download';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import QueryState from '@/components/admin/QueryState';
 import H1RegisterTable from './H1RegisterTable';
+import { daysAgoIST, todayIST } from '@/lib/dates';
 
 /** Schedule H1 register for a date range, viewable and downloadable as CSV (C-09). */
 export default function H1Register() {

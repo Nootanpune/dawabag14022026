@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import type { Adjustment } from '@/lib/stock/types';
 import { REASON_LABELS, DISPOSAL_LABELS } from '@/lib/stock/labels';
-import { formatDateIST, formatDateTimeIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 interface Props {
   rows: Adjustment[];

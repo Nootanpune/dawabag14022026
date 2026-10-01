@@ -1,7 +1,7 @@
 'use client';
 import type { ReceiptHeaderDraft } from '@/lib/purchasing/receiptForm';
-import { todayIST } from '@/lib/fulfilment/roles';
 import SupplierSelect from '@/components/admin/purchasing/SupplierSelect';
+import { todayIST } from '@/lib/dates';
 
 interface Props {
   value: ReceiptHeaderDraft;

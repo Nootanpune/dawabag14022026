@@ -1,7 +1,7 @@
 import type { AlertDetail } from '@/lib/recallAlerts/types';
 import { SOURCE_LABELS } from '@/lib/recallAlerts/labels';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import DeadlineBadge from './DeadlineBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Alert header: source, receipt, 4-hour deadline (C-28) and decision counts. */
 export default function AlertSummaryCard({ alert: a }: { alert: AlertDetail }) {
@@ -21,7 +21,7 @@ export default function AlertSummaryCard({ alert: a }: { alert: AlertDetail }) {
           <dt className="text-gray-500">Received</dt>
           <dd>{formatDateTimeIST(a.received_at)}</dd>
           <dt className="text-gray-500">Deadline</dt>
-          <dd>{formatDateTimeIST(a.due_at)}</dd>
+          <dd>{formatDateTimeIST(a.due_at, { zone: true })}</dd>
           <dt className="text-gray-500">Entered</dt>
           <dd>
             {formatDateTimeIST(a.entered_at)}

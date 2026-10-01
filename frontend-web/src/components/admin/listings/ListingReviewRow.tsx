@@ -1,9 +1,9 @@
 'use client';
 import type { ListingForReview } from '@/lib/admin/listings';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '../StatusBadge';
 import { scheduleBadge } from '@/lib/drugSchedule';
+import { formatDateIST } from '@/lib/dates';
 
 interface Props {
   l: ListingForReview;

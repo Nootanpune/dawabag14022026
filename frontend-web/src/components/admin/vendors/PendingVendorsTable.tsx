@@ -1,7 +1,7 @@
 'use client';
 import { ExternalLink } from 'lucide-react';
 import type { PendingVendor } from '@/lib/admin/vendors';
-import { formatDateIST } from '@/lib/admin/format';
+import { formatDateIST } from '@/lib/dates';
 
 interface Props {
   vendors: PendingVendor[];

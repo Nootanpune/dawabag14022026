@@ -1,7 +1,7 @@
 'use client';
 import { cn, formatPrice } from '@/lib/utils';
 import type { OpenCreditOrder } from '@/lib/admin/credit';
-import { formatDateIST } from '@/lib/admin/format';
+import { formatDateIST } from '@/lib/dates';
 
 function dueLabel(days: number | null): string {
   if (days == null) return '—';

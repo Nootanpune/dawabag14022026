@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../config/theme.dart';
 import '../../../models/grievance.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 
 /// Coloured status pill for a complaint.
 class GrievanceStatusChip extends StatelessWidget {
@@ -37,17 +37,17 @@ class GrievanceDeadlineText extends StatelessWidget {
     String? text;
     var overdue = false;
     if (g.isResolved) {
-      if (g.resolvedAt != null) text = 'Resolved ${formatDate(g.resolvedAt!)}';
+      if (g.resolvedAt != null) text = 'Resolved ${formatDateIst(g.resolvedAt!)}';
     } else if (g.acknowledgedAt == null && g.ackDueAt != null) {
       overdue = g.ackOverdue;
       text = overdue
-          ? 'Acknowledgement overdue (was due ${formatDateTime(g.ackDueAt!)})'
-          : 'We will acknowledge by ${formatDateTime(g.ackDueAt!)}';
+          ? 'Acknowledgement overdue (was due ${formatDateTimeIst(g.ackDueAt!)})'
+          : 'We will acknowledge by ${formatDateTimeIst(g.ackDueAt!)}';
     } else if (g.resolveDueAt != null) {
       overdue = g.resolutionOverdue;
       text = overdue
-          ? 'Resolution overdue (was due ${formatDate(g.resolveDueAt!)})'
-          : 'Resolution due by ${formatDate(g.resolveDueAt!)}';
+          ? 'Resolution overdue (was due ${formatDateIst(g.resolveDueAt!)})'
+          : 'Resolution due by ${formatDateIst(g.resolveDueAt!)}';
     }
     if (text == null) return const SizedBox.shrink();
     return Text(text,
@@ -96,7 +96,7 @@ class GrievanceTile extends StatelessWidget {
                 [
                   grievanceCategoryLabel(g.category),
                   if (g.orderNumber != null) 'Order ${g.orderNumber}',
-                  if (g.createdAt != null) formatDate(g.createdAt!),
+                  if (g.createdAt != null) formatDateIst(g.createdAt!),
                 ].join(' · '),
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),

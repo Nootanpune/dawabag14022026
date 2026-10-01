@@ -8,7 +8,6 @@ import { RECEIVE_WITHOUT_PO_ROLES, STORE_ROLES } from '@/lib/purchasing/roles';
 import { hasRole } from '@/lib/admin/roles';
 import { useAuthStore } from '@/store/authStore';
 import type { ReceiptFilter } from '@/lib/purchasing/types';
-import { daysAgoIST, todayIST } from '@/lib/fulfilment/roles';
 import RequireAuth from '@/components/auth/RequireAuth';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
@@ -16,6 +15,7 @@ import PoTable from '@/components/admin/purchasing/PoTable';
 import Pager from '@/components/admin/Pager';
 import ReceiptTable from '@/components/staff/receive/ReceiptTable';
 import ReceiptFilters from '@/components/staff/receive/ReceiptFilters';
+import { daysAgoIST, todayIST } from '@/lib/dates';
 
 const RECEIPT_PAGE_SIZE = 50;
 

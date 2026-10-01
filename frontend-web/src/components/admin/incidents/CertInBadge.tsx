@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react';
 import { AlarmClock, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { formatDuration, type Incident } from '@/lib/compliance/incidents';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { cn } from '@/lib/utils';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** CERT-In 6-hour reporting clock (C-43): live countdown, overdue, or reported (on time / late). */
 export default function CertInBadge({ incident, large }: { incident: Incident; large?: boolean }) {
@@ -40,7 +40,7 @@ export default function CertInBadge({ incident, large }: { incident: Incident; l
       {overdue ? <AlertTriangle className="w-4 h-4" /> : <AlarmClock className="w-4 h-4" />}
       {overdue
         ? `CERT-In report OVERDUE by ${formatDuration(left)}`
-        : `CERT-In report due in ${formatDuration(left)} (by ${formatDateTimeIST(incident.cert_in_due_at)})`}
+        : `CERT-In report due in ${formatDuration(left)} (by ${formatDateTimeIST(incident.cert_in_due_at, { zone: true })})`}
     </span>
   );
 }

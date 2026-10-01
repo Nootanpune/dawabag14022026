@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { categoryLabel, type GrievanceSummary } from '@/lib/grievances/api';
-import { formatDateIST } from '@/lib/admin/format';
 import GrievanceStatusBadge from './GrievanceStatusBadge';
 import GrievanceDueDates from './GrievanceDueDates';
+import { formatDateIST } from '@/lib/dates';
 
 /** One complaint in the buyer's list: ticket, status and due dates (C-36). */
 export default function ComplaintListItem({ g }: { g: GrievanceSummary }) {

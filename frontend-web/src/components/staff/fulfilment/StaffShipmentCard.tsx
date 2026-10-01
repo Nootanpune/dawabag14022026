@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { QueueShipment } from '@/lib/fulfilment/types';
-import { formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
 import InvoiceDownloadButton from '@/components/orders/InvoiceDownloadButton';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 interface Props {
   shipment: QueueShipment;

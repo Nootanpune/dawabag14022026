@@ -77,7 +77,7 @@ class ConsultationCard extends StatelessWidget {
     ].join(' · ');
     final when = [
       if (c.slotDate != null) formatConsultDay(c.slotDate),
-      if (c.slotStart != null) '${formatSlotTime(c.slotStart)} IST',
+      if (c.slotStart != null) formatSlotTime(c.slotStart, zone: true),
     ].join(', ');
 
     return Card(

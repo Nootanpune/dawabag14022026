@@ -1,6 +1,6 @@
 import type { LowStockProduct } from '@/lib/admin/stock';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '../StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function LowStockTable({ products }: { products: LowStockProduct[] }) {
   return (

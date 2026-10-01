@@ -1,8 +1,9 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import type { KycQueueRow } from '@/lib/admin/kyc';
-import { CUSTOMER_TYPE_SHORT, formatDateTimeIST } from '@/lib/admin/format';
+import { CUSTOMER_TYPE_SHORT } from '@/lib/admin/format';
 import StatusBadge from '../StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function KycQueueTable({ rows }: { rows: KycQueueRow[] }) {
   const router = useRouter();

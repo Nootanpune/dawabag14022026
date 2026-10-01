@@ -3,11 +3,11 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { adrKeys, fetchMyAdrs, labelOf, SERIOUSNESS } from '@/lib/compliance/adverseEvents';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import Header from '@/components/layout/Header';
 import BackLink from '@/components/admin/BackLink';
 import QueryState from '@/components/admin/QueryState';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 // Side-effect reports the buyer has made (C-29)
 export default function MySideEffectsPage() {

@@ -3,8 +3,8 @@ import { useState } from 'react';
 import type { AppSetting } from '@/lib/admin/settings';
 import { labelOf } from '@/lib/admin/dltTemplates';
 import { toWaRows } from '@/lib/admin/whatsappTemplates';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import WhatsAppTemplatesEditor from './WhatsAppTemplatesEditor';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Read-only list of WhatsApp templates (Sprint 13); super admin edits them in a table dialog. */
 export default function WhatsAppTemplatesSection({ setting, canEdit }: { setting: AppSetting | undefined; canEdit: boolean }) {

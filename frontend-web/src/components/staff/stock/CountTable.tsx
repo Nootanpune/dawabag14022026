@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { StockCount } from '@/lib/stock/types';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function CountTable({ counts }: { counts: StockCount[] }) {
   return (

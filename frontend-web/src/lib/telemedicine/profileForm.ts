@@ -1,5 +1,6 @@
 // Doctor profile form <-> API body. Fee is typed in rupees and sent in paise.
 import { rupeesToPaise } from '../admin/format';
+import { currentYearIST } from '../dates';
 import type { DoctorProfile, ProfileInput } from './types';
 
 export interface ProfileFormValues {
@@ -45,7 +46,7 @@ export function buildProfileBody(v: ProfileFormValues): { body?: ProfileInput; p
   if (v.council.trim().length < 3) problems.push('Council: National Medical Commission or your State Medical Council');
   if (v.nmc_reg_number.trim().length < 3) problems.push('Registration number: at least 3 characters');
   const year = Number(v.registration_year);
-  if (!Number.isInteger(year) || year < 1950 || year > new Date().getFullYear()) problems.push('Registration year: a year from 1950');
+  if (!Number.isInteger(year) || year < 1950 || year > currentYearIST()) problems.push('Registration year: a year from 1950');
   const fee = rupeesToPaise(v.fee_rupees || '0');
   if (fee == null || fee > 10_000_00) problems.push('Fee: ₹0 to ₹10,000');
   const languages = v.languages.split(',').map((s) => s.trim()).filter(Boolean);

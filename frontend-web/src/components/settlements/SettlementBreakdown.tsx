@@ -1,7 +1,7 @@
 import type { Settlement } from '@/lib/marketplace/settlement';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 function Line({ label, paise, minus, strong }: { label: string; paise: number; minus?: boolean; strong?: boolean }) {
   return (

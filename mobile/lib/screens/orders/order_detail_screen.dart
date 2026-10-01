@@ -6,7 +6,7 @@ import '../../config/theme.dart';
 import '../../models/json_utils.dart';
 import '../../providers/order_detail_provider.dart';
 import '../../services/api_service.dart';
-import '../../utils/formatters.dart';
+import '../../utils/ist.dart';
 import '../../widgets/error_retry_view.dart';
 import 'widgets/cancel_order_button.dart';
 import 'widgets/handover_code_card.dart';
@@ -124,7 +124,7 @@ class _Header extends StatelessWidget {
                 Text(asString(order['order_number']) ?? '',
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
                 const SizedBox(height: 4),
-                Text(formatDate(asString(order['created_at']) ?? ''),
+                Text(formatDateIst(asString(order['created_at']) ?? ''),
                     style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
               ],
             ),

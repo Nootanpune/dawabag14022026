@@ -7,12 +7,12 @@ import { approveCount, fetchCount, saveCountLines, stockControlKeys, submitCount
 import { useAuthStore } from '@/store/authStore';
 import { hasRole } from '@/lib/admin/roles';
 import { PURCHASE_ADMIN_ROLES } from '@/lib/purchasing/roles';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import StatusBadge from '@/components/admin/StatusBadge';
 import CountSheet from './CountSheet';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /**
  * Count sheet. Only the person who started the count records and submits it;

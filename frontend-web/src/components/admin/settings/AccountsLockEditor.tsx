@@ -4,10 +4,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { settingsKeys, updateSetting } from '@/lib/admin/settings';
 import { ACCOUNTS_LOCK_KEY, latestLockableDate, lockDateError, lockedUntil } from '@/lib/admin/accountsLock';
-import { formatDateIST } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '../Modal';
 import DialogActions from '../DialogActions';
+import { formatDateIST } from '@/lib/dates';
 
 /**
  * Set or clear the GST period lock (C-31). Choose a date, then confirm: saving

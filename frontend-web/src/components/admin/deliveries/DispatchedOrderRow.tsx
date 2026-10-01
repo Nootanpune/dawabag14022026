@@ -7,10 +7,10 @@ import { adminMarkDelivered, deliveryKeys, type QueueOrder } from '@/lib/admin/d
 import { fetchOrder, orderKeys, type OrderShipmentDetail } from '@/lib/orders/api';
 import type { HandoverInput } from '@/lib/fulfilment/handover';
 import { getApiErrorMessage } from '@/lib/apiErrors';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
 import QueryState from '@/components/admin/QueryState';
 import HandoverDialog from '@/components/delivery/HandoverDialog';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** One dispatched order; expands to its shipments with an admin "Confirm delivery" (C-26). */
 export default function DispatchedOrderRow({ order }: { order: QueueOrder }) {

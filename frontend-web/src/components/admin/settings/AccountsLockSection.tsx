@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { Lock, Unlock } from 'lucide-react';
 import type { AppSetting } from '@/lib/admin/settings';
 import { lockedUntil } from '@/lib/admin/accountsLock';
-import { formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
 import AccountsLockEditor from './AccountsLockEditor';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 /** accounts.locked_until — GST period lock on purchase-side documents (Sprint 13, C-31). */
 export default function AccountsLockSection({ setting, canEdit }: { setting: AppSetting | undefined; canEdit: boolean }) {

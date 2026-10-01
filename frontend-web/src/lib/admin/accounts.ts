@@ -3,6 +3,7 @@
 // API to the browser's save dialog; nothing is kept by the app.
 import api from '../api';
 import { downloadFromApi } from '../download';
+import { lastMonthIST } from '../dates';
 
 export type ReportRow = Record<string, unknown>;
 
@@ -63,13 +64,9 @@ export function downloadReportCsv(name: string, from: string, to: string) {
   return downloadFromApi(`/accounts/reports/${encodeURIComponent(name)}`, `${name}-${from}-to-${to}.csv`, { from, to, format: 'csv' });
 }
 
-const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-/** First and last day of the previous calendar month (local time). */
-export function lastMonth(today = new Date()): { from: string; to: string } {
-  const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const last = new Date(today.getFullYear(), today.getMonth(), 0);
-  return { from: ymd(first), to: ymd(last) };
+/** First and last day of the previous calendar month in India (IST). */
+export function lastMonth(): { from: string; to: string } {
+  return lastMonthIST();
 }
 
 /** Mirrors the server: from ≤ to, at most 13 months (400 days). '' when fine. */

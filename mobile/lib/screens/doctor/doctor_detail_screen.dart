@@ -8,6 +8,7 @@ import '../../providers/doctor_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/consult_format.dart';
 import '../../utils/formatters.dart';
+import '../../utils/ist.dart';
 import '../../widgets/error_retry_view.dart';
 import 'widgets/doctor_card.dart';
 import 'widgets/slot_picker.dart';
@@ -26,10 +27,7 @@ class _DoctorDetailScreenState extends ConsumerState<DoctorDetailScreen> {
   late DateTime _day = _today();
   DoctorSlot? _slot;
 
-  static DateTime _today() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
+  static DateTime _today() => todayIstDate();
 
   void _reload() => ref.invalidate(doctorDetailProvider(widget.doctorId));
 
@@ -86,7 +84,7 @@ class _DoctorDetailScreenState extends ConsumerState<DoctorDetailScreen> {
                   onPressed: _slot == null ? null : _book,
                   child: Text(_slot == null
                       ? 'Pick a slot to book'
-                      : 'Book ${formatConsultDay(slotQueryDate(_day))}, ${formatSlotTime(_slot!.slotStart)}'),
+                      : 'Book ${formatConsultDay(slotQueryDate(_day))}, ${formatSlotTime(_slot!.slotStart, zone: true)}'),
                 ),
               ),
             )

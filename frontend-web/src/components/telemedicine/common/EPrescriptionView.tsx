@@ -1,12 +1,12 @@
-import { formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
 import { KIND_LABELS, MODE_LABELS, patientLine } from '@/lib/telemedicine/labels';
 import type { EPrescription } from '@/lib/telemedicine/types';
 import DoctorRegistration from './DoctorRegistration';
 import MedicineItemsTable from './MedicineItemsTable';
+import { formatDateIST, formatDateTimeIST, isOnOrAfterTodayIST } from '@/lib/dates';
 
 /** E-prescription as issued: frozen doctor and patient details, diagnosis and medicines (C-24). */
 export default function EPrescriptionView({ rx }: { rx: EPrescription }) {
-  const expired = new Date(rx.valid_until) < new Date(new Date().toISOString().slice(0, 10));
+  const expired = !isOnOrAfterTodayIST(rx.valid_until);
   return (
     <div className="card space-y-4 text-sm">
       <div className="flex flex-wrap justify-between gap-3">

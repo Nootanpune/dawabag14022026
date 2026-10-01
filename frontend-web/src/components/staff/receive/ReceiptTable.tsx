@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReceiptRow } from '@/lib/purchasing/types';
-import { formatDateIST, formatDateTimeIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 export default function ReceiptTable({ receipts }: { receipts: ReceiptRow[] }) {
   return (

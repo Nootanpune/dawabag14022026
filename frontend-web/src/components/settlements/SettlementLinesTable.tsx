@@ -1,6 +1,6 @@
 import type { SettlementLine } from '@/lib/marketplace/settlement';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
+import { formatDateIST } from '@/lib/dates';
 
 export default function SettlementLinesTable({ lines }: { lines: SettlementLine[] }) {
   if (!lines.length) return <p className="text-sm text-gray-400 py-4">No lines in this batch.</p>;

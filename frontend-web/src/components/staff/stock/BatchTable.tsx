@@ -1,8 +1,9 @@
 'use client';
 import type { Batch } from '@/lib/stock/types';
-import { formatDateIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import { scheduleBadge } from '@/lib/drugSchedule';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 function ExpiryCell({ b }: { b: Batch }) {
   // Recalled (C-28) and expired batches are never sold; the server's allocation filters them out.

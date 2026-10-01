@@ -8,7 +8,7 @@ import '../../../models/legal_info.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/legal_provider.dart';
 import '../../../services/api_service.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 import '../../../widgets/error_retry_view.dart';
 import 'legal_section.dart';
 import 'policies_section.dart';
@@ -73,7 +73,7 @@ class LegalScreen extends ConsumerWidget {
         LegalRow('Retail — Form 21', legalValue(dl, 'retail_21')),
         LegalRow('Wholesale — Form 20B', legalValue(dl, 'wholesale_20b')),
         LegalRow('Wholesale — Form 21B', legalValue(dl, 'wholesale_21b')),
-        LegalRow('Valid up to', validUpto == null ? null : formatDate(validUpto)),
+        LegalRow('Valid up to', validUpto == null ? null : formatDateIst(validUpto)),
       ]),
       LegalSection(title: 'Pharmacist in charge', rows: [
         LegalRow('Name', legalValue(info.pharmacist, 'name')),

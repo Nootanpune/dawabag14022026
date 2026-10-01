@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import type { GrievanceSummary } from '@/lib/grievances/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /**
  * Acknowledge-by (48 h) and resolve-by (30 days) dates with overdue flags.
@@ -11,11 +11,11 @@ export default function GrievanceDueDates({ g, compact }: { g: GrievanceSummary;
   return (
     <div className={`${cls} text-gray-500 space-y-0.5`}>
       <p className={g.ack_overdue ? 'text-red-600 font-medium' : ''}>
-        {g.acknowledged_at ? `Acknowledged ${formatDateTimeIST(g.acknowledged_at)}` : `Acknowledge by ${formatDateTimeIST(g.ack_due_at)}`}
+        {g.acknowledged_at ? `Acknowledged ${formatDateTimeIST(g.acknowledged_at)}` : `Acknowledge by ${formatDateTimeIST(g.ack_due_at, { zone: true })}`}
         {g.ack_overdue && <OverdueFlag />}
       </p>
       <p className={g.resolution_overdue ? 'text-red-600 font-medium' : ''}>
-        {g.resolved_at ? `Resolved ${formatDateTimeIST(g.resolved_at)}` : `Resolve by ${formatDateTimeIST(g.resolve_due_at)}`}
+        {g.resolved_at ? `Resolved ${formatDateTimeIST(g.resolved_at)}` : `Resolve by ${formatDateTimeIST(g.resolve_due_at, { zone: true })}`}
         {g.resolution_overdue && <OverdueFlag />}
       </p>
     </div>

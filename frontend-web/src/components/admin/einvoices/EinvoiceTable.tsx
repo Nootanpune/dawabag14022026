@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import type { Einvoice } from '@/lib/einvoices/types';
 import { DOC_TYPE_LABELS, shortIrn } from '@/lib/einvoices/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 interface Props {
   rows: Einvoice[];

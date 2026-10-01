@@ -1,7 +1,7 @@
 import type { OrderShipmentDetail } from '@/lib/orders/api';
 import { trackingLabel } from '@/lib/orders/tracking';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { cn } from '@/lib/utils';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Courier scans for one shipment, newest at the top and highlighted. */
 export default function ShipmentTrackingTimeline({ shipment }: { shipment: OrderShipmentDetail }) {

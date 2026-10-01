@@ -3,8 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { Loader2, Package, RefreshCw, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
-import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils';
+import { formatPrice, ORDER_STATUS_LABELS } from '@/lib/utils';
 import Header from '@/components/layout/Header';
+import { formatDateIST } from '@/lib/dates';
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function OrdersPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="font-semibold text-sm">{order.order_number}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.created_at)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatDateIST(order.created_at)}</p>
                     </div>
                     <div className="text-right flex items-center gap-2">
                       <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusInfo.color}`}>

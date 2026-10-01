@@ -1,5 +1,6 @@
 import type { PurchaseReturnLine } from '@/lib/purchaseReturns/types';
-import { formatDateIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
+import { formatDateIST } from '@/lib/dates';
 
 /** Batches on the return; the adjustment number appears once approval has taken the stock out (C-46). */
 export default function ReturnLinesTable({ lines }: { lines: PurchaseReturnLine[] }) {

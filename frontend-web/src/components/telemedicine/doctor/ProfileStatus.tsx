@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import type { DoctorProfile } from '@/lib/telemedicine/types';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Where the doctor's registration check stands (C-22). `link` points to the profile page. */
 export default function ProfileStatus({ profile, link }: { profile: DoctorProfile | null; link?: boolean }) {

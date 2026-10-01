@@ -11,12 +11,12 @@ import {
   policyKeys,
   type PolicyLanguage,
 } from '@/lib/legal/policies';
-import { formatDateIST } from '@/lib/admin/format';
 import Header from '@/components/layout/Header';
 import QueryState from '@/components/admin/QueryState';
 import PolicyBody from '@/components/legal/PolicyBody';
 import PolicyLanguageSwitcher from '@/components/legal/PolicyLanguageSwitcher';
 import TranslationNote from '@/components/legal/TranslationNote';
+import { formatDateIST } from '@/lib/dates';
 
 // Public policy page, from the server (C-39). ?version=n shows an older version;
 // ?lang=mr|hi shows the Marathi / Hindi text where published (C-40).

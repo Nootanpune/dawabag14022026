@@ -7,10 +7,10 @@ import { toast } from 'sonner';
 import { createPurchaseOrder } from '@/lib/purchasing/api';
 import type { NewPurchaseOrder } from '@/lib/purchasing/types';
 import { rupeesToPaise } from '@/lib/admin/format';
-import { todayIST } from '@/lib/fulfilment/roles';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import SupplierSelect from './SupplierSelect';
 import PoItemsEditor, { type PoItemDraft } from './PoItemsEditor';
+import { todayIST } from '@/lib/dates';
 
 function buildBody(vendorId: string, expectedBy: string, notes: string, items: PoItemDraft[]): NewPurchaseOrder | string {
   if (!vendorId) return 'Choose a supplier';

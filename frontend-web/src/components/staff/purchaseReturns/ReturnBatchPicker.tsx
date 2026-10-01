@@ -1,8 +1,9 @@
 'use client';
 import type { Batch } from '@/lib/stock/types';
 import { freeQty } from '@/lib/purchaseReturns/labels';
-import { formatDateIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 interface Props {
   batches: Batch[];

@@ -1,28 +1,5 @@
 // Display helpers for admin screens (no business math — values come from the API).
 
-/** e.g. "30 Sep 2026, 9:45 pm" in India time */
-export function formatDateTimeIST(value: string | null | undefined): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-export function formatDateIST(value: string | null | undefined): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
 export const CUSTOMER_TYPE_SHORT: Record<string, string> = {
   customer: 'Patient',
   b2b_retailer: 'Retailer',

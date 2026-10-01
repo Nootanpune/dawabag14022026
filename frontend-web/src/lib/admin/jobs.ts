@@ -1,4 +1,5 @@
 import api from '../api';
+import { IST_TZ } from '../dates';
 
 export interface JobRun {
   id: string;
@@ -30,7 +31,7 @@ export const jobKeys = { list: ['admin', 'jobs'] as const };
 
 export async function fetchJobs(): Promise<{ timezone: string; jobs: ScheduledJob[] }> {
   const { data } = await api.get('/admin/jobs');
-  return { timezone: data.data?.timezone ?? 'Asia/Kolkata', jobs: data.data?.jobs ?? [] };
+  return { timezone: data.data?.timezone ?? IST_TZ, jobs: data.data?.jobs ?? [] };
 }
 
 export async function runJob(name: string): Promise<JobRunResult> {

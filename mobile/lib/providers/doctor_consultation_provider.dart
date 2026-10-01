@@ -6,14 +6,12 @@ import '../services/api_service.dart';
 import '../services/consultation_api.dart';
 import '../services/doctor_consultation_api.dart';
 import '../utils/consult_format.dart';
+import '../utils/ist.dart';
 import 'auth_provider.dart';
 
 /// Today's date in India time (slots are Asia/Kolkata), whatever the phone's
 /// time zone is.
-DateTime indiaToday() {
-  final ist = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
-  return DateTime(ist.year, ist.month, ist.day);
-}
+DateTime indiaToday() => todayIstDate();
 
 /// In-memory mirror of the doctor's consultations for one day (Mobile Sprint
 /// 15; C-22, C-23). Nothing is stored on the device; every action is a request

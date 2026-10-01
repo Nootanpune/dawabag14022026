@@ -4,8 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { fetchPolicy, policyKeys, publishPolicy, POLICY_LABELS, type PolicyKey } from '@/lib/legal/policies';
 import { getApiErrorMessage } from '@/lib/apiErrors';
-import { todayIST } from '@/lib/fulfilment/roles';
 import DialogActions from '@/components/admin/DialogActions';
+import { todayIST } from '@/lib/dates';
 
 interface Props {
   docKey: PolicyKey;

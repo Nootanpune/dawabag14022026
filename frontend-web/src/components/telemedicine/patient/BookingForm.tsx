@@ -11,10 +11,10 @@ import { MODE_LABELS, MODES, TPG_CONSENT_TEXT } from '@/lib/telemedicine/labels'
 import type { ConsultMode, Doctor } from '@/lib/telemedicine/types';
 import { getApiErrorLines, getApiErrorMessage } from '@/lib/apiErrors';
 import { formatPaise } from '@/lib/admin/format';
-import { todayIST } from '@/lib/fulfilment/roles';
 import { useAuthStore } from '@/store/authStore';
 import ErrorLines from '../common/ErrorLines';
 import SlotPicker from './SlotPicker';
+import { todayIST } from '@/lib/dates';
 
 /**
  * Book a slot: mode, chief complaint and recorded consent (TPG 2020), then pay

@@ -44,12 +44,6 @@ export function buildSlots(p: SlotPlan): NewSlot[] {
   return slots;
 }
 
-/** `date` (YYYY-MM-DD) moved by `days`. */
-export function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 /** Groups rows by slot day, keeping the server's order. */
 export function groupByDay<T extends { slot_date: string }>(rows: T[]): [string, T[]][] {

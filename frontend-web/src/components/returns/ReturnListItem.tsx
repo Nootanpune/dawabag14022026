@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { returnReasonLabel, type ReturnSummary } from '@/lib/returns/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function ReturnListItem({ r, href }: { r: ReturnSummary; href: string }) {
   return (

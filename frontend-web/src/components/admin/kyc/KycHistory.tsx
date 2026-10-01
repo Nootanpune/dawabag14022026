@@ -1,5 +1,5 @@
 import type { KycHistoryEntry } from '@/lib/admin/kyc';
-import { formatDateTimeIST } from '@/lib/admin/format';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function KycHistory({ history }: { history: KycHistoryEntry[] }) {
   return (

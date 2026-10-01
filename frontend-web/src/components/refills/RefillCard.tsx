@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { Mandate, Refill } from '@/lib/refills';
-import { formatDate } from '@/lib/utils';
 import { useRefillActions } from '@/hooks/useRefills';
 import StatusBadge from '@/components/admin/StatusBadge';
 import RefillItemsEditor from './RefillItemsEditor';
 import RefillFrequencyEditor from './RefillFrequencyEditor';
 import RefillMandatePicker from './RefillMandatePicker';
+import { formatDateIST } from '@/lib/dates';
 
 type Editing = 'none' | 'items' | 'frequency';
 
@@ -28,7 +28,7 @@ export default function RefillCard({ refill: r, mandates }: { refill: Refill; ma
         <div>
           <p className="font-semibold text-sm">Every {r.frequency_days} days</p>
           <p className="text-xs text-gray-500">
-            {r.is_active ? `Next refill ${formatDate(r.next_refill_date)}` : 'Paused'}
+            {r.is_active ? `Next refill ${formatDateIST(r.next_refill_date)}` : 'Paused'}
             {r.source_order_number && (
               <>
                 {' · from '}

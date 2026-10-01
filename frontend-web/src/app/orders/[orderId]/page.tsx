@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { fetchOrder, orderKeys } from '@/lib/orders/api';
-import { formatDate, ORDER_STATUS_LABELS } from '@/lib/utils';
+import { ORDER_STATUS_LABELS } from '@/lib/utils';
 import Header from '@/components/layout/Header';
 import QueryState from '@/components/admin/QueryState';
 import OrderTimeline from '@/components/orders/OrderTimeline';
@@ -15,6 +15,7 @@ import RefundsCard from '@/components/orders/RefundsCard';
 import OrderBillCard from '@/components/orders/OrderBillCard';
 import DeliveryAddressCard from '@/components/orders/DeliveryAddressCard';
 import RefillSetupButton from '@/components/orders/RefillSetupButton';
+import { formatDateIST } from '@/lib/dates';
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -43,7 +44,7 @@ export default function OrderDetailPage() {
               <div className="flex-1">
                 <h1 className="text-lg font-semibold">{order.order_number}</h1>
                 <p className="text-xs text-gray-400">
-                  {formatDate(order.created_at)}
+                  {formatDateIST(order.created_at)}
                   {order.invoice_number ? ` · Invoice ${order.invoice_number}` : ''}
                 </p>
               </div>

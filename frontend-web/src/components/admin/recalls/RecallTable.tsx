@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Recall } from '@/lib/recalls/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function RecallTable({ rows }: { rows: Recall[] }) {
   return (

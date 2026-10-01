@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../models/policy.dart';
 import '../../../providers/legal_provider.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 
 /// "Policies" card on About & legal: every published policy from
 /// GET /legal/policies, each opening /policies/:key (C-39).
@@ -42,7 +42,7 @@ class PoliciesSection extends ConsumerWidget {
                 title: Text(p.title, style: const TextStyle(fontSize: 14)),
                 subtitle: p.effectiveFrom == null
                     ? null
-                    : Text('Effective from ${formatDate(p.effectiveFrom!)}',
+                    : Text('Effective from ${formatDateIst(p.effectiveFrom!)}',
                         style: const TextStyle(fontSize: 11)),
                 trailing: const Icon(Icons.chevron_right, size: 20),
                 onTap: () => context.push('/policies/${p.key}'),

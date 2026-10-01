@@ -3,9 +3,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Play, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { describeCron, formatSummary, runJob, type ScheduledJob } from '@/lib/admin/jobs';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import StatusBadge from '../StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function JobCard({ job, canRun }: { job: ScheduledJob; canRun: boolean }) {
   const queryClient = useQueryClient();
@@ -51,8 +51,8 @@ export default function JobCard({ job, canRun }: { job: ScheduledJob; canRun: bo
               <li key={r.id} className="text-xs flex flex-wrap items-start gap-2">
                 <StatusBadge status={r.status} />
                 <span className="text-gray-500">
-                  {formatDateTimeIST(r.started_at)}
-                  {r.finished_at ? ` → ${formatDateTimeIST(r.finished_at)}` : ''}
+                  {formatDateTimeIST(r.started_at, { zone: !r.finished_at })}
+                  {r.finished_at ? ` → ${formatDateTimeIST(r.finished_at, { zone: true })}` : ''}
                   {r.triggered_by ? ' · manual' : ''}
                 </span>
                 {r.error ? (

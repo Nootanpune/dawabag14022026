@@ -2,6 +2,7 @@
 // verified prescription can be offered for a new order, and the pharmacist still
 // checks and applies it before anything is dispensed.
 import api from '../api';
+import { isOnOrAfterTodayIST } from '../dates';
 
 export interface MyPrescription {
   id: string;
@@ -22,9 +23,9 @@ export async function fetchMyPrescriptions(): Promise<MyPrescription[]> {
 }
 
 /** Verified and valid today or later (the server makes the final check). */
-export function isReusable(rx: MyPrescription, today = new Date()): boolean {
+export function isReusable(rx: MyPrescription): boolean {
   if (rx.status !== 'verified' || !rx.valid_until) return false;
-  return new Date(rx.valid_until) >= new Date(today.toDateString());
+  return isOnOrAfterTodayIST(rx.valid_until);
 }
 
 /** Multipart upload straight to the API (server object store). */

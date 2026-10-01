@@ -1,6 +1,6 @@
 import type { DataRequest } from '@/lib/privacy/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 interface Props {
   rows: DataRequest[];

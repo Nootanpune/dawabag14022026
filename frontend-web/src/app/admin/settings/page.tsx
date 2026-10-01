@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DLT_TEMPLATES_KEY, fetchSettings, SETTING_KINDS, settingsKeys, type AppSetting } from '@/lib/admin/settings';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { useAuthStore } from '@/store/authStore';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
@@ -19,6 +18,7 @@ import AccountsLockSection from '@/components/admin/settings/AccountsLockSection
 import WhatsAppTemplatesSection from '@/components/admin/settings/WhatsAppTemplatesSection';
 import { ACCOUNTS_LOCK_KEY } from '@/lib/admin/accountsLock';
 import { WHATSAPP_TEMPLATES_KEY } from '@/lib/admin/whatsappTemplates';
+import { formatDateTimeIST } from '@/lib/dates';
 
 // Edited in their own sections below, not the generic list
 const OWN_SECTION_KEYS = [DLT_TEMPLATES_KEY, RETENTION_KEY, ACCOUNTS_LOCK_KEY, WHATSAPP_TEMPLATES_KEY];

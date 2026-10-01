@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { REFUND_METHOD_LABELS, type OrderDetail } from '@/lib/orders/api';
 import { returnReasonLabel } from '@/lib/returns/api';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
 import CreditNoteDownloadButton from './CreditNoteDownloadButton';
+import { formatDateIST } from '@/lib/dates';
 
 /** Returns, refunds and credit notes on this order (C-37). Renders nothing when there are none. */
 export default function RefundsCard({ order }: { order: OrderDetail }) {

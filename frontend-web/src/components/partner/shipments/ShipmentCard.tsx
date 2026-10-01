@@ -1,10 +1,10 @@
 'use client';
 import type { PartnerShipment } from '@/lib/partner/types';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
 import ShipmentLines from './ShipmentLines';
 import InvoiceDownloadButton from '@/components/orders/InvoiceDownloadButton';
+import { formatDateTimeIST } from '@/lib/dates';
 
 interface Props {
   shipment: PartnerShipment;

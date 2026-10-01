@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../config/theme.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 
 /// Bottom sheet: take a photo or pick from the gallery.
 Future<ImageSource?> showPrescriptionSourceSheet(BuildContext context) =>
@@ -33,10 +33,9 @@ Future<XFile?> pickPrescriptionImage(BuildContext context) async {
   return ImagePicker().pickImage(source: source, imageQuality: 85);
 }
 
-/// valid_until as a local calendar date ("31 Dec 2026"), or a dash.
+/// valid_until as an India calendar date ("31 Dec 2026"), or a dash.
 String _validUntil(Object? raw) {
-  final d = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
-  return d == null ? '—' : formatDate(DateTime(d.year, d.month, d.day).toIso8601String());
+  return istCalendarDay(raw) == null ? '—' : formatDateIst(raw);
 }
 
 // ── Prescription step ──────────────────────────────────────────────────────────

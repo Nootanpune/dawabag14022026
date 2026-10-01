@@ -4,6 +4,7 @@ import '../models/checkout_summary.dart';
 import '../models/json_utils.dart';
 import 'api_service.dart';
 import 'api_utils.dart';
+import '../utils/ist.dart';
 
 /// Checkout requests (order placement, prescription upload or saved-
 /// prescription reuse, Razorpay).
@@ -20,15 +21,11 @@ extension CheckoutApi on ApiService {
   }
 
   /// True for a verified prescription whose valid_until is today or later
-  /// (compared as a local calendar date). No date counts as expired, as on
+  /// (compared as an India calendar date). No date counts as expired, as on
   /// the server (C-08).
   static bool isUsableSavedPrescription(Map<String, dynamic> rx) {
     if (rx['status'] != 'verified') return false;
-    final until = DateTime.tryParse(rx['valid_until']?.toString() ?? '')?.toLocal();
-    if (until == null) return false;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return !DateTime(until.year, until.month, until.day).isBefore(today);
+    return isOnOrAfterTodayIst(rx['valid_until']);
   }
 
   /// POST /prescriptions/:id/use-for-order { order_id } — offers a saved,

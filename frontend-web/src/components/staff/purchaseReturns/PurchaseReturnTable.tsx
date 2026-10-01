@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import type { PurchaseReturnRow } from '@/lib/purchaseReturns/types';
 import { RETURN_REASON_LABELS } from '@/lib/purchaseReturns/labels';
-import { formatDateTimeIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Purchase returns, newest first; who raised and who approved each (C-46). */
 export default function PurchaseReturnTable({ rows }: { rows: PurchaseReturnRow[] }) {

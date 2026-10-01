@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { DISPOSITIONS, returnReasonLabel, type ReturnDetail } from '@/lib/returns/api';
 import { REFUND_METHOD_LABELS } from '@/lib/orders/api';
-import { formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 /** A return with its items (batch / expiry), decision, credit notes and refunds (C-37). Shared by buyer, staff and partner views. */
 export default function ReturnDetailView({ r, actions }: { r: ReturnDetail; actions?: ReactNode }) {

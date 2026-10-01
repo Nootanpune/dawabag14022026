@@ -1,5 +1,5 @@
 import type { SavedBatch } from '@/lib/partner/types';
-import { formatDateIST } from '@/lib/admin/format';
+import { formatDateIST } from '@/lib/dates';
 
 export default function SavedBatchesTable({ batches }: { batches: SavedBatch[] }) {
   return (

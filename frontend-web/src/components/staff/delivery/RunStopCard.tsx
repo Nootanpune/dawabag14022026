@@ -1,6 +1,6 @@
 import { MapPin, Phone } from 'lucide-react';
 import type { RunStop } from '@/lib/fulfilment/types';
-import { formatDateTimeIST } from '@/lib/admin/format';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /**
  * One parcel on the rider's run sheet: where, to whom, the seal and whether a

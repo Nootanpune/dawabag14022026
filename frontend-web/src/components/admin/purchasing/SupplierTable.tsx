@@ -1,7 +1,7 @@
 'use client';
 import type { Supplier } from '@/lib/purchasing/types';
-import { formatDateIST } from '@/lib/admin/format';
 import StatusBadge from '../StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 interface Props {
   suppliers: Supplier[];

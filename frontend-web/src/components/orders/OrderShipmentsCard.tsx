@@ -2,13 +2,13 @@
 import { useState } from 'react';
 import type { OrderDetail, OrderShipmentDetail } from '@/lib/orders/api';
 import { RECEIVER_RELATIONS } from '@/lib/fulfilment/handover';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
 import InvoiceDownloadButton from './InvoiceDownloadButton';
 import DeliveryCodeBanner from './DeliveryCodeBanner';
 import ReturnRequestDialog from './ReturnRequestDialog';
 import ShipmentTrackingTimeline from './ShipmentTrackingTimeline';
+import { formatDateTimeIST } from '@/lib/dates';
 
 function relationLabel(r: string | null) {
   return RECEIVER_RELATIONS.find((x) => x.value === r)?.label ?? r ?? '';

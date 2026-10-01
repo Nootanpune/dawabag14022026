@@ -3,10 +3,10 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMyRefunds, returnKeys } from '@/lib/returns/api';
 import { REFUND_METHOD_LABELS } from '@/lib/orders/api';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import QueryState from '@/components/admin/QueryState';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 /** GET /returns/refunds/my — every refund from cancellations and returns (C-37). */
 export default function MyRefundsList() {

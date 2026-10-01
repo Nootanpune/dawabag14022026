@@ -1,7 +1,7 @@
 import type { KycCheck } from '@/lib/admin/kyc';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '../StatusBadge';
 import { checkLabel } from './useKycActions';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function KycChecksList({ checks }: { checks: KycCheck[] }) {
   return (

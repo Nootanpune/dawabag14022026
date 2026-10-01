@@ -3,12 +3,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchStaffReturns, returnKeys, returnReasonLabel, type ReturnStatus } from '@/lib/returns/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import StatusTabs from '@/components/admin/StatusTabs';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 const TABS: { value: ReturnStatus; label: string }[] = [
   { value: 'requested', label: 'To decide' },

@@ -5,12 +5,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { blockSlot, doctorKeys, fetchMySlots } from '@/lib/telemedicine/doctorApi';
-import { formatSlotDate, formatSlotTime } from '@/lib/telemedicine/labels';
-import { addDays, groupByDay } from '@/lib/telemedicine/slots';
+import { groupByDay } from '@/lib/telemedicine/slots';
 import type { OwnSlot } from '@/lib/telemedicine/types';
-import { todayIST } from '@/lib/fulfilment/roles';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import QueryState from '@/components/admin/QueryState';
+import { addDaysToDate, formatClockTime, formatDateIST, todayIST } from '@/lib/dates';
 
 function SlotState({ s }: { s: OwnSlot }) {
   if (s.is_booked) {
@@ -29,7 +28,7 @@ function SlotState({ s }: { s: OwnSlot }) {
 export default function MySlotsList() {
   const queryClient = useQueryClient();
   const [from, setFrom] = useState(todayIST());
-  const [to, setTo] = useState(addDays(todayIST(), 6));
+  const [to, setTo] = useState(addDaysToDate(todayIST(), 6));
   const { data, isLoading, error } = useQuery({
     queryKey: doctorKeys.slots(from, to),
     queryFn: () => fetchMySlots(from, to),
@@ -59,12 +58,12 @@ export default function MySlotsList() {
       {!!data?.length &&
         groupByDay(data).map(([day, slots]) => (
           <div key={day}>
-            <h3 className="text-xs font-semibold text-gray-500 mb-1">{formatSlotDate(day)}</h3>
+            <h3 className="text-xs font-semibold text-gray-500 mb-1">{formatDateIST(day)}</h3>
             <ul className="divide-y divide-gray-100">
               {slots.map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2">
                   <span className={s.is_blocked ? 'text-gray-400 line-through' : ''}>
-                    {formatSlotTime(s.slot_start)} – {formatSlotTime(s.slot_end)}
+                    {formatClockTime(s.slot_start)} – {formatClockTime(s.slot_end, { zone: true })}
                   </span>
                   {s.is_booked || s.is_blocked ? (
                     <SlotState s={s} />

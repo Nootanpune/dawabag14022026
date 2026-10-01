@@ -1,5 +1,5 @@
 import type { H1Entry } from '@/lib/fulfilment/types';
-import { formatDateTimeIST } from '@/lib/admin/format';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Schedule H1 register rows as the server records them at dispatch (C-09). */
 export default function H1RegisterTable({ entries }: { entries: H1Entry[] }) {

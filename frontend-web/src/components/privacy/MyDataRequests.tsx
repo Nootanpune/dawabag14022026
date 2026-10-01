@@ -1,9 +1,9 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMyDataRequests, privacyKeys } from '@/lib/privacy/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import QueryState from '@/components/admin/QueryState';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** The user's own correction / erasure requests and what was done (C-43, C-44). */
 export default function MyDataRequests() {

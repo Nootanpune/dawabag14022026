@@ -11,10 +11,10 @@ import {
   toRetentionDraft,
   type RetentionField,
 } from '@/lib/admin/retention';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '../Modal';
 import DialogActions from '../DialogActions';
+import { formatDateTimeIST } from '@/lib/dates';
 
 function RetentionEditor({ value, onClose }: { value: unknown; onClose: () => void }) {
   const queryClient = useQueryClient();

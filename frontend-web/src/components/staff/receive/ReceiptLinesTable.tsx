@@ -1,5 +1,6 @@
 import type { ReceiptLine } from '@/lib/purchasing/types';
-import { formatDateIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
+import { formatDateIST } from '@/lib/dates';
 
 export default function ReceiptLinesTable({ lines }: { lines: ReceiptLine[] }) {
   return (

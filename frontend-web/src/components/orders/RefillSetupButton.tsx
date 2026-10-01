@@ -6,11 +6,11 @@ import { Repeat } from 'lucide-react';
 import { toast } from 'sonner';
 import { createRefill, refillKeys } from '@/lib/refills';
 import { getApiErrorMessage } from '@/lib/apiErrors';
-import { formatDate } from '@/lib/utils';
 import Modal from '@/components/admin/Modal';
 import DialogActions from '@/components/admin/DialogActions';
 import FrequencySelect, { frequencyError } from '@/components/refills/FrequencySelect';
 import RefillCopy from '@/components/refills/RefillCopy';
+import { formatDateIST } from '@/lib/dates';
 
 /** "Refill every…" on a delivered order — creates a refill subscription on the server. */
 export default function RefillSetupButton({ orderId }: { orderId: string }) {
@@ -46,7 +46,7 @@ export default function RefillSetupButton({ orderId }: { orderId: string }) {
           <p className="text-xs text-gray-500">
             {created ? (
               <>
-                Next refill on {formatDate(created)}.{' '}
+                Next refill on {formatDateIST(created)}.{' '}
                 <Link href="/account/refills" className="text-brand-600 hover:underline">
                   Manage refills
                 </Link>

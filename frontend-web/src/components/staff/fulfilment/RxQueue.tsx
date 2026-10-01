@@ -4,12 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { FileText } from 'lucide-react';
 import { fetchRxQueue, fulfilmentKeys } from '@/lib/fulfilment/api';
 import type { QueuePrescription, RxQueueItem } from '@/lib/fulfilment/types';
-import { CUSTOMER_TYPE_SHORT, formatDateTimeIST } from '@/lib/admin/format';
+import { CUSTOMER_TYPE_SHORT } from '@/lib/admin/format';
 import QueryState from '@/components/admin/QueryState';
 import StatusBadge from '@/components/admin/StatusBadge';
 import RxReviewDialog from './RxReviewDialog';
 import ApplyRxDialog from './ApplyRxDialog';
 import OfferedRxNotice from './OfferedRxNotice';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Orders waiting for a pharmacist's prescription decision (C-08). */
 export default function RxQueue() {

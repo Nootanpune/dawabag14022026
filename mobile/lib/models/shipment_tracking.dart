@@ -30,7 +30,7 @@ String trackingStatusLabel(String? status, [String? rawStatus]) {
 DateTime? _asDateTime(Object? v) {
   final s = asString(v);
   if (s == null || s.isEmpty) return null;
-  return DateTime.tryParse(s)?.toLocal();
+  return DateTime.tryParse(s); // an instant; shown in IST via utils/ist.dart
 }
 
 String? _nonEmpty(Object? v) {

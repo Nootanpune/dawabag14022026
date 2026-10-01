@@ -1,7 +1,7 @@
 'use client';
 import { describeNotice, PURPOSE_LABELS, type Consents } from '@/lib/privacy/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import ConsentToggleRow from './ConsentToggleRow';
+import { formatDateTimeIST } from '@/lib/dates';
 
 const OPTIONAL = ['marketing', 'whatsapp'];
 

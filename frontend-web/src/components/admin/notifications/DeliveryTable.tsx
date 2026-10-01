@@ -1,7 +1,7 @@
 import type { NotificationDelivery } from '@/lib/notifications/types';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { cn } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Latest delivery attempts; failed rows are highlighted with the provider's reason. */
 export default function DeliveryTable({ rows }: { rows: NotificationDelivery[] }) {

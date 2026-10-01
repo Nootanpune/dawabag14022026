@@ -4,7 +4,7 @@ import '../../../config/theme.dart';
 import '../../../models/consultation.dart';
 import '../../../models/eprescription.dart';
 import '../../../utils/consult_format.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 
 /// The parts of an e-prescription in the Telemedicine Practice Guidelines
 /// 2020 format: doctor and registration, patient, consultation, diagnosis,
@@ -106,7 +106,7 @@ class RxPatientSection extends StatelessWidget {
           _Line('Name', rx.patientName),
           _Line('Age / gender', ageGender),
           _Line('Consultation', consult),
-          _Line('Issued', rx.issuedAt == null ? null : formatDateTime(rx.issuedAt!)),
+          _Line('Issued', rx.issuedAt == null ? null : formatDateTimeIst(rx.issuedAt!)),
         ],
       ),
     );
@@ -211,8 +211,7 @@ class RxValiditySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final validDay = consultDay(rx.validUntil);
-    final now = DateTime.now();
-    final expired = validDay != null && validDay.isBefore(DateTime(now.year, now.month, now.day));
+    final expired = validDay != null && validDay.isBefore(todayIstDate());
     return RxSectionCard(
       title: 'Validity and check code',
       child: Column(

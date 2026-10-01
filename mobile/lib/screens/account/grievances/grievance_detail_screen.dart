@@ -7,7 +7,7 @@ import '../../../models/grievance.dart';
 import '../../../providers/grievance_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../services/grievance_api.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 import '../../../widgets/error_retry_view.dart';
 import 'grievance_thread.dart';
 import 'grievance_tile.dart';
@@ -139,10 +139,10 @@ class _SummaryCard extends StatelessWidget {
             ],
             const SizedBox(height: 8),
             if (g.createdAt != null)
-              Text('Raised ${formatDateTime(g.createdAt!)}',
+              Text('Raised ${formatDateTimeIst(g.createdAt!)}',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
             if (g.acknowledgedAt != null)
-              Text('Acknowledged ${formatDateTime(g.acknowledgedAt!)}',
+              Text('Acknowledged ${formatDateTimeIst(g.acknowledgedAt!)}',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
             GrievanceDeadlineText(grievance: g),
             if (g.orderId != null)

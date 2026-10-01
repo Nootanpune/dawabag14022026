@@ -1,6 +1,6 @@
 import { labelOf, SERIOUSNESS, type AdrSummary } from '@/lib/compliance/adverseEvents';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Reports with the server's PvPI forwarding deadline and overdue flag (C-29). */
 export default function AdrTable({ rows, onOpen }: { rows: AdrSummary[]; onOpen: (id: string) => void }) {
@@ -33,7 +33,7 @@ export default function AdrTable({ rows, onOpen }: { rows: AdrSummary[]; onOpen:
                 {labelOf(SERIOUSNESS, r.seriousness)}
               </td>
               <td className="px-4 py-2.5 text-xs">
-                {formatDateTimeIST(r.forward_due_at)}
+                {formatDateTimeIST(r.forward_due_at, { zone: true })}
                 {r.overdue && <span className="ml-1"><StatusBadge status="overdue" /></span>}
               </td>
               <td className="px-4 py-2.5">

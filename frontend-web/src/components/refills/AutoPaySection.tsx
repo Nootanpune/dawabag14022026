@@ -1,10 +1,11 @@
 'use client';
 import { useState } from 'react';
 import type { Mandate } from '@/lib/refills';
-import { formatDate, formatPrice } from '@/lib/utils';
+import { formatPrice } from '@/lib/utils';
 import { useRefillActions } from '@/hooks/useRefills';
 import StatusBadge from '@/components/admin/StatusBadge';
 import TurnOnAutoPayDialog from './TurnOnAutoPayDialog';
+import { formatDateIST } from '@/lib/dates';
 
 export default function AutoPaySection({ mandates }: { mandates: Mandate[] }) {
   const { removeMandate, refresh } = useRefillActions();
@@ -28,8 +29,8 @@ export default function AutoPaySection({ mandates }: { mandates: Mandate[] }) {
                   {m.method.toUpperCase()} · up to {formatPrice(m.max_amount_paise)}
                 </p>
                 <p className="text-xs text-gray-400">
-                  Set up {formatDate(m.created_at)}
-                  {m.activated_at ? ` · active since ${formatDate(m.activated_at)}` : ''}
+                  Set up {formatDateIST(m.created_at)}
+                  {m.activated_at ? ` · active since ${formatDateIST(m.activated_at)}` : ''}
                 </p>
               </div>
               <div className="flex items-center gap-2">

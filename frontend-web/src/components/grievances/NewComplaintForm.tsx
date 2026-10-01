@@ -6,8 +6,8 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createGrievance, GRIEVANCE_CATEGORIES, type GrievanceCategory } from '@/lib/grievances/api';
 import { fetchMyOrderChoices } from '@/lib/grievances/orderChoices';
-import { formatDateIST } from '@/lib/admin/format';
 import { getApiErrorMessage, getApiFieldErrors } from '@/lib/apiErrors';
+import { formatDateIST } from '@/lib/dates';
 
 /** Raise a complaint; the server issues the ticket number and deadlines (C-36). */
 export default function NewComplaintForm({ initialOrderId }: { initialOrderId?: string }) {

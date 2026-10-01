@@ -7,6 +7,7 @@ import '../../../models/aftercare.dart';
 import '../../../providers/aftercare_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 import '../../../widgets/error_retry_view.dart';
 
 /// /account/returns — "Returns & refunds" (C-37). Both lists come from the
@@ -65,7 +66,7 @@ class _ReturnsTab extends ConsumerWidget {
                       [
                         if (r.orderNumber != null) 'Order ${r.orderNumber}',
                         returnStatusLabel(r.status),
-                        if (r.createdAt != null) formatDate(r.createdAt!),
+                        if (r.createdAt != null) formatDateIst(r.createdAt!),
                       ].join(' · '),
                       style: const TextStyle(fontSize: 12),
                     ),
@@ -110,7 +111,7 @@ class _RefundsTab extends ConsumerWidget {
                       [
                         if (r.orderNumber != null) 'Order ${r.orderNumber}',
                         refundMethodLabel(r.method),
-                        if (r.createdAt != null) formatDate(r.createdAt!),
+                        if (r.createdAt != null) formatDateIst(r.createdAt!),
                       ].join(' · '),
                       style: const TextStyle(fontSize: 12),
                     ),

@@ -3,8 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { privacyKeys, PURPOSE_LABELS, setOptionalConsent, type ConsentRecord, type OptionalPurpose } from '@/lib/privacy/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import { formatDateTimeIST } from '@/lib/dates';
 
 interface Props {
   purpose: OptionalPurpose;

@@ -1,6 +1,6 @@
 import type { ConsentRecord } from '@/lib/privacy/api';
 import { describeNotice, PURPOSE_LABELS } from '@/lib/privacy/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Every consent given or withdrawn, newest first (append-only log on the server, C-40). */
 export default function ConsentHistory({ history }: { history: ConsentRecord[] }) {

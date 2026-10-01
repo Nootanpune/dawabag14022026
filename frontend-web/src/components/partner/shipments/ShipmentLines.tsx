@@ -1,6 +1,6 @@
 import type { ShipmentLine } from '@/lib/partner/types';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
+import { formatDateIST } from '@/lib/dates';
 
 export default function ShipmentLines({ lines }: { lines: ShipmentLine[] }) {
   return (

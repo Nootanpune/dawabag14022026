@@ -2,10 +2,10 @@
 import Link from 'next/link';
 import { canRetryGatewayRefund, type Refund } from '@/lib/returns/api';
 import { REFUND_METHOD_LABELS } from '@/lib/orders/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
 import RetryRefundButton from './RetryRefundButton';
+import { formatDateTimeIST } from '@/lib/dates';
 
 interface Props {
   rows: Refund[];

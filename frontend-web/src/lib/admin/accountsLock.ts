@@ -2,11 +2,13 @@
 // for a period, accounts sets accounts.locked_until; purchase entries (GRN) and
 // supplier credit notes dated on or before it are refused by the server (409).
 
+import { daysAgoIST } from '../dates';
+
 export const ACCOUNTS_LOCK_KEY = 'accounts.locked_until';
 
-/** The server accepts only a date before its own (UTC) today, or null to open the period */
+/** The server accepts only a date before today in India (IST), or null to open the period */
 export function latestLockableDate(): string {
-  return new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  return daysAgoIST(1);
 }
 
 export function lockedUntil(value: unknown): string | null {

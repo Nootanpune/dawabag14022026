@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { fetchPurchaseOrder, purchasingKeys } from '@/lib/purchasing/api';
-import { formatDateIST, formatDateTimeIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import { PURCHASE_ADMIN_ROLES } from '@/lib/purchasing/roles';
 import RequireAuth from '@/components/auth/RequireAuth';
 import BackLink from '@/components/admin/BackLink';
@@ -12,6 +12,7 @@ import QueryState from '@/components/admin/QueryState';
 import StatusBadge from '@/components/admin/StatusBadge';
 import PoActions from '@/components/admin/purchasing/PoActions';
 import PoItemsTable from '@/components/admin/purchasing/PoItemsTable';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 function PoDetail({ id }: { id: string }) {
   const { data: po, isLoading, error, refetch, isFetching } = useQuery({

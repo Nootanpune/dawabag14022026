@@ -2,9 +2,10 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import StatusBadge from '@/components/admin/StatusBadge';
 import { formatPaise } from '@/lib/admin/format';
-import { formatSlotDate, formatSlotTime, KIND_LABELS, MODE_LABELS, paymentStatusLabel } from '@/lib/telemedicine/labels';
+import { KIND_LABELS, MODE_LABELS, paymentStatusLabel } from '@/lib/telemedicine/labels';
 import type { MyConsultation } from '@/lib/telemedicine/types';
 import DoctorRegistration from '../common/DoctorRegistration';
+import { formatClockTime, formatDateIST } from '@/lib/dates';
 
 /** One of the patient's consultations; actions come from the page. */
 export default function ConsultationCard({ c, actions }: { c: MyConsultation; actions?: ReactNode }) {
@@ -18,7 +19,7 @@ export default function ConsultationCard({ c, actions }: { c: MyConsultation; ac
         </div>
         <div className="text-right space-y-1">
           <p className="font-medium">
-            {formatSlotDate(c.slot_date)}, {formatSlotTime(c.slot_start)}
+            {formatDateIST(c.slot_date)}, {formatClockTime(c.slot_start, { zone: true })}
           </p>
           <p className="text-xs text-gray-500">
             {MODE_LABELS[c.mode] ?? c.mode} · {KIND_LABELS[c.consult_kind] ?? c.consult_kind}

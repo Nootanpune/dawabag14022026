@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../config/theme.dart';
 import '../../../models/shipment_tracking.dart';
+import '../../../utils/ist.dart';
 
 /// Courier tracking for one shipment (Sprint 8): the scans from
 /// GET /orders/:id `shipments[].tracking`, newest first and highlighted,
@@ -40,7 +41,7 @@ class TrackingTimeline extends StatelessWidget {
             event: events[i],
             latest: i == 0,
             isLast: i == events.length - 1,
-            time: events[i].eventTime == null ? null : _timeFormat.format(events[i].eventTime!),
+            time: events[i].eventTime == null ? null : _timeFormat.format(toIst(events[i].eventTime!)),
           ),
       ],
     );

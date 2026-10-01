@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import type { AlertMatch } from '@/lib/recallAlerts/types';
 import { DECISION_LABELS } from '@/lib/recallAlerts/labels';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 interface Props {
   match: AlertMatch;

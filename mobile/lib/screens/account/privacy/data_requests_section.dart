@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/privacy.dart';
 import '../../../providers/privacy_provider.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 
 /// The buyer's correction / erasure requests and their outcome, from
 /// GET /privacy/requests (C-40..C-44). Hidden when there are none.
@@ -49,7 +49,7 @@ class DataRequestsSection extends ConsumerWidget {
         subtitle: Text(
           [
             r.statusLabel,
-            if (r.createdAt != null) formatDate(r.createdAt!),
+            if (r.createdAt != null) formatDateIst(r.createdAt!),
             if ((r.outcome ?? '').isNotEmpty) r.outcome!,
           ].join(' · '),
           style: const TextStyle(fontSize: 12),

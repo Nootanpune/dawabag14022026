@@ -1,7 +1,7 @@
 'use client';
 import type { AlertHeaderDraft, AlertSource } from '@/lib/recallAlerts/types';
 import { SOURCE_OPTIONS } from '@/lib/recallAlerts/labels';
-import { istNowInput } from '@/lib/recallAlerts/time';
+import { nowISTInput } from '@/lib/dates';
 
 interface Props {
   value: AlertHeaderDraft;
@@ -23,11 +23,11 @@ export default function AlertHeaderFields({ value, onChange }: Props) {
         </select>
       </label>
       <label className="block">
-        <span className="block font-medium text-gray-700 mb-1">Received at (India time)</span>
+        <span className="block font-medium text-gray-700 mb-1">Received at (IST)</span>
         <input
           type="datetime-local"
           value={value.received_local}
-          max={istNowInput()}
+          max={nowISTInput()}
           onChange={(e) => onChange({ received_local: e.target.value })}
           className="input"
         />

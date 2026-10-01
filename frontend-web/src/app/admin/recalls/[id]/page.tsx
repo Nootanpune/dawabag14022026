@@ -2,11 +2,11 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { fetchRecall, recallKeys } from '@/lib/recalls/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import BackLink from '@/components/admin/BackLink';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import AffectedOrdersTable from '@/components/admin/recalls/AffectedOrdersTable';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function AdminRecallPage() {
   const { id } = useParams<{ id: string }>();

@@ -1,6 +1,6 @@
 import { licenceTypeLabel, type Licence } from '@/lib/compliance/licences';
-import { formatDateIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 /** Licence register with the server's validity and days left (C-07). */
 export default function LicenceTable({ rows, onEdit }: { rows: Licence[]; onEdit: (l: Licence) => void }) {

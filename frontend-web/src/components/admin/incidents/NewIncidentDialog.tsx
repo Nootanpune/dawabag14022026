@@ -7,15 +7,13 @@ import {
   INCIDENT_SEVERITIES,
   createIncident,
   incidentKeys,
-  localInputToIso,
-  nowLocalInput,
   type IncidentCategory,
   type IncidentSeverity,
 } from '@/lib/compliance/incidents';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '@/components/admin/Modal';
 import DialogActions from '@/components/admin/DialogActions';
+import { formatDateTimeIST, istInputToIso, nowISTInput } from '@/lib/dates';
 
 /** Log a security incident; the 6-hour CERT-In clock runs from the detection time (C-43). */
 export default function NewIncidentDialog({ onClose }: { onClose: () => void }) {
@@ -25,13 +23,13 @@ export default function NewIncidentDialog({ onClose }: { onClose: () => void }) 
   const [severity, setSeverity] = useState<IncidentSeverity>('high');
   const [description, setDescription] = useState('');
   const [personal, setPersonal] = useState(false);
-  const [detected, setDetected] = useState(nowLocalInput);
+  const [detected, setDetected] = useState(nowISTInput);
   const [error, setError] = useState('');
 
   const save = useMutation({
     mutationFn: createIncident,
     onSuccess: (r) => {
-      toast.success(`${r.incident_no} logged — report to CERT-In by ${formatDateTimeIST(r.cert_in_due_at)}`);
+      toast.success(`${r.incident_no} logged — report to CERT-In by ${formatDateTimeIST(r.cert_in_due_at, { zone: true })}`);
       onClose();
     },
     onError: (err) => setError(getApiErrorMessage(err, 'Could not log the incident')),
@@ -39,7 +37,7 @@ export default function NewIncidentDialog({ onClose }: { onClose: () => void }) 
   });
 
   const submit = () => {
-    const detected_at = localInputToIso(detected);
+    const detected_at = istInputToIso(detected);
     if (title.trim().length < 5) return setError('Give a title of at least 5 characters');
     if (description.trim().length < 10) return setError('Describe what happened (at least 10 characters)');
     if (!detected_at) return setError('Enter when it was detected');
@@ -76,8 +74,8 @@ export default function NewIncidentDialog({ onClose }: { onClose: () => void }) 
           </select>
         </label>
         <label className="block">
-          <span className="block font-medium text-gray-700 mb-1">Detected at (your local time)</span>
-          <input type="datetime-local" value={detected} max={nowLocalInput()} onChange={(e) => setDetected(e.target.value)} className="input" />
+          <span className="block font-medium text-gray-700 mb-1">Detected at (IST)</span>
+          <input type="datetime-local" value={detected} max={nowISTInput()} onChange={(e) => setDetected(e.target.value)} className="input" />
         </label>
         <label className="flex items-center gap-2 self-end pb-2">
           <input type="checkbox" checked={personal} onChange={(e) => setPersonal(e.target.checked)} />

@@ -10,6 +10,22 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 20 — IST everywhere (web, mobile)
+- Owner rule: every date/time shown or computed is India Standard Time (Asia/Kolkata,
+  UTC+05:30, no DST), whatever the viewer's device/browser zone.
+- Web: one module `frontend-web/src/lib/dates.ts` (IST_TZ, formatDateIST '01 Oct 2026',
+  formatDateTimeIST '01 Oct 2026, 2:05 pm', formatTimeIST, formatClockTime, `{ zone: true }`
+  appends " IST", todayIST, daysAgoIST, lastMonthIST, isOnOrAfterTodayIST, nowISTInput,
+  istInputToIso / isoToISTInput for datetime-local). Old copies (utils.formatDate,
+  admin/format, fulfilment/roles, recallAlerts/time, incidents local-time inputs,
+  telemedicine formatSlotDate/Time) removed; all imports point at lib/dates.
+  'YYYY-MM-DD' values are never zone-shifted. Staff deadlines, slot times and
+  datetime-local labels say IST.
+- Mobile: one helper `mobile/lib/utils/ist.dart` (toIst = UTC+5:30, never .toLocal();
+  formatDateIst, formatDateTimeIst, formatTimeIst, formatClockTime, istCalendarDay,
+  todayIst/todayIstDate, isOnOrAfterTodayIst); formatters.dart keeps only money;
+  consult_format.dart delegates. Slot times show "IST". Tests: mobile/test/ist_test.dart.
+
 ## Done in Sprint 20 (critical journeys in the browser)
 - e2e: checkout to the payment step with C-35 disclosures (seller + licence, country of origin,
   delivery charge, refund/return policy links); Schedule H order blocked at the prescription step

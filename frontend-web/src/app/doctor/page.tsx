@@ -2,11 +2,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { doctorKeys, fetchDoctorDay, fetchMyProfile } from '@/lib/telemedicine/doctorApi';
-import { todayIST } from '@/lib/fulfilment/roles';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import ProfileStatus from '@/components/telemedicine/doctor/ProfileStatus';
 import DoctorDayList from '@/components/telemedicine/doctor/DoctorDayList';
+import { todayIST } from '@/lib/dates';
 
 // Doctor's consultations for a day (C-22). Join opens 15 minutes before the slot.
 export default function DoctorHomePage() {

@@ -1,6 +1,6 @@
 'use client';
 import type { CountLine } from '@/lib/stock/types';
-import { formatDateIST } from '@/lib/admin/format';
+import { formatDateIST } from '@/lib/dates';
 
 interface Props {
   lines: CountLine[];

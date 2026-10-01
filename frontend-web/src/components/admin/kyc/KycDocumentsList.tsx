@@ -3,9 +3,9 @@ import { useState } from 'react';
 import { FileText, ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchDocumentUrl, type KycDocument } from '@/lib/admin/kyc';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { formatFileSize, DOCUMENT_LABELS, type DocumentType } from '@/lib/registration';
 import { getApiErrorMessage } from '@/lib/apiErrors';
+import { formatDateTimeIST } from '@/lib/dates';
 
 export default function KycDocumentsList({ documents }: { documents: KycDocument[] }) {
   const [openingId, setOpeningId] = useState<string | null>(null);

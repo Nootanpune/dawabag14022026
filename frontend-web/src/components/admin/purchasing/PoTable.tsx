@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
 import type { PurchaseOrderRow } from '@/lib/purchasing/types';
-import { formatDateIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import StatusBadge from '../StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 /** Purchase order list; `hrefFor` decides where a row opens (admin detail or staff receive). */
 export default function PoTable({ orders, hrefFor }: { orders: PurchaseOrderRow[]; hrefFor: (po: PurchaseOrderRow) => string }) {

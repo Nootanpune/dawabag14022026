@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import type { AppSetting } from '@/lib/admin/settings';
 import { labelOf, toDltRows } from '@/lib/admin/dltTemplates';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import DltTemplatesEditor from './DltTemplatesEditor';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Read-only list of SMS DLT templates; super admin edits them in a table dialog. */
 export default function DltTemplatesSection({ setting, canEdit }: { setting: AppSetting | undefined; canEdit: boolean }) {

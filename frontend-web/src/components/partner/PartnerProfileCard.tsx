@@ -1,7 +1,8 @@
 import type { PartnerMe } from '@/lib/partner/types';
-import { DL_TYPE_LABELS, formatDateIST } from '@/lib/admin/format';
+import { DL_TYPE_LABELS } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (

@@ -1,6 +1,6 @@
 import type { GrievanceDetail } from '@/lib/grievances/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { cn } from '@/lib/utils';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** The complaint text followed by every buyer / staff message, oldest first. */
 export default function MessageThread({ g, viewer }: { g: GrievanceDetail; viewer: 'buyer' | 'staff' }) {

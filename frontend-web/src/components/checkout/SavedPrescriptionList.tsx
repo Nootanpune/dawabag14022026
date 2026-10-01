@@ -1,7 +1,7 @@
 'use client';
 import { FileCheck2 } from 'lucide-react';
 import type { MyPrescription } from '@/lib/prescriptions/api';
-import { formatDate } from '@/lib/utils';
+import { formatDateIST } from '@/lib/dates';
 
 interface Props {
   prescriptions: MyPrescription[];
@@ -29,7 +29,7 @@ export default function SavedPrescriptionList({ prescriptions, selectedId, onSel
               {rx.patient_name ? ` · for ${rx.patient_name}` : ''}
             </span>
             <span className="block text-xs text-gray-500">
-              Uploaded {formatDate(rx.created_at)} · valid until {rx.valid_until ? formatDate(rx.valid_until) : '—'}
+              Uploaded {formatDateIST(rx.created_at)} · valid until {rx.valid_until ? formatDateIST(rx.valid_until) : '—'}
             </span>
           </span>
         </button>

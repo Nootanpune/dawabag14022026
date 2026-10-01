@@ -1,9 +1,9 @@
 'use client';
 import type { PartnerListing } from '@/lib/partner/types';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
 import { scheduleBadge } from '@/lib/drugSchedule';
+import { formatDateIST } from '@/lib/dates';
 
 export default function ListingsTable({
   listings,

@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { categoryLabel, type GrievanceSummary } from '@/lib/grievances/api';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import GrievanceStatusBadge from '@/components/grievances/GrievanceStatusBadge';
 import GrievanceDueDates from '@/components/grievances/GrievanceDueDates';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Staff complaint list with overdue flags (C-36). */
 export default function GrievanceTable({ rows }: { rows: GrievanceSummary[] }) {

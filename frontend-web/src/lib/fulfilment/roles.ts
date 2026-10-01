@@ -21,13 +21,3 @@ export const STAGE_ROLES: Record<QueueStage | 'h1', readonly string[]> = {
 
   h1: ['pharmacist_rx', 'admin', 'super_admin'],
 };
-
-/** Today in India as YYYY-MM-DD */
-export function todayIST(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-}
-
-/** YYYY-MM-DD `days` before today (IST) */
-export function daysAgoIST(days: number): string {
-  return new Date(Date.now() - days * 864e5).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-}

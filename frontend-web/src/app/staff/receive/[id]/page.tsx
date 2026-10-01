@@ -3,12 +3,13 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { fetchReceipt, purchasingKeys } from '@/lib/purchasing/api';
 import { STORE_ROLES } from '@/lib/purchasing/roles';
-import { formatDateIST, formatDateTimeIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import RequireAuth from '@/components/auth/RequireAuth';
 import BackLink from '@/components/admin/BackLink';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import ReceiptLinesTable from '@/components/staff/receive/ReceiptLinesTable';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 // A goods receipt is a final record (C-34): shown read-only.
 function ReceiptDetail({ id }: { id: string }) {

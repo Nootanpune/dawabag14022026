@@ -1,6 +1,7 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import { fetchJobs, jobKeys } from '@/lib/admin/jobs';
+import { IST_TZ } from '@/lib/dates';
 import { useAuthStore } from '@/store/authStore';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
@@ -14,7 +15,7 @@ export default function JobsPage() {
     <div>
       <PageHeader
         title="Scheduled jobs"
-        subtitle={`Schedules shown in ${data?.timezone === 'Asia/Kolkata' || !data ? 'IST' : data.timezone}${canRun ? '' : ' · only super admins can run jobs manually'}`}
+        subtitle={`Schedules shown in ${data?.timezone === IST_TZ || !data ? 'IST' : data.timezone}${canRun ? '' : ' · only super admins can run jobs manually'}`}
         onRefresh={() => refetch()}
         refreshing={isFetching}
       />

@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import StatusBadge from '@/components/admin/StatusBadge';
-import { formatSlotTime, KIND_LABELS, MODE_LABELS, patientLine, paymentStatusLabel } from '@/lib/telemedicine/labels';
+import { KIND_LABELS, MODE_LABELS, patientLine, paymentStatusLabel } from '@/lib/telemedicine/labels';
 import type { DoctorConsultation } from '@/lib/telemedicine/types';
+import { formatClockTime } from '@/lib/dates';
 
 /** One booked consultation on the doctor's day list. */
 export default function DoctorConsultRow({ c, actions }: { c: DoctorConsultation; actions: ReactNode }) {
@@ -11,7 +12,7 @@ export default function DoctorConsultRow({ c, actions }: { c: DoctorConsultation
     <div className="card text-sm flex flex-wrap justify-between gap-3">
       <div className="space-y-1 min-w-0">
         <p className="font-semibold">
-          {formatSlotTime(c.slot_start)} – {formatSlotTime(c.slot_end)}
+          {formatClockTime(c.slot_start)} – {formatClockTime(c.slot_end, { zone: true })}
           <span className="font-normal text-gray-500">
             {' '}
             · {MODE_LABELS[c.mode] ?? c.mode} · {KIND_LABELS[c.consult_kind] ?? c.consult_kind}

@@ -32,7 +32,7 @@ class DoctorConsultationCard extends StatelessWidget {
     final time = [
       if (c.slotStart != null) formatSlotTime(c.slotStart),
       if (c.slotEnd != null) formatSlotTime(c.slotEnd),
-    ].join(' – ');
+    ].join(' – ') + (c.slotStart != null || c.slotEnd != null ? ' IST' : '');
     final details = c.patientDetails;
 
     return Card(

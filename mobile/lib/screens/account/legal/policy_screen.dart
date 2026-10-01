@@ -6,7 +6,7 @@ import '../../../config/theme.dart';
 import '../../../models/policy.dart';
 import '../../../providers/legal_provider.dart';
 import '../../../services/api_service.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 import '../../../widgets/error_retry_view.dart';
 import 'policy_language_bar.dart';
 
@@ -85,7 +85,7 @@ class _PolicyScreenState extends ConsumerState<PolicyScreen> {
                       [
                         if (doc.version != null)
                           'Version ${doc.version}${doc.language != 'en' ? ' (${kPolicyLanguageNames[doc.language]})' : ''}',
-                        if (doc.effectiveFrom != null) 'Effective from ${formatDate(doc.effectiveFrom!)}',
+                        if (doc.effectiveFrom != null) 'Effective from ${formatDateIst(doc.effectiveFrom!)}',
                       ].join(' · '),
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),

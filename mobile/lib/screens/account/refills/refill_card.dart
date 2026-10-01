@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../config/theme.dart';
 import '../../../models/refill.dart';
 import '../../../providers/refill_provider.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 import 'refill_dialogs.dart';
 
 /// One refill subscription, as the server returned it, with its actions.
@@ -116,7 +116,7 @@ class RefillCard extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Text(
                     'Every ${refill.frequencyDays} days'
-                    '${refill.nextRefillDate != null ? ' · next on ${formatDate(refill.nextRefillDate!)}' : ''}',
+                    '${refill.nextRefillDate != null ? ' · next on ${formatDateIst(refill.nextRefillDate!)}' : ''}',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 4),

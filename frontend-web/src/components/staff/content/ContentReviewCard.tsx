@@ -5,8 +5,8 @@ import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { productKeys, reviewContent, type ContentReviewItem } from '@/lib/products/api';
 import { getApiErrorMessage } from '@/lib/apiErrors';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import { useAuthStore } from '@/store/authStore';
+import { formatDateTimeIST } from '@/lib/dates';
 
 function Field({ label, value }: { label: string; value: string | null }) {
   return (

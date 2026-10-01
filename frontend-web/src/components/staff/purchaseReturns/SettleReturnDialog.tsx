@@ -6,12 +6,12 @@ import { purchaseReturnKeys, settlePurchaseReturn } from '@/lib/purchaseReturns/
 import type { PurchaseReturn } from '@/lib/purchaseReturns/types';
 import { creditDifferenceText, isIsoDate } from '@/lib/purchaseReturns/labels';
 import { formatPaise, rupeesToPaise } from '@/lib/admin/format';
-import { todayIST } from '@/lib/fulfilment/roles';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { isLockedPeriodError } from '@/lib/admin/accountsLock';
 import LockedPeriodBanner from '@/components/admin/accounts/LockedPeriodBanner';
 import Modal from '@/components/admin/Modal';
 import DialogActions from '@/components/admin/DialogActions';
+import { todayIST } from '@/lib/dates';
 
 interface Props {
   r: PurchaseReturn;

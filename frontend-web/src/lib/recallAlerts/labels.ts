@@ -2,7 +2,7 @@
 // re-checks everything; these only save a round trip.
 import type { AlertHeaderDraft, AlertLineDraft, AlertLineInput, AlertSource, MatchDecision } from './types';
 import type { AlertHeaderBody } from './api';
-import { istInputToIso, istNowInput } from './time';
+import { istInputToIso, nowISTInput } from '@/lib/dates';
 
 export const SOURCE_LABELS: Record<AlertSource, string> = {
   cdsco_nsq: 'CDSCO NSQ list',
@@ -80,5 +80,5 @@ export function headerFromDraft(d: AlertHeaderDraft): { header?: AlertHeaderBody
 }
 
 export function blankHeader(): AlertHeaderDraft {
-  return { source: 'cdsco_nsq', reference: '', received_local: istNowInput() };
+  return { source: 'cdsco_nsq', reference: '', received_local: nowISTInput() };
 }

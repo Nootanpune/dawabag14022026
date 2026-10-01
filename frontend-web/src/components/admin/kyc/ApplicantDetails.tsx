@@ -1,6 +1,7 @@
 import type { KycApplicant } from '@/lib/admin/kyc';
-import { CUSTOMER_TYPE_SHORT, DL_TYPE_LABELS, formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
+import { CUSTOMER_TYPE_SHORT, DL_TYPE_LABELS } from '@/lib/admin/format';
 import StatusBadge from '../StatusBadge';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (

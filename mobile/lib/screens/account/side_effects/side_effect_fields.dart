@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../utils/ist.dart';
+
 /// Dropdown over a code → label map. With [optional] a "Not sure" entry
 /// (null) is offered; otherwise [requiredMessage] makes a choice mandatory.
 class CodeDropdown extends StatelessWidget {
@@ -49,7 +51,7 @@ class OnsetDateField extends StatelessWidget {
   static String? toApi(DateTime? d) => d == null ? null : DateFormat('yyyy-MM-dd').format(d);
 
   Future<void> _pick(BuildContext context) async {
-    final now = DateTime.now();
+    final now = todayIstDate();
     final picked = await showDatePicker(
       context: context,
       initialDate: value ?? now,

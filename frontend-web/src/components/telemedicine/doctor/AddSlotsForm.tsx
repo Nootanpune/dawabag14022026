@@ -6,10 +6,10 @@ import { toast } from 'sonner';
 import { addSlots, doctorKeys } from '@/lib/telemedicine/doctorApi';
 import { teleKeys } from '@/lib/telemedicine/api';
 import { buildSlots, type SlotPlan } from '@/lib/telemedicine/slots';
-import { todayIST } from '@/lib/fulfilment/roles';
 import { getApiErrorLines } from '@/lib/apiErrors';
 import { cn } from '@/lib/utils';
 import ErrorLines from '../common/ErrorLines';
+import { todayIST } from '@/lib/dates';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MAX_PER_REQUEST = 200; // server limit per POST
@@ -58,11 +58,11 @@ export default function AddSlotsForm() {
           <input type="date" min={plan.from} value={plan.to} onChange={(e) => set({ to: e.target.value })} className="input mt-1" />
         </label>
         <label className="block font-medium text-gray-700">
-          Start
+          Start (IST)
           <input type="time" value={plan.start} onChange={(e) => set({ start: e.target.value })} className="input mt-1" />
         </label>
         <label className="block font-medium text-gray-700">
-          End
+          End (IST)
           <input type="time" value={plan.end} onChange={(e) => set({ end: e.target.value })} className="input mt-1" />
         </label>
         <label className="block font-medium text-gray-700">

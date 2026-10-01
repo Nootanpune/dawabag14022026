@@ -1,9 +1,9 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
-import { formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
 import { MODE_LABELS, patientLine } from '@/lib/telemedicine/labels';
 import type { VerifyResult } from '@/lib/telemedicine/types';
 import DoctorRegistration from '../common/DoctorRegistration';
 import MedicineItemsTable from '../common/MedicineItemsTable';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 /** What a pharmacist needs to match a paper or PDF e-prescription (C-24): validity, doctor, patient initials, medicines. */
 export default function VerifyResultView({ code, r }: { code: string; r: VerifyResult }) {

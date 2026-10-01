@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../config/theme.dart';
 import '../../../models/privacy.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 
 /// Marketing and WhatsApp switches (WhatsApp: Sprint 13, C-42) + the current
 /// consent record per purpose, with the
@@ -42,7 +42,7 @@ class ConsentSection extends StatelessWidget {
               title: const Text('Offers and marketing messages', style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 marketing?.recordedAt != null
-                    ? 'Last changed ${formatDateTime(marketing!.recordedAt!)}. You can change this at any time.'
+                    ? 'Last changed ${formatDateTimeIst(marketing!.recordedAt!)}. You can change this at any time.'
                     : 'Off unless you turn it on. Order and health updates are sent regardless.',
                 style: const TextStyle(fontSize: 12),
               ),
@@ -54,7 +54,7 @@ class ConsentSection extends StatelessWidget {
               title: const Text('Send order and refill updates on WhatsApp', style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 whatsapp?.recordedAt != null
-                    ? 'Last changed ${formatDateTime(whatsapp!.recordedAt!)}. You can turn this off any time.'
+                    ? 'Last changed ${formatDateTimeIst(whatsapp!.recordedAt!)}. You can turn this off any time.'
                     : 'Off unless you turn it on. You can turn it off any time; SMS updates continue either way.',
                 style: const TextStyle(fontSize: 12),
               ),
@@ -93,7 +93,7 @@ class ConsentSection extends StatelessWidget {
   }
 
   static String _recordLine(ConsentRecord c) => [
-        if (c.recordedAt != null) formatDateTime(c.recordedAt!),
+        if (c.recordedAt != null) formatDateTimeIst(c.recordedAt!),
         if (c.policyVersion != null) describePrivacyNotice(c.policyVersion!),
       ].join(' · ');
 }

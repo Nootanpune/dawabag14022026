@@ -1,6 +1,6 @@
 import type { SettlementAdjustment } from '@/lib/marketplace/settlement';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
+import { formatDateIST } from '@/lib/dates';
 
 const signed = (p: number) => (p < 0 ? `– ${formatPrice(-p)}` : formatPrice(p));
 

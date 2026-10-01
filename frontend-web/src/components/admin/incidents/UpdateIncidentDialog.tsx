@@ -6,8 +6,6 @@ import {
   INCIDENT_STATUSES,
   fetchIncident,
   incidentKeys,
-  localInputToIso,
-  nowLocalInput,
   updateIncident,
   type Incident,
   type IncidentStatus,
@@ -17,12 +15,13 @@ import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '@/components/admin/Modal';
 import DialogActions from '@/components/admin/DialogActions';
 import CertInBadge from './CertInBadge';
+import { istInputToIso, nowISTInput } from '@/lib/dates';
 
 function When({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <label className="block">
-      <span className="block font-medium text-gray-700 mb-1">{label}</span>
-      <input type="datetime-local" value={value} max={nowLocalInput()} onChange={(e) => onChange(e.target.value)} className="input" />
+      <span className="block font-medium text-gray-700 mb-1">{label} (IST)</span>
+      <input type="datetime-local" value={value} max={nowISTInput()} onChange={(e) => onChange(e.target.value)} className="input" />
     </label>
   );
 }
@@ -56,11 +55,11 @@ export default function UpdateIncidentDialog({ incident, onClose }: { incident: 
     if (status !== i.status) body.status = status;
     if (certAt || certRef.trim()) {
       if (!certAt || certRef.trim().length < 3) return setError('Enter both the CERT-In report time and its acknowledgement reference');
-      body.cert_in_reported_at = localInputToIso(certAt);
+      body.cert_in_reported_at = istInputToIso(certAt);
       body.cert_in_reference = certRef.trim();
     }
-    if (dpbAt) body.dpb_notified_at = localInputToIso(dpbAt);
-    if (usersAt) body.users_notified_at = localInputToIso(usersAt);
+    if (dpbAt) body.dpb_notified_at = istInputToIso(dpbAt);
+    if (usersAt) body.users_notified_at = istInputToIso(usersAt);
     if (actions.trim() && actions.trim() !== (i.actions_taken ?? '')) {
       if (actions.trim().length < 10) return setError('Describe the actions in at least 10 characters');
       body.actions_taken = actions.trim();

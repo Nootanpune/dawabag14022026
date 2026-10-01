@@ -1,8 +1,8 @@
 'use client';
 import { categoryLabel, type Incident } from '@/lib/compliance/incidents';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
 import CertInBadge from './CertInBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 const SEVERITY_TONE: Record<string, string> = {
   critical: 'bg-red-600 text-white',

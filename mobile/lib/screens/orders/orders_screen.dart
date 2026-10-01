@@ -5,6 +5,7 @@ import '../../services/api_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
+import '../../utils/ist.dart';
 
 final ordersProvider = FutureProvider<List<dynamic>>((ref) async {
   final res = await apiService.dio.get('/orders/my?limit=20');
@@ -189,7 +190,7 @@ class _OrderCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Text(formatDate(order['created_at'] ?? ''),
+            Text(formatDateIst(order['created_at'] ?? ''),
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
             const SizedBox(height: 10),
             Row(

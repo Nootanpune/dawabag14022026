@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../config/theme.dart';
 import '../../../models/grievance.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 
 /// One message in a complaint conversation: staff on the left, buyer right.
 class GrievanceMessageBubble extends StatelessWidget {
@@ -29,7 +29,7 @@ class GrievanceMessageBubble extends StatelessWidget {
             Text(
               [
                 message.author ?? (staff ? 'Dawabag support' : 'You'),
-                if (message.createdAt != null) formatDateTime(message.createdAt!),
+                if (message.createdAt != null) formatDateTimeIst(message.createdAt!),
               ].join(' · '),
               style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
             ),

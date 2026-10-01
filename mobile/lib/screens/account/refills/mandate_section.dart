@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
 import '../../../models/refill.dart';
 import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 
 /// "Automatic payment" section: the server's mandate list, a button to
 /// start a new UPI mandate, and a note after a mandate was started.
@@ -67,7 +68,7 @@ class MandateSection extends StatelessWidget {
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   subtitle: Text(
                     '${_statusLabel(m.status)}'
-                    '${m.activatedAt != null ? ' · since ${formatDate(m.activatedAt!)}' : ''}',
+                    '${m.activatedAt != null ? ' · since ${formatDateIst(m.activatedAt!)}' : ''}',
                     style: const TextStyle(fontSize: 12),
                   ),
                   trailing: TextButton(

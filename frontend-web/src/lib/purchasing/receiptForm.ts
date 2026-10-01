@@ -2,8 +2,8 @@
 // them into the API body (paise, integers). The server re-checks everything —
 // shelf life, PO quantities, printed MRP ≥ selling prices (C-16), recalls (C-28).
 import { rupeesToPaise } from '../admin/format';
-import { todayIST } from '../fulfilment/roles';
 import type { NewReceipt, NewReceiptLine, PurchaseOrder } from './types';
+import { todayIST } from '@/lib/dates';
 
 export interface ReceiptLineDraft {
   key: string;

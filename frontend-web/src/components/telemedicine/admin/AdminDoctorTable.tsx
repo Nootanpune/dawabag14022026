@@ -1,6 +1,7 @@
 import StatusBadge from '@/components/admin/StatusBadge';
-import { formatDateTimeIST, formatPaise } from '@/lib/admin/format';
+import { formatPaise } from '@/lib/admin/format';
 import type { AdminDoctor } from '@/lib/telemedicine/types';
+import { formatDateTimeIST } from '@/lib/dates';
 
 const statusOf = (d: AdminDoctor) => (d.is_verified ? 'verified' : d.rejection_reason ? 'rejected' : 'pending');
 

@@ -90,20 +90,6 @@ export async function updateIncident(id: string, body: IncidentUpdate) {
   return data.data as { id: string; status: IncidentStatus };
 }
 
-/** <input type="datetime-local"> value → ISO string (UTC, accepted as an offset time). */
-export function localInputToIso(v: string): string | undefined {
-  if (!v) return undefined;
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
-}
-
-/** Now as a datetime-local value, for defaults and max= limits. */
-export function nowLocalInput(): string {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
-
 /** "2h 14m" style countdown; negative ms render as overdue time. */
 export function formatDuration(ms: number): string {
   const mins = Math.floor(Math.abs(ms) / 60000);

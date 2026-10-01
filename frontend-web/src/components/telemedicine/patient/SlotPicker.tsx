@@ -1,10 +1,9 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import { fetchSlots, teleKeys } from '@/lib/telemedicine/api';
-import { formatSlotTime } from '@/lib/telemedicine/labels';
-import { todayIST } from '@/lib/fulfilment/roles';
 import { cn } from '@/lib/utils';
 import QueryState from '@/components/admin/QueryState';
+import { formatClockTime, todayIST } from '@/lib/dates';
 
 interface Props {
   doctorId: string;
@@ -49,7 +48,7 @@ export default function SlotPicker({ doctorId, date, onDate, slotId, onSlot }: P
                 slotId === s.id ? 'bg-brand-600 border-brand-600 text-white' : 'border-gray-200 hover:border-brand-400'
               )}
             >
-              {formatSlotTime(s.slot_start)} – {formatSlotTime(s.slot_end)}
+              {formatClockTime(s.slot_start)} – {formatClockTime(s.slot_end, { zone: true })}
             </button>
           ))}
         </div>

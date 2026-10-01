@@ -1,5 +1,5 @@
 import { LANGUAGE_NAMES, type PolicyKey, type PolicyLanguage, type PolicyVersion } from '@/lib/legal/policies';
-import { formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 interface VersionGroup {
   version: number;

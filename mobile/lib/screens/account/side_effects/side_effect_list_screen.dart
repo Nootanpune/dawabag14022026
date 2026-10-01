@@ -5,7 +5,7 @@ import '../../../config/theme.dart';
 import '../../../models/adverse_event.dart';
 import '../../../providers/adverse_event_provider.dart';
 import '../../../services/api_service.dart';
-import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 import '../../../widgets/error_retry_view.dart';
 
 /// /account/side-effects — the buyer's side-effect reports and where each
@@ -57,7 +57,7 @@ class SideEffectListScreen extends ConsumerWidget {
                           r.reportNo,
                           adrSeriousnessLabel(r.seriousness),
                           adrStatusLabel(r.status),
-                          if (r.createdAt != null) formatDate(r.createdAt!),
+                          if (r.createdAt != null) formatDateIst(r.createdAt!),
                         ].join(' · '),
                         style: const TextStyle(fontSize: 12),
                       ),

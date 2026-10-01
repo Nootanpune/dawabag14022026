@@ -1,9 +1,9 @@
 'use client';
 import Link from 'next/link';
 import type { Settlement } from '@/lib/marketplace/settlement';
-import { formatDateIST } from '@/lib/admin/format';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST } from '@/lib/dates';
 
 interface Props {
   settlements: Settlement[];

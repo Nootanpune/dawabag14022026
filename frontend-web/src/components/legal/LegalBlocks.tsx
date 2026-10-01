@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { LegalInfo } from '@/lib/legal/api';
-import { formatDateIST } from '@/lib/admin/format';
+import { formatDateIST } from '@/lib/dates';
 
 const orDash = (v: string | null | undefined) => (v && v.trim() ? v : '—');
 

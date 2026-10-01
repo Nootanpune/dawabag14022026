@@ -4,12 +4,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fulfilmentKeys, rejectPrescription, verifyPrescription } from '@/lib/fulfilment/api';
-import { todayIST } from '@/lib/fulfilment/roles';
 import type { StaffOrder } from '@/lib/fulfilment/types';
 import { getApiErrorMessage, getApiFieldErrors } from '@/lib/apiErrors';
 import ReasonDialog from '@/components/admin/ReasonDialog';
 import RxLinesTable from './RxLinesTable';
 import { emptyDraft, rxLinesFor, toVerifyBody, type RxDraft } from './rxForm';
+import { todayIST } from '@/lib/dates';
 
 interface Props {
   order: StaffOrder;

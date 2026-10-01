@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { labelOf, OUTCOMES, SERIOUSNESS, type AdrDetail } from '@/lib/compliance/adverseEvents';
-import { formatDateIST, formatDateTimeIST } from '@/lib/admin/format';
 import StatusBadge from '@/components/admin/StatusBadge';
+import { formatDateIST, formatDateTimeIST } from '@/lib/dates';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (

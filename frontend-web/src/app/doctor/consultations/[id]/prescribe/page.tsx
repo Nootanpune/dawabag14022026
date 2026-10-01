@@ -2,11 +2,12 @@
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { doctorKeys, fetchConsultation } from '@/lib/telemedicine/doctorApi';
-import { formatSlotDate, formatSlotTime, KIND_LABELS, MODE_LABELS, patientLine } from '@/lib/telemedicine/labels';
+import { KIND_LABELS, MODE_LABELS, patientLine } from '@/lib/telemedicine/labels';
 import BackLink from '@/components/admin/BackLink';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import PrescribeForm from '@/components/telemedicine/doctor/PrescribeForm';
+import { formatClockTime, formatDateIST } from '@/lib/dates';
 
 // Write the e-prescription for a consultation (C-23, C-24). The server returns it only to its doctor or patient.
 export default function PrescribePage() {
@@ -20,7 +21,7 @@ export default function PrescribePage() {
         <>
           <PageHeader
             title={`E-prescription for ${c.patient_name ?? 'patient'}`}
-            subtitle={`${patientLine(c.patient_age, c.patient_gender)} · ${formatSlotDate(c.slot_date)} ${formatSlotTime(c.slot_start)} · ${
+            subtitle={`${patientLine(c.patient_age, c.patient_gender)} · ${formatDateIST(c.slot_date)} ${formatClockTime(c.slot_start, { zone: true })} · ${
               MODE_LABELS[c.mode] ?? c.mode
             } · ${KIND_LABELS[c.consult_kind] ?? c.consult_kind}`}
           />

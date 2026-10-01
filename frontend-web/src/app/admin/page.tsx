@@ -7,7 +7,8 @@ import PageHeader from '@/components/admin/PageHeader';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES } from '@/lib/admin/roles';
 import api from '@/lib/api';
-import { formatPrice, formatDate, ORDER_STATUS_LABELS } from '@/lib/utils';
+import { formatPrice, ORDER_STATUS_LABELS } from '@/lib/utils';
+import { formatDateIST, formatLongDayIST } from '@/lib/dates';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -53,7 +54,7 @@ export default function AdminDashboard() {
   return (
     <div>
       <PageHeader
-        title={`Overview — ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`}
+        title={`Overview — ${formatLongDayIST()}`}
         onRefresh={() => refetch()}
       />
       <div>
@@ -117,7 +118,7 @@ export default function AdminDashboard() {
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${si.color}`}>{si.label}</span>
                           </td>
                           <td className="py-2.5 text-gray-500">{order.item_count}</td>
-                          <td className="py-2.5 text-gray-400 text-xs">{formatDate(order.created_at)}</td>
+                          <td className="py-2.5 text-gray-400 text-xs">{formatDateIST(order.created_at)}</td>
                         </tr>
                       );
                     })}

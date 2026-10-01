@@ -7,6 +7,7 @@ import '../../../models/aftercare.dart';
 import '../../../providers/aftercare_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/formatters.dart';
+import '../../../utils/ist.dart';
 import '../../../widgets/error_retry_view.dart';
 import '../../../widgets/summary_row.dart';
 
@@ -40,7 +41,7 @@ class ReturnDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 SummaryRow('Reason', returnReasonLabel(r.reason)),
                 if (r.sellerName != null) SummaryRow('Seller', r.sellerName!),
-                if (r.createdAt != null) SummaryRow('Reported', formatDateTime(r.createdAt!)),
+                if (r.createdAt != null) SummaryRow('Reported', formatDateTimeIst(r.createdAt!)),
                 if (r.refundPaise != null && r.refundPaise! > 0)
                   SummaryRow('Refund', formatPrice(r.refundPaise!), valueColor: AppTheme.brandGreen),
                 if (r.orderId != null)
@@ -67,7 +68,7 @@ class ReturnDetailScreen extends ConsumerWidget {
                           [
                             'Qty ${i.quantity}',
                             if (i.batchNumber != null) 'Batch ${i.batchNumber}',
-                            if (i.expiryDate != null) 'Exp ${formatDate(i.expiryDate!)}',
+                            if (i.expiryDate != null) 'Exp ${formatDateIst(i.expiryDate!)}',
                           ].join(' · '),
                           style: const TextStyle(fontSize: 11),
                         ),

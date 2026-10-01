@@ -7,6 +7,7 @@ import '../../../models/doctor.dart';
 import '../../../providers/doctor_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../utils/consult_format.dart';
+import '../../../utils/ist.dart';
 
 /// Number of days offered in the date strip.
 const int kSlotDays = 14;
@@ -32,8 +33,7 @@ class SlotPicker extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = todayIstDate();
     final days = List.generate(kSlotDays, (i) => DateTime(today.year, today.month, today.day + i));
     final query = (doctorId: doctorId, date: slotQueryDate(day));
     final slots = ref.watch(doctorSlotsProvider(query));
@@ -108,7 +108,7 @@ class SlotPicker extends ConsumerWidget {
                   runSpacing: 8,
                   children: list
                       .map((s) => ChoiceChip(
-                            label: Text(formatSlotTime(s.slotStart)),
+                            label: Text(formatSlotTime(s.slotStart, zone: true)),
                             selected: s.id == selectedSlotId,
                             onSelected: (_) => onSlotSelected(s),
                             selectedColor: AppTheme.brandGreen100,

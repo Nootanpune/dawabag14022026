@@ -1,7 +1,7 @@
 'use client';
 import { Copy, Trash2 } from 'lucide-react';
 import type { ReceiptLineDraft } from '@/lib/purchasing/receiptForm';
-import { todayIST } from '@/lib/fulfilment/roles';
+import { todayIST } from '@/lib/dates';
 
 interface Props {
   index: number;

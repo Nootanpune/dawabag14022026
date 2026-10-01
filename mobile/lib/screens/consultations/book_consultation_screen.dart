@@ -142,7 +142,7 @@ class _BookConsultationScreenState extends ConsumerState<BookConsultationScreen>
     final doctor = ref.watch(doctorDetailProvider(widget.doctorId)).valueOrNull;
     final when = [
       if (widget.date != null) formatConsultDay(widget.date),
-      if (widget.start != null) formatSlotTime(widget.start),
+      if (widget.start != null) formatSlotTime(widget.start, zone: true),
     ].join(', ');
 
     return Scaffold(

@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import type { AlertSummary } from '@/lib/recallAlerts/types';
 import { SOURCE_LABELS } from '@/lib/recallAlerts/labels';
-import { formatDateTimeIST } from '@/lib/admin/format';
 import DeadlineBadge from './DeadlineBadge';
+import { formatDateTimeIST } from '@/lib/dates';
 
 /** Regulator alerts with their 4-hour deadline and decision counts (C-28). */
 export default function AlertTable({ rows }: { rows: AlertSummary[] }) {
@@ -39,7 +39,7 @@ export default function AlertTable({ rows }: { rows: AlertSummary[] }) {
                 {a.entered_by_name && <span className="block">entered by {a.entered_by_name}</span>}
               </td>
               <td className="px-4 py-2.5 text-xs whitespace-nowrap">
-                <span className="block text-gray-500 mb-1">{formatDateTimeIST(a.due_at)}</span>
+                <span className="block text-gray-500 mb-1">{formatDateTimeIST(a.due_at, { zone: true })}</span>
                 <DeadlineBadge dueAt={a.due_at} pending={a.pending} matches={a.matches} />
               </td>
               <td className="px-4 py-2.5 text-right tabular-nums">{a.lines}</td>
