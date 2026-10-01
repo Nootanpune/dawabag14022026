@@ -10,10 +10,13 @@ export async function getMyConsents(req: Request, res: Response, next: NextFunct
   try { res.json({ success: true, data: await getConsents(req.user!.id) }); } catch (err) { next(err); }
 }
 
+// notice_language: the language of the privacy notice on the screen when the buyer chose (C-40)
+const consentBody = z.object({ granted: z.boolean(), notice_language: z.enum(['en', 'mr', 'hi']).optional() });
+
 export async function putMarketingConsent(req: Request, res: Response, next: NextFunction) {
   try {
-    const { granted } = z.object({ granted: z.boolean() }).parse(req.body);
-    const data = await setMarketingConsent(req.user!.id, granted, req.ip || null, req.get('user-agent')?.slice(0, 500) || null);
+    const { granted, notice_language } = consentBody.parse(req.body);
+    const data = await setMarketingConsent(req.user!.id, granted, req.ip || null, req.get('user-agent')?.slice(0, 500) || null, notice_language);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
@@ -21,8 +24,8 @@ export async function putMarketingConsent(req: Request, res: Response, next: Nex
 // PUT /privacy/consents/whatsapp { granted } — order updates on WhatsApp, opt-in only
 export async function putWhatsAppConsent(req: Request, res: Response, next: NextFunction) {
   try {
-    const { granted } = z.object({ granted: z.boolean() }).parse(req.body);
-    res.json({ success: true, data: await setConsent(req.user!.id, 'whatsapp', granted, req.ip || null, req.get('user-agent')?.slice(0, 500) || null) });
+    const { granted, notice_language } = consentBody.parse(req.body);
+    res.json({ success: true, data: await setConsent(req.user!.id, 'whatsapp', granted, req.ip || null, req.get('user-agent')?.slice(0, 500) || null, notice_language) });
   } catch (err) { next(err); }
 }
 

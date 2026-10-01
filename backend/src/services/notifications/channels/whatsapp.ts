@@ -8,6 +8,15 @@ import { ChannelResult } from './result';
 
 interface WaTemplate { name: string; language: string; vars?: string[] }
 
+// WhatsApp is a third-party platform: only order and account updates go there, and
+// only with values that say nothing about health — never medicine names, batch,
+// prescription or recall details, reasons or verification codes (C-41).
+export const WHATSAPP_TYPES = [
+  'payment_confirmed', 'packed', 'dispatched', 'out_for_delivery', 'delivered', 'order_status', 'order_cancelled',
+  'return_update', 'refill_reminder', 'refill_upcoming', 'refill_order_created', 'credit_due', 'grievance_update', 'kyc_approved',
+] as const;
+export const WHATSAPP_VARS = ['order_number', 'status', 'awb', 'courier', 'tracking_url', 'amount', 'date', 'code', 'ticket', 'return_no'] as const;
+
 export async function whatsappOptedIn(userId: string): Promise<boolean> {
   const c = await queryOne<{ granted: boolean }>(
     `SELECT granted FROM consent_records WHERE user_id = $1 AND purpose = 'whatsapp' ORDER BY recorded_at DESC LIMIT 1`, [userId]);
@@ -17,7 +26,10 @@ export async function whatsappOptedIn(userId: string): Promise<boolean> {
 export async function sendWhatsApp(mobile: string, type: string, values: Record<string, string>): Promise<ChannelResult | null> {
   const templates = await getSetting<Record<string, WaTemplate>>('whatsapp.templates', {});
   const t = templates[type];
-  if (!t) return null;                                         // this message type is not sent on WhatsApp
+  if (!t || !(WHATSAPP_TYPES as readonly string[]).includes(type)) return null;   // this message type is not sent on WhatsApp
+  if ((t.vars ?? []).some((v) => !(WHATSAPP_VARS as readonly string[]).includes(v))) {
+    return { status: 'skipped', detail: `WhatsApp template for "${type}" uses a value that may not be sent on WhatsApp` };
+  }
   if (!process.env.MSG91_AUTH_KEY || !process.env.MSG91_WHATSAPP_NUMBER) return { status: 'skipped', detail: 'WhatsApp not configured' };
   const components: Record<string, { type: 'text'; value: string }> = {};
   for (const [i, ours] of (t.vars ?? []).entries()) {

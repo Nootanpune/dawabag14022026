@@ -111,7 +111,6 @@ export interface Rider {
  */
 export interface RunStop {
   shipment_id: string;
-  invoice_number: string | null;
   order_number: string;
   /** the DWR… run reference */
   run_ref: string | null;

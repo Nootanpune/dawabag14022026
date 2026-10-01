@@ -10,6 +10,7 @@ import { handoverSchema } from './fulfilment.controller';
 import { generateSettlements, getSettlement, listSettlements, markSettlementPaid } from '../services/settlement.service';
 import { listSettings } from '../services/settings.service';
 import { REJECTION_CODES } from '../utils/rejectionCodes';
+import { WHATSAPP_TYPES, WHATSAPP_VARS } from '../services/notifications/channels/whatsapp';
 
 export async function getRejectionCodes(_req: Request, res: Response) {
   res.json({ success: true, data: { codes: Object.entries(REJECTION_CODES).map(([code, v]) => ({ code, ...v })) } });
@@ -153,9 +154,10 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Sprint 13 — GST period lock: a past date (or null to open), never in the future
   'accounts.locked_until': z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((d) => d < new Date().toISOString().slice(0, 10), 'Lock only past dates').nullable(),
   // Sprint 13 — WhatsApp templates approved by Meta, per message type
-  'whatsapp.templates': z.record(z.string().regex(/^[a-z_]{2,40}$/), z.object({
+  // (order and account updates only, no health details — C-41)
+  'whatsapp.templates': z.record(z.enum(WHATSAPP_TYPES), z.object({
     name: z.string().trim().regex(/^[a-z0-9_]{1,512}$/), language: z.string().regex(/^[a-z]{2}(_[A-Z]{2})?$/),
-    vars: z.array(z.string().regex(/^[a-z_]{2,30}$/)).max(10).optional(),
+    vars: z.array(z.enum(WHATSAPP_VARS)).max(10).optional(),
   }).strict()),
   // Sprint 12 — opening stock by catalogue import closes at go-live (C-46)
   'catalogue.opening_stock_open': z.boolean(),

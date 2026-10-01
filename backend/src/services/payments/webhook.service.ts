@@ -8,6 +8,7 @@ import { logger } from '../../config/logger';
 import { applyTokenEvent } from '../mandate.service';
 import { settleGatewayLeg } from '../refund.service';
 import { applyCapture } from './capture.service';
+import { consultationRefundEvent } from '../telemedicine/consultationFee.service';
 
 async function paymentFailed(p: any): Promise<string> {
   if (!p?.order_id) return 'no order id';
@@ -20,7 +21,11 @@ async function paymentFailed(p: any): Promise<string> {
 
 async function refundEvent(event: string, rf: any): Promise<string> {
   const leg = await queryOne<{ id: string; status: string }>(`SELECT id, status FROM refunds WHERE gateway_refund_id = $1`, [rf?.id]);
-  if (!leg) { logger.warn(`Refund ${rf?.id} is not in the refund ledger (made outside Dawabag?)`); return 'refund not in ledger'; }
+  if (!leg) {
+    const consult = await consultationRefundEvent(event, rf);
+    if (consult) return consult;
+    logger.warn(`Refund ${rf?.id} is not in the refund ledger (made outside Dawabag?)`); return 'refund not in ledger';
+  }
   if (event === 'refund.failed') {
     await query(`UPDATE refunds SET failure_reason = $2 WHERE id = $1 AND status = 'pending'`,
       [leg.id, `Gateway refund failed${rf?.error_description ? `: ${rf.error_description}` : ''}; retry or refund manually`]);

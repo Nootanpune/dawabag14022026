@@ -9,6 +9,7 @@ import { runExpiryWatchJob } from './expiryWatch.job';
 import { runEinvoiceSweep } from '../services/einvoice/einvoice.service';
 import { runPaymentSweep } from '../services/payments/reconcile.service';
 import { runRetentionPurge } from '../services/retention.service';
+import { runRecallAlertWatch } from '../services/recallAlerts/alert.service';
 
 export interface JobDefinition {
   name: string;
@@ -18,6 +19,12 @@ export interface JobDefinition {
 }
 
 export const JOBS: JobDefinition[] = [
+  {
+    name: 'recall_alert_watch',
+    description: 'Alert admins when a regulator recall alert passes its 4 hours with matches undecided (C-28)',
+    cron: '*/10 * * * *',                    // every 10 minutes
+    run: runRecallAlertWatch,
+  },
   {
     name: 'retention_purge',
     description: 'Delete operational data past its retention period (setting retention.days; DPDP storage limitation, C-44)',

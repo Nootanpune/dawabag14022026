@@ -51,14 +51,15 @@ export async function refundConsultationFee(id: string): Promise<{ id: string; a
   try {
     const rzp: any = getRazorpay();
     const earlier = await rzp.payments.fetchMultipleRefund(c.gateway_payment_id).catch(() => ({ items: [] }));
-    const refund = (earlier.items ?? []).find((x: any) => x?.notes?.consultation_id === id)
+    // An earlier refund that failed at the gateway is not adopted: a new one is made
+    const refund = (earlier.items ?? []).find((x: any) => x?.notes?.consultation_id === id && x?.status !== 'failed')
       ?? await rzp.payments.refund(c.gateway_payment_id, { amount: c.fee_paise, notes: { consultation_id: id } });
-    await withTransaction(async (client) => {
-      const done = await client.query(
-        `UPDATE consultations SET payment_status = 'refunded', gateway_refund_id = $2, refund_error = NULL WHERE id = $1 AND payment_status = 'refund_pending' RETURNING patient_user_id`,
-        [id, refund.id]);
-      if (done.rowCount) await writeAuditTx(client, { userId: done.rows[0].patient_user_id, action: 'consultation_refunded', newValue: { consultation_id: id, refund_id: refund.id, amount_paise: c.fee_paise } });
-    });
+    if (refund.status !== 'processed') {
+      // Still with the bank: stays refund_pending until Razorpay reports it processed (webhook or sweep)
+      await query(`UPDATE consultations SET gateway_refund_id = $2, refund_error = NULL WHERE id = $1 AND payment_status = 'refund_pending'`, [id, refund.id]);
+      return { id: refund.id, amount_paise: c.fee_paise };
+    }
+    await markConsultationRefunded(id, refund.id, c.fee_paise);
     return { id: refund.id, amount_paise: c.fee_paise };
   } catch (e: any) {
     const msg = String(e?.error?.description || e?.message || e).slice(0, 500);
@@ -66,6 +67,33 @@ export async function refundConsultationFee(id: string): Promise<{ id: string; a
     await query(`UPDATE consultations SET refund_error = $2 WHERE id = $1`, [id, msg]);
     return null;
   }
+}
+
+async function markConsultationRefunded(id: string, refundId: string, amountPaise: number) {
+  await withTransaction(async (client) => {
+    const done = await client.query(
+      `UPDATE consultations SET payment_status = 'refunded', gateway_refund_id = $2, refund_error = NULL WHERE id = $1 AND payment_status = 'refund_pending' RETURNING patient_user_id`,
+      [id, refundId]);
+    if (done.rowCount) await writeAuditTx(client, { userId: done.rows[0].patient_user_id, action: 'consultation_refunded', newValue: { consultation_id: id, refund_id: refundId, amount_paise: amountPaise } });
+  });
+}
+
+// Webhook refund.processed / refund.failed for a consultation fee (C-37). A failed
+// refund goes back to refund_pending with the error; the sweep makes a new one.
+export async function consultationRefundEvent(event: string, rf: any): Promise<string | null> {
+  const c = await queryOne<{ id: string; fee_paise: number; payment_status: string }>(
+    `SELECT id, fee_paise, payment_status FROM consultations WHERE gateway_refund_id = $1`, [rf?.id]);
+  if (!c) return null;
+  if (event === 'refund.failed') {
+    await query(`UPDATE consultations SET payment_status = 'refund_pending', gateway_refund_id = NULL, refund_error = $2 WHERE id = $1 AND payment_status = 'refund_pending'`,
+      [c.id, `Gateway refund failed${rf?.error_description ? `: ${rf.error_description}` : ''}; will retry`]);
+    return 'consultation refund failed; will retry';
+  }
+  if (event === 'refund.processed' || rf?.status === 'processed') {
+    await markConsultationRefunded(c.id, rf.id, c.fee_paise);
+    return 'consultation refund settled';
+  }
+  return 'consultation refund noted';
 }
 
 // Payment sweep: retry refunds still pending

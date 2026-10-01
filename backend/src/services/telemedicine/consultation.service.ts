@@ -60,6 +60,8 @@ async function patientConsultation(userId: string, id: string) {
 
 // Patient or the consultation's own (still verified) doctor; paid; from 15 minutes
 // before the slot until an hour after it ends
+const TOKEN_MAX_S = 30 * 60;
+
 export async function joinConsultation(userId: string, id: string) {
   const c = await queryOne<any>(
     `SELECT c.*, dp.user_id AS doctor_user_id, dp.is_verified AND dp.is_active AS doctor_ok,
@@ -73,9 +75,10 @@ export async function joinConsultation(userId: string, id: string) {
   if (!['paid', 'waived'].includes(c.payment_status)) throw new AppError('Pay the consultation fee to join', 402);
   if (Number(c.minutes_to_start) > JOIN_EARLY_MIN) throw new AppError(`The consultation opens ${JOIN_EARLY_MIN} minutes before the slot`, 409);
   if (c.status === 'booked' && isDoctor) await query(`UPDATE consultations SET status = 'in_progress', started_at = NOW() WHERE id = $1 AND status = 'booked'`, [id]);
-  // A token for this channel and this person only, valid until an hour after the slot ends:
-  // the channel name alone never lets anyone in (security review)
-  const validFor = Math.max(60, Math.round((60 - Number(c.minutes_after_end)) * 60));
+  // A token for this channel and this person only, for at most 30 minutes and never past an
+  // hour after the slot: the apps renew it through this call, which refuses once the
+  // consultation is cancelled, ended or the doctor de-listed — so access ends with it (C-23)
+  const validFor = Math.max(60, Math.min(TOKEN_MAX_S, Math.round((60 - Number(c.minutes_after_end)) * 60)));
   return { channel: c.agora_channel, mode: c.type, app_id: process.env.AGORA_APP_ID ?? null, role: isDoctor ? 'doctor' : 'patient',
     uid: userId, token: rtcToken(c.agora_channel, userId, validFor), token_expires_in: validFor };
 }
@@ -120,6 +123,9 @@ export async function cancelDoctorConsultations(client: PoolClient, doctorId: st
      WHERE doctor_id = $1 AND status IN ('booked', 'in_progress')
        AND NOT EXISTS (SELECT 1 FROM digital_prescriptions rx WHERE rx.consultation_id = consultations.id)
      RETURNING id, slot_id, payment_status`, [doctorId, adminId])).rows;
+  // A consultation already prescribed in is closed as completed, not left in progress
+  await client.query(`UPDATE consultations SET status = 'completed', ended_at = COALESCE(ended_at, NOW())
+                      WHERE doctor_id = $1 AND status = 'in_progress'`, [doctorId]);
   await client.query(`UPDATE doctor_slots SET is_blocked = TRUE WHERE doctor_id = $1 AND (slot_date + slot_start) > (NOW() AT TIME ZONE 'Asia/Kolkata')`, [doctorId]);
   return rows.filter((r: any) => r.payment_status === 'refund_pending').map((r: any) => r.id);
 }

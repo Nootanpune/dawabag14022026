@@ -7,6 +7,7 @@ import { query, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { getSetting } from './settings.service';
+import { assertOpenPeriod } from './accountsLock';
 import { computeSettlement } from './settlementMath';
 
 const DEFAULT_COMMISSION_PCT = 8;
@@ -14,6 +15,8 @@ const DEFAULT_FINDING_FEE_PAISE = 1500;
 
 export async function generateSettlements(periodFrom: string, periodTo: string, createdBy: string | null) {
   if (periodFrom > periodTo) throw new AppError('period_from must be on or before period_to', 400);
+  // Settlements feed GSTR-8 (TCS) and the commission invoices: never into a filed period (C-31, C-32)
+  await assertOpenPeriod(periodTo, 'A partner settlement');
   const tcsPct = Number(await getSetting('marketplace.tcs_pct', 0.5));
   const tdsPct = Number(await getSetting('marketplace.tds_pct', 0.1));
   const feeGstPct = Number(await getSetting('marketplace.fee_gst_pct', 18));

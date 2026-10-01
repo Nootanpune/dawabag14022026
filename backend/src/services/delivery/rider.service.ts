@@ -45,7 +45,7 @@ export async function reassignRider(by: string, shipmentId: string, riderId: str
 // The rider's run sheet
 export async function myRun(riderId: string) {
   return query(
-    `SELECT s.id AS shipment_id, s.invoice_number, o.order_number, s.awb_number AS run_ref, s.seal_number, s.cold_chain, s.handover_code_required,
+    `SELECT s.id AS shipment_id, o.order_number, s.awb_number AS run_ref, s.seal_number, s.cold_chain, s.handover_code_required,
             s.handover_attempts, s.dispatched_at, a.full_name AS deliver_to, a.mobile AS contact_mobile,
             concat_ws(', ', a.address_line1, a.address_line2, a.city, a.pincode) AS address,
             (SELECT COUNT(*)::int FROM order_items oi WHERE oi.shipment_id = s.id) AS item_lines

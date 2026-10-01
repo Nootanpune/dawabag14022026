@@ -144,7 +144,8 @@ app.use(`${api}/vendors`, vendorRoutes);
 app.use(`${api}/admin`, adminRoutes);
 app.use(`${api}/doctors`, doctorRoutes);
 app.use(`${api}/consultations`, consultationRoutes);
-app.use(`${api}/eprescriptions`, verifyLimiter, eprescriptionRoutes);
+app.use(`${api}/eprescriptions/verify`, verifyLimiter);   // the public check only
+app.use(`${api}/eprescriptions`, eprescriptionRoutes);
 app.use(`${api}/notifications`, notificationRoutes);
 app.use(`${api}/coupons`, couponRoutes);
 app.use(`${api}/reports`, reportRoutes);

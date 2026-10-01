@@ -11,6 +11,7 @@ import { getSetting } from '../settings.service';
 import { sameState } from '../shipment.service';
 import { assertSupplierCanSupply } from './supplierCheck';
 import { assertOpenPeriod } from '../accountsLock';
+import { assertBatchReceivable } from '../recallAlerts/receiptGate';
 
 export interface GrnLineInput {
   po_item_id?: string; product_id: string; batch_number: string; expiry_date: string; manufactured_date?: string;
@@ -103,6 +104,8 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
         `SELECT id, is_recalled, expiry_date, printed_mrp_paise FROM inventory_batches
          WHERE product_id = $1 AND batch_number = $2 FOR UPDATE`, [l!.product_id, l!.batch_number])).rows[0];
       let batchId: string;
+      // Recalled for this product, or on a regulator alert not cleared for it (C-28)
+      await assertBatchReceivable(client, l!.product_id, l!.batch_number, l!.product.name);
       if (existing?.is_recalled) throw new AppError(`${l!.product.name} batch ${l!.batch_number} is recalled and cannot be received`, 409);
       if (existing && new Date(existing.expiry_date).toISOString().slice(0, 10) === l!.expiry_date
           && (existing.printed_mrp_paise == null || existing.printed_mrp_paise === l!.printed_mrp_paise)) {

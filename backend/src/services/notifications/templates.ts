@@ -182,6 +182,17 @@ export function buildMessage(payload: NotificationPayload) {
         body: `A security incident ${payload.incidentNo} was logged. If it is reportable, CERT-In must be informed by ${payload.dueAt}.` },
       push: { title: `Security incident ${payload.incidentNo}`, body: 'Report to CERT-In within 6 hours if reportable' },
     },
+    // ── Sprint 14: regulator recall alerts (C-28), staff only ──
+    recall_alert: {
+      email: { subject: `Recall alert ${payload.reportNo}: ${payload.count} product(s) to check`,
+        body: `${payload.reason}. ${payload.count} of our product batch(es) match the list. Recall or clear each one by ${payload.dueAt} (4 hours from receipt). Open Admin → Recall alerts.` },
+      push: { title: `Recall alert ${payload.reportNo}`, body: `${payload.count} match(es) to decide by ${payload.dueAt}` },
+    },
+    recall_alert_overdue: {
+      email: { subject: `OVERDUE: recall alert ${payload.reportNo}`,
+        body: `Recall alert ${payload.reportNo} is past its 4-hour deadline with ${payload.count} match(es) undecided. Open Admin → Recall alerts now.` },
+      push: { title: `Overdue recall alert ${payload.reportNo}`, body: `${payload.count} match(es) still undecided` },
+    },
     expiry_watch: {
       email: { subject: `Expiry watch: ${payload.expired} expired, ${payload.nearExpiry} near expiry`,
         body: `${payload.expired} expired batch(es) were raised for write-off approval; ${payload.nearExpiry} batch(es) expire within ${payload.days} days. Open Admin → Stock.` },

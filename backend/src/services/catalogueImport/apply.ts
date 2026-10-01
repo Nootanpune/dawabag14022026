@@ -12,6 +12,7 @@ import { getSetting } from '../settings.service';
 import { assertBelowShelfMrp } from '../shelfMrp';
 import { parseCatalogueWorkbook } from './parse';
 import { BatchRecord, Checked, ProductRecord, checkBatch, checkProduct } from './validate';
+import { assertBatchReceivable } from '../recallAlerts/receiptGate';
 
 const COPY = ['name', 'description', 'composition', 'storage_instructions'] as const;
 
@@ -122,6 +123,7 @@ export async function commitCatalogue(adminId: string, buffer: Buffer, skipError
       if (!row.record || row.action === 'error') continue;
       const b = row.record;
       const productId = ids.get(b.sku) ?? (await client.query(`SELECT id FROM products WHERE upper(sku) = $1`, [b.sku])).rows[0]?.id;
+      await assertBatchReceivable(client, productId, b.batch_number, b.sku);   // C-28
       await client.query(
         `INSERT INTO inventory_batches (product_id, batch_number, quantity_available, purchase_price_paise, expiry_date,
            manufactured_date, storage_location)

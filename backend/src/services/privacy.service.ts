@@ -11,7 +11,8 @@ import { queueNotification } from './notification.service';
 import { privacyNoticeRef } from './policy.service';
 
 // Consent cites the privacy notice actually published, in the language shown (C-40; one authority: policy_documents)
-async function noticeFor(userId: string) {
+async function noticeFor(userId: string, shown?: 'en' | 'mr' | 'hi') {
+  if (shown) return privacyNoticeRef(shown);
   const u = await queryOne<{ preferred_language: string | null }>(`SELECT preferred_language FROM users WHERE id = $1`, [userId]);
   const lang = (['en', 'mr', 'hi'] as const).find((l) => l === u?.preferred_language) ?? 'en';
   return privacyNoticeRef(lang);
@@ -28,13 +29,14 @@ export async function getConsents(userId: string) {
   return { current, history, policy_version: notice.version, notice_language: notice.language };
 }
 
-export async function setMarketingConsent(userId: string, granted: boolean, ip: string | null, agent: string | null) {
-  return setConsent(userId, 'marketing', granted, ip, agent);
+export async function setMarketingConsent(userId: string, granted: boolean, ip: string | null, agent: string | null, lang?: 'en' | 'mr' | 'hi') {
+  return setConsent(userId, 'marketing', granted, ip, agent, lang);
 }
 
 // Optional purposes the buyer can switch on and off at any time (DPDP s.6(4))
-export async function setConsent(userId: string, purpose: 'marketing' | 'whatsapp', granted: boolean, ip: string | null, agent: string | null) {
-  const notice = await noticeFor(userId);
+export async function setConsent(userId: string, purpose: 'marketing' | 'whatsapp', granted: boolean, ip: string | null, agent: string | null,
+  lang?: 'en' | 'mr' | 'hi') {
+  const notice = await noticeFor(userId, lang);
   await query(
     `INSERT INTO consent_records (user_id, purpose, granted, policy_version, notice_language, ip_address, user_agent)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`, [userId, purpose, granted, notice.version, notice.language, ip, agent]);
@@ -144,6 +146,6 @@ async function anonymiseUser(client: PoolClient, userId: string) {
   await client.query(`DELETE FROM user_devices WHERE user_id = $1`, [userId]);
   await client.query(`DELETE FROM carts WHERE user_id = $1`, [userId]);
   await client.query(
-    `INSERT INTO consent_records (user_id, purpose, granted, policy_version) VALUES ($1, 'marketing', FALSE, $2)`,
+    `INSERT INTO consent_records (user_id, purpose, granted, policy_version) VALUES ($1, 'marketing', FALSE, $2), ($1, 'whatsapp', FALSE, $2)`,
     [userId, (await privacyNoticeRef('en')).version]);
 }

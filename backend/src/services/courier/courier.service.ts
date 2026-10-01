@@ -4,7 +4,7 @@
 import crypto from 'crypto';
 import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
-import { writeAuditTx } from '../../utils/audit';
+import { writeAudit, writeAuditTx } from '../../utils/audit';
 import { getSetting } from '../settings.service';
 import { queueNotification } from '../notification.service';
 import { markShipmentDelivered } from '../partnerFulfilment.service';
@@ -38,17 +38,25 @@ export async function bookCourier(userId: string, shipmentId: string) {
     await query(`UPDATE order_shipments SET courier_provider = NULL WHERE id = $1 AND courier_provider = 'shiprocket:booking'`, [shipmentId]);
     throw e;
   }
-  return withTransaction(async (client) => {
-    await client.query(
+  const out = await withTransaction(async (client) => {
+    const saved = await client.query(
       `UPDATE order_shipments SET courier_provider = 'shiprocket', courier_order_ref = $2, courier_shipment_ref = $3,
          awb_number = $4, courier_partner = $5, tracking_status = 'booked' WHERE id = $1 AND awb_number IS NULL`,
       [shipmentId, booked.orderRef, booked.shipmentRef, booked.awb, booked.courier]);
+    if (!saved.rowCount) return null;
     await client.query(
       `INSERT INTO shipment_tracking_events (shipment_id, status, raw_status, event_time) VALUES ($1, 'booked', 'AWB ASSIGNED', NOW())
        ON CONFLICT DO NOTHING`, [shipmentId]);
     await writeAuditTx(client, { userId: null, action: 'courier_booked', performedBy: userId, newValue: { shipment_id: shipmentId, awb: booked.awb, courier: booked.courier } });
     return { shipment_id: shipmentId, awb_number: booked.awb, courier_partner: booked.courier };
   });
+  if (!out) {
+    // The parcel left another way meanwhile: the Shiprocket order must be cancelled by hand
+    await writeAudit({ userId: null, action: 'courier_booking_orphaned', performedBy: userId,
+      newValue: { shipment_id: shipmentId, shiprocket_order: booked.orderRef, awb: booked.awb } });
+    throw new AppError(`The shipment was dispatched another way; cancel Shiprocket order ${booked.orderRef} (AWB ${booked.awb}) in Shiprocket`, 409);
+  }
+  return out;
 }
 
 export function webhookAuthorised(given: string | undefined): boolean {

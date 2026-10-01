@@ -54,7 +54,7 @@ export async function fulfilmentQueue(stage: QueueStage) {
 
 async function lockOwnShipment(client: PoolClient, shipmentId: string) {
   const s = (await client.query(
-    `SELECT s.id, s.status, s.order_id, s.courier_partner, s.awb_number, o.status AS order_status, o.order_number, o.user_id
+    `SELECT s.id, s.status, s.order_id, s.courier_partner, s.awb_number, s.courier_provider, o.status AS order_status, o.order_number, o.user_id
      FROM order_shipments s JOIN orders o ON o.id = s.order_id
      WHERE s.id = $1 AND s.seller_type = 'dawabag' FOR UPDATE OF s`, [shipmentId])).rows[0];
   if (!s) throw new AppError('Shipment not found', 404);
@@ -80,11 +80,13 @@ export async function packShipment(shipmentId: string, userId: string) {
 
 export async function dispatchOwnShipment(shipmentId: string, courierIn: string | undefined, awbIn: string | undefined, userId: string, dispatch: DispatchRecord, riderId?: string) {
   await prepareDispatchEinvoice(shipmentId);
-  return withTransaction(async (client) => {
+  const { result, notice } = await withTransaction(async (client) => {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'packed') throw new AppError('Pack the shipment before dispatch', 409);
     // A shipment booked with the courier (courier.service) already has both; a rider gets a run reference
     if (riderId && s.awb_number) throw new AppError('This shipment is booked with a courier', 409);
+    // A Shiprocket booking still in flight would leave a live courier pickup for a parcel already gone
+    if (s.courier_provider === 'shiprocket:booking') throw new AppError('A courier booking for this shipment is in progress; wait for it', 409);
     const own = riderId ? await assignAtDispatch(client, shipmentId, riderId, userId) : null;
     const courier = own?.courier ?? courierIn ?? s.courier_partner, awb = own?.awb ?? awbIn ?? s.awb_number;
     if (!courier || !awb) throw new AppError('Enter the courier and AWB number, or book the courier first', 400);
@@ -105,10 +107,13 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
     await syncOrderStatus(client, s.order_id);
     await writeAuditTx(client, { userId: s.user_id, action: 'shipment_dispatched', performedBy: userId,
       newValue: { shipment_id: shipmentId, courier, awb, h1_register_rows: h1 } });
-    await queueNotification({ userId: s.user_id, type: 'dispatched', orderId: s.order_id, orderNumber: s.order_number,
-      awbNumber: awb, courierPartner: courier, handoverCode: codeNeeded ? await dispatchedCode(client, shipmentId) : undefined });
-    return { id: shipmentId, status: 'dispatched', courier_partner: courier, awb_number: awb, h1_register_rows: h1 };
+    const notice = { userId: s.user_id, type: 'dispatched', orderId: s.order_id, orderNumber: s.order_number,
+      awbNumber: awb, courierPartner: courier, handoverCode: codeNeeded ? await dispatchedCode(client, shipmentId) : undefined };
+    return { result: { id: shipmentId, status: 'dispatched', courier_partner: courier, awb_number: awb, h1_register_rows: h1 }, notice };
   });
+  // Told only once the dispatch is committed: a refused dispatch never messages the buyer
+  await queueNotification(notice);
+  return result;
 }
 
 // Order status follows its shipments: dispatched when none is still waiting,

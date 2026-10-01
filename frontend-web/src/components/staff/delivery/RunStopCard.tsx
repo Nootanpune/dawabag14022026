@@ -1,7 +1,6 @@
 import { MapPin, Phone } from 'lucide-react';
 import type { RunStop } from '@/lib/fulfilment/types';
 import { formatDateTimeIST } from '@/lib/admin/format';
-import InvoiceDownloadButton from '@/components/orders/InvoiceDownloadButton';
 
 /**
  * One parcel on the rider's run sheet: where, to whom, the seal and whether a
@@ -40,7 +39,6 @@ export default function RunStopCard({ stop: s, onDeliver }: { stop: RunStop; onD
         <p className="text-xs text-red-700 mt-1">{s.handover_attempts} wrong code attempt(s) — the pack locks after 5.</p>
       )}
       <div className="flex flex-wrap justify-end items-center gap-2 mt-3">
-        {s.invoice_number && <InvoiceDownloadButton shipmentId={s.shipment_id} invoiceNumber={s.invoice_number} />}
         <button onClick={onDeliver} className="btn-primary text-xs py-1.5 px-3">
           Mark delivered
         </button>

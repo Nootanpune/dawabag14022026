@@ -24,8 +24,15 @@ const AFFECTED_SQL = `
   WHERE oi.product_id = $1 AND o.status <> 'cancelled'
     AND (ib.batch_number = $2 OR pi.batch_number = $2)`;
 
-export async function recallBatch(staffId: string, input: { product_id: string; batch_number: string; reason: string; source?: string }) {
-  return withTransaction(async (client) => {
+export interface RecallInput { product_id: string; batch_number: string; reason: string; source?: string }
+
+export async function recallBatch(staffId: string, input: RecallInput) {
+  return withTransaction((client) => recallBatchTx(client, staffId, input));
+}
+
+// Inside the caller's transaction (a recall decided from a regulator alert, recallAlerts/)
+export async function recallBatchTx(client: PoolClient, staffId: string, input: RecallInput) {
+  {
     const product = (await client.query('SELECT id, name FROM products WHERE id = $1', [input.product_id])).rows[0];
     if (!product) throw new AppError('Product not found', 404);
     const recall = (await client.query(
@@ -58,7 +65,7 @@ export async function recallBatch(staffId: string, input: { product_id: string; 
       own_batches: own.rowCount, partner_batches: partner.rowCount, orders_notified: orders.size,
       awaiting_dispatch: affected.filter((a) => !a.shipment_status || ['pending', 'packed'].includes(a.shipment_status)).length,
     };
-  });
+  }
 }
 
 export async function listRecalls() {

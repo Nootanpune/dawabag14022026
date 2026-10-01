@@ -16,11 +16,11 @@ const uuid = z.string().uuid();
 async function canSee(req: Request, shipmentId: string): Promise<boolean> {
   const u = req.user;
   if (!u) return false;
-  const s = await queryOne<{ user_id: string; partner_id: string | null; status: string; rider_id: string | null }>(
-    `SELECT o.user_id, s.partner_id, s.status, s.rider_id FROM order_shipments s JOIN orders o ON o.id = s.order_id WHERE s.id = $1`, [shipmentId]);
+  const s = await queryOne<{ user_id: string; partner_id: string | null; status: string }>(
+    `SELECT o.user_id, s.partner_id, s.status FROM order_shipments s JOIN orders o ON o.id = s.order_id WHERE s.id = $1`, [shipmentId]);
   if (!s) return false;
   if (s.user_id === u.id || STAFF.includes(u.role)) return true;
-  if (u.role === 'delivery') return s.status === 'dispatched' && s.rider_id === u.id;   // only packs they are carrying
+  // Riders never open invoices: they list the medicines inside (C-41); the invoice travels in the sealed pack
   if (u.role === 'partner' && s.partner_id) {
     return !!(await queryOne('SELECT 1 FROM vendor_users WHERE user_id = $1 AND vendor_id = $2', [u.id, s.partner_id]));
   }

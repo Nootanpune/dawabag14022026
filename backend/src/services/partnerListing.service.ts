@@ -5,6 +5,8 @@ import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAudit, writeAuditTx } from '../utils/audit';
+import { assertBatchReceivable } from './recallAlerts/receiptGate';
+
 
 const BLOCKED = ['Schedule X', 'NDPS'];
 
@@ -97,12 +99,14 @@ export interface BatchInput {
 export async function upsertInventory(vendorId: string, partnerProductId: string, batches: BatchInput[], userId: string) {
   return withTransaction(async (client: PoolClient) => {
     const pp = (await client.query(
-      'SELECT id, cold_chain FROM partner_products WHERE id = $1 AND partner_id = $2', [partnerProductId, vendorId])).rows[0];
+      'SELECT id, product_id, cold_chain FROM partner_products WHERE id = $1 AND partner_id = $2', [partnerProductId, vendorId])).rows[0];
     if (!pp) throw new AppError('Listing not found', 404);
     for (const b of batches) {
       if (pp.cold_chain && !b.cold_chain_confirmed) {
         throw new AppError(`Batch ${b.batch_number}: confirm cold storage (2–8 °C) for this refrigerated product`, 400);
       }
+      // A recalled batch, or one on a regulator alert, cannot be listed (C-28)
+      await assertBatchReceivable(client, pp.product_id, b.batch_number);
       const existing = (await client.query(
         `SELECT qty_reserved FROM partner_inventory WHERE partner_product_id = $1 AND batch_number = $2 FOR UPDATE`,
         [partnerProductId, b.batch_number])).rows[0];

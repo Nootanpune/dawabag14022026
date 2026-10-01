@@ -4,13 +4,20 @@
 // from `vars`. Sent only to buyers who opted in (C-42).
 //   { "<message type>": { "name": "order_dispatched", "language": "en", "vars": ["order_number", "awb"] } }
 // The server validates the object strictly (PUT /admin/settings/whatsapp.templates).
-import { DLT_MESSAGE_TYPES, DLT_VARIABLES, labelOf } from './dltTemplates';
+import { labelOf } from './dltTemplates';
 
 export const WHATSAPP_TEMPLATES_KEY = 'whatsapp.templates';
 
-/** Same message types and values as SMS: the server fills both from smsVariables() */
-export const WA_MESSAGE_TYPES = DLT_MESSAGE_TYPES;
-export const WA_VARIABLES = DLT_VARIABLES;
+/**
+ * Mirrors WHATSAPP_TYPES / WHATSAPP_VARS on the server: WhatsApp is a third-party
+ * platform, so only order and account updates go there, with values that say
+ * nothing about health — no medicine names, prescription or recall details (C-41).
+ */
+export const WA_MESSAGE_TYPES = [
+  'payment_confirmed', 'packed', 'dispatched', 'out_for_delivery', 'delivered', 'order_status', 'order_cancelled',
+  'return_update', 'refill_reminder', 'refill_upcoming', 'refill_order_created', 'credit_due', 'grievance_update', 'kyc_approved',
+] as const;
+export const WA_VARIABLES = ['order_number', 'status', 'awb', 'courier', 'tracking_url', 'amount', 'date', 'code', 'ticket', 'return_no'] as const;
 export const WA_MAX_VARS = 10;
 
 export interface WaTemplate {
@@ -54,6 +61,7 @@ export function fromWaRows(rows: WaRow[]): { value: WaTemplates } | { error: str
   for (const r of rows) {
     if (!r.type) return { error: 'Choose a message type for every row' };
     if (!TYPE_RE.test(r.type)) return { error: `${r.type}: message types use lowercase letters and _` };
+    if (!(WA_MESSAGE_TYPES as readonly string[]).includes(r.type)) return { error: `${labelOf(r.type)} cannot be sent on WhatsApp (health details stay off third-party apps)` };
     if (out[r.type]) return { error: `${labelOf(r.type)} appears twice` };
     const name = r.name.trim();
     if (!NAME_RE.test(name)) return { error: `${labelOf(r.type)}: the template name uses lowercase letters, digits and _ only (as approved by Meta)` };
@@ -61,7 +69,7 @@ export function fromWaRows(rows: WaRow[]): { value: WaTemplates } | { error: str
     if (!LANGUAGE_RE.test(language)) return { error: `${labelOf(r.type)}: language is a code like en, hi, mr or en_US` };
     if (r.vars.length > WA_MAX_VARS) return { error: `${labelOf(r.type)}: at most ${WA_MAX_VARS} variables` };
     if (r.vars.some((v) => !v)) return { error: `${labelOf(r.type)}: choose a value for every variable` };
-    if (r.vars.some((v) => !VAR_RE.test(v))) return { error: `${labelOf(r.type)}: unknown variable` };
+    if (r.vars.some((v) => !VAR_RE.test(v) || !(WA_VARIABLES as readonly string[]).includes(v))) return { error: `${labelOf(r.type)}: that value may not be sent on WhatsApp` };
     out[r.type] = r.vars.length ? { name, language, vars: r.vars } : { name, language };
   }
   return { value: out };

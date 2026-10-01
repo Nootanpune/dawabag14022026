@@ -42,6 +42,8 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
     if (!env.DB_PASSWORD || PLACEHOLDER.test(env.DB_PASSWORD)) errors.push('DB_PASSWORD must be set to a real password');
     if (!env.CORS_ORIGINS) errors.push('CORS_ORIGINS must list the website origin(s)');
     if (env.COOKIE_SECURE === 'false') errors.push('COOKIE_SECURE=false is not allowed in production');
+    // Unset behind a load balancer, every visitor shares one address and rate limits become global
+    if (env.TRUST_PROXY_HOPS == null || !/^\d+$/.test(String(env.TRUST_PROXY_HOPS))) errors.push('TRUST_PROXY_HOPS must be set (1 behind an AWS load balancer, 0 if none)');
     if (env.DISABLE_SCHEDULER === 'true') warnings.push('Scheduler disabled: licence, refill, settlement and reminder jobs will not run');
     if (env.AWS_REGION && env.AWS_REGION !== 'ap-south-1') errors.push('AWS_REGION must be ap-south-1 (data stays in India, C-44)');
   }

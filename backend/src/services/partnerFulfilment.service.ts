@@ -88,13 +88,19 @@ export async function markShipmentDelivered(
     const own = await queryOne('SELECT 1 FROM order_shipments WHERE id = $1 AND partner_id = $2', [shipmentId, vendorId]);
     if (!own) throw new AppError('Shipment not found', 404);
   }
+  // A rider closes only parcels assigned to them — checked again under the lock below,
+  // so a parcel reassigned meanwhile cannot be closed by the previous rider (C-26)
+  const riderId = actor.role === 'delivery' ? actor.id : null;
+  if (riderId && !(await queryOne('SELECT 1 FROM order_shipments WHERE id = $1 AND rider_id = $2', [shipmentId, riderId]))) {
+    throw new AppError('Shipment not found', 404);
+  }
   // Delivery code and receiver checked before the transaction, so wrong attempts are counted (C-26)
   const { override } = await checkHandover(shipmentId, handover, actor.role);
   return withTransaction(async (client) => {
     const s = (await client.query(
-      `SELECT id, status, order_id FROM order_shipments WHERE id = $1 ${vendorId ? 'AND partner_id = $2' : ''} FOR UPDATE`,
+      `SELECT id, status, order_id, rider_id FROM order_shipments WHERE id = $1 ${vendorId ? 'AND partner_id = $2' : ''} FOR UPDATE`,
       vendorId ? [shipmentId, vendorId] : [shipmentId])).rows[0];
-    if (!s) throw new AppError('Shipment not found', 404);
+    if (!s || (riderId && s.rider_id !== riderId)) throw new AppError('Shipment not found', 404);
     if (s.status !== 'dispatched') throw new AppError('Only dispatched shipments can be marked delivered', 409);
     await client.query(`UPDATE order_shipments SET status = 'delivered', delivered_at = NOW() WHERE id = $1`, [shipmentId]);
     await recordHandover(client, shipmentId, handover, override, userId);

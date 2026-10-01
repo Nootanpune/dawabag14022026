@@ -13,6 +13,10 @@ export async function runRiders(ctx) {
   check('a rider or a courier, not both', r.status === 400, r.json);
   r = await dispatch({ rider_id: ids.buyer });
   check('only delivery staff can be riders', r.status === 404, r.json);
+  await q(`UPDATE order_shipments SET courier_provider = 'shiprocket:booking' WHERE id = $1`, [a.shipmentId]);
+  r = await dispatch({ rider_id: ids.rider1 });
+  check('no rider dispatch while a courier booking is in flight', r.status === 409 && /booking/.test(r.json.message), r.json);
+  await q(`UPDATE order_shipments SET courier_provider = NULL WHERE id = $1`, [a.shipmentId]);
   r = await dispatch({ rider_id: ids.rider1 });
   const sh = (await q(`SELECT courier_partner, awb_number, rider_id, status FROM order_shipments WHERE id = $1`, [a.shipmentId]))[0];
   check('dispatched with a rider and a run reference', r.status === 200 && sh.courier_partner === 'Dawabag rider' && /^DWR\d{7}$/.test(sh.awb_number) && sh.rider_id === ids.rider1, { r: r.json, sh });
@@ -31,7 +35,9 @@ export async function runRiders(ctx) {
   r = await call('GET', `/invoices/shipments/${a.shipmentId}.pdf`, { token: t.rider2, raw: true });
   check("…nor another rider's invoice", r.status === 404, r.status);
   r = await call('GET', `/invoices/shipments/${a.shipmentId}.pdf`, { token: t.rider1, raw: true });
-  check('the carrying rider can print the invoice for the pack', r.status === 200, r.status);
+  check('…nor the carrying rider: invoices name the medicines (C-41)', r.status === 404, r.status);
+  r = await call('GET', '/orders/queue', { token: t.rider1 });
+  check('riders cannot list orders', r.status === 403, r.status);
   r = await call('POST', `/fulfilment/shipments/${a.shipmentId}/delivered`, { token: t.rider2, body: { received_by_name: 'S13 Buyer', received_by_relation: 'self' } });
   check("a rider cannot close another rider's parcel", r.status === 404, r.json);
 
