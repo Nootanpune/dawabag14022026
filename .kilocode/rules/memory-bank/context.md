@@ -2,13 +2,23 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–14 are done (Sprint 14 video calls wired on web and mobile) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–15 are done (Sprint 14 video calls wired on web and mobile) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprint 15 (engineering readiness)
+- `scripts/dev-env.sh` + `scripts/dev-up.sh`: one command from a fresh machine (or this container after a
+  restart) to a migrated API on the fake providers; Redis without snapshots.
+- GitHub Actions CI on every push/PR: backend tsc, jest, migrations ×2 on empty Postgres 16, all smoke
+  suites; web tsc, lint, build. First runs green.
+- X-Request-Id on every request (access/error logs `rid=`, error replies `request_id`); admins alerted once
+  when a scheduled job starts failing (`job_failed`).
+- Mobile: doctors list a day's consultations, join the call and end it (prescribing stays on the web).
+- Tests: Sprint 1–15 smoke 700 checks, jest 67.
 
 ## Done in Sprint 14 (backend)
 - Regulator recall alerts (C-28): CDSCO NSQ / FDA / manufacturer lists uploaded (.xlsx/.csv in memory) or
@@ -62,6 +72,18 @@ the lawyer/CA sign-off.
   unmatched lines read "Not held".
 - GRN form: 409 "recall alert RA-…" shows RecallAlertBanner (link for admins).
 - Files: lib/recallAlerts/{api,types,labels,time}.ts, components/admin/recallAlerts/*.
+
+## Mobile Sprint 15 — doctor join (not compiled — no Flutter SDK here)
+- /doctor/portal is now a small hub → /doctor/consultations (DoctorConsultationsScreen:
+  day list from GET /consultations/doctor?date=YYYY-MM-DD, IST today by default, DayBar
+  prev/next + date picker). Card: slot time, patient name/gender/age, mode, status, payment.
+- "Join" on open rows calls GET /consultations/:id/join (server 402/409 text in a snackbar),
+  then pushes /consultations/:id/call with the ConsultJoin as GoRouter `extra`
+  (VideoCallScreen.initialJoin; patients still use consultJoinProvider). Call screen closes
+  to /doctor/consultations for role 'doctor'. "End consultation" (in_progress only) →
+  POST /consultations/:id/end { notes? }. Prescribing stays web-only (note on rows).
+- Files: models/doctor_consultation.dart, services/doctor_consultation_api.dart,
+  providers/doctor_consultation_provider.dart, screens/doctor/portal/ (+ widgets/).
 
 ## Mobile Sprint 14 — video calls (not compiled — no Flutter SDK here)
 - services/video_call_service.dart (ChangeNotifier over agora_rtc_engine 6.x: permissions

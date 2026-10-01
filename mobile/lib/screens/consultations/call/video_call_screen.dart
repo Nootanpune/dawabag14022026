@@ -15,15 +15,24 @@ import 'widgets/local_preview.dart';
 import 'widgets/remote_view.dart';
 
 /// /consultations/:id/call — the in-app audio/video consultation (Mobile
-/// Sprint 14). Uses the join details the join screen already fetched
-/// ([consultJoinProvider], same consultation), or asks the server when opened
-/// directly. C-23: private between the patient and the doctor; never recorded.
+/// Sprint 14). Used by both sides (Sprint 15): the patient arrives from the
+/// join screen, whose [consultJoinProvider] already holds the join details;
+/// the doctor arrives from the doctor's consultation list with the details in
+/// [initialJoin] (role 'doctor'), so nothing is fetched twice. Opened
+/// directly, it asks the server. C-23: private between the patient and the
+/// consultation's doctor; never recorded. The join details stay in memory.
 class VideoCallScreen extends ConsumerWidget {
   final String consultationId;
-  const VideoCallScreen({super.key, required this.consultationId});
+
+  /// Join details already fetched by the caller (GET /consultations/:id/join).
+  final ConsultJoin? initialJoin;
+
+  const VideoCallScreen({super.key, required this.consultationId, this.initialJoin});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final ready = initialJoin;
+    if (ready != null) return _CallView(consultationId: consultationId, join: ready);
     final async = ref.watch(consultJoinProvider(consultationId));
     return async.when(
       loading: () => const Scaffold(
@@ -73,7 +82,8 @@ class _CallViewState extends State<_CallView> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/consultations');
+      // Back to the list this person joined from (C-22: the doctor's own list).
+      context.go(widget.join.role == 'doctor' ? '/doctor/consultations' : '/consultations');
     }
   }
 

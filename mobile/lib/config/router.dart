@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/consultation.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register/register_screen.dart';
@@ -35,6 +36,7 @@ import '../screens/consultations/my_consultations_screen.dart';
 import '../screens/doctor/doctor_detail_screen.dart';
 import '../screens/doctor/doctor_list_screen.dart';
 import '../screens/doctor/doctor_portal_screen.dart';
+import '../screens/doctor/portal/doctor_consultations_screen.dart';
 import '../screens/admin/admin_screen.dart';
 import '../widgets/main_scaffold.dart';
 
@@ -57,7 +59,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
 
       // Protected routes
-      final protectedRoutes = ['/checkout', '/orders', '/account', '/consultations', '/doctor/portal', '/admin'];
+      final protectedRoutes = ['/checkout', '/orders', '/account', '/consultations', '/doctor/portal', '/doctor/consultations', '/admin'];
       final isProtected = protectedRoutes.any((r) => state.matchedLocation.startsWith(r));
 
       if (!isLoggedIn && isProtected) return '/auth/login?from=${state.matchedLocation}';
@@ -181,9 +183,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       // In-app audio/video call (Mobile Sprint 14, C-23: patient and doctor only, not recorded)
       GoRoute(
         path: '/consultations/:id/call',
-        builder: (c, s) => VideoCallScreen(consultationId: s.pathParameters['id']!),
+        // The doctor's list passes the join details it already fetched as
+        // `extra` (Sprint 15); without them the screen asks the server.
+        builder: (c, s) => VideoCallScreen(
+          consultationId: s.pathParameters['id']!,
+          initialJoin: s.extra is ConsultJoin ? s.extra as ConsultJoin : null,
+        ),
       ),
       GoRoute(path: '/doctor/portal', builder: (c, s) => const DoctorPortalScreen()),
+      // The doctor's consultations for a day, with Join / End (Mobile Sprint 15; C-22, C-23)
+      GoRoute(path: '/doctor/consultations', builder: (c, s) => const DoctorConsultationsScreen()),
       GoRoute(path: '/admin', builder: (c, s) => const AdminScreen()),
     ],
     errorBuilder: (context, state) => Scaffold(
