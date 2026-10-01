@@ -2,7 +2,7 @@
 
 ## Current state (2026-09-30)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–5 are done on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–6 are done on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
@@ -34,6 +34,20 @@ the lawyer/CA sign-off.
   "PDF on website" note (endpoint is Bearer-only, no file writes), checkout split.
 - Owner to fill in: legal.* settings (entity, licences, pharmacist-in-charge, grievance
   officer); appoint the pharmacist-in-charge and grievance officer.
+
+## Done in Sprint 6 (beta launch readiness)
+- Security review of money/access paths: 12 findings fixed (status route admin-cancel only,
+  refund cap, payment webhooks, credit settlement, address/patient ownership, duplicate lines,
+  coupons, wallet cap, partner handover/suspension, consultation ownership).
+- Deployability: stdout logs, config checks, /ready, graceful shutdown, migration runner
+  (`npm run db:migrate`, `--baseline 08` for pre-runner DBs), Dockerfiles, compose, docs/RUNBOOK.md.
+  All suites pass on a DB built only by migrations; API image migrates an empty DB and runs.
+- Migration 09: coupon redemptions, final-record triggers (C-34), saved-Rx request,
+  cold-chain dispatch fields, security incidents.
+- Catalogue/opening-stock import from the xlsx template (in memory); admin product list/detail
+  (`/products/admin/list`, `/products/:id/admin`); accountant reports (`/accounts/reports/*`);
+  saved Rx reuse (C-08); cold-chain dispatch record (C-25); incident register (C-43).
+- Tests: test/sprint6.smoke.mjs (64 checks) + Sprint 1–5 + 35 jest tests pass.
 
 ## Done in Sprint 5 (after-sale care and consumer protection)
 - Migration 08. Cancellation, returns, refund ledger, GST credit notes, partner settlement
@@ -78,6 +92,19 @@ the lawyer/CA sign-off.
   handover_code_required / seal_number; return detail credit_notes have no id (PDF only
   from order page); no admin product create/edit screen exists yet on web.
 
+## Web Sprint 6 (tsc + next lint + next build pass)
+- /admin/products (search list), /new and /[id] edit (rupees in, paise out; only changed
+  fields PATCHed; C-16 price checks mirrored, C-17 declarations, C-19 copy review note).
+- /admin/catalogue-import: template download, preview (per-row errors/warnings), commit with
+  "skip rows with errors"; the File stays in memory only.
+- /admin/accounts: report + period (default last month), table (₹ for *_paise), CSV download.
+- /admin/incidents (C-43): live 6-hour CERT-In countdown/overdue badge, log incident, record
+  CERT-In / DPB / users notified, actions, status.
+- Cold-chain dispatch (C-25): temperature 2–8 °C + logger ID on staff and partner dialogs.
+- Checkout Rx step offers saved verified prescriptions (POST /prescriptions/:id/use-for-order);
+  staff Rx queue shows "Buyer offered saved prescription" with View / Apply.
+- No web UI used PATCH /orders/:id/status (admin-only cancel), so nothing to remove.
+
 ## Done in Sprint 3 (backend)
 - Owner decisions: allocation rule (> ₹10k + Dawabag ≤24 h → own stock first, else
   nearest seller), partners sell at catalogue price, refills with reminders +
@@ -104,9 +131,11 @@ the lawyer/CA sign-off.
   keychain, register screen split into screens/auth/register/ (not compiled).
 
 ## Known gaps
-- Buyer cannot attach a saved verified prescription at checkout (pharmacist applies it instead).
 - Refunds through Razorpay untested (no keys; legs wait for accounts). Replacement = new order.
-- No web admin product create/edit form (API only). Policy texts must be published by the owner.
+- Backend uses AWS SDK v2 (end of support): move to v3 before launch.
+- Web Docker image not yet built here (Docker Hub rate limit); API image built and run.
+- External penetration test pending (internal review done, 12 findings fixed).
+- Policy texts must be published by the owner.
 - WhatsApp channel not wired; GSTR-8 filing manual; Razorpay mandates untested.
 
 ## Done in Sprint 1
@@ -141,3 +170,4 @@ deployment per docs/Dawabag_Beta_Deployment_Guide.docx.
 | 2026-09-30 | Sprint 3 backend: marketplace, allocation, settlements, refills |
 | 2026-09-30 | Sprint 4: pharmacist gate, H1 register, invoices, price checks, grievances, recall, privacy |
 | 2026-09-30 | Sprint 5: cancellation, returns, refunds, credit notes, checkout disclosure, policies, handover code, ADR, licences, addresses |
+| 2026-10-01 | Sprint 6: security fixes, deployability, catalogue import, final records, GST reports, saved Rx, cold chain, incidents |

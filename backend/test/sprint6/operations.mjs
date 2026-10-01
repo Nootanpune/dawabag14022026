@@ -71,6 +71,14 @@ export async function runOperations({ t, P, addr, ids }) {
   check('re-importing the same file changes nothing and refuses duplicate batches',
     r.json.data?.summary?.products?.create === 0 && r.json.data.batches.every((b) => b.action === 'error'), r.json.data?.summary);
 
+  r = await call('GET', '/products/admin/list?q=S6-PARA500&status=inactive', { token: t.admin });
+  check('admin list finds inactive imports', r.json.data?.products?.some((p) => p.sku === 'S6-PARA500' && p.has_declarations === false), r.json.data);
+  const atoId = (await q(`SELECT id FROM products WHERE sku = 'S6-ATO10TAB'`))[0].id;
+  r = await call('GET', `/products/${atoId}/admin`, { token: t.admin });
+  check('admin record carries trade prices and limits', r.json.data?.ptr_price_paise === 6970 && r.json.data?.min_order_qty_retailer >= 1 && !('search_vector' in r.json.data), r.json.data);
+  r = await call('GET', `/products/${atoId}/admin`, { token: t.buyer });
+  check('buyers cannot read the admin record', r.status === 403, r.json);
+
   console.log('Final records (C-34)');
   const raw = new Client({ connectionString: process.env.DATABASE_URL });   // a normal session, no maintenance flag
   await raw.connect();

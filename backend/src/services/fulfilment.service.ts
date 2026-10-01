@@ -21,6 +21,9 @@ export async function fulfilmentQueue(stage: QueueStage) {
     return query(
       `SELECT o.id AS order_id, o.order_number, o.status, o.created_at, up.full_name AS buyer_name, u.customer_type,
               o.requested_prescription_id,   -- saved prescription the buyer offered (apply it after checking)
+              (SELECT json_build_object('prescriber_name', r2.prescriber_name, 'prescribed_on', r2.prescribed_on,
+                 'valid_until', r2.valid_until, 'file_type', r2.file_type) FROM prescriptions r2
+               WHERE r2.id = o.requested_prescription_id) AS requested_prescription,
               json_agg(json_build_object('prescription_id', rx.id, 'status', rx.status, 'uploaded_at', rx.created_at,
                 'file_type', rx.file_type) ORDER BY rx.created_at) FILTER (WHERE rx.id IS NOT NULL) AS prescriptions
        FROM orders o JOIN users u ON u.id = o.user_id

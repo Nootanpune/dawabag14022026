@@ -86,17 +86,19 @@ export function blankForm(): ProductFormValues {
 
 const rupees = (paise: number | null | undefined) => (paise == null ? '' : (Number(paise) / 100).toFixed(2));
 
-/** Prefill from GET /products/:id. Trade prices, MOQs and unapproved copy are not returned → blank. */
+/** Prefill from the admin record (GET /products/:id/admin), which carries every field. */
 export function formFromDetail(p: ProductDetail): ProductFormValues {
   const src = p as unknown as Record<string, unknown>;
+  const full = 'min_order_qty_retailer' in src;   // admin record, not the public page
   const text: Record<string, string> = {};
   for (const f of ALL_FIELDS) {
-    if (f.hiddenOnDetail && f.key !== 'description') text[f.key] = '';
+    if (f.hiddenOnDetail && !full && f.key !== 'description') text[f.key] = '';
     else if (f.key === 'offer_price_paise') text[f.key] = rupees(p.price_paise);
     else if (f.kind === 'rupees') text[f.key] = rupees(src[f.key] as number | null);
     else text[f.key] = src[f.key] == null ? '' : String(src[f.key]);
   }
-  return { sku: p.sku, drug_schedule: p.drug_schedule ?? 'OTC', cold_chain: !!p.cold_chain, is_active: true, text };
+  return { sku: p.sku, drug_schedule: p.drug_schedule ?? 'OTC', cold_chain: !!p.cold_chain,
+    is_active: full ? src.is_active !== false : true, text };
 }
 
 function convert(f: FieldSpec, raw: string): { value?: string | number | null; error?: string } {

@@ -110,7 +110,7 @@ export async function getMyPrescriptions(req: Request, res: Response, next: Next
 
     const prescriptions = await query(
       `SELECT p.id, p.status, p.valid_until, p.created_at,
-              p.is_digital, p.doctor_name, p.order_id,
+              p.is_digital, p.doctor_name, p.order_id, p.prescriber_name, p.prescribed_on,
               pt.full_name as patient_name
        FROM prescriptions p
        LEFT JOIN patients pt ON pt.id = p.patient_id

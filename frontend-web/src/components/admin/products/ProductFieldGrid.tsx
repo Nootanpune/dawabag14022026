@@ -21,7 +21,8 @@ export default function ProductFieldGrid({ title, note, fields, values, onChange
       {note && <p className="text-xs text-gray-500 mb-3">{note}</p>}
       <div className="grid sm:grid-cols-2 gap-3 text-sm mt-2">
         {fields.map((f) => {
-          const keepHint = editing && f.hiddenOnDetail ? 'leave blank to keep' : '';
+          // The admin record fills every field, so blanks are real changes (no 'keep' hint)
+          const keepHint = '';
           const hint = [f.hint, keepHint, !f.required && !keepHint ? 'optional' : ''].filter(Boolean).join(' · ');
           const common = {
             value: values[f.key] ?? '',

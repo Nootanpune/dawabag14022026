@@ -13,7 +13,8 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export const catalogueUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
-  fileFilter: (_req, file, cb) => cb(null, file.mimetype === XLSX || /\.xlsx$/i.test(file.originalname)),
+  fileFilter: (_req, file, cb) => (file.mimetype === XLSX || /\.xlsx$/i.test(file.originalname)
+    ? cb(null, true) : cb(new AppError('Upload the .xlsx template (Excel workbook), not another file type', 422))),
 }).single('file');
 
 function fileOf(req: Request): Buffer {

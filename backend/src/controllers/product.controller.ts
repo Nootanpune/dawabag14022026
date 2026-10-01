@@ -5,6 +5,7 @@ import { cacheGet, cacheSet } from '../config/redis';
 import { AppError } from '../utils/AppError';
 import { writeAudit } from '../utils/audit';
 import { productDetail } from '../services/productDetail.service';
+import { adminGetProduct, adminListProducts } from '../services/productAdmin.service';
 import { COPY_FIELDS, contentQueue, copyFlags, reviewContent } from '../services/productContent.service';
 
 // ─── Search Products ─────────────────────────────────────────────────────────
@@ -287,4 +288,19 @@ export async function postContentReview(req: Request, res: Response, next: NextF
     const d = z.object({ approve: z.boolean(), notes: z.string().trim().min(3).max(1000) }).parse(req.body);
     res.json({ success: true, data: await reviewContent(req.user!.id, z.string().uuid().parse(req.params.productId), d.approve, d.notes) });
   } catch (error) { next(error); }
+}
+
+// ─── Admin catalogue view ─────────────────────────────────────────────────────
+export async function getAdminProducts(req: Request, res: Response, next: NextFunction) {
+  try {
+    const d = z.object({
+      q: z.string().trim().max(100).optional(), page: z.coerce.number().int().min(1).default(1),
+      limit: z.coerce.number().int().min(1).max(100).default(20), status: z.enum(['active', 'inactive']).optional(),
+    }).parse(req.query);
+    res.json({ success: true, data: await adminListProducts(d.q || undefined, d.page, d.limit, d.status) });
+  } catch (error) { next(error); }
+}
+
+export async function getAdminProduct(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await adminGetProduct(z.string().uuid().parse(req.params.productId)) }); } catch (error) { next(error); }
 }
