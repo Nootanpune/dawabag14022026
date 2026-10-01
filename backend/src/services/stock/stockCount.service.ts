@@ -70,7 +70,9 @@ export async function approveCount(approverId: string, id: string) {
 }
 
 export async function getCount(id: string) {
-  const c = await queryOne<any>(`SELECT * FROM stock_counts WHERE id = $1`, [id]);
+  const c = await queryOne<any>(
+    `SELECT c.*, cu.full_name AS counted_by_name, au.full_name AS approved_by_name FROM stock_counts c
+     LEFT JOIN user_profiles cu ON cu.user_id = c.counted_by LEFT JOIN user_profiles au ON au.user_id = c.approved_by WHERE c.id = $1`, [id]);
   if (!c) throw new AppError('Count not found', 404);
   const lines = await query(
     `SELECT l.batch_id, b.batch_number, b.expiry_date, b.storage_location, p.name AS product_name, p.sku, l.system_qty, l.counted_qty
@@ -80,5 +82,9 @@ export async function getCount(id: string) {
 }
 
 export async function listCounts() {
-  return query(`SELECT c.*, (SELECT COUNT(*)::int FROM stock_count_lines l WHERE l.stock_count_id = c.id) AS lines FROM stock_counts c ORDER BY c.created_at DESC LIMIT 100`);
+  return query(
+    `SELECT c.*, cu.full_name AS counted_by_name, au.full_name AS approved_by_name,
+            (SELECT COUNT(*)::int FROM stock_count_lines l WHERE l.stock_count_id = c.id) AS lines
+     FROM stock_counts c LEFT JOIN user_profiles cu ON cu.user_id = c.counted_by LEFT JOIN user_profiles au ON au.user_id = c.approved_by
+     ORDER BY c.created_at DESC LIMIT 100`);
 }

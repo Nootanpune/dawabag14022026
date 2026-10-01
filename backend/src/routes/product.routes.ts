@@ -9,7 +9,7 @@ const router = Router();
 
 router.get('/search', optionalAuth, searchProducts);
 router.get('/categories', getCategories);
-router.get('/admin/list', authenticate, authorize('admin', 'super_admin'), getAdminProducts);
+router.get('/admin/list', authenticate, authorize('admin', 'super_admin', 'pharmacist_pack', 'pharmacist_rx'), getAdminProducts);
 router.get('/:productId/admin', authenticate, authorize('admin', 'super_admin'), getAdminProduct);
 router.get('/content-review/queue', authenticate, authorize('pharmacist_rx', 'admin', 'super_admin'), getContentQueue);
 router.post('/:productId/content-review', authenticate, authorize('pharmacist_rx'), postContentReview);

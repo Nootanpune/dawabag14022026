@@ -82,7 +82,7 @@ const LIST = `
   SELECT a.id, a.adjustment_no, a.batch_id, b.batch_number, b.expiry_date, p.name AS product_name, p.sku, p.drug_schedule,
          a.quantity_delta, a.reason, a.notes, a.status, a.created_at, a.decided_at, a.decision_notes,
          a.disposal_method, a.disposal_reference, a.disposal_witness, a.disposed_at,
-         COALESCE(ru.full_name, 'Expiry watch (system)') AS requested_by_name, au.full_name AS approved_by_name,
+         a.requested_by, a.approved_by, COALESCE(ru.full_name, 'Expiry watch (system)') AS requested_by_name, au.full_name AS approved_by_name,
          (a.quantity_delta * b.purchase_price_paise)::bigint AS value_paise
   FROM stock_adjustments a JOIN inventory_batches b ON b.id = a.batch_id JOIN products p ON p.id = b.product_id
   LEFT JOIN user_profiles ru ON ru.user_id = a.requested_by LEFT JOIN user_profiles au ON au.user_id = a.approved_by`;

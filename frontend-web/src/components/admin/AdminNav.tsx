@@ -26,11 +26,19 @@ import {
   FileSpreadsheet,
   Calculator,
   Siren,
+  Factory,
+  ShoppingCart,
+  PackagePlus,
+  Boxes,
+  SlidersHorizontal,
+  Flame,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_ROLES } from '@/lib/fulfilment/roles';
+import { STORE_ROLES } from '@/lib/purchasing/roles';
 
 const ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, roles: MANAGER_ROLES },
@@ -51,6 +59,14 @@ const ITEMS = [
   { href: '/admin/products', label: 'Products', icon: Package, roles: MANAGER_ROLES },
   { href: '/admin/catalogue-import', label: 'Catalogue import', icon: FileSpreadsheet, roles: MANAGER_ROLES },
   { href: '/admin/stock', label: 'Low stock', icon: PackageX, roles: MANAGER_ROLES },
+  // Sprint 7 — purchasing and stock control (C-02 licensed suppliers, C-46 two-person approvals)
+  { href: '/admin/suppliers', label: 'Suppliers', icon: Factory, roles: MANAGER_ROLES },
+  { href: '/admin/purchase-orders', label: 'Purchase orders', icon: ShoppingCart, roles: MANAGER_ROLES },
+  { href: '/staff/receive', label: 'Receive goods', icon: PackagePlus, roles: STORE_ROLES },
+  { href: '/staff/stock', label: 'Stock', icon: Boxes, roles: STORE_ROLES },
+  { href: '/admin/stock-adjustments', label: 'Stock adjustments', icon: SlidersHorizontal, roles: MANAGER_ROLES },
+  { href: '/staff/stock-counts', label: 'Stock counts', icon: ClipboardList, roles: STORE_ROLES },
+  { href: '/staff/destruction-register', label: 'Destruction register', icon: Flame, roles: STORE_ROLES },
   { href: '/admin/credit', label: 'Credit', icon: IndianRupee, roles: MANAGER_ROLES },
   { href: '/admin/accounts', label: 'Accounts', icon: Calculator, roles: MANAGER_ROLES },
   { href: '/admin/jobs', label: 'Jobs', icon: Timer, roles: MANAGER_ROLES },
@@ -68,7 +84,8 @@ export default function AdminNav() {
   return (
     <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
       {items.map(({ href, label, icon: Icon }) => {
-        const active = href === '/admin' ? pathname === '/admin' : pathname?.startsWith(href);
+        // exact segment match so /admin/stock is not active on /admin/stock-adjustments
+        const active = href === '/admin' ? pathname === '/admin' : pathname === href || !!pathname?.startsWith(`${href}/`);
         return (
           <Link
             key={href}

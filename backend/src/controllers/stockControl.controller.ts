@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { listBatches } from '../services/stock/batches.service';
+import { getSetting } from '../services/settings.service';
 import { REASONS, decideAdjustment, destructionRegister, listAdjustments, recordDisposal, requestAdjustment } from '../services/stock/adjustment.service';
 import { approveCount, getCount, listCounts, recordCounts, startCount, submitCount } from '../services/stock/stockCount.service';
 
@@ -13,7 +14,7 @@ export async function getBatches(req: Request, res: Response, next: NextFunction
       q: z.string().trim().max(100).optional(), product_id: uuid.optional(), expiry: z.enum(['expired', 'near', 'ok']).optional(),
       page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(200).default(50),
     }).parse(req.query);
-    res.json({ success: true, data: { batches: await listBatches(f) } });
+    res.json({ success: true, data: { batches: await listBatches(f), near_expiry_days: Number(await getSetting('stock.near_expiry_days', 90)) } });
   } catch (e) { next(e); }
 }
 

@@ -2,7 +2,7 @@
 
 ## Current state (2026-09-30)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–6 are done on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–7 are done on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
@@ -34,6 +34,31 @@ the lawyer/CA sign-off.
   "PDF on website" note (endpoint is Bearer-only, no file writes), checkout split.
 - Owner to fill in: legal.* settings (entity, licences, pharmacist-in-charge, grievance
   officer); appoint the pharmacist-in-charge and grievance officer.
+
+## Web Sprint 7 — purchasing and stock control (tsc + next lint + next build pass)
+- lib/purchasing (types, api, roles STORE/PURCHASE_ADMIN, productSearch, receiptForm) and
+  lib/stock (types, api, labels); formatPaise added to lib/admin/format.ts.
+- /admin/suppliers (list, add, approve via the existing ApproveVendorDialog, C-02);
+  /admin/purchase-orders (+ /new, + /[id] with approve, cancel, close short, receive link);
+  /staff/receive (open POs + receipts by date) /new?po= (lines prefilled with the remaining
+  qty, split a PO line into batches, server 422 problems listed one per line) /[id];
+  /staff/stock (batches, expiry tabs, adjust request); /admin/stock-adjustments (approval
+  queue, 403 → two-person message, C-46); /staff/destruction-register (record disposal,
+  C-28/C-34); /staff/stock-counts (+ /[id] blind count sheet: system qty hidden until
+  submitted; approve by a different admin). AdminNav links by role; nav active match is now
+  per path segment. purchase-register / stock-valuation labels added to Accounts reports.
+- Backend gaps: adjustments list has no requested_by id (cannot hide Approve on own
+  requests); counts list has no counter / approver names; GET /products/admin/list is
+  admin-only, so pharmacists receiving without a PO search active products only;
+  receipts list has no supplier/PO filter or pagination; batches list returns no total.
+
+## Done in Sprint 7 (purchasing and stock control)
+- Migration 10; suppliers, purchase orders, goods receipts (purchase register), two-person
+  stock adjustments, destruction register, stock counts (blind on web), expiry_watch job,
+  stock valuation; AWS SDK v3; legacy inventory routes retired; both Docker images build
+  (NODE_IMAGE from ECR Public) and run.
+- Tests: test/sprint7.smoke.mjs (40 checks); all seven suites pass, also on a migrations-only DB.
+- Open: receipts list has no supplier/PO filter or paging; no destruction-register CSV.
 
 ## Done in Sprint 6 (beta launch readiness)
 - Security review of money/access paths: 12 findings fixed (status route admin-cancel only,
@@ -132,8 +157,6 @@ the lawyer/CA sign-off.
 
 ## Known gaps
 - Refunds through Razorpay untested (no keys; legs wait for accounts). Replacement = new order.
-- Backend uses AWS SDK v2 (end of support): move to v3 before launch.
-- Web Docker image not yet built here (Docker Hub rate limit); API image built and run.
 - External penetration test pending (internal review done, 12 findings fixed).
 - Policy texts must be published by the owner.
 - WhatsApp channel not wired; GSTR-8 filing manual; Razorpay mandates untested.
@@ -171,3 +194,4 @@ deployment per docs/Dawabag_Beta_Deployment_Guide.docx.
 | 2026-09-30 | Sprint 4: pharmacist gate, H1 register, invoices, price checks, grievances, recall, privacy |
 | 2026-09-30 | Sprint 5: cancellation, returns, refunds, credit notes, checkout disclosure, policies, handover code, ADR, licences, addresses |
 | 2026-10-01 | Sprint 6: security fixes, deployability, catalogue import, final records, GST reports, saved Rx, cold chain, incidents |
+| 2026-10-01 | Sprint 7: purchasing, goods receipt, stock adjustments, destruction register, counts, expiry watch, AWS SDK v3 |
