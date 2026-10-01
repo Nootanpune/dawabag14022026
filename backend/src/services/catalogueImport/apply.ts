@@ -8,6 +8,8 @@ import { cacheDel } from '../../config/redis';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
 import { copyFlags } from '../productContent.service';
+import { getSetting } from '../settings.service';
+import { assertBelowShelfMrp } from '../shelfMrp';
 import { parseCatalogueWorkbook } from './parse';
 import { BatchRecord, Checked, ProductRecord, checkBatch, checkProduct } from './validate';
 
@@ -100,6 +102,7 @@ export async function commitCatalogue(adminId: string, buffer: Buffer, skipError
         ids.set(rec.sku, cur.id);
         if (row.action === 'unchanged') continue;
         const { sku, ...fields } = rec;
+        await assertBelowShelfMrp(cur.id, { ...cur, ...fields }, client);
         const copyChanged = COPY.some((k) => (fields as any)[k] !== cur[k]);
         const all: Record<string, unknown> = copyChanged
           ? { ...fields, content_status: 'pending_review', content_flags: JSON.stringify(copyFlags({ ...cur, ...fields })) } : fields;
@@ -109,6 +112,12 @@ export async function commitCatalogue(adminId: string, buffer: Buffer, skipError
         await cacheDel(`product:${cur.id}`);
       }
     }
+    // Opening stock is for go-live only; afterwards stock enters through goods receipts (C-02, C-16, C-46)
+    const opening = p.batches.filter((r) => r.record && r.action !== 'error');
+    if (opening.length && (await getSetting('catalogue.opening_stock_open', true, client)) !== true) {
+      throw new AppError('Opening stock is closed: receive stock with a goods receipt against a purchase order', 409);
+    }
+    const created: unknown[] = [];
     for (const row of p.batches) {
       if (!row.record || row.action === 'error') continue;
       const b = row.record;
@@ -118,8 +127,10 @@ export async function commitCatalogue(adminId: string, buffer: Buffer, skipError
            manufactured_date, storage_location)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [productId, b.batch_number, b.quantity, b.purchase_price_paise, b.expiry_date, b.manufactured_date, b.storage_location]);
+      created.push({ sku: b.sku, batch: b.batch_number, quantity: b.quantity, cost_paise: b.purchase_price_paise, expiry: b.expiry_date });
     }
-    await writeAuditTx(client, { userId: null, action: 'catalogue_imported', performedBy: adminId, newValue: { ...s, skip_errors: skipErrors } });
+    // Every opening-stock batch is named in the audit, not just counted (C-46)
+    await writeAuditTx(client, { userId: null, action: 'catalogue_imported', performedBy: adminId, newValue: { ...s, skip_errors: skipErrors, opening_stock: created } });
     return { summary: s };
   });
 }

@@ -12,7 +12,7 @@ export async function cleanup() {
   const orderIds = (await q('SELECT id FROM orders WHERE user_id = ANY($1)', [ids])).map((r) => r.id);
   const run = (sql, p) => q(sql, p);
   await run(`DELETE FROM payment_webhook_events WHERE order_ref IN (SELECT gateway_order_id FROM payments WHERE order_id = ANY($1))
-             OR order_ref IN (SELECT gateway_order_id FROM payment_mandates WHERE user_id = ANY($2)) OR event_id LIKE 'evt_s11_%'`, [orderIds, ids]);
+             OR order_ref IN (SELECT gateway_order_id FROM payment_mandates WHERE user_id = ANY($2)) OR entity_id IN (SELECT gateway_payment_id FROM payments WHERE order_id = ANY($1)) OR entity_id LIKE 'rfnd_not_ours%'`, [orderIds, ids]);
   await run('UPDATE refill_subscriptions SET mandate_id = NULL, last_order_id = NULL WHERE user_id = ANY($1)', [ids]);
   await run('UPDATE orders SET refill_subscription_id = NULL WHERE user_id = ANY($1)', [ids]);
   await run('DELETE FROM refill_items WHERE subscription_id IN (SELECT id FROM refill_subscriptions WHERE user_id = ANY($1))', [ids]).catch(() => {});

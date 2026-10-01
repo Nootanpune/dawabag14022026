@@ -90,6 +90,7 @@ export async function dispatchReturn(userId: string, id: string, reference: stri
   return withTransaction(async (client) => {
     const r = await lockReturn(client, id);
     if (r.status !== 'approved') throw new AppError('Only an approved return can be dispatched', 409);
+    if (r.requested_by === userId) throw new AppError('Someone other than the person who raised the return must hand it over', 403);
     await client.query(`UPDATE purchase_returns SET status = 'dispatched', dispatched_by = $2, dispatched_at = NOW(), dispatch_reference = $3 WHERE id = $1`, [id, userId, reference]);
     await writeAuditTx(client, { userId: null, action: 'purchase_return_dispatched', performedBy: userId, newValue: { return_id: id, reference } });
     return { id, status: 'dispatched' };

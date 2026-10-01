@@ -56,6 +56,14 @@ export async function approveCount(approverId: string, id: string) {
     if (!c) throw new AppError('Count not found', 404);
     if (c.status !== 'submitted') throw new AppError(`Count is ${c.status}`, 409);
     if (c.counted_by === approverId) throw new AppError('Someone other than the counter must approve', 403);
+    // The variance is counted against the stock at the start of the count; if sales,
+    // receipts or adjustments moved a batch since, that variance is no longer true
+    const moved = (await client.query(
+      `SELECT p.name, b.batch_number FROM stock_count_lines l JOIN inventory_batches b ON b.id = l.batch_id JOIN products p ON p.id = b.product_id
+       WHERE l.stock_count_id = $1 AND b.quantity_available <> l.system_qty FOR UPDATE OF b`, [id])).rows;
+    if (moved.length) {
+      throw new AppError(`Stock moved during the count for ${moved.map((m: any) => `${m.name} ${m.batch_number}`).join(', ')}; start a new count for these batches`, 409);
+    }
     const diffs = (await client.query(
       `SELECT batch_id, counted_qty - system_qty AS delta FROM stock_count_lines WHERE stock_count_id = $1 AND counted_qty <> system_qty`, [id])).rows;
     for (const d of diffs) {
@@ -69,7 +77,8 @@ export async function approveCount(approverId: string, id: string) {
   });
 }
 
-export async function getCount(id: string) {
+// Blind count: the counter does not see the system quantity until the count is submitted
+export async function getCount(id: string, viewer?: { id: string; role: string }) {
   const c = await queryOne<any>(
     `SELECT c.*, cu.full_name AS counted_by_name, au.full_name AS approved_by_name FROM stock_counts c
      LEFT JOIN user_profiles cu ON cu.user_id = c.counted_by LEFT JOIN user_profiles au ON au.user_id = c.approved_by WHERE c.id = $1`, [id]);
@@ -78,7 +87,8 @@ export async function getCount(id: string) {
     `SELECT l.batch_id, b.batch_number, b.expiry_date, b.storage_location, p.name AS product_name, p.sku, l.system_qty, l.counted_qty
      FROM stock_count_lines l JOIN inventory_batches b ON b.id = l.batch_id JOIN products p ON p.id = b.product_id
      WHERE l.stock_count_id = $1 ORDER BY b.storage_location NULLS LAST, p.name`, [id]);
-  return { ...c, lines };
+  const blind = c.status === 'open' && viewer && !['admin', 'super_admin'].includes(viewer.role);
+  return { ...c, lines: blind ? lines.map(({ system_qty, ...l }: any) => l) : lines };
 }
 
 export async function listCounts() {

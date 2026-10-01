@@ -11,11 +11,16 @@ export async function postDevice(req: Request, res: Response, next: NextFunction
   try {
     const d = z.object({ token: tokenSchema, platform: z.enum(['android', 'ios', 'web']).optional() })
       .parse({ token: req.body.token ?? req.body.fcm_token, platform: req.body.platform });
-    // A token belongs to one device; if another account used it, it moves here
-    await query(
+    // A token belongs to one device. It moves to this account only when the other
+    // account has not used it for a day (a shared phone signing in to someone else);
+    // otherwise a known token could be used to take another person's pushes.
+    const r = await query(
       `INSERT INTO user_devices (user_id, fcm_token, platform) VALUES ($1, $2, $3)
-       ON CONFLICT (fcm_token) DO UPDATE SET user_id = EXCLUDED.user_id, platform = COALESCE(EXCLUDED.platform, user_devices.platform), last_seen_at = NOW()`,
+       ON CONFLICT (fcm_token) DO UPDATE SET user_id = EXCLUDED.user_id, platform = COALESCE(EXCLUDED.platform, user_devices.platform), last_seen_at = NOW()
+       WHERE user_devices.user_id = EXCLUDED.user_id OR user_devices.last_seen_at < NOW() - INTERVAL '1 day'
+       RETURNING id`,
       [req.user!.id, d.token, d.platform ?? null]);
+    if (!r.length) return res.status(409).json({ success: false, message: 'This device is registered to another account; sign out there first' });
     res.json({ success: true });
   } catch (e) { next(e); }
 }

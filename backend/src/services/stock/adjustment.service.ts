@@ -67,8 +67,10 @@ export async function decideAdjustment(approverId: string, id: string, approve: 
 
 export async function recordDisposal(userId: string, id: string, d: { method: 'incineration' | 'authorised_vendor' | 'returned_to_manufacturer'; reference: string; witness: string }) {
   return withTransaction(async (client) => {
-    const adj = (await client.query(`SELECT status, reason, disposed_at FROM stock_adjustments WHERE id = $1 FOR UPDATE`, [id])).rows[0];
+    const adj = (await client.query(`SELECT status, reason, disposed_at, requested_by FROM stock_adjustments WHERE id = $1 FOR UPDATE`, [id])).rows[0];
     if (!adj) throw new AppError('Adjustment not found', 404);
+    // Whoever raised the write-off does not also certify the destruction (C-46)
+    if (adj.requested_by === userId) throw new AppError('Someone other than the person who raised the write-off must record its destruction', 403);
     if (adj.status !== 'approved' || !DESTROY.includes(adj.reason)) throw new AppError('Only approved expired, damaged or recalled write-offs are destroyed', 409);
     if (adj.disposed_at) throw new AppError('Destruction already recorded', 409);
     await client.query(`UPDATE stock_adjustments SET disposal_method = $2, disposal_reference = $3, disposal_witness = $4, disposed_at = NOW() WHERE id = $1`,

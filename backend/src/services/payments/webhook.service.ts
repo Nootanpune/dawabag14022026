@@ -34,8 +34,14 @@ async function refundEvent(event: string, rf: any): Promise<string> {
   return 'refund noted';
 }
 
-export async function handleWebhookEvent(eventId: string | undefined, rawBody: Buffer, body: any): Promise<{ duplicate: boolean; outcome: string }> {
-  const id = eventId || `body:${crypto.createHash('sha256').update(rawBody).digest('hex').slice(0, 40)}`;
+const MAX_AGE_S = 7 * 24 * 3600;
+
+// The key is the hash of the signed body (Razorpay resends the same bytes); the
+// x-razorpay-event-id header is not covered by the signature, so it is not trusted.
+export async function handleWebhookEvent(_eventId: string | undefined, rawBody: Buffer, body: any): Promise<{ duplicate: boolean; outcome: string }> {
+  const id = `sha256:${crypto.createHash('sha256').update(rawBody).digest('hex').slice(0, 64)}`;
+  const createdAt = Number(body?.created_at);
+  if (Number.isFinite(createdAt) && Date.now() / 1000 - createdAt > MAX_AGE_S) return { duplicate: true, outcome: 'stale event ignored' };
   const event = String(body?.event || 'unknown');
   const entity = body?.payload?.payment?.entity ?? body?.payload?.refund?.entity ?? body?.payload?.token?.entity ?? {};
   const fresh = await query(

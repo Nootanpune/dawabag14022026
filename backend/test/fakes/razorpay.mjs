@@ -5,7 +5,7 @@
 // leaves refunds for a later refund.processed webhook.
 import crypto from 'crypto';
 
-export const razorpay = { orders: new Map(), payments: new Map(), refunds: [], recurring: [], deletedTokens: [], extraSettlementLines: [], refundStatus: 'processed' };
+export const razorpay = { orders: new Map(), payments: new Map(), refunds: [], recurring: [], deletedTokens: [], extraSettlementLines: [], refundStatus: 'processed', loseNextRefundReply: false };
 const rid = (p) => `${p}_${crypto.randomBytes(7).toString('hex')}`;
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -20,8 +20,8 @@ export function checkoutPayment(orderId, { status = 'captured', method = 'upi', 
 }
 
 // Razorpay calling the API's webhook, signed over the exact bytes sent
-export async function sendWebhook(event, payload, eventId = rid('evt')) {
-  const raw = JSON.stringify({ entity: 'event', event, payload, created_at: Math.floor(Date.now() / 1000) });
+export async function sendWebhook(event, payload, eventId = rid('evt'), createdAt = Math.floor(Date.now() / 1000)) {
+  const raw = JSON.stringify({ entity: 'event', event, payload, created_at: createdAt });
   const sig = crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET).update(raw).digest('hex');
   const res = await fetch(`${process.env.API_URL || 'http://localhost:4000'}/api/v1/payments/webhook`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-razorpay-signature': sig, 'x-razorpay-event-id': eventId }, body: raw });
@@ -85,8 +85,12 @@ export function razorpayRoute(req, body) {
     if (m[1].includes('FAIL')) return [400, { error: { code: 'BAD_REQUEST_ERROR', description: 'The payment has been fully refunded already' } }];
     const r = { id: rid('rfnd'), entity: 'refund', payment_id: m[1], amount: b.amount, status: razorpay.refundStatus, notes: b.notes };
     razorpay.refunds.push(r);
+    // The refund is made but the reply never arrives (timeout)
+    if (razorpay.loseNextRefundReply) { razorpay.loseNextRefundReply = false; return [502, { error: { code: 'SERVER_ERROR', description: 'Gateway timeout' } }]; }
     return [200, r];
   }
+  m = path.match(/^\/v1\/payments\/([^/]+)\/refunds$/);
+  if (req.method === 'GET' && m) return [200, { entity: 'collection', items: razorpay.refunds.filter((x) => x.payment_id === m[1]) }];
   if (req.method === 'GET' && path === '/v1/settlements/recon/combined') {
     const day = `${url.searchParams.get('year')}-${String(url.searchParams.get('month')).padStart(2, '0')}-${String(url.searchParams.get('day')).padStart(2, '0')}`;
     const items = settlementLines(day);

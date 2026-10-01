@@ -32,13 +32,16 @@ export async function runPayments(ctx) {
   const o2 = await pendingOrder(ctx);
   const c2 = await startCheckout(o2);
   const pay2 = checkoutPayment(c2.razorpay_order_id);
-  r = await sendWebhook('payment.captured', captured(razorpay.payments.get(pay2.razorpay_payment_id)), 'evt_s11_a');
+  const sentAt = Math.floor(Date.now() / 1000);
+  r = await sendWebhook('payment.captured', captured(razorpay.payments.get(pay2.razorpay_payment_id)), 'evt_s11_a', sentAt);
   check('the app never confirmed, the webhook did: order paid', r.status === 200 && /order paid/.test(r.json.outcome) && (await status(o2.id)) === 'packing', r.json);
-  r = await sendWebhook('payment.captured', captured(razorpay.payments.get(pay2.razorpay_payment_id)), 'evt_s11_a');
-  check('Razorpay retrying the same event: acknowledged, not acted on', r.json.duplicate === true, r.json);
-  r = await sendWebhook('payment.captured', captured(razorpay.payments.get(pay2.razorpay_payment_id)), 'evt_s11_b');
+  r = await sendWebhook('payment.captured', captured(razorpay.payments.get(pay2.razorpay_payment_id)), 'evt_s11_other_header', sentAt);
+  check('Razorpay retrying the same signed event (whatever the header says): acknowledged, not acted on', r.json.duplicate === true, r.json);
+  r = await sendWebhook('payment.captured', captured(razorpay.payments.get(pay2.razorpay_payment_id)), 'evt_s11_b', sentAt + 1);
   check('a second event for the same payment changes nothing', /already recorded/.test(r.json.outcome), r.json);
-  const ev = (await q(`SELECT event, entity_id, amount_paise, outcome FROM payment_webhook_events WHERE event_id = 'evt_s11_a'`))[0];
+  r = await sendWebhook('payment.captured', captured(razorpay.payments.get(pay2.razorpay_payment_id)), 'evt_s11_c', sentAt - 8 * 24 * 3600);
+  check('a signed event older than 7 days is ignored (replay)', r.json.outcome === 'stale event ignored', r.json);
+  const ev = (await q(`SELECT event, entity_id, amount_paise, outcome FROM payment_webhook_events WHERE entity_id = $1 ORDER BY received_at LIMIT 1`, [pay2.razorpay_payment_id]))[0];
   check('events kept with ids, amount and outcome only', ev?.entity_id === pay2.razorpay_payment_id && ev.amount_paise === o2.total_paise && /order paid/.test(ev.outcome), ev);
 
   const o3 = await pendingOrder(ctx);
@@ -72,6 +75,7 @@ export async function runPayments(ctx) {
   let leg2 = (await q(`SELECT id, gateway_refund_id FROM refunds WHERE order_id = $1`, [o2.id]))[0];
   r = await call('POST', `/returns/refunds/admin/${leg2.id}/retry`, { token: t.admin });
   check('a refund still with the gateway cannot be resent', r.status === 409, r.json);
+  razorpay.refunds.find((x) => x.id === leg2.gateway_refund_id).status = 'failed';
   await sendWebhook('refund.failed', { refund: { entity: { id: leg2.gateway_refund_id, amount: 2000, status: 'failed', error_description: 'Bank account closed' } } });
   leg2 = (await q(`SELECT id, status, failure_reason FROM refunds WHERE id = $1`, [leg2.id]))[0];
   check('refund.failed leaves it pending with the reason for accounts', leg2.status === 'pending' && /Bank account closed/.test(leg2.failure_reason || ''), leg2);
@@ -80,6 +84,14 @@ export async function runPayments(ctx) {
   check('buyers cannot resend refunds', r.status === 403, r.status);
   r = await call('POST', `/returns/refunds/admin/${leg2.id}/retry`, { token: t.admin });
   check('accounts resends it: processed on the second attempt', r.json.data?.status === 'processed' && r.json.data.gateway_attempts === 2, r.json);
+  // The refund reaches Razorpay but its reply is lost: the retry finds it instead of paying twice
+  razorpay.loseNextRefundReply = true;
+  await call('POST', '/payments/refund', { token: t.admin, body: { order_id: o3.id, amount_paise: 1500, reason: 'Short supply' } });
+  let leg3 = (await q(`SELECT id, status, gateway_refund_id, failure_reason FROM refunds WHERE order_id = $1`, [o3.id]))[0];
+  check('a lost gateway reply leaves the refund pending with the reason', leg3.status === 'pending' && !leg3.gateway_refund_id && !!leg3.failure_reason, leg3);
+  r = await call('POST', `/returns/refunds/admin/${leg3.id}/retry`, { token: t.admin });
+  const made = razorpay.refunds.filter((x) => x.payment_id === pay3.razorpay_payment_id);
+  check('retrying adopts the refund already made — the buyer is never paid twice', made.length === 1 && r.json.data?.gateway_refund_id === made[0].id && r.json.data.status === 'processed', { made: made.length, out: r.json });
   await sendWebhook('refund.processed', { refund: { entity: { id: 'rfnd_not_ours', amount: 500, status: 'processed' } } });
   check('a refund made outside Dawabag is only noted', (await q(`SELECT outcome FROM payment_webhook_events WHERE entity_id = 'rfnd_not_ours'`))[0]?.outcome === 'refund not in ledger');
 

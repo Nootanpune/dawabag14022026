@@ -67,7 +67,16 @@ export async function verifyPrescription(pharmacistId: string, prescriptionId: s
     const ageDays = (Date.now() - prescribedOn.getTime()) / 864e5;
     if (ageDays < -1) throw new AppError('Prescription date is in the future', 400);
     if (ageDays > MAX_RX_AGE_DAYS) throw new AppError(`Prescription is older than ${MAX_RX_AGE_DAYS} days`, 400);
-    const validUntil = new Date(prescribedOn.getTime() + input.valid_days * 864e5).toISOString().slice(0, 10);
+    let validUntil = new Date(prescribedOn.getTime() + input.valid_days * 864e5).toISOString().slice(0, 10);
+    // A Dawabag e-prescription: never longer than the doctor wrote it for, never other medicines
+    if (rx.digital_prescription_id) {
+      const ep = (await client.query(`SELECT valid_until FROM digital_prescriptions WHERE id = $1`, [rx.digital_prescription_id])).rows[0];
+      const allowed = new Set((await client.query(`SELECT product_id FROM digital_prescription_items WHERE prescription_id = $1`, [rx.digital_prescription_id])).rows.map((r: any) => r.product_id));
+      const epUntil = new Date(ep.valid_until).toISOString().slice(0, 10);
+      if (validUntil > epUntil) validUntil = epUntil;
+      const extra = input.items.filter((it) => !allowed.has(it.product_id));
+      if (extra.length) throw new AppError('Only medicines on the doctor\'s e-prescription can be entered', 400);
+    }
 
     await client.query(
       `UPDATE prescriptions SET status = 'verified', verified_by = $2, verified_at = NOW(), valid_until = $3,

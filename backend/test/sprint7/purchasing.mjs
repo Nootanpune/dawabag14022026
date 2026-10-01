@@ -33,7 +33,9 @@ export async function runPurchasing({ t, P }) {
   r = await receive({ lines: [line()] });
   check('goods cannot be received on a draft PO', r.status === 409, r.json);
   r = await call('POST', `/purchasing/purchase-orders/${po.id}/approve`, { token: t.admin });
-  check('admin approves the PO', r.status === 200 && r.json.data.status === 'sent', r.json);
+  check('the admin who raised the PO cannot approve it (C-46)', r.status === 403, r.json);
+  r = await call('POST', `/purchasing/purchase-orders/${po.id}/approve`, { token: t.admin2 });
+  check('a second admin approves the PO', r.status === 200 && r.json.data.status === 'sent', r.json);
 
   console.log('Goods receipt rules');
   r = await receive({ lines: [line({ expiry_date: days(60) }), line({ batch_number: 'S7-A-002', printed_mrp_paise: 8000 }),
@@ -55,12 +57,15 @@ export async function runPurchasing({ t, P }) {
   const a2 = (await q(`SELECT quantity_available FROM inventory_batches WHERE id = $1`, [batchA.id]))[0].quantity_available;
   check('second delivery of the same batch adds to it; PO fully received', r.status === 201 && a2 === 110
     && (await call('GET', `/purchasing/purchase-orders/${po.id}`, { token: t.admin })).json.data.status === 'received', { a2, r: r.json });
-  r = await call('POST', '/purchasing/receipts', { token: t.packer, body: { vendor_id: G, supplier_invoice_no: 'GJ-1', supplier_invoice_date: days(0),
+  r = await call('POST', '/purchasing/receipts', { token: t.packer, body: { vendor_id: G, supplier_invoice_no: 'GJ-0', supplier_invoice_date: days(0),
+    lines: [{ product_id: P.a, batch_number: 'GJ0', expiry_date: days(400), quantity: 1, unit_cost_paise: 7000, printed_mrp_paise: 10000 }] } });
+  check('the store cannot receive goods without a purchase order', r.status === 403, r.json);
+  r = await call('POST', '/purchasing/receipts', { token: t.admin, body: { vendor_id: G, supplier_invoice_no: 'GJ-1', supplier_invoice_date: days(0),
     lines: [{ product_id: P.c, batch_number: 'S7-C-1', expiry_date: days(400), quantity: 10, unit_cost_paise: 6000, printed_mrp_paise: 10000 }] } });
   const gj = r.json.data ? (await q(`SELECT cgst_paise, sgst_paise, igst_paise FROM goods_receipts WHERE id = $1`, [r.json.data.id]))[0] : null;
   check('inter-state supplier: IGST, not CGST/SGST', gj && Number(gj.igst_paise) === 7200 && Number(gj.cgst_paise) === 0, gj);
   await q(`UPDATE vendors SET drug_license_expiry = CURRENT_DATE - 1 WHERE id = $1`, [G]);
-  r = await call('POST', '/purchasing/receipts', { token: t.packer, body: { vendor_id: G, supplier_invoice_no: 'GJ-2', supplier_invoice_date: days(0),
+  r = await call('POST', '/purchasing/receipts', { token: t.admin, body: { vendor_id: G, supplier_invoice_no: 'GJ-2', supplier_invoice_date: days(0),
     lines: [{ product_id: P.c, batch_number: 'S7-C-2', expiry_date: days(400), quantity: 1, unit_cost_paise: 6000, printed_mrp_paise: 10000 }] } });
   check('no receipt from a supplier whose licence has expired', r.status === 409 && /licence/.test(r.json.message), r.json);
 

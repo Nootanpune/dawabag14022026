@@ -109,10 +109,20 @@ export async function activateMandateFromCapture(client: PoolClient, p: { order_
 // token.confirmed / token.rejected / token.cancelled webhooks (e-mandates confirm later than the payment)
 export async function applyTokenEvent(event: string, token: { id: string; customer_id?: string }): Promise<string> {
   return withTransaction(async (client) => {
+    // A confirmation may name a token we have not seen yet (the customer's pending mandate);
+    // a rejection or cancellation acts only on the mandate holding that exact token
     const m = (await client.query(
-      `SELECT id, user_id, status FROM payment_mandates
-       WHERE gateway_token_id = $1 OR (gateway_customer_id = $2 AND gateway_token_id IS NULL AND status = 'pending')
-       ORDER BY created_at DESC LIMIT 1 FOR UPDATE`, [token.id, token.customer_id ?? null])).rows[0];
+      event === 'token.confirmed'
+        ? `SELECT id, user_id, status FROM payment_mandates
+           WHERE gateway_token_id = $1 OR (gateway_customer_id = $2 AND gateway_token_id IS NULL AND status = 'pending')
+           ORDER BY created_at DESC LIMIT 1 FOR UPDATE`
+        : `SELECT id, user_id, status FROM payment_mandates WHERE gateway_token_id = $1
+           UNION ALL
+           SELECT id, user_id, status FROM payment_mandates
+           WHERE NOT EXISTS (SELECT 1 FROM payment_mandates WHERE gateway_token_id = $1)
+             AND gateway_customer_id = $2 AND gateway_token_id IS NULL AND status = 'pending'
+             AND (SELECT COUNT(*) FROM payment_mandates WHERE gateway_customer_id = $2 AND gateway_token_id IS NULL AND status = 'pending') = 1
+           LIMIT 1`, [token.id, token.customer_id ?? null])).rows[0];
     if (!m) return 'no matching mandate';
     if (event === 'token.confirmed') {
       if (m.status !== 'pending') return `mandate already ${m.status}`;

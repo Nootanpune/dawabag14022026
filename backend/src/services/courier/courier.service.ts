@@ -22,12 +22,22 @@ export async function bookCourier(userId: string, shipmentId: string) {
   if (!s || s.seller_type !== 'dawabag') throw new AppError('Shipment not found', 404);
   if (s.status !== 'packed') throw new AppError('Book the courier after packing, before dispatch', 409);
   if (s.awb_number) throw new AppError('This shipment already has an AWB', 409);
-  const booked = await createShipment({
+  // Claim it first so two clicks cannot book two couriers (released if the booking fails)
+  const claimed = await query(`UPDATE order_shipments SET courier_provider = 'shiprocket:booking' WHERE id = $1 AND awb_number IS NULL
+                               AND (courier_provider IS NULL OR courier_provider = 'shiprocket') RETURNING id`, [shipmentId]);
+  if (!claimed.length) throw new AppError('A courier booking for this shipment is already in progress', 409);
+  let booked: Awaited<ReturnType<typeof createShipment>>;
+  try {
+    booked = await createShipment({
     order_id: s.invoice_number, order_date: new Date(s.created_at).toISOString().slice(0, 16).replace('T', ' '),
     pickup_location: String(await getSetting('courier.pickup_location', 'Primary')),
     name: s.full_name, address: s.address, city: s.city, pincode: s.pincode, state: s.state, phone: s.mobile, email: s.email,
     sub_total: Math.round(Number(s.total_paise) / 100), weight_kg: s.cold_chain ? 2.5 : 0.5,
   });
+  } catch (e) {
+    await query(`UPDATE order_shipments SET courier_provider = NULL WHERE id = $1 AND courier_provider = 'shiprocket:booking'`, [shipmentId]);
+    throw e;
+  }
   return withTransaction(async (client) => {
     await client.query(
       `UPDATE order_shipments SET courier_provider = 'shiprocket', courier_order_ref = $2, courier_shipment_ref = $3,

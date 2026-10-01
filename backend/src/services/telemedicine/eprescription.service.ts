@@ -78,7 +78,7 @@ export async function loadPrescription(id: string, viewer: { id: string; role: s
     `SELECT r.*, dp.user_id AS doctor_user_id, EXISTS (SELECT 1 FROM prescriptions p WHERE p.digital_prescription_id = r.id) AS sent_to_dawabag
      FROM digital_prescriptions r JOIN doctor_profiles dp ON dp.id = r.doctor_id WHERE r.id = $1`, [id]);
   const allowed = rx && (rx.patient_user_id === viewer.id || rx.doctor_user_id === viewer.id
-    || (rx.sent_to_dawabag && ['pharmacist_rx', 'admin', 'super_admin'].includes(viewer.role)));
+    || (rx.sent_to_dawabag && viewer.role === 'pharmacist_rx'));   // minimum access (C-41)
   if (!allowed) throw new AppError('Prescription not found', 404);
   const items = await query(`SELECT medicine_name, dosage, frequency, duration_days, instructions, telemedicine_list FROM digital_prescription_items
                              WHERE prescription_id = $1 ORDER BY medicine_name`, [id]);
@@ -95,6 +95,7 @@ export async function verifyByCode(code: string) {
             patient_gender, consult_mode FROM digital_prescriptions WHERE verification_code = $1`, [code.toUpperCase()]);
   if (!rx) throw new AppError('No e-prescription with that code', 404);
   const items = await query(`SELECT medicine_name, dosage, frequency, duration_days FROM digital_prescription_items WHERE prescription_id = $1 ORDER BY medicine_name`, [rx.id]);
+  await writeAudit({ userId: null, action: 'eprescription_checked_by_code', performedBy: null, newValue: { prescription_id: rx.id } });
   const initials = String(rx.patient_name || '').split(/\s+/).filter(Boolean).map((w: string) => `${w[0]}.`).join(' ');
   return {
     valid: new Date(rx.valid_until) >= new Date(new Date().toISOString().slice(0, 10)),

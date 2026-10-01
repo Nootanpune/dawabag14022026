@@ -8,8 +8,14 @@ import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { queueNotification } from './notification.service';
+import { privacyNoticeRef } from './policy.service';
 
-export const PRIVACY_POLICY_VERSION = process.env.PRIVACY_POLICY_VERSION || '2026-10-v1';
+// Consent cites the privacy notice actually published, in the language shown (C-40; one authority: policy_documents)
+async function noticeFor(userId: string) {
+  const u = await queryOne<{ preferred_language: string | null }>(`SELECT preferred_language FROM users WHERE id = $1`, [userId]);
+  const lang = (['en', 'mr', 'hi'] as const).find((l) => l === u?.preferred_language) ?? 'en';
+  return privacyNoticeRef(lang);
+}
 
 export async function getConsents(userId: string) {
   const current = await query(
@@ -18,13 +24,15 @@ export async function getConsents(userId: string) {
   const history = await query(
     `SELECT purpose, granted, policy_version, recorded_at FROM consent_records
      WHERE user_id = $1 ORDER BY recorded_at DESC LIMIT 100`, [userId]);
-  return { current, history, policy_version: PRIVACY_POLICY_VERSION };
+  const notice = await noticeFor(userId);
+  return { current, history, policy_version: notice.version, notice_language: notice.language };
 }
 
 export async function setMarketingConsent(userId: string, granted: boolean, ip: string | null, agent: string | null) {
+  const notice = await noticeFor(userId);
   await query(
-    `INSERT INTO consent_records (user_id, purpose, granted, policy_version, ip_address, user_agent)
-     VALUES ($1, 'marketing', $2, $3, $4, $5)`, [userId, granted, PRIVACY_POLICY_VERSION, ip, agent]);
+    `INSERT INTO consent_records (user_id, purpose, granted, policy_version, notice_language, ip_address, user_agent)
+     VALUES ($1, 'marketing', $2, $3, $4, $5, $6)`, [userId, granted, notice.version, notice.language, ip, agent]);
   return getConsents(userId);
 }
 
@@ -132,5 +140,5 @@ async function anonymiseUser(client: PoolClient, userId: string) {
   await client.query(`DELETE FROM carts WHERE user_id = $1`, [userId]);
   await client.query(
     `INSERT INTO consent_records (user_id, purpose, granted, policy_version) VALUES ($1, 'marketing', FALSE, $2)`,
-    [userId, PRIVACY_POLICY_VERSION]);
+    [userId, (await privacyNoticeRef('en')).version]);
 }

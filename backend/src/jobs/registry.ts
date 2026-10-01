@@ -8,6 +8,7 @@ import { runLicenceRegisterAlerts } from '../services/licence.service';
 import { runExpiryWatchJob } from './expiryWatch.job';
 import { runEinvoiceSweep } from '../services/einvoice/einvoice.service';
 import { runPaymentSweep } from '../services/payments/reconcile.service';
+import { runRetentionPurge } from '../services/retention.service';
 
 export interface JobDefinition {
   name: string;
@@ -17,6 +18,12 @@ export interface JobDefinition {
 }
 
 export const JOBS: JobDefinition[] = [
+  {
+    name: 'retention_purge',
+    description: 'Delete operational data past its retention period (setting retention.days; DPDP storage limitation, C-44)',
+    cron: '30 3 * * *',                      // daily 03:30
+    run: runRetentionPurge,
+  },
   {
     name: 'payment_reconcile',
     description: 'Look up payments still open 10 minutes after checkout at Razorpay; record any captured (lost confirmations)',

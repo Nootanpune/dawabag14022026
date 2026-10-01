@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { privacyNoticeRef } from '../services/policy.service';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -36,10 +37,11 @@ const commonFields = {
     errorMap: () => ({ message: 'You must be 18 or older to create an account' }),
   }),
   marketing_consent: z.boolean().optional().default(false),
+  // Language the privacy notice was read in (DPDP s.5(3)); English unless chosen
+  notice_language: z.enum(['en', 'mr', 'hi']).optional().default('en'),
 };
 
 // Bump when the privacy notice text changes; stored with every consent record
-const PRIVACY_POLICY_VERSION = process.env.PRIVACY_POLICY_VERSION || '2026-10-v1';
 
 // One schema per buyer type — URS v3.1 §2 and the §3 document matrix
 const registerSchema = z.discriminatedUnion('customer_type', [
@@ -172,6 +174,8 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       // Consent log — append-only; purposes per Rulebook C-40 / C-42
       const ip = req.ip || null;
       const agent = req.get('user-agent')?.slice(0, 500) || null;
+      const notice = await privacyNoticeRef(data.notice_language);
+      await client.query(`UPDATE users SET preferred_language = $2 WHERE id = $1`, [userId, data.notice_language]);
       for (const [purpose, granted] of [
         ['privacy_notice', true],
         ['age_18_plus', true],
@@ -179,9 +183,9 @@ export async function register(req: Request, res: Response, next: NextFunction) 
         ...(data.customer_type === 'doc_hospital' ? [['practitioner_declaration', true] as const] : []),
       ] as const) {
         await client.query(
-          `INSERT INTO consent_records (user_id, purpose, granted, policy_version, ip_address, user_agent)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [userId, purpose, granted, PRIVACY_POLICY_VERSION, ip, agent]
+          `INSERT INTO consent_records (user_id, purpose, granted, policy_version, notice_language, ip_address, user_agent)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [userId, purpose, granted, notice.version, notice.language, ip, agent]
         );
       }
 
@@ -444,19 +448,20 @@ export async function sendLoginOTP(req: Request, res: Response, next: NextFuncti
 // Revokes the refresh token (cookie or body) and the presented access token.
 export async function logout(req: Request, res: Response, next: NextFunction) {
   try {
+    let userId: string | null = null;
     const refresh = readRefreshToken(req);
     if (refresh) {
       const decoded = await verifyRefreshToken(refresh).catch(() => null);
-      if (decoded) await blacklistToken(decoded.jti, 7 * 24 * 3600);
+      if (decoded) { await blacklistToken(decoded.jti, 7 * 24 * 3600); userId = decoded.sub; }
     }
     const access = req.headers.authorization?.split(' ')[1];
     if (access) {
       const decoded = await verifyAccessToken(access).catch(() => null);
-      if (decoded) await blacklistToken(decoded.jti, 15 * 60);
+      if (decoded) { await blacklistToken(decoded.jti, 15 * 60); userId = userId ?? decoded.sub; }
     }
-    // This device stops receiving pushes for the account
-    if (typeof req.body?.fcm_token === 'string' && req.body.fcm_token) {
-      await query('DELETE FROM user_devices WHERE fcm_token = $1', [req.body.fcm_token]);
+    // This device stops receiving pushes for the account signing out (never someone else's)
+    if (userId && typeof req.body?.fcm_token === 'string' && req.body.fcm_token) {
+      await query('DELETE FROM user_devices WHERE fcm_token = $1 AND user_id = $2', [req.body.fcm_token, userId]);
     }
     clearSession(res);
     res.json({ success: true, message: 'Logged out successfully' });

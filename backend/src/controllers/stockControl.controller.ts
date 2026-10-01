@@ -76,7 +76,7 @@ export async function getCounts(_req: Request, res: Response, next: NextFunction
   try { res.json({ success: true, data: { counts: await listCounts() } }); } catch (e) { next(e); }
 }
 export async function getOneCount(req: Request, res: Response, next: NextFunction) {
-  try { res.json({ success: true, data: await getCount(uuid.parse(req.params.id)) }); } catch (e) { next(e); }
+  try { res.json({ success: true, data: await getCount(uuid.parse(req.params.id), req.user!) }); } catch (e) { next(e); }
 }
 export async function putCountLines(req: Request, res: Response, next: NextFunction) {
   try {

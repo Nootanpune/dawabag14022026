@@ -48,7 +48,11 @@ async function transition(userId: string, id: string, from: string[], to: string
     const po = (await client.query(`SELECT id, status, vendor_id, raised_by FROM purchase_orders WHERE id = $1 FOR UPDATE`, [id])).rows[0];
     if (!po) throw new AppError('Purchase order not found', 404);
     if (!from.includes(po.status)) throw new AppError(`A ${po.status.replace('_', ' ')} purchase order cannot be ${action}`, 409);
-    if (to === 'sent') await assertSupplierCanSupply(client, po.vendor_id);
+    if (to === 'sent') {
+      // Raised by one admin, approved by another (C-46)
+      if (po.raised_by === userId) throw new AppError('Someone other than the person who raised it must approve this purchase order', 403);
+      await assertSupplierCanSupply(client, po.vendor_id);
+    }
     await client.query(
       `UPDATE purchase_orders SET status = $2,
          approved_by = CASE WHEN $2::varchar = 'sent' THEN $3 ELSE approved_by END,

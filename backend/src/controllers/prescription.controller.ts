@@ -27,6 +27,13 @@ export async function uploadPrescription(req: Request, res: Response, next: Next
       throw new AppError('File size must be under 10MB', 400);
     }
 
+    const uuidOk = (v: unknown) => v == null || v === '' || /^[0-9a-f-]{36}$/i.test(String(v));
+    if (!uuidOk(order_id) || !uuidOk(patient_id)) throw new AppError('Invalid order or patient', 422);
+    // A family member must be one of this account's own (C-41)
+    if (patient_id) {
+      const own = await queryOne('SELECT 1 FROM patients WHERE id = $1 AND owner_user_id = $2 AND deleted_at IS NULL', [patient_id, userId]);
+      if (!own) throw new AppError('Patient not found', 404);
+    }
     // Verify order belongs to user
     if (order_id) {
       const order = await queryOne(
@@ -78,6 +85,7 @@ export async function uploadPrescription(req: Request, res: Response, next: Next
 export async function getPrescriptionUrl(req: Request, res: Response, next: NextFunction) {
   try {
     const { prescriptionId } = req.params;
+    if (!/^[0-9a-f-]{36}$/i.test(prescriptionId)) throw new AppError('Prescription not found', 404);
     const userId = req.user!.id;
     const userRole = req.user!.role;
 

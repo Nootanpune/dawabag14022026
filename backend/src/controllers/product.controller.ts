@@ -4,6 +4,7 @@ import { query, queryOne } from '../config/database';
 import { cacheGet, cacheSet } from '../config/redis';
 import { AppError } from '../utils/AppError';
 import { writeAudit } from '../utils/audit';
+import { assertBelowShelfMrp } from '../services/shelfMrp';
 import { productDetail } from '../services/productDetail.service';
 import { adminGetProduct, adminListProducts } from '../services/productAdmin.service';
 import { COPY_FIELDS, contentQueue, copyFlags, reviewContent } from '../services/productContent.service';
@@ -250,6 +251,7 @@ export async function updateProduct(req: Request, res: Response, next: NextFunct
     const before = await queryOne<Record<string, any>>('SELECT * FROM products WHERE id = $1', [productId]);
     if (!before) throw new AppError('Product not found', 404);
     assertPrices({ ...before, ...updates });
+    await assertBelowShelfMrp(productId, { ...before, ...updates });
 
     // Changed copy goes back to the pharmacist (C-19)
     const copyChanged = COPY_FIELDS.some((k) => k in updates && (updates as any)[k] !== before[k]);
@@ -311,6 +313,8 @@ export async function setTelemedicineList(req: Request, res: Response, next: Nex
   try {
     const d = z.object({ list: z.enum(['O', 'A', 'B', 'prohibited']), notes: z.string().trim().min(3).max(500) }).parse(req.body);
     const id = z.string().uuid().parse(req.params.productId);
+    const ph = await queryOne<{ pharmacist_reg_no: string | null }>('SELECT pharmacist_reg_no FROM users WHERE id = $1', [req.user!.id]);
+    if (!ph?.pharmacist_reg_no) throw new AppError('Add your pharmacy council registration number before classifying medicines', 403);
     const before = await queryOne<{ telemedicine_list: string | null }>('SELECT telemedicine_list FROM products WHERE id = $1', [id]);
     if (!before) throw new AppError('Product not found', 404);
     const after = await queryOne<{ telemedicine_list: string }>('UPDATE products SET telemedicine_list = $2, updated_at = NOW() WHERE id = $1 RETURNING telemedicine_list', [id, d.list]);

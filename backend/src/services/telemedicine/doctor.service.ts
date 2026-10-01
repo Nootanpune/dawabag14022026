@@ -7,6 +7,8 @@
 import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
+import { cancelDoctorConsultations } from './consultation.service';
+import { refundConsultationFee } from './consultationFee.service';
 
 export interface ProfileInput {
   full_name: string; qualification: string; council: string; nmc_reg_number: string; registration_year: number;
@@ -68,18 +70,24 @@ export async function verifiedDoctorId(userId: string): Promise<string> {
   return d.id;
 }
 
-// Admin: checked against the council register (C-22)
-export async function decideDoctor(adminId: string, doctorId: string, approve: boolean, notes: string) {
-  return withTransaction(async (client) => {
-    const d = (await client.query(`SELECT id, user_id FROM doctor_profiles WHERE id = $1 FOR UPDATE`, [doctorId])).rows[0];
+// Admin: checked against the council register (C-22). Approval names the
+// registration number the admin checked, so a profile edited meanwhile is not approved.
+// Rejection cancels the doctor's open consultations, refunds them and closes slots.
+export async function decideDoctor(adminId: string, doctorId: string, approve: boolean, notes: string, checkedRegNo?: string) {
+  const refunds = await withTransaction(async (client) => {
+    const d = (await client.query(`SELECT id, user_id, nmc_reg_number FROM doctor_profiles WHERE id = $1 FOR UPDATE`, [doctorId])).rows[0];
     if (!d) throw new AppError('Doctor not found', 404);
     if (d.user_id === adminId) throw new AppError('You cannot verify your own registration', 403);
+    if (approve && checkedRegNo !== d.nmc_reg_number) throw new AppError('The registration details changed since you checked them; review again', 409);
     await client.query(
       `UPDATE doctor_profiles SET is_verified = $2, is_active = $2, verified_by = $3, verified_at = NOW(), rejection_reason = $4 WHERE id = $1`,
       [doctorId, approve, adminId, approve ? null : notes]);
-    await writeAuditTx(client, { userId: d.user_id, action: approve ? 'doctor_verified' : 'doctor_rejected', performedBy: adminId, notes });
-    return { id: doctorId, is_verified: approve };
+    await writeAuditTx(client, { userId: d.user_id, action: approve ? 'doctor_verified' : 'doctor_rejected', performedBy: adminId, notes,
+      newValue: { reg_no: d.nmc_reg_number } });
+    return approve ? [] : cancelDoctorConsultations(client, doctorId, adminId);
   });
+  for (const id of refunds) await refundConsultationFee(id);
+  return { id: doctorId, is_verified: approve, consultations_cancelled_refunds: refunds.length };
 }
 
 export async function listDoctorsForAdmin(status: 'pending' | 'verified' | 'rejected' | undefined) {

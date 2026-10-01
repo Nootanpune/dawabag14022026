@@ -2,8 +2,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import {
-  bookConsultation, cancelConsultation, getConsultation, confirmPayment, doctorConsultations, endConsultation, joinConsultation, myConsultations, startPayment,
+  bookConsultation, cancelConsultation, getConsultation, doctorConsultations, endConsultation, joinConsultation, myConsultations,
 } from '../services/telemedicine/consultation.service';
+import { confirmPayment, startPayment } from '../services/telemedicine/consultationFee.service';
 import { issuePrescription, loadPrescription, useAtDawabag, verifyByCode } from '../services/telemedicine/eprescription.service';
 import { renderEprescriptionPdf } from '../services/telemedicine/eprescriptionPdf';
 

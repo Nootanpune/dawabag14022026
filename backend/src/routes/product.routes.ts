@@ -16,6 +16,6 @@ router.post('/:productId/content-review', authenticate, authorize('pharmacist_rx
 router.get('/:productId', optionalAuth, getProductDetail);
 router.post('/', authenticate, authorize('admin', 'super_admin'), createProduct);
 router.patch('/:productId', authenticate, authorize('admin', 'super_admin'), updateProduct);
-router.post('/:productId/telemedicine-list', authenticate, authorize('pharmacist_rx', 'admin', 'super_admin'), setTelemedicineList);   // C-23
+router.post('/:productId/telemedicine-list', authenticate, authorize('pharmacist_rx'), setTelemedicineList);   // C-23
 
 export default router;

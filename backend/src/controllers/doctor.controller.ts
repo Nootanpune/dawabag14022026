@@ -63,8 +63,9 @@ export async function getDoctorsForAdmin(req: Request, res: Response, next: Next
 }
 export async function postVerifyDoctor(req: Request, res: Response, next: NextFunction) {
   try {
-    const d = z.object({ approve: z.boolean(), notes: z.string().trim().min(3).max(1000) }).parse(req.body);
-    res.json({ success: true, data: await decideDoctor(req.user!.id, uuid.parse(req.params.doctorId), d.approve, d.notes) });
+    const d = z.object({ approve: z.boolean(), notes: z.string().trim().min(3).max(1000), nmc_reg_number: z.string().trim().max(60).optional() })
+      .refine((x) => !x.approve || !!x.nmc_reg_number, { message: 'Approving needs the registration number you checked', path: ['nmc_reg_number'] }).parse(req.body);
+    res.json({ success: true, data: await decideDoctor(req.user!.id, uuid.parse(req.params.doctorId), d.approve, d.notes, d.nmc_reg_number) });
   } catch (e) { next(e); }
 }
 export async function getMySlots(req: Request, res: Response, next: NextFunction) {

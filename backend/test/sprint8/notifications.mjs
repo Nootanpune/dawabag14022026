@@ -20,9 +20,12 @@ export async function runNotifications(ctx) {
   check('several devices per buyer, no duplicates', mine.length === 2, mine);
   const shared = 'moved-device-token-s8-00000000000000003';
   await call('POST', '/users/me/devices', { token: t.buyer2, body: { token: shared } });
+  r = await call('POST', '/users/me/devices', { token: t.buyer, body: { token: shared } });
+  check("a token in use by another account cannot be taken over", r.status === 409, r.json);
+  await q(`UPDATE user_devices SET last_seen_at = NOW() - INTERVAL '2 days' WHERE fcm_token = $1`, [shared]);
   await call('POST', '/users/me/devices', { token: t.buyer, body: { token: shared } });
   const owner = (await q(`SELECT user_id FROM user_devices WHERE fcm_token = $1`, [shared]))[0]?.user_id;
-  check('a token used by another account moves to the account now signed in', owner === ids.buyer, owner);
+  check('a token idle on the other account for a day moves to the account now signed in', owner === ids.buyer, owner);
   r = await call('DELETE', '/users/me/devices', { token: t.buyer2, body: { token: shared } });
   check("removing someone else's device does nothing", (await q(`SELECT 1 FROM user_devices WHERE fcm_token = $1`, [shared])).length === 1);
   await call('DELETE', '/users/me/devices', { token: t.buyer, body: { token: shared } });

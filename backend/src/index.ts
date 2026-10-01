@@ -74,12 +74,25 @@ app.use(cors({
 // ─── Rate Limiting ──────────────────────────────────────────────────────────
 const limitMessage = (message: string) => ({ success: false, message, error: message });
 
+// Behind a load balancer the client address is in X-Forwarded-For (set TRUST_PROXY_HOPS)
+app.set('trust proxy', parseInt(process.env.TRUST_PROXY_HOPS || '0'));
+
+// Signed gateway callbacks are not rate-limited per IP (Razorpay and Shiprocket share addresses)
+const WEBHOOKS = ['/api/v1/payments/webhook', '/api/v1/courier/shiprocket/webhook'];
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX || '200'),
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => WEBHOOKS.includes(req.path),
   message: limitMessage('Too many requests. Please try again later.'),
+});
+
+// The public e-prescription check: a code is a bearer of health data (C-41)
+const verifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.VERIFY_RATE_LIMIT_MAX || '30'),
+  message: limitMessage('Too many prescription checks. Please try again later.'),
 });
 
 const authLimiter = rateLimit({
@@ -97,6 +110,8 @@ app.use(express.json({
   verify: (req, _res, buf) => { (req as express.Request & { rawBody?: Buffer }).rawBody = buf; },
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Access logs never carry an e-prescription check code
+morgan.token('url', (req: express.Request) => (req.originalUrl || req.url).replace(/(\/eprescriptions\/verify\/)[^/?]+/, '$1[code]'));
 app.use(morgan('combined', {
   stream: { write: (msg) => logger.http(msg.trim()) },
 }));
@@ -129,7 +144,7 @@ app.use(`${api}/vendors`, vendorRoutes);
 app.use(`${api}/admin`, adminRoutes);
 app.use(`${api}/doctors`, doctorRoutes);
 app.use(`${api}/consultations`, consultationRoutes);
-app.use(`${api}/eprescriptions`, eprescriptionRoutes);
+app.use(`${api}/eprescriptions`, verifyLimiter, eprescriptionRoutes);
 app.use(`${api}/notifications`, notificationRoutes);
 app.use(`${api}/coupons`, couponRoutes);
 app.use(`${api}/reports`, reportRoutes);

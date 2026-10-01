@@ -176,11 +176,20 @@ export async function retryGatewayRefund(userId: string, id: string) {
     if (!leg) throw new AppError('Refund not found', 404);
     if (leg.method !== 'gateway' || leg.status !== 'pending') throw new AppError('Only a pending gateway refund can be sent again', 409);
     if (!leg.failure_reason) throw new AppError('This refund is still with the gateway; wait for its result', 409);
+    // The earlier attempt may have reached Razorpay with its reply lost: adopt that refund, never pay twice
+    const earlier: any = await (getRazorpay() as any).payments.fetchMultipleRefund(leg.gateway_payment_id).catch(() => ({ items: [] }));
+    const found = (earlier.items ?? []).find((x: any) => x?.notes?.refund_id === id && x.status !== 'failed');
+    if (found) {
+      await client.query(`UPDATE refunds SET gateway_refund_id = $2, failure_reason = NULL WHERE id = $1`, [id, found.id]);
+      if (found.status === 'processed') await settleGatewayLeg(client, id, userId);
+      await writeAuditTx(client, { userId: null, action: 'refund_found_at_gateway', performedBy: userId, newValue: { refund_id: id, gateway_refund_id: found.id } });
+      return { ...leg, adopted: true };
+    }
     await client.query(`UPDATE refunds SET gateway_refund_id = NULL, failure_reason = NULL WHERE id = $1`, [id]);
     await writeAuditTx(client, { userId: null, action: 'refund_retried', performedBy: userId, newValue: { refund_id: id, previous_failure: leg.failure_reason } });
     return leg;
   });
-  await sendGatewayRefunds([id]);
+  if (!(r as any).adopted) await sendGatewayRefunds([id]);
   return (await query(`SELECT id, status, gateway_refund_id, failure_reason, gateway_attempts FROM refunds WHERE id = $1`, [id]))[0];
 }
 

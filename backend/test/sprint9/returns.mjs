@@ -47,6 +47,8 @@ export async function runReturns({ t, V, B }) {
   r = await call('POST', `/purchasing/returns/${ret.id}/settle`, { token: t.admin, body: { supplier_credit_note_no: 'SCN-1', supplier_credit_note_date: today, supplier_credit_paise: 56000 } });
   check('cannot settle before the goods leave', r.status === 409, r.json);
   r = await call('POST', `/purchasing/returns/${ret.id}/dispatch`, { token: t.packer, body: { dispatch_reference: 'EWB-181000123456' } });
+  check('whoever raised the return does not also hand it over (C-46)', r.status === 403, r.json);
+  r = await call('POST', `/purchasing/returns/${ret.id}/dispatch`, { token: t.admin2, body: { dispatch_reference: 'EWB-181000123456' } });
   check('dispatched under its e-way bill / LR', r.json.data?.status === 'dispatched', r.json);
   r = await call('POST', `/purchasing/returns/${ret.id}/settle`, { token: t.admin, body: { supplier_credit_note_no: 'SCN-1', supplier_credit_note_date: '2020-01-01', supplier_credit_paise: 56000 } });
   check('credit note dated before dispatch refused', r.status === 400, r.json);

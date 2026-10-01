@@ -31,6 +31,14 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
   const minShelf = Number(await getSetting('purchasing.min_shelf_life_days', 180));
   return withTransaction(async (client) => {
     const supplier = await assertSupplierCanSupply(client, input.vendor_id);
+    // Without a purchase order there is no second person behind the purchase: admins only (C-46)
+    if (!input.po_id && !['admin', 'super_admin'].includes(role)) {
+      throw new AppError('Receive against an approved purchase order, or ask an admin to receive goods that were not ordered', 403);
+    }
+    if (!input.po_id && input.lines.some((l) => l.po_item_id)) throw new AppError('Purchase order lines given without the purchase order', 400);
+    // Free goods (schemes) up to the paid quantity, never more
+    const tooFree = input.lines.findIndex((l) => (l.free_quantity ?? 0) > l.quantity);
+    if (tooFree >= 0) throw new AppError(`Line ${tooFree + 1}: free quantity cannot exceed the paid quantity`, 400);
     let poItems = new Map<string, any>();
     if (input.po_id) {
       const po = (await client.query(`SELECT id, vendor_id, status FROM purchase_orders WHERE id = $1 FOR UPDATE`, [input.po_id])).rows[0];

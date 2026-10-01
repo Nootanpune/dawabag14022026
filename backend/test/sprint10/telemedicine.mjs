@@ -27,7 +27,9 @@ export async function runTelemedicine(ctx) {
   check('an unverified doctor cannot open slots', r.status === 403, r.json);
   r = await call('POST', `/doctors/${docId}/verify`, { token: t.doctor, body: { approve: true, notes: 'self' } });
   check('a doctor cannot verify anyone', r.status === 403, r.status);
-  r = await call('POST', `/doctors/${docId}/verify`, { token: t.admin, body: { approve: true, notes: 'Checked on the MMC register' } });
+  r = await call('POST', `/doctors/${docId}/verify`, { token: t.admin, body: { approve: true, notes: 'Checked on the MMC register', nmc_reg_number: 'MMC-OTHER' } });
+  check('approval must name the registration number that was checked', r.status === 409, r.json);
+  r = await call('POST', `/doctors/${docId}/verify`, { token: t.admin, body: { approve: true, notes: 'Checked on the MMC register', nmc_reg_number: profile.nmc_reg_number } });
   check('admin verifies against the council register', r.json.data?.is_verified === true, r.json);
   r = await call('GET', '/doctors');
   const listed = r.json.data.find((d) => d.id === docId);
@@ -36,7 +38,7 @@ export async function runTelemedicine(ctx) {
   r = await call('GET', `/doctors/${docId}`);
   check('changing the registration number needs checking again', r.status === 404, r.status);
   await call('PUT', '/doctors/me/profile', { token: t.doctor, body: profile });
-  await call('POST', `/doctors/${docId}/verify`, { token: t.admin, body: { approve: true, notes: 'Rechecked' } });
+  await call('POST', `/doctors/${docId}/verify`, { token: t.admin, body: { approve: true, notes: 'Rechecked', nmc_reg_number: profile.nmc_reg_number } });
   const d2 = (await q(`SELECT id FROM doctor_profiles WHERE full_name = 'Dr Unchecked'`))[0].id;
   await call('POST', `/doctors/${d2}/verify`, { token: t.admin, body: { approve: false, notes: 'Number not on the register' } });
   await call('PUT', '/doctors/me/profile', { token: t.doctor2, body: { ...profile, full_name: 'Dr Unchecked', nmc_reg_number: 'MMC-2015-0100' } });
@@ -91,7 +93,9 @@ export async function runTelemedicine(ctx) {
   check('an unclassified medicine is refused until a pharmacist classifies it', r.status === 422 && /classify/.test(r.json.message), r.json);
   const classify = (p, list, token = t.pharmacist) => call('POST', `/products/${p}/telemedicine-list`, { token, body: { list, notes: 'Per TPG 2020 annexure' } });
   r = await classify(P.a, 'A', t.patient);
-  check('only a pharmacist or admin classifies', r.status === 403, r.status);
+  check('patients cannot classify', r.status === 403, r.status);
+  r = await classify(P.a, 'A', t.admin);
+  check('only a registered pharmacist classifies, not an admin', r.status === 403, r.status);
   await classify(P.a, 'A'); await classify(P.b, 'B');
   r = await classify(P.ndps, 'O');
   check('Schedule X / NDPS stay prohibited whatever is set', r.json.data?.telemedicine_list === 'prohibited', r.json);
@@ -192,4 +196,44 @@ export async function runTelemedicine(ctx) {
   check("the doctor's own slots include booked ones", r.json.data?.some((x) => x.id === slots.now1 && x.is_booked && x.consultation_id === c1.id), r.json.data?.length);
   r = await call('GET', '/consultations/my', { token: t.patient });
   check('patient\'s list shows the doctor\'s registration and the e-prescription', r.json.data?.some((x) => x.id === c1.id && x.nmc_reg_number === profile.nmc_reg_number && x.prescription_id === rx1.id), r.json.data);
+
+  console.log('Security review fixes');
+  r = await call('PATCH', `/products/${P.unclassified}`, { token: t.admin, body: { drug_schedule: 'OTC' } });
+  r = await call('PATCH', `/products/${P.otc}`, { token: t.admin, body: { drug_schedule: 'Schedule H' } });
+  const tl = (await q(`SELECT telemedicine_list FROM products WHERE id = $1`, [P.otc]))[0].telemedicine_list;
+  check('a schedule change clears the telemedicine list for reclassification', r.status === 200 && tl === null, { status: r.status, tl });
+
+  // A fee only authorised at checkout is captured before it counts
+  r = await book(t.patient2, slots.later);
+  const c5 = r.json.data;
+  r = await call('POST', `/consultations/${c5.id}/pay`, { token: t.patient2 });
+  const pay5 = checkoutPayment(r.json.data.gateway_order_id, { status: 'authorized' });
+  r = await call('POST', `/consultations/${c5.id}/pay/verify`, { token: t.patient2, body: pay5 });
+  check('an authorised-only fee is captured at Razorpay before the consultation counts as paid', r.json.data?.payment_status === 'paid'
+    && razorpay.payments.get(pay5.razorpay_payment_id).status === 'captured', r.json);
+  r = await call('POST', `/consultations/${c5.id}/cancel`, { token: t.patient2, body: { reason: 'Plans changed' } });
+  await sendWebhook('payment.captured', { payment: { entity: razorpay.payments.get(pay5.razorpay_payment_id) } });
+  const c5row = (await q(`SELECT payment_status FROM consultations WHERE id = $1`, [c5.id]))[0];
+  check('a late capture event never turns a refunded consultation back to paid', c5row.payment_status === 'refunded', c5row);
+
+  // Paid after the doctor cancelled: the money goes straight back
+  r = await book(t.patient2, slots.later);
+  const c6 = r.json.data;
+  r = await call('POST', `/consultations/${c6.id}/pay`, { token: t.patient2 });
+  const order6 = r.json.data.gateway_order_id;
+  await call('POST', `/consultations/${c6.id}/cancel`, { token: t.doctor, body: { reason: 'Emergency' } });
+  const pay6 = checkoutPayment(order6);
+  r = await sendWebhook('payment.captured', { payment: { entity: razorpay.payments.get(pay6.razorpay_payment_id) } });
+  const c6row = (await q(`SELECT payment_status, gateway_refund_id FROM consultations WHERE id = $1`, [c6.id]))[0];
+  check('a fee paid after cancellation is refunded at once', /refund/.test(r.json.outcome) && c6row.payment_status === 'refunded'
+    && razorpay.refunds.some((x) => x.payment_id === pay6.razorpay_payment_id), { out: r.json, c6row });
+
+  // A rejected doctor: open consultations cancelled and refunded; no more access
+  const open = (await q(`SELECT id FROM consultations WHERE doctor_id = $1 AND status = 'booked' AND payment_status = 'paid'`, [docId])).map((x) => x.id);
+  r = await call('POST', `/doctors/${docId}/verify`, { token: t.admin, body: { approve: false, notes: 'Registration suspended by the council' } });
+  const after = await q(`SELECT status, payment_status FROM consultations WHERE id = ANY($1)`, [open]);
+  check('rejecting a doctor cancels and refunds their open paid consultations', open.length >= 1 && r.json.data?.consultations_cancelled_refunds === open.length
+    && after.every((x) => x.status === 'cancelled' && x.payment_status === 'refunded'), { open: open.length, out: r.json, after });
+  r = await call('GET', `/consultations/${c1.id}`, { token: t.doctor });
+  check('…and the doctor can no longer open patients\' consultations', r.status === 404, r.status);
 }

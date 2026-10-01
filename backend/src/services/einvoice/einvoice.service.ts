@@ -112,41 +112,50 @@ async function partiesFor(client: PoolClient, shipmentId: string): Promise<Einvo
   return { seller, buyer, placeOfSupply: stateCode(b.state) ?? buyer.stateCode, originalInvoiceDate: b.invoice_date };
 }
 
-// Registers one document. 'done' | 'failed' (needs a person) | 'retry' (queue tries again)
+// Registers one document. 'done' | 'failed' (needs a person) | 'retry' (queue tries again).
+// The row is claimed (a 2-minute lease) and the IRP is called with no database
+// lock or connection held, so a slow IRP cannot exhaust the pool.
 export async function submitEinvoice(id: string): Promise<'done' | 'failed' | 'retry'> {
-  return withTransaction(async (client) => {
-    const e = (await client.query(`SELECT * FROM einvoices WHERE id = $1 FOR UPDATE SKIP LOCKED`, [id])).rows[0];
-    if (!e) return 'retry';                                   // not committed yet, or another worker has it
-    if (e.status !== 'pending') return 'done';
-    const fail = async (err: IrpError | Error, transient: boolean) => {
-      const code = err instanceof IrpError ? err.code : 'ERROR';
-      await client.query(
-        `UPDATE einvoices SET status = $2, error_code = $3, error_message = $4, attempts = attempts + 1, last_attempt_at = NOW() WHERE id = $1`,
-        [id, transient ? 'pending' : 'failed', code, err.message.slice(0, 1000)]);
-      return transient ? 'retry' as const : 'failed' as const;
-    };
-    if (!irpConfigured()) return fail(new IrpError('CONFIG', 'IRP credentials are not set (IRP_* environment)'), false);
-    if (e.doc_type === 'CRN') {
-      const inv = (await client.query(`SELECT status FROM einvoices WHERE shipment_id = $1 AND doc_type = 'INV'`, [e.shipment_id])).rows[0];
-      if (inv?.status !== 'generated') return fail(new IrpError('WAIT', 'Waiting for the original invoice IRN'), true);
-    }
-    try {
-      const doc = e.doc_type === 'INV' ? await loadInvoice(e.shipment_id) : await loadCreditNote(e.credit_note_id);
-      const parties = await partiesFor(client, e.shipment_id);
-      const r = await generateIrn(parties.seller.gstin, buildIrpPayload(doc, parties));
-      const ack = Date.parse(String(r.AckDt).replace(' ', 'T') + '+05:30');
+  const e = (await query<any>(
+    `UPDATE einvoices SET error_code = 'SUBMITTING', last_attempt_at = NOW()
+     WHERE id = $1 AND status = 'pending'
+       AND (error_code IS DISTINCT FROM 'SUBMITTING' OR last_attempt_at < NOW() - INTERVAL '2 minutes')
+     RETURNING *`, [id]))[0];
+  if (!e) {
+    const now = await queryOne<{ status: string }>(`SELECT status FROM einvoices WHERE id = $1`, [id]);
+    return !now || now.status === 'pending' ? 'retry' : 'done';   // not committed yet, or another worker has it
+  }
+  const fail = async (err: IrpError | Error, transient: boolean) => {
+    const code = err instanceof IrpError ? err.code : 'ERROR';
+    await query(
+      `UPDATE einvoices SET status = $2, error_code = $3, error_message = $4, attempts = attempts + 1, last_attempt_at = NOW() WHERE id = $1 AND status = 'pending'`,
+      [id, transient ? 'pending' : 'failed', code, err.message.slice(0, 1000)]);
+    return transient ? 'retry' as const : 'failed' as const;
+  };
+  if (!irpConfigured()) return fail(new IrpError('CONFIG', 'IRP credentials are not set (IRP_* environment)'), false);
+  if (e.doc_type === 'CRN') {
+    const inv = await queryOne<{ status: string }>(`SELECT status FROM einvoices WHERE shipment_id = $1 AND doc_type = 'INV'`, [e.shipment_id]);
+    if (inv?.status !== 'generated') return fail(new IrpError('WAIT', 'Waiting for the original invoice IRN'), true);
+  }
+  try {
+    const doc = e.doc_type === 'INV' ? await loadInvoice(e.shipment_id) : await loadCreditNote(e.credit_note_id);
+    const parties = await withTransaction((client) => partiesFor(client, e.shipment_id));
+    const r = await generateIrn(parties.seller.gstin, buildIrpPayload(doc, parties));
+    const ack = Date.parse(String(r.AckDt).replace(' ', 'T') + '+05:30');
+    await withTransaction(async (client) => {
       await client.query(
         `UPDATE einvoices SET status = 'generated', irn = $2, ack_no = $3, ack_date = $4, signed_qr = $5, signed_invoice = $6,
            error_code = NULL, error_message = NULL, attempts = attempts + 1, last_attempt_at = NOW(), generated_at = NOW() WHERE id = $1`,
         [id, r.Irn, String(r.AckNo), Number.isNaN(ack) ? new Date() : new Date(ack), r.SignedQRCode ?? null, r.SignedInvoice ?? null]);
       await writeAuditTx(client, { userId: null, action: 'einvoice_generated', performedBy: null,
         newValue: { einvoice_id: id, doc_type: e.doc_type, doc_number: e.doc_number, irn: r.Irn } });
-      return 'done';
-    } catch (err: any) {
-      if (err instanceof IrpError) return fail(err, err.transient);
-      throw err;
-    }
-  });
+    });
+    return 'done';
+  } catch (err: any) {
+    if (err instanceof IrpError) return fail(err, err.transient);
+    await query(`UPDATE einvoices SET error_code = 'ERROR', error_message = $2 WHERE id = $1 AND status = 'pending'`, [id, String(err?.message || err).slice(0, 1000)]);
+    throw err;
+  }
 }
 
 // ── Admin ────────────────────────────────────────────────────────────────────
@@ -165,7 +174,7 @@ export async function retryEinvoice(userId: string, id: string) {
   await withTransaction(async (client) => {
     const e = (await client.query(`SELECT status FROM einvoices WHERE id = $1 FOR UPDATE`, [id])).rows[0];
     if (!e) throw new AppError('E-invoice not found', 404);
-    if (e.status === 'generated') throw new AppError('Already registered', 409);
+    if (!['failed', 'pending'].includes(e.status)) throw new AppError(`An e-invoice that is ${e.status} cannot be retried`, 409);
     await client.query(`UPDATE einvoices SET status = 'pending' WHERE id = $1`, [id]);
     await writeAuditTx(client, { userId: null, action: 'einvoice_retry', performedBy: userId, newValue: { einvoice_id: id } });
   });

@@ -13,18 +13,26 @@ import { activateMandateFromCapture } from '../mandate.service';
 import { moveOrderToFulfilment } from '../paymentCapture.service';
 import { recordRefund, sendGatewayRefunds } from '../refund.service';
 import { queueNotification } from '../notification.service';
+import { refundConsultationFee } from '../telemedicine/consultationFee.service';
 
 export interface GatewayPayment { id: string; order_id: string; amount: number; method?: string; token_id?: string; status?: string }
 export interface CaptureOutcome { kind: 'mandate' | 'consultation' | 'order' | 'unknown'; outcome: string; orderId?: string }
 
-async function captureConsultation(client: PoolClient, p: GatewayPayment): Promise<CaptureOutcome | null> {
-  const c = (await client.query(`SELECT id, patient_user_id, fee_paise, payment_status, gateway_payment_id FROM consultations
+async function captureConsultation(client: PoolClient, p: GatewayPayment): Promise<(CaptureOutcome & { consultRefund?: string }) | null> {
+  const c = (await client.query(`SELECT id, status, patient_user_id, fee_paise, payment_status, gateway_payment_id FROM consultations
                                  WHERE gateway_order_id = $1 FOR UPDATE`, [p.order_id])).rows[0];
   if (!c) return null;
-  if (c.payment_status === 'paid') return { kind: 'consultation', outcome: 'already paid' };
+  // Paid, refunding or refunded already: a late or repeated capture changes nothing
+  if (c.payment_status !== 'unpaid') return { kind: 'consultation', outcome: `already ${c.payment_status}` };
   if (Number(p.amount) !== Number(c.fee_paise)) {
     logger.error(`Consultation ${c.id}: captured ${p.amount} but the fee is ${c.fee_paise}`);
     return { kind: 'consultation', outcome: 'amount mismatch; left for accounts' };
+  }
+  if (c.status !== 'booked') {
+    // Paid after it was cancelled: the money goes straight back (C-37)
+    await client.query(`UPDATE consultations SET payment_status = 'refund_pending', gateway_payment_id = $2, paid_at = NOW() WHERE id = $1`, [c.id, p.id]);
+    await writeAuditTx(client, { userId: c.patient_user_id, action: 'consultation_paid_after_cancel', newValue: { consultation_id: c.id, payment_id: p.id } });
+    return { kind: 'consultation', outcome: 'consultation already cancelled: refund', consultRefund: c.id };
   }
   await client.query(`UPDATE consultations SET payment_status = 'paid', gateway_payment_id = $2, paid_at = NOW() WHERE id = $1`, [c.id, p.id]);
   await writeAuditTx(client, { userId: c.patient_user_id, action: 'consultation_paid', newValue: { consultation_id: c.id, payment_id: p.id, amount_paise: p.amount } });
@@ -62,6 +70,7 @@ export async function applyCapture(p: GatewayPayment, actor: string | null = nul
   });
   const extra = r as any;
   if (extra.refundIds?.length) await sendGatewayRefunds(extra.refundIds);
+  if (extra.consultRefund) await refundConsultationFee(extra.consultRefund);
   if (extra.notify) await queueNotification(extra.notify);
   return { kind: r.kind, outcome: r.outcome, orderId: extra.orderId };
 }

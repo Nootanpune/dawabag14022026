@@ -9,6 +9,7 @@ import { logger } from '../../config/logger';
 import { AppError } from '../../utils/AppError';
 import { getRazorpay, razorpayConfigured } from '../razorpay.client';
 import { applyCapture } from './capture.service';
+import { retryPendingConsultationRefunds } from '../telemedicine/consultationFee.service';
 
 export async function runPaymentSweep(): Promise<Record<string, unknown>> {
   if (!razorpayConfigured()) return { skipped: 'Razorpay not configured' };
@@ -31,7 +32,8 @@ export async function runPaymentSweep(): Promise<Record<string, unknown>> {
       logger.error(`Payment sweep ${o.gateway_order_id}: ${e?.error?.description || e?.message || e}`);
     }
   }
-  return { checked: open.length, recorded };
+  const refunded = await retryPendingConsultationRefunds();
+  return { checked: open.length, recorded, consultation_refunds_sent: refunded };
 }
 
 function days(from: string, to: string): Date[] {

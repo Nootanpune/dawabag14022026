@@ -150,6 +150,14 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Sprint 7 — purchasing and stock (C-16, C-28)
   'purchasing.min_shelf_life_days': z.number().int().min(30).max(730),
   'stock.near_expiry_days': z.number().int().min(15).max(365),
+  // Sprint 12 — opening stock by catalogue import closes at go-live (C-46)
+  'catalogue.opening_stock_open': z.boolean(),
+  // Sprint 12 — retention of operational data, at least 30 days each (C-44)
+  'retention.days': z.object({
+    notification_deliveries: z.number().int().min(30).max(3650), notifications: z.number().int().min(30).max(3650),
+    payment_webhook_events: z.number().int().min(180).max(3650), job_runs: z.number().int().min(30).max(3650),
+    abandoned_carts: z.number().int().min(30).max(3650), stale_devices: z.number().int().min(30).max(3650),
+  }).strict(),
   // Sprint 9 — e-invoicing once turnover crosses the threshold (C-31)
   'einvoice.enabled': z.boolean(),
   // Sprint 8 — courier and DLT SMS templates (TRAI: only registered templates are delivered)

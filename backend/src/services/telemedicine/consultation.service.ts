@@ -4,11 +4,12 @@
 // 15 minutes before the slot. Whether it is a first consultation or a follow-up
 // decides which medicines may be prescribed (rules.ts).
 import crypto from 'crypto';
+import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
 import { getSetting } from '../settings.service';
-import { getRazorpay, validCheckoutSignature } from '../razorpay.client';
+import { refundConsultationFee } from './consultationFee.service';
 import { ConsultMode, consultKind } from './rules';
 import { verifiedDoctorId } from './doctor.service';
 
@@ -56,37 +57,17 @@ async function patientConsultation(userId: string, id: string) {
   return c;
 }
 
-// Fee: a Razorpay order the app opens in checkout
-export async function startPayment(userId: string, id: string) {
-  const c = await patientConsultation(userId, id);
-  if (c.status !== 'booked' || c.payment_status !== 'unpaid') throw new AppError('Nothing to pay for this consultation', 409);
-  if (c.gateway_order_id) return { gateway_order_id: c.gateway_order_id, amount_paise: c.fee_paise, key_id: process.env.RAZORPAY_KEY_ID };
-  const order: any = await getRazorpay().orders.create({ amount: c.fee_paise, currency: 'INR', receipt: `consult_${String(id).slice(0, 30)}`,
-    notes: { consultation_id: id } });
-  await query(`UPDATE consultations SET gateway_order_id = $2 WHERE id = $1 AND gateway_order_id IS NULL`, [id, order.id]);
-  return { gateway_order_id: order.id, amount_paise: c.fee_paise, key_id: process.env.RAZORPAY_KEY_ID };
-}
-
-export async function confirmPayment(userId: string, id: string, p: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
-  return withTransaction(async (client) => {
-    const c = (await client.query(`SELECT * FROM consultations WHERE id = $1 AND patient_user_id = $2 FOR UPDATE`, [id, userId])).rows[0];
-    if (!c) throw new AppError('Consultation not found', 404);
-    if (c.payment_status === 'paid' && c.gateway_payment_id === p.razorpay_payment_id) return { id, payment_status: 'paid' };
-    if (c.payment_status !== 'unpaid' || c.gateway_order_id !== p.razorpay_order_id) throw new AppError('Payment does not match this consultation', 400);
-    if (!validCheckoutSignature(p.razorpay_order_id, p.razorpay_payment_id, p.razorpay_signature)) throw new AppError('Payment signature is invalid', 400);
-    await client.query(`UPDATE consultations SET payment_status = 'paid', gateway_payment_id = $2, paid_at = NOW() WHERE id = $1`, [id, p.razorpay_payment_id]);
-    await writeAuditTx(client, { userId, action: 'consultation_paid', performedBy: userId, newValue: { consultation_id: id, payment_id: p.razorpay_payment_id, amount_paise: c.fee_paise } });
-    return { id, payment_status: 'paid' };
-  });
-}
-
-// Patient or the consultation's own doctor; paid; from 15 minutes before the slot
+// Patient or the consultation's own (still verified) doctor; paid; from 15 minutes
+// before the slot until an hour after it ends
 export async function joinConsultation(userId: string, id: string) {
   const c = await queryOne<any>(
-    `SELECT c.*, dp.user_id AS doctor_user_id, EXTRACT(EPOCH FROM ((s.slot_date + s.slot_start) - (NOW() AT TIME ZONE 'Asia/Kolkata'))) / 60 AS minutes_to_start
+    `SELECT c.*, dp.user_id AS doctor_user_id, dp.is_verified AND dp.is_active AS doctor_ok,
+            EXTRACT(EPOCH FROM ((s.slot_date + s.slot_start) - (NOW() AT TIME ZONE 'Asia/Kolkata'))) / 60 AS minutes_to_start,
+            EXTRACT(EPOCH FROM ((NOW() AT TIME ZONE 'Asia/Kolkata') - (s.slot_date + s.slot_end))) / 60 AS minutes_after_end
      FROM consultations c JOIN doctor_profiles dp ON dp.id = c.doctor_id LEFT JOIN doctor_slots s ON s.id = c.slot_id WHERE c.id = $1`, [id]);
-  const isPatient = c?.patient_user_id === userId, isDoctor = c?.doctor_user_id === userId;
+  const isPatient = c?.patient_user_id === userId, isDoctor = c?.doctor_user_id === userId && c?.doctor_ok;
   if (!c || (!isPatient && !isDoctor)) throw new AppError('Consultation not found', 404);
+  if (Number(c.minutes_after_end) > 60) throw new AppError('This consultation\'s time has passed', 409);
   if (!['booked', 'in_progress'].includes(c.status)) throw new AppError(`Consultation is ${c.status}`, 409);
   if (!['paid', 'waived'].includes(c.payment_status)) throw new AppError('Pay the consultation fee to join', 402);
   if (Number(c.minutes_to_start) > JOIN_EARLY_MIN) throw new AppError(`The consultation opens ${JOIN_EARLY_MIN} minutes before the slot`, 409);
@@ -113,16 +94,29 @@ export async function cancelConsultation(userId: string, id: string, reason: str
     if (!c || (!isPatient && !isDoctor)) throw new AppError('Consultation not found', 404);
     if (c.status !== 'booked') throw new AppError(`A consultation that is ${c.status.replace('_', ' ')} cannot be cancelled`, 409);
     if (isPatient && Number(c.hours_to_start) < PATIENT_CANCEL_HOURS) throw new AppError(`Cancel at least ${PATIENT_CANCEL_HOURS} hours before the slot`, 409);
-    await client.query(`UPDATE consultations SET status = 'cancelled', cancelled_by = $2, cancel_reason = $3 WHERE id = $1`, [id, userId, reason]);
+    // A paid fee is owed back from this moment; the gateway refund follows the commit
+    await client.query(`UPDATE consultations SET status = 'cancelled', cancelled_by = $2, cancel_reason = $3,
+                          payment_status = CASE WHEN payment_status = 'paid' THEN 'refund_pending' ELSE payment_status END WHERE id = $1`, [id, userId, reason]);
     await client.query(`UPDATE doctor_slots SET is_booked = FALSE WHERE id = $1`, [c.slot_id]);
     await writeAuditTx(client, { userId: c.patient_user_id, action: 'consultation_cancelled', performedBy: userId, newValue: { consultation_id: id }, notes: reason });
     return c;
   });
   if (r.payment_status !== 'paid') return { id, status: 'cancelled', refund: null };
-  // Full refund through the gateway, after the cancellation is committed
-  const refund: any = await getRazorpay().payments.refund(r.gateway_payment_id, { amount: r.fee_paise, notes: { consultation_id: id } } as any);
-  await query(`UPDATE consultations SET payment_status = 'refunded', gateway_refund_id = $2 WHERE id = $1`, [id, refund.id]);
-  return { id, status: 'cancelled', refund: { id: refund.id, amount_paise: r.fee_paise } };
+  const refund = await refundConsultationFee(id);
+  return { id, status: 'cancelled', refund: refund ?? { pending: true, amount_paise: r.fee_paise } };
+}
+
+// A doctor whose registration is rejected: their open consultations are cancelled
+// and refunded, and their free slots closed (C-22)
+export async function cancelDoctorConsultations(client: PoolClient, doctorId: string, adminId: string): Promise<string[]> {
+  const rows = (await client.query(
+    `UPDATE consultations SET status = 'cancelled', cancelled_by = $2, cancel_reason = 'Doctor registration not verified',
+       payment_status = CASE WHEN payment_status = 'paid' THEN 'refund_pending' ELSE payment_status END
+     WHERE doctor_id = $1 AND status IN ('booked', 'in_progress')
+       AND NOT EXISTS (SELECT 1 FROM digital_prescriptions rx WHERE rx.consultation_id = consultations.id)
+     RETURNING id, slot_id, payment_status`, [doctorId, adminId])).rows;
+  await client.query(`UPDATE doctor_slots SET is_blocked = TRUE WHERE doctor_id = $1 AND (slot_date + slot_start) > (NOW() AT TIME ZONE 'Asia/Kolkata')`, [doctorId]);
+  return rows.filter((r: any) => r.payment_status === 'refund_pending').map((r: any) => r.id);
 }
 
 export async function myConsultations(userId: string) {
@@ -150,7 +144,7 @@ export async function doctorConsultations(userId: string, date: string) {
 export async function getConsultation(userId: string, id: string) {
   const c = await queryOne<any>(
     `SELECT c.id, c.type AS mode, c.status, c.consult_kind, c.fee_paise, c.payment_status, c.chief_complaint, c.started_at, c.ended_at,
-            c.patient_user_id, dp.user_id AS doctor_user_id, dp.id AS doctor_id, dp.full_name AS doctor_name, dp.qualification, dp.council, dp.nmc_reg_number,
+            c.patient_user_id, CASE WHEN dp.is_verified AND dp.is_active THEN dp.user_id END AS doctor_user_id, dp.id AS doctor_id, dp.full_name AS doctor_name, dp.qualification, dp.council, dp.nmc_reg_number,
             s.slot_date, s.slot_start, s.slot_end, COALESCE(pt.full_name, up.full_name) AS patient_name, COALESCE(pt.gender, up.gender) AS patient_gender,
             date_part('year', age(COALESCE(pt.date_of_birth, up.date_of_birth)))::int AS patient_age, rx.id AS prescription_id
      FROM consultations c JOIN doctor_profiles dp ON dp.id = c.doctor_id LEFT JOIN doctor_slots s ON s.id = c.slot_id
