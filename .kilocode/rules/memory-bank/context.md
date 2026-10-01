@@ -2,7 +2,7 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–13 are done on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–13 are done (Sprint 14 video calls wired on web and mobile) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
@@ -18,6 +18,28 @@ the lawyer/CA sign-off.
 - GST period lock `accounts.locked_until` for GRNs and supplier credit notes (C-31).
 - WhatsApp through MSG91 templates after opt-in consent (`whatsapp` purpose).
 - Tests: Sprint 1–13 smoke 653 checks pass, jest 60, fresh-DB migrations 01–16 apply.
+
+## Web Sprint 14 — video calls (tsc + next lint + next build pass)
+- `agora-rtc-sdk-ng` ^4.24.8, imported only inside the call hook's effect; CallRoom loaded
+  with next/dynamic ssr:false. lib/telemedicine/useAgoraCall.ts (join with the string user
+  account uid, publish mic/camera, subscribe, mute = setMuted, camera off = setEnabled,
+  token-privilege-will-expire → GET /consultations/:id/join again → renewToken, remote
+  left, always close tracks + leave on unmount) and callStatus.ts (status/error wording).
+- components/telemedicine/call/: CallRoom (full-screen), CallStage, VideoTile,
+  CallControls, CallStatusLine. JoinDialog shows "Start video/audio call" when mode is
+  video/audio and the server sent a token; token null keeps the "not set up" note; chat
+  keeps the old text. useJoin keeps { id, info }. Patient + doctor both. Audio mode = mic
+  only. C-23: patient and doctor only, nothing recorded; nothing stored in the browser.
+
+## Mobile Sprint 14 — video calls (not compiled — no Flutter SDK here)
+- services/video_call_service.dart (ChangeNotifier over agora_rtc_engine 6.x: permissions
+  via permission_handler, initialize, enableVideo/startPreview, joinChannelWithUserAccount,
+  onTokenPrivilegeWillExpire → refetch join → renewToken, leave/release on dispose).
+- screens/consultations/call/video_call_screen.dart + widgets (local_preview, remote_view,
+  call_controls, call_status_banner); route /consultations/:id/call reuses
+  consultJoinProvider. Join screen "Start video/audio call" when a token was issued.
+- No android/ios folders in the repo: add CAMERA/RECORD_AUDIO/INTERNET (Android) and
+  NSCameraUsageDescription/NSMicrophoneUsageDescription (iOS) when they are generated.
 
 ## Web Sprint 13 (tsc + next lint + next build pass)
 - Dispatch dialog: "Our rider" (RiderSelect from GET /fulfilment/riders) or courier — never

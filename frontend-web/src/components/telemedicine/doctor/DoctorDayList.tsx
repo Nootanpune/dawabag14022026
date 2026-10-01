@@ -73,7 +73,7 @@ export default function DoctorDayList({ rows }: { rows: DoctorConsultation[] }) 
           }
         />
       ))}
-      {room && <JoinDialog info={room} onClose={closeRoom} />}
+      {room && <JoinDialog consultationId={room.id} info={room.info} onClose={closeRoom} />}
       {ending && (
         <EndConsultDialog
           pending={end.isPending}

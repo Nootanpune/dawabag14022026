@@ -72,7 +72,7 @@ export default function MyConsultationsList({ rows }: { rows: MyConsultation[] }
           }
         />
       ))}
-      {room && <JoinDialog info={room} onClose={closeRoom} />}
+      {room && <JoinDialog consultationId={room.id} info={room.info} onClose={closeRoom} />}
       {cancelling && (
         <ReasonDialog
           title="Cancel consultation"

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../config/theme.dart';
 import '../../models/consultation.dart';
 import '../../providers/consultation_provider.dart';
+import '../../services/video_call_service.dart';
 import '../../utils/consult_format.dart';
 import '../../widgets/error_retry_view.dart';
 import 'widgets/call_link_notice.dart';
@@ -11,10 +13,11 @@ import 'widgets/call_link_notice.dart';
 /// /consultations/:id/join — asks the server for the call room (GET
 /// /consultations/:id/join). The server decides whether the patient may join
 /// (fee paid, from 15 minutes before the slot) and its message is shown when
-/// it refuses. The video/audio/chat client itself is not built into the app
-/// yet; it will open on this screen and join `channel` as `uid` with `token`
-/// (Sprint 13, C-23). Until then the screen shows how long the secure call
-/// link is valid, or that the video service is not set up (token null).
+/// it refuses. For a video or audio consultation with a server-issued token
+/// the "Start call" button opens /consultations/:id/call, which joins `channel`
+/// as the user account `uid` with `token` (Sprint 13/14, C-23). Without a
+/// token (video service not set up) the notice says so and no call starts;
+/// chat consultations are not in the app yet.
 class JoinConsultationScreen extends ConsumerWidget {
   final String consultationId;
   const JoinConsultationScreen({super.key, required this.consultationId});
@@ -60,27 +63,39 @@ class JoinConsultationScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             CallLinkNotice(join: j),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.amberBadge,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.info_outline, size: 18, color: AppTheme.amberText),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'The call client opens here. In-app video, audio and chat calls are not '
-                      'available in this version of the app yet.',
-                      style: TextStyle(fontSize: 13, color: AppTheme.amberText),
+            if (VideoCallService.canCall(j))
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.brandGreen,
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: () => context.push('/consultations/$consultationId/call'),
+                icon: Icon(_icon(j.mode)),
+                label: Text(j.mode == 'video' ? 'Start video call' : 'Start audio call'),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.amberBadge,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline, size: 18, color: AppTheme.amberText),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        j.mode == 'text'
+                            ? 'In-app chat consultations are not available in this version of the app yet.'
+                            : 'The call cannot start until the video service is set up.',
+                        style: const TextStyle(fontSize: 13, color: AppTheme.amberText),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             const SizedBox(height: 12),
             Text(
               'Keep your previous prescriptions and reports at hand. The doctor may ask you to '

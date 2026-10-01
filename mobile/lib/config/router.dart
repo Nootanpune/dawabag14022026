@@ -28,6 +28,7 @@ import '../screens/account/returns/returns_screen.dart';
 import '../screens/account/side_effects/new_side_effect_screen.dart';
 import '../screens/account/side_effects/side_effect_list_screen.dart';
 import '../screens/consultations/book_consultation_screen.dart';
+import '../screens/consultations/call/video_call_screen.dart';
 import '../screens/consultations/eprescription_screen.dart';
 import '../screens/consultations/join_consultation_screen.dart';
 import '../screens/consultations/my_consultations_screen.dart';
@@ -176,6 +177,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/consultations/:id/join',
         builder: (c, s) => JoinConsultationScreen(consultationId: s.pathParameters['id']!),
+      ),
+      // In-app audio/video call (Mobile Sprint 14, C-23: patient and doctor only, not recorded)
+      GoRoute(
+        path: '/consultations/:id/call',
+        builder: (c, s) => VideoCallScreen(consultationId: s.pathParameters['id']!),
       ),
       GoRoute(path: '/doctor/portal', builder: (c, s) => const DoctorPortalScreen()),
       GoRoute(path: '/admin', builder: (c, s) => const AdminScreen()),
