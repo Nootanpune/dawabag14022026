@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../config/theme.dart';
+import '../../../utils/formatters.dart';
 
 /// Bottom sheet: take a photo or pick from the gallery.
 Future<ImageSource?> showPrescriptionSourceSheet(BuildContext context) =>
@@ -30,6 +31,12 @@ Future<XFile?> pickPrescriptionImage(BuildContext context) async {
   final source = await showPrescriptionSourceSheet(context);
   if (source == null) return null;
   return ImagePicker().pickImage(source: source, imageQuality: 85);
+}
+
+/// valid_until as a local calendar date ("31 Dec 2026"), or a dash.
+String _validUntil(Object? raw) {
+  final d = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
+  return d == null ? '—' : formatDate(DateTime(d.year, d.month, d.day).toIso8601String());
 }
 
 // ── Prescription step ──────────────────────────────────────────────────────────
@@ -101,19 +108,24 @@ class PrescriptionStep extends StatelessWidget {
           const SizedBox(height: 20),
           const Text('Or use a saved prescription',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 4),
+          // Only verified, unexpired prescriptions are listed; the server
+          // checks it covers this order and a pharmacist confirms it (C-08).
+          Text('Verified by our pharmacist and still valid.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
           const SizedBox(height: 10),
-          ...savedPrescriptions.map((rx) => GestureDetector(
-            onTap: () => onSelectSaved(rx['id']),
+          ...savedPrescriptions.whereType<Map>().map((rx) => GestureDetector(
+            onTap: () => onSelectSaved(rx['id']?.toString() ?? ''),
             child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: selectedSavedId == rx['id'] ? AppTheme.brandGreen : Colors.grey.shade200,
-                  width: selectedSavedId == rx['id'] ? 2 : 1,
+                  color: selectedSavedId == rx['id']?.toString() ? AppTheme.brandGreen : Colors.grey.shade200,
+                  width: selectedSavedId == rx['id']?.toString() ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(10),
-                color: selectedSavedId == rx['id'] ? AppTheme.brandGreen50 : Colors.white,
+                color: selectedSavedId == rx['id']?.toString() ? AppTheme.brandGreen50 : Colors.white,
               ),
               child: Row(
                 children: [
@@ -126,7 +138,7 @@ class PrescriptionStep extends StatelessWidget {
                         Text(rx['doctor_name'] != null ? 'Dr. ${rx['doctor_name']}' : 'Uploaded prescription',
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13,
                             color: AppTheme.brandGreen700)),
-                        Text('Valid until ${rx['valid_until'] ?? '—'}',
+                        Text('Valid until ${_validUntil(rx['valid_until'])}',
                           style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                       ],
                     ),

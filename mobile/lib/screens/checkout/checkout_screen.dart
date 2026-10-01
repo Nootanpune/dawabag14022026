@@ -148,11 +148,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _showError('Please upload a prescription or select a saved one');
       return;
     }
+    final orderId = _order?.id;
+    if (orderId == null) return; // this step only follows POST /orders
+    // Photo upload or saved-Rx use-for-order (C-08); the pharmacist confirms
+    // either. Server 400s (expired, "does not cover: …") are shown as-is.
     var ok = false;
     await _busy(() async {
-      await _rx.upload(_order?.id ?? '');
+      await _rx.submit(orderId);
       ok = true;
-    }, 'Upload failed');
+    }, _rx.file != null ? 'Upload failed' : 'Could not use this prescription');
     if (ok && mounted) setState(() => _step = CheckoutStep.payment);
   }
 

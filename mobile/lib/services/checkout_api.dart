@@ -1,16 +1,49 @@
 import 'package:dio/dio.dart';
 
 import '../models/checkout_summary.dart';
+import '../models/json_utils.dart';
 import 'api_service.dart';
 import 'api_utils.dart';
 
-/// Checkout requests (order placement, prescription upload, Razorpay).
+/// Checkout requests (order placement, prescription upload or saved-
+/// prescription reuse, Razorpay).
 /// The server computes prices and totals; nothing is cached on the device.
 extension CheckoutApi on ApiService {
-  /// GET /prescriptions/my — only prescriptions a pharmacist has verified.
-  Future<List<dynamic>> getVerifiedPrescriptions() async {
+  /// GET /prescriptions/my → only the buyer's prescriptions a pharmacist has
+  /// verified and that are still valid today, the only ones that can be
+  /// offered for an order (C-08). The server re-checks both on use.
+  Future<List<Map<String, dynamic>>> getVerifiedPrescriptions() async {
     final res = await dio.get('/prescriptions/my');
-    return (res.data['data'] as List).where((p) => p['status'] == 'verified').toList();
+    final body = res.data;
+    final list = body is Map ? asMapList(body['data']) : const <Map<String, dynamic>>[];
+    return list.where(isUsableSavedPrescription).toList();
+  }
+
+  /// True for a verified prescription whose valid_until is today or later
+  /// (compared as a local calendar date). No date counts as expired, as on
+  /// the server (C-08).
+  static bool isUsableSavedPrescription(Map<String, dynamic> rx) {
+    if (rx['status'] != 'verified') return false;
+    final until = DateTime.tryParse(rx['valid_until']?.toString() ?? '')?.toLocal();
+    if (until == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return !DateTime(until.year, until.month, until.day).isBefore(today);
+  }
+
+  /// POST /prescriptions/:id/use-for-order { order_id } — offers a saved,
+  /// verified prescription for [orderId]; a pharmacist still confirms it
+  /// (C-08). Returns { order_id, prescription_id, status:'awaiting_pharmacist' }.
+  /// A 400 explains an expired prescription or the products it does not cover.
+  Future<Map<String, dynamic>> useSavedPrescriptionForOrder({
+    required String prescriptionId,
+    required String orderId,
+  }) async {
+    final res = await dio.post(
+      '/prescriptions/${Uri.encodeComponent(prescriptionId)}/use-for-order',
+      data: {'order_id': orderId},
+    );
+    return apiData(res);
   }
 
   /// Body shared by POST /orders/preview and POST /orders. Doctors and
