@@ -22,7 +22,7 @@ export async function runPurchasing({ t, P }) {
   r = await call('POST', '/purchasing/purchase-orders', { token: t.admin, body: { vendor_id: S, items: [
     { product_id: P.a, quantity: 100, unit_cost_paise: 5000 }, { product_id: P.b, quantity: 50, unit_cost_paise: 3000 }] } });
   const po = r.json.data;
-  check('purchase order numbered in the PO series', r.status === 201 && /^PO\/\d{4}-\d{2}\/\d{6}$/.test(po?.po_number || ''), r.json);
+  check('purchase order numbered in the PO series', r.status === 201 && /^PO\/\d{4}\/\d{5}$/.test(po?.po_number || ''), r.json);
   const detail = (await call('GET', `/purchasing/purchase-orders/${po.id}`, { token: t.admin })).json.data;
   const itemA = detail.items.find((i) => i.product_id === P.a), itemB = detail.items.find((i) => i.product_id === P.b);
   check('PO totals include GST', detail.total_amount_paise === 650000 + 78000 && detail.gst_paise === 78000, detail);
@@ -45,7 +45,7 @@ export async function runPurchasing({ t, P }) {
   r = await receive({ lines: [line()] });
   const grn1 = r.json.data;
   const batchA = (await q(`SELECT id, quantity_available, purchase_price_paise, printed_mrp_paise FROM inventory_batches WHERE product_id = $1 AND batch_number = 'S7-A-001'`, [P.a]))[0];
-  check('receipt numbered in the GRN series', r.status === 201 && /^GRN\/\d{4}-\d{2}\/\d{6}$/.test(grn1?.grn_number || ''), r.json);
+  check('receipt numbered in the GRN series', r.status === 201 && /^GRN\/\d{4}\/\d{5}$/.test(grn1?.grn_number || ''), r.json);
   check('batch created with free goods and their lower unit cost', batchA?.quantity_available === 70 && batchA.purchase_price_paise === 4286 && batchA.printed_mrp_paise === 10000, batchA);
   check('PO now partially received', (await call('GET', `/purchasing/purchase-orders/${po.id}`, { token: t.admin })).json.data.status === 'partially_received');
   r = await receive({ lines: [line({ quantity: 1, free_quantity: 0 })] });

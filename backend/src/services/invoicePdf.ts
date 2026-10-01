@@ -1,10 +1,13 @@
 // src/services/invoicePdf.ts — renders InvoiceData as a PDF buffer (pdfkit)
 import PDFDocument from 'pdfkit';
+import QRCode from 'qrcode';
 import { InvoiceData } from './invoiceData.service';
 
 const rs = (p: number) => `Rs. ${(p / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
+export async function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
+  // The IRP's signed QR code, printed as issued (CGST Rule 48(4), C-31)
+  const qr = d.einvoice?.signedQr ? await QRCode.toBuffer(d.einvoice.signedQr, { errorCorrectionLevel: 'M', margin: 1, width: 220 }) : null;
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 36 });
     const chunks: Buffer[] = [];
@@ -17,7 +20,12 @@ export function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
     doc.moveDown(0.3).font('Helvetica').fontSize(9)
       .text(`${isCredit ? 'Credit note' : 'Invoice'} No: ${d.invoiceNumber}    Date: ${new Date(d.invoiceDate).toLocaleDateString('en-IN')}    Order: ${d.orderNumber}`, { align: 'center' });
     if (d.againstInvoice) doc.text(`Against tax invoice: ${d.againstInvoice}`, { align: 'center' });
-    if (d.irn && !isCredit) doc.text(`IRN: ${d.irn}`, { align: 'center' });
+    if (d.einvoice) {
+      doc.fontSize(7.5).text(`IRN: ${d.einvoice.irn}`, { align: 'center' })
+        .text(`Ack No: ${d.einvoice.ackNo}    Ack Date: ${new Date(d.einvoice.ackDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`, { align: 'center' })
+        .fontSize(9);
+      if (qr) doc.image(qr, 36 + 523 - 80, 36, { width: 80 });
+    }
     doc.moveDown();
 
     const top = doc.y;

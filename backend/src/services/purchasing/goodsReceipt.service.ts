@@ -22,7 +22,7 @@ export interface GrnInput {
 
 const PRICE_COLS = ['offer_price_paise', 'ptr_price_paise', 'pts_price_paise', 'institutional_price_paise'] as const;
 
-async function dawabagState(client: PoolClient) {
+export async function dawabagState(client: PoolClient) {
   const e = (await client.query(`SELECT value FROM app_settings WHERE key = 'legal.entity'`)).rows[0]?.value;
   return e?.state || 'Maharashtra';
 }

@@ -13,6 +13,7 @@ import { checkEnv } from './config/env';
 import { connectRedis, getRedis } from './config/redis';
 import { startScheduler, stopScheduler } from './jobs/scheduler';
 import { stopNotificationQueue } from './services/notification.service';
+import { stopEinvoiceQueue } from './services/einvoice/einvoice.service';
 
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -46,7 +47,7 @@ import accountsRoutes from './routes/accounts.routes';
 import purchasingRoutes from './routes/purchasing.routes';
 import stockControlRoutes from './routes/stockControl.routes';
 import courierRoutes from './routes/courier.routes';
-import eInvoiceRouter from './controllers/einvoice.controller';
+import einvoiceRoutes from './routes/einvoice.routes';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
@@ -148,7 +149,7 @@ app.use(`${api}/accounts`, accountsRoutes);
 app.use(`${api}/purchasing`, purchasingRoutes);
 app.use(`${api}/stock`, stockControlRoutes);
 app.use(`${api}/courier`, courierRoutes);
-app.use(`${api}/einvoice`, eInvoiceRouter);
+app.use(`${api}/einvoices`, einvoiceRoutes);
 
 // ─── Error Handling ─────────────────────────────────────────────────────────
 app.use(notFound);
@@ -181,6 +182,7 @@ async function bootstrap() {
       logger.info(`${signal} received: shutting down`);
       stopScheduler();
       void stopNotificationQueue();
+      void stopEinvoiceQueue();
       server.close(async () => {
         await getDB().end().catch(() => undefined);
         await getRedis().quit().catch(() => undefined);

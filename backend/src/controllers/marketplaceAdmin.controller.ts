@@ -150,6 +150,8 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Sprint 7 — purchasing and stock (C-16, C-28)
   'purchasing.min_shelf_life_days': z.number().int().min(30).max(730),
   'stock.near_expiry_days': z.number().int().min(15).max(365),
+  // Sprint 9 — e-invoicing once turnover crosses the threshold (C-31)
+  'einvoice.enabled': z.boolean(),
   // Sprint 8 — courier and DLT SMS templates (TRAI: only registered templates are delivered)
   'courier.provider': z.enum(['manual', 'shiprocket']),
   'courier.pickup_location': z.string().trim().min(1).max(100),

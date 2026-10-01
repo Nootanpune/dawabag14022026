@@ -6,6 +6,7 @@ import { runSettlementJob } from './settlement.job';
 import { runRefillOrdersJob, runRefillRemindersJob } from './refill.job';
 import { runLicenceRegisterAlerts } from '../services/licence.service';
 import { runExpiryWatchJob } from './expiryWatch.job';
+import { runEinvoiceSweep } from '../services/einvoice/einvoice.service';
 
 export interface JobDefinition {
   name: string;
@@ -15,6 +16,12 @@ export interface JobDefinition {
 }
 
 export const JOBS: JobDefinition[] = [
+  {
+    name: 'einvoice_sweep',
+    description: 'Re-queue e-invoices still waiting for the IRP (C-31)',
+    cron: '*/15 * * * *',                    // every 15 minutes
+    run: runEinvoiceSweep,
+  },
   {
     name: 'licence_expiry',
     description: 'Warn buyers before drug licence expiry; pause trade ordering on expiry (C-14)',

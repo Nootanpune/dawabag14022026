@@ -12,10 +12,12 @@ const uuid = z.string().uuid();
 export async function getBatches(req: Request, res: Response, next: NextFunction) {
   try {
     const f = z.object({
-      q: z.string().trim().max(100).optional(), product_id: uuid.optional(), expiry: z.enum(['expired', 'near', 'ok']).optional(),
+      q: z.string().trim().max(100).optional(), product_id: uuid.optional(), vendor_id: uuid.optional(),
+      recalled: z.enum(['true', 'false']).transform((v) => v === 'true').optional(), expiry: z.enum(['expired', 'near', 'ok']).optional(),
       page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(200).default(50),
     }).parse(req.query);
-    res.json({ success: true, data: { batches: await listBatches(f), near_expiry_days: Number(await getSetting('stock.near_expiry_days', 90)) } });
+    const { batches, total } = await listBatches(f);
+    res.json({ success: true, data: { batches, total, page: f.page, limit: f.limit, near_expiry_days: Number(await getSetting('stock.near_expiry_days', 90)) } });
   } catch (e) { next(e); }
 }
 

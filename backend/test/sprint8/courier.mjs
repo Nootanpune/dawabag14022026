@@ -1,6 +1,6 @@
 // Shiprocket booking, the tracking webhook and the buyer's tracking timeline
 import { API, call, check, q } from '../sprint5/lib.mjs';
-import { calls } from './fakes.mjs';
+import { calls } from '../fakes/server.mjs';
 import { paidOrder, waitFor } from './fixtures.mjs';
 
 const hook = (body, key = process.env.SHIPROCKET_WEBHOOK_TOKEN) => fetch(`${API}/courier/shiprocket/webhook`, {

@@ -26,7 +26,8 @@ export class VendorApprovalService {
     const isPartner = vendorType !== 'supplier';
     const prefix = params.invoicePrefix?.trim().toUpperCase();
     if (isPartner && !prefix) throw new AppError('invoice_prefix is required for marketplace partners', 400);
-    if (prefix && !/^[A-Z0-9]{2,10}$/.test(prefix)) throw new AppError('invoice_prefix must be 2–10 letters/digits', 400);
+    // <prefix>C/2627/00001 must fit the 16-character limit (CGST Rule 46, IRP)
+    if (prefix && !/^[A-Z1-9][A-Z0-9]{1,3}$/.test(prefix)) throw new AppError('invoice_prefix must be 2–4 capital letters/digits, not starting with 0', 400);
     if (prefix && ['DWB', 'DWS'].includes(prefix)) throw new AppError('That prefix is reserved for Dawabag', 400);
 
     const result = await pool.query(

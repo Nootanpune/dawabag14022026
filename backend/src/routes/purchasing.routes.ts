@@ -4,6 +4,9 @@ import {
   getGoodsReceipts, getOneGoodsReceipt, getOnePurchaseOrder, getPurchaseOrders, getSuppliers, postApprovePo, postCancelPo,
   postClosePo, postGoodsReceipt, postPurchaseOrder, postSupplier,
 } from '../controllers/purchasing.controller';
+import {
+  getOnePurchaseReturn, getPurchaseReturns, postDecidePurchaseReturn, postDispatchPurchaseReturn, postPurchaseReturn, postSettlePurchaseReturn,
+} from '../controllers/purchaseReturn.controller';
 
 // Suppliers, purchase orders and goods receipts — /api/v1/purchasing/*
 const router = Router();
@@ -22,4 +25,11 @@ router.post('/purchase-orders/:id/close', admin, postClosePo);
 router.get('/receipts', store, getGoodsReceipts);
 router.post('/receipts', store, postGoodsReceipt);
 router.get('/receipts/:id', store, getOneGoodsReceipt);
+// Purchase returns to suppliers (C-28): store raises and dispatches, a second admin approves
+router.get('/returns', store, getPurchaseReturns);
+router.post('/returns', store, postPurchaseReturn);
+router.get('/returns/:id', store, getOnePurchaseReturn);
+router.post('/returns/:id/decide', admin, postDecidePurchaseReturn);
+router.post('/returns/:id/dispatch', store, postDispatchPurchaseReturn);
+router.post('/returns/:id/settle', admin, postSettlePurchaseReturn);
 export default router;

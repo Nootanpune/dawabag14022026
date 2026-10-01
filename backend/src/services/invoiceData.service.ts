@@ -17,7 +17,8 @@ export interface InvoiceData {
   seller: { name: string; address: string; state: string | null; gstin: string | null; drugLicence: string | null };
   buyer: { name: string; address: string; state: string | null; gstin: string | null; pan: string | null; drugLicence: string | null; unregistered: boolean };
   interState: boolean;
-  irn: string | null;
+  // Registered e-invoice (C-31): printed with its signed QR code
+  einvoice: { irn: string; ackNo: string; ackDate: Date; signedQr: string | null } | null;
   lines: {
     orderItemId?: string;
     name: string; hsn: string | null; batch: string | null; expiry: string | null; manufacturer: string | null;
@@ -27,9 +28,14 @@ export interface InvoiceData {
   totals: { taxablePaise: number; cgstPaise: number; sgstPaise: number; igstPaise: number; totalPaise: number };
 }
 
+async function registered(where: string, id: string): Promise<InvoiceData['einvoice']> {
+  const e = await queryOne<any>(`SELECT irn, ack_no, ack_date, signed_qr FROM einvoices WHERE ${where} AND status = 'generated'`, [id]);
+  return e ? { irn: e.irn, ackNo: e.ack_no, ackDate: e.ack_date, signedQr: e.signed_qr } : null;
+}
+
 export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
   const s = await queryOne<any>(
-    `SELECT s.*, o.order_number, o.created_at AS order_date, o.buyer_gstin, o.buyer_pan, o.buyer_drug_license, o.irn,
+    `SELECT s.*, o.order_number, o.created_at AS order_date, o.buyer_gstin, o.buyer_pan, o.buyer_drug_license,
             a.full_name AS ship_name, concat_ws(', ', a.address_line1, a.city, a.state, a.pincode) AS ship_address, a.state AS ship_state,
             u.business_name, up.full_name AS buyer_name,
             v.name AS partner_name, concat_ws(', ', v.address_line1, v.city, v.state, v.pincode) AS partner_address,
@@ -96,7 +102,7 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
       drugLicence: s.buyer_drug_license,
     },
     interState: !sameState(seller.state, s.ship_state),
-    irn: s.seller_type === 'dawabag' ? s.irn : null,
+    einvoice: s.seller_type === 'dawabag' ? await registered('shipment_id = $1 AND doc_type = \'INV\'', shipmentId) : null,
     lines, totals,
   };
 }
@@ -119,6 +125,7 @@ export async function loadCreditNote(creditNoteId: string): Promise<InvoiceData>
   return {
     ...inv, title: 'CREDIT NOTE', againstInvoice: inv.invoiceNumber,
     invoiceNumber: cn.credit_note_number, invoiceDate: cn.created_at, lines,
+    einvoice: await registered('credit_note_id = $1', creditNoteId),
     totals: { taxablePaise: cn.taxable_paise, cgstPaise: cn.cgst_paise, sgstPaise: cn.sgst_paise,
       igstPaise: cn.igst_paise, totalPaise: cn.total_paise },
   };

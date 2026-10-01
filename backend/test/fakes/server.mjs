@@ -1,7 +1,8 @@
-// One throwaway HTTP server playing MSG91 (flow API), Google OAuth + FCM HTTP v1
-// and Shiprocket. Every request is recorded in memory for the checks.
+// One throwaway HTTP server playing MSG91 (flow API), Google OAuth + FCM HTTP v1,
+// Shiprocket and the GST IRP (irp.mjs). Every request is recorded in memory.
 import crypto from 'crypto';
 import http from 'http';
+import { irpRoute } from './irp.mjs';
 
 export const seen = [];
 const ACCESS = 'fake-google-access-token';
@@ -24,6 +25,8 @@ function jwtValid(assertion) {
 }
 
 function route(req, body) {
+  const fromIrp = irpRoute(req, body);
+  if (fromIrp) return fromIrp;
   const url = req.url;
   if (url === '/api/v5/flow/') {
     if (req.headers.authkey !== process.env.MSG91_AUTH_KEY) return [401, { type: 'error', message: 'bad authkey' }];

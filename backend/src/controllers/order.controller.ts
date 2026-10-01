@@ -83,11 +83,6 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
       [id]
     );
 
-    const einvoice = await queryOne<any>(
-      'SELECT irn, ack_no, irn_status, invoice_pdf_s3_key FROM e_invoices WHERE order_id = $1',
-      [id]
-    );
-
     // Seller of record per shipment (C-05); partners shown by name
     const shipments = await query<any>(
       `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.invoice_number, s.status,
@@ -116,7 +111,7 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     const canCancel = CANCELLABLE.includes(orderResult.status) && shipments.every((s: any) => ['pending', 'cancelled'].includes(s.status));
 
     res.json({ success: true, data: {
-      ...orderResult, items, shipments, e_invoice: einvoice||null,
+      ...orderResult, items, shipments,
       requires_prescription: needsRx, can_cancel: canCancel,
       credit_notes: creditNotes, refunds, returns,
     } });

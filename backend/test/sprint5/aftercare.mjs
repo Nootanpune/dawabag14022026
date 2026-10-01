@@ -27,7 +27,7 @@ export async function runAftercare({ t, P, addr, ids }) {
   const methods = (r.json.data?.refunds || []).map((l) => `${l.method}:${l.status}`).sort();
   check('buyer cancels a paid order: gateway leg pending, wallet leg refunded at once', r.status === 200
     && methods.join() === 'gateway:pending,wallet:processed' && r.json.data.refund_paise === o1.total_paise + 3000, r.json);
-  check('credit note issued in the Dawabag credit-note series', /^DWB-CN\/\d{4}-\d{2}\/\d{6}$/.test(r.json.data?.credit_notes?.[0] || ''), r.json.data);
+  check('credit note issued in the Dawabag credit-note series', /^DWBC\/\d{4}\/\d{5}$/.test(r.json.data?.credit_notes?.[0] || ''), r.json.data);
   const reservedAfter = (await q(`SELECT quantity_reserved FROM inventory_batches WHERE product_id = $1`, [P.own]))[0].quantity_reserved;
   check('cancellation releases reserved stock', reservedAfter === reservedBefore - 2, { reservedBefore, reservedAfter });
   const wallet = (await q(`SELECT wallet_balance_paise FROM user_profiles WHERE user_id = $1`, [ids.buyer]))[0].wallet_balance_paise;
@@ -90,7 +90,7 @@ export async function runAftercare({ t, P, addr, ids }) {
   check('packer cannot approve returns', r.status === 403, r.json);
   r = await call('POST', `/returns/${ret1.id}/decide`, { token: t.pharmacist, body: { approve: true, notes: 'Photo shows crushed strip' } });
   check('pharmacist approves: credit note and full refund of the line', r.status === 200 && r.json.data.status === 'approved'
-    && /^DWB-CN\//.test(r.json.data.credit_note_number || '') && r.json.data.refund_paise === 10080 /* ₹90 + 12% GST; delivery not refunded */, r.json);
+    && /^DWBC\//.test(r.json.data.credit_note_number || '') && r.json.data.refund_paise === 10080 /* ₹90 + 12% GST; delivery not refunded */, r.json);
   const o3s = (await q(`SELECT o.status, s.status AS s FROM orders o JOIN order_shipments s ON s.order_id = o.id WHERE o.id = $1`, [o3.id]))[0];
   check('fully returned shipment and order marked returned', o3s.status === 'returned' && o3s.s === 'returned', o3s);
   const stock = (await q(`SELECT quantity_available FROM inventory_batches WHERE product_id = $1`, [P.own]))[0].quantity_available;
@@ -120,7 +120,7 @@ export async function runAftercare({ t, P, addr, ids }) {
   r = await call('POST', '/returns', { token: t.buyer, body: { shipment_id: s4.id, reason: 'expired', description: 'Batch expiry already passed', items: [{ order_item_id: item4, quantity: 1 }] } });
   const ret2 = r.json.data;
   r = await call('POST', `/returns/${ret2.id}/decide`, { token: t.admin, body: { approve: true, notes: 'Expired stock supplied' } });
-  check('partner return approved with a partner-series credit note', /^S5P-CN\//.test(r.json.data?.credit_note_number || ''), r.json);
+  check('partner return approved with a partner-series credit note', /^S5PC\//.test(r.json.data?.credit_note_number || ''), r.json);
   r = await call('GET', '/partner/returns', { token: t.partner });
   check('partner sees the return', r.json.data?.returns?.some((x) => x.id === ret2.id), r.json);
   const today = new Date().toISOString().slice(0, 10);

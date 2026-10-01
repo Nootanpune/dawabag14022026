@@ -208,7 +208,7 @@ async function main() {
   let sh = r.json.data?.order ? await shipmentsOf(r.json.data.order.id) : [];
   check('small order → nearest seller (partner A at the buyer, not Dawabag 1.5 km away)',
     sh.length === 1 && sh[0].partner === 'S3 Partner A', { r: r.json, sh });
-  check('partner invoice uses the partner series', /^S3A\/\d{4}-\d{2}\/\d{6}$/.test(sh[0]?.invoice_number || ''), sh);
+  check('partner invoice uses the partner series', /^S3A\/\d{4}\/\d{5}$/.test(sh[0]?.invoice_number || ''), sh);
   check('order invoice_number empty when Dawabag ships nothing', r.json.data?.order?.invoice_number === null, r.json.data?.order);
   const smallOrderId = r.json.data?.order?.id;
 
@@ -230,7 +230,7 @@ async function main() {
   check('cold-chain line goes only to a partner with confirmed cold storage (B, not A/Dawabag)',
     sh.length === 1 && sh[0].partner === 'S3 Partner B', { r: r.json, sh });
 
-  const dwbNumbers = (await q(`SELECT invoice_number FROM order_shipments WHERE invoice_number LIKE 'DWB/%' ORDER BY invoice_number DESC LIMIT 2`)).map((x) => Number(x.invoice_number.slice(-6)));
+  const dwbNumbers = (await q(`SELECT invoice_number FROM order_shipments WHERE invoice_number LIKE 'DWB/%' ORDER BY created_at DESC, invoice_number DESC LIMIT 2`)).map((x) => Number(x.invoice_number.split('/').pop()));
   check('Dawabag invoice numbers are consecutive', dwbNumbers.length < 2 || dwbNumbers[0] - dwbNumbers[1] === 1, dwbNumbers);
 
   console.log('Cancellation releases reservations');

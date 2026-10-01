@@ -1,6 +1,6 @@
 // Push devices, DLT SMS, FCM v1 and the delivery log
 import { call, check, q } from '../sprint5/lib.mjs';
-import { calls } from './fakes.mjs';
+import { calls } from '../fakes/server.mjs';
 import { paidOrder, waitFor } from './fixtures.mjs';
 
 const GOOD = 'good-device-token-s8-0000000000000001';

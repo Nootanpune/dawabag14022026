@@ -1,10 +1,12 @@
 // src/services/creditNote.service.ts — GST credit notes (Rulebook C-30, C-37)
 // A cancellation or an approved return reverses the seller's tax invoice with a
-// credit note in the seller's own gap-free series: '<invoice prefix>-CN/<FY>/n'.
+// credit note in the seller's own gap-free series: '<invoice prefix>C/<FY>/n'
+// (16 characters at most, CGST Rule 46).
 // Amounts are the invoiced line values pro-rated by quantity, split into the
 // same CGST/SGST/IGST heads as the invoice.
 import { PoolClient } from 'pg';
 import { AppError } from '../utils/AppError';
+import { ensureCreditNoteEinvoice } from './einvoice/einvoice.service';
 
 export interface CreditLine { order_item_id: string; quantity: number }
 
@@ -47,8 +49,9 @@ export async function issueCreditNote(
     return { ...l, taxable: lineTaxable, gst: c + s + i };
   });
 
-  const prefix = `${String(shipment.invoice_number).split('/')[0]}-CN`;
-  const number = (await client.query(`SELECT next_invoice_number($1, $2) AS n`, [`CN:${prefix}`, prefix])).rows[0].n;
+  const sellerPrefix = String(shipment.invoice_number).split('/')[0];
+  // Series key unchanged since Sprint 5 so the counter continues without a gap
+  const number = (await client.query(`SELECT next_invoice_number($1, $2) AS n`, [`CN:${sellerPrefix}-CN`, `${sellerPrefix}C`])).rows[0].n;
   const gst = cgst + sgst + igst;
   const cn = (await client.query(
     `INSERT INTO credit_notes (credit_note_number, shipment_id, order_id, return_id, reason,
@@ -61,6 +64,8 @@ export async function issueCreditNote(
       `INSERT INTO credit_note_items (credit_note_id, order_item_id, quantity, taxable_paise, gst_paise)
        VALUES ($1, $2, $3, $4, $5)`, [cn.id, l.order_item_id, l.quantity, l.taxable, l.gst]);
   }
+  // Credit note against an e-invoiced invoice is registered too (C-31)
+  await ensureCreditNoteEinvoice(client, cn.id, shipment.id, number);
   return { id: cn.id, credit_note_number: number, taxable_paise: taxable, gst_paise: gst,
     total_paise: taxable + gst, partner_id: shipment.partner_id };
 }

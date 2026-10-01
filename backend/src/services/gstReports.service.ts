@@ -107,6 +107,18 @@ export async function purchaseRegister({ from, to }: Range) {
 }
 
 // Stock valuation at cost, today (the period is ignored); expired and recalled shown separately
+// Goods returned to suppliers, by approval date: the input tax to reverse until
+// the supplier's credit note arrives (C-28; CGST s.34)
+export async function purchaseReturnRegister({ from, to }: Range) {
+  return query(
+    `SELECT r.return_no, r.decided_at::date AS approved_on, v.name AS supplier, v.gst_number AS supplier_gstin, r.reason, r.status,
+            r.taxable_paise, r.cgst_paise, r.sgst_paise, r.igst_paise, r.total_paise, r.dispatch_reference,
+            r.supplier_credit_note_no, r.supplier_credit_note_date, r.supplier_credit_paise
+     FROM purchase_returns r JOIN vendors v ON v.id = r.vendor_id
+     WHERE r.status IN ('approved', 'dispatched', 'settled') AND (r.decided_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN $1 AND $2
+     ORDER BY r.decided_at`, [from, to]);
+}
+
 export async function stockValuation(_: Range) {
   return query(
     `SELECT p.sku, p.name AS product_name, b.batch_number, b.expiry_date, b.quantity_available AS quantity,
@@ -124,6 +136,7 @@ export const REPORTS = {
   'gstr1-summary': gstr1Summary,
   'marketplace-tcs-tds': marketplaceTaxes,
   'purchase-register': purchaseRegister,
+  'purchase-returns': purchaseReturnRegister,
   'stock-valuation': stockValuation,
 } as const;
 export type ReportName = keyof typeof REPORTS;

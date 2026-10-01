@@ -10,6 +10,7 @@ import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
 import { assertNoRecalledLines } from './recall.service';
 import { DispatchRecord, handoverCode, prepareHandover } from './handover.service';
 import { queueNotification } from './notification.service';
+import { assertEinvoiceReady, ensureInvoiceEinvoice, prepareDispatchEinvoice } from './einvoice/einvoice.service';
 
 // Orders ready for fulfilment: paid (packing), prescription-verified, or on credit (confirmed)
 const READY = ['packing', 'rx_verified', 'confirmed', 'packed', 'dispatched'];
@@ -70,11 +71,14 @@ export async function packShipment(shipmentId: string, userId: string) {
     await client.query(`UPDATE orders SET status = 'packed', pharmacist_pack_id = $2, packed_at = NOW(), updated_at = NOW()
                         WHERE id = $1 AND status IN ('packing', 'rx_verified', 'confirmed')`, [s.order_id, userId]);
     await writeAuditTx(client, { userId: s.user_id, action: 'shipment_packed', performedBy: userId, newValue: { shipment_id: shipmentId } });
-    return { id: shipmentId, status: 'packed' };
+    // B2B invoice: register it with the IRP while the parcel waits for the courier (C-31)
+    const einvoice = await ensureInvoiceEinvoice(client, shipmentId);
+    return { id: shipmentId, status: 'packed', einvoice_required: !!einvoice };
   });
 }
 
 export async function dispatchOwnShipment(shipmentId: string, courierIn: string | undefined, awbIn: string | undefined, userId: string, dispatch: DispatchRecord) {
+  await prepareDispatchEinvoice(shipmentId);
   return withTransaction(async (client) => {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'packed') throw new AppError('Pack the shipment before dispatch', 409);
@@ -83,6 +87,7 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
     if (!courier || !awb) throw new AppError('Enter the courier and AWB number, or book the courier first', 400);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
+    await assertEinvoiceReady(client, shipmentId);
     // Reserved → shipped
     await client.query(
       `UPDATE inventory_batches b
