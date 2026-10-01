@@ -46,6 +46,11 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
     if (env.AWS_REGION && env.AWS_REGION !== 'ap-south-1') errors.push('AWS_REGION must be ap-south-1 (data stays in India, C-44)');
   }
   if (!env.FCM_SERVICE_ACCOUNT_JSON) warnings.push('Push notifications off: FCM_SERVICE_ACCOUNT_JSON not set');
+  if (env.SHIPROCKET_EMAIL && !env.SHIPROCKET_WEBHOOK_TOKEN) warnings.push('Shiprocket tracking updates refused: SHIPROCKET_WEBHOOK_TOKEN not set');
+  if (production) {
+    const overridden = ['MSG91_BASE_URL', 'GOOGLE_OAUTH_TOKEN_URL', 'FCM_BASE_URL', 'SHIPROCKET_BASE_URL'].filter((k) => env[k]);
+    if (overridden.length) errors.push(`${overridden.join(', ')} must not be set in production (test-only provider addresses)`);
+  }
   const missing = INTEGRATIONS.filter((k) => !env[k] || PLACEHOLDER.test(String(env[k])));
   if (missing.length) {
     const msg = `Not configured: ${missing.join(', ')}`;

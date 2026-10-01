@@ -105,3 +105,13 @@
   (snapshot → count → second-person approval → count_variance adjustments), `batches.service`;
   job `expiry_watch`. Routes `/stock/*`. Reports `purchase-register`, `stock-valuation`.
 - **Storage/email:** AWS SDK v3 (`@aws-sdk/client-s3`, presigner, `client-ses` via nodemailer).
+- **Notifications (Sprint 8):** `notification.service` (Bull queue, `queueNotification`, `sendOTP`)
+  → `notifications/dispatcher` (inbox row + every channel attempt logged in
+  `notification_deliveries`) → `channels/sms` (MSG91 flow API, DLT template per message type from
+  setting `sms.dlt_templates`, variables from `templates.smsVariables`), `channels/email` (SES),
+  `channels/push` (FCM HTTP v1, service-account JWT; tokens in `user_devices`, unregistered ones
+  removed). Wording in `notifications/templates.ts`.
+- **Courier (Sprint 8):** `services/courier/` — `shiprocket.client` (login token in memory, adhoc
+  order + AWB assign), `courier.service` (book, webhook updates, buyer tracking), `status` (pure:
+  status normalising, IST timestamps). Routes `/fulfilment/shipments/:id/book-courier`,
+  `/courier/shiprocket/webhook`. Provider URLs overridable by `*_BASE_URL` for tests only.

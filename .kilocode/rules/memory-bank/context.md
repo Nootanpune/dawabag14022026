@@ -1,14 +1,33 @@
 # Active Context
 
-## Current state (2026-09-30)
+## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–7 are done on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–8 are done on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprint 8 (delivery and communications)
+- Migration 11: user_devices (several phones per user), notification_deliveries (every
+  SMS/email/push attempt: sent / failed / skipped + reason), shipment courier columns,
+  shipment_tracking_events; settings courier.provider, courier.pickup_location, sms.dlt_templates.
+- Notifications split into notifications/{templates,dispatcher,channels/{sms,email,push}}.
+  SMS only through MSG91 DLT templates mapped in sms.dlt_templates (free text never sent);
+  push through FCM HTTP v1 (service-account JWT, token cached in memory, unregistered
+  tokens deleted). Admin → GET /admin/notification-deliveries.
+- Shiprocket: POST /fulfilment/shipments/:id/book-courier (packed, no AWB; courier sees
+  "Pharmacy items" only, C-41); dispatch can reuse the booked courier/AWB; webhook
+  POST /courier/shiprocket/webhook (x-api-key = SHIPROCKET_WEBHOOK_TOKEN, idempotent,
+  zone-less times read as IST): out_for_delivery notifies the buyer, delivered closes
+  non-Rx parcels (Rx parcels need the code, admins alerted, C-26), RTO alerts admins once.
+  Buyer order detail returns tracking_status, rto_at, tracking[].
+- Admin settings accept the Sprint 7/8 keys (were missing). Receipts list filters + paging;
+  destruction register CSV. Production refuses the test-only *_BASE_URL overrides.
+- Tests: test/sprint8.smoke.mjs (51 checks) against one fake provider server
+  (test/sprint8/fakes.mjs; env from fake-env.mjs); sprints 1–8 = 428 checks; jest 47.
 
 ## Done in Sprint 4 (beta readiness)
 - Migration 07. Pharmacist prescription gate with quantities and reuse (C-08), H1 register

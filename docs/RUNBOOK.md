@@ -31,6 +31,26 @@ Razorpay: dashboard → Webhooks → URL `https://<api-domain>/api/v1/payments/w
 events `payment.*` and `refund.*`, copy the secret to `RAZORPAY_WEBHOOK_SECRET`.
 Enable automatic capture.
 
+**SMS (MSG91, DLT).** Indian operators deliver only templates registered on DLT
+(TRAI). Register each message in the DLT portal and MSG91, then map it in Admin →
+Settings → SMS templates (message type → template id → variables). A message type
+with no template is not sent by SMS; it is logged as *skipped* in Admin → Notification
+deliveries, which also shows every failed SMS, email and push with the reason.
+
+**Push (FCM HTTP v1).** Firebase console → Project settings → Service accounts →
+Generate new private key; put the JSON (or its base64) in `FCM_SERVICE_ACCOUNT_JSON`.
+Phones that uninstalled the app are removed automatically.
+
+**Courier (Shiprocket).** Set `SHIPROCKET_EMAIL`/`SHIPROCKET_PASSWORD` (an API user)
+and `SHIPROCKET_WEBHOOK_TOKEN`; in Shiprocket → Settings → API → Webhooks set the URL
+`https://<api-domain>/api/v1/courier/shiprocket/webhook` and the same token. Create the
+pickup address and put its name in Admin → Settings → courier pickup location, then
+switch courier provider to *shiprocket*. Packers then book the AWB after packing; the
+courier sees "Pharmacy items" only (C-41). A courier "delivered" scan closes
+non-prescription parcels; prescription parcels still need the buyer's delivery code
+(C-26) and admins get an alert to confirm. Returns to origin (RTO) alert admins once.
+`*_BASE_URL` / `GOOGLE_OAUTH_TOKEN_URL` are for tests only; production refuses them.
+
 ## 3. Build the images
 
 ```bash
@@ -91,6 +111,9 @@ can trigger one.
 5. Razorpay live keys, webhook, test payment and refund; MSG91 DLT template; SES out
    of sandbox.
 6. Confirm the Sprint 5 defaults in `DECISIONS.md` (return windows, delivery code).
+7. DLT templates registered and mapped for at least otp, dispatched, out_for_delivery,
+   delivered, order_cancelled and return_update; Firebase service account; Shiprocket
+   API user, webhook and pickup address (section 2).
 
 ## 9. Incidents
 

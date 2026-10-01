@@ -22,4 +22,7 @@ describe('checkEnv', () => {
     expect(r.errors).toEqual([]);
     expect(r.warnings.join(' ')).toMatch(/Not configured/);
   });
+  it('refuses test-only provider addresses in production', () => {
+    expect(checkEnv({ ...prod, SHIPROCKET_BASE_URL: 'http://127.0.0.1:4890' } as NodeJS.ProcessEnv).errors.join(' ')).toMatch(/SHIPROCKET_BASE_URL/);
+  });
 });
