@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../utils/formatters.dart';
+import 'product_image.dart';
 
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
@@ -27,15 +28,12 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image area
-            Container(
+            // Image area: network image or a brand-tinted placeholder
+            ProductImage.fromProduct(
+              product,
               height: 90,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppTheme.brandGreen50,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: const Center(child: Text('💊', style: TextStyle(fontSize: 36))),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             ),
 
             Padding(
@@ -67,15 +65,15 @@ class ProductCard extends StatelessWidget {
                   const SizedBox(height: 6),
 
                   // Price
-                  Row(
+                  Wrap(
+                    spacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(formatPrice(product['offer_price_paise'] ?? 0),
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.brandGreen600)),
-                      if (discountPct > 0) ...[
-                        const SizedBox(width: 4),
+                      if (discountPct > 0)
                         Text('$discountPct% off',
-                          style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.w600)),
-                      ],
+                          style: const TextStyle(fontSize: 10, color: AppTheme.brandGreen700, fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 8),

@@ -7,9 +7,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import 'widgets/cart_coupon_card.dart';
 import 'widgets/cart_line_card.dart';
-import 'widgets/cart_message_view.dart';
 import 'widgets/cart_prescription_notice.dart';
 import 'widgets/cart_summary_card.dart';
+import '../../widgets/empty_state.dart';
 
 /// Renders the server CartView. Every change is a server call; the screen
 /// never computes prices.
@@ -40,12 +40,12 @@ class CartScreen extends ConsumerWidget {
     if (!isAuth) {
       return Scaffold(
         appBar: AppBar(title: const Text('Cart')),
-        body: CartMessageView(
+        body: EmptyState(
           icon: Icons.shopping_cart_outlined,
           title: 'Sign in to see your cart',
-          subtitle: 'Your cart is saved to your account.',
-          buttonLabel: 'Sign in',
-          onPressed: () => context.push('/auth/login'),
+          hint: 'Your cart is kept with your account, so it is there on any device.',
+          actionLabel: 'Sign in',
+          onAction: () => context.push('/auth/login'),
         ),
       );
     }
@@ -60,12 +60,12 @@ class CartScreen extends ConsumerWidget {
     if (cartState.error != null && cart.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Cart')),
-        body: CartMessageView(
+        body: EmptyState(
           icon: Icons.cloud_off_outlined,
           title: 'Could not load your cart',
-          subtitle: cartState.error ?? '',
-          buttonLabel: 'Try again',
-          onPressed: notifier.load,
+          hint: cartState.error,
+          actionLabel: 'Try again',
+          onAction: notifier.load,
         ),
       );
     }
@@ -73,12 +73,12 @@ class CartScreen extends ConsumerWidget {
     if (cart.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Cart')),
-        body: CartMessageView(
+        body: EmptyState(
           icon: Icons.shopping_cart_outlined,
           title: 'Your cart is empty',
-          subtitle: 'Browse medicines and add them here',
-          buttonLabel: 'Browse medicines',
-          onPressed: () => context.go('/'),
+          hint: 'Search for a medicine or browse by category to add it here.',
+          actionLabel: 'Search medicines',
+          onAction: () => context.go('/search'),
         ),
       );
     }

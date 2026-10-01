@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color brandGreen    = Color(0xFF1A8856);
+  // Brand green matches the website (brand-600 #167A4C / 700 #105C38),
+  // chosen for AA contrast on white (Direction A — clinical trust).
+  static const Color brandGreen    = Color(0xFF167A4C);
   static const Color brandGreen50  = Color(0xFFEDFAF4);
   static const Color brandGreen100 = Color(0xFFC6EFD9);
-  static const Color brandGreen600 = Color(0xFF1A8856);
-  static const Color brandGreen700 = Color(0xFF126840);
+  static const Color brandGreen600 = Color(0xFF167A4C);
+  static const Color brandGreen700 = Color(0xFF105C38);
   static const Color amberBadge    = Color(0xFFFAEEDA);
   static const Color amberText     = Color(0xFF633806);
   static const Color errorRed      = Color(0xFFE24B4A);
@@ -76,6 +78,20 @@ class AppTheme {
         minimumSize: const Size(double.infinity, 48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: Colors.white,
+      indicatorColor: brandGreen100,
+      surfaceTintColor: Colors.transparent,
+      height: 64,
+      iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+            color: states.contains(WidgetState.selected) ? brandGreen700 : const Color(0xFF6B7280),
+          )),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) => GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
+            color: states.contains(WidgetState.selected) ? brandGreen700 : const Color(0xFF6B7280),
+          )),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Colors.white,

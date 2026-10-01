@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
 import '../../../models/cart_view.dart';
 import '../../../utils/formatters.dart';
+import '../../../widgets/product_image.dart';
 
 /// One server cart line: server prices, quantity controls and any `issue`.
 class CartLineCard extends StatelessWidget {
@@ -32,14 +33,13 @@ class CartLineCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
+                ProductImage(
+                  name: line.name,
+                  imageUrl: ProductImage.imageUrlOf({'image_key': line.imageKey}),
                   width: 52,
                   height: 52,
-                  decoration: BoxDecoration(
-                    color: AppTheme.brandGreen50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Center(child: Text('💊', style: TextStyle(fontSize: 22))),
+                  compact: true,
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: _details()),

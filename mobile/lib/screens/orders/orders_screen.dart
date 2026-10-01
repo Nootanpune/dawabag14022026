@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
 import '../../utils/ist.dart';
+import '../../widgets/empty_state.dart';
 
 final ordersProvider = FutureProvider<List<dynamic>>((ref) async {
   final res = await apiService.dio.get('/orders/my?limit=20');
@@ -62,24 +63,12 @@ class OrdersScreen extends ConsumerWidget {
     if (!authState.isAuthenticated) {
       return Scaffold(
         appBar: AppBar(title: const Text('My orders')),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.lock_outline, size: 48, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text('Login to view your orders',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: 200,
-                child: ElevatedButton(
-                  onPressed: () => context.push('/auth/login'),
-                  child: const Text('Sign in'),
-                ),
-              ),
-            ],
-          ),
+        body: EmptyState(
+          icon: Icons.receipt_long_outlined,
+          title: 'Sign in to see your orders',
+          hint: 'Track deliveries, download invoices and request returns.',
+          actionLabel: 'Sign in',
+          onAction: () => context.push('/auth/login'),
         ),
       );
     }
@@ -109,27 +98,12 @@ class OrdersScreen extends ConsumerWidget {
         ),
         data: (orderList) {
           if (orderList.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
-                  const SizedBox(height: 16),
-                  Text('No orders yet',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.grey.shade500)),
-                  const SizedBox(height: 8),
-                  Text('Your order history will appear here',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade400)),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: 180,
-                    child: ElevatedButton(
-                      onPressed: () => context.go('/'),
-                      child: const Text('Browse medicines'),
-                    ),
-                  ),
-                ],
-              ),
+            return EmptyState(
+              icon: Icons.receipt_long_outlined,
+              title: 'No orders yet',
+              hint: 'When you place an order, you can track it here, from pharmacist check to delivery.',
+              actionLabel: 'Search medicines',
+              onAction: () => context.go('/search'),
             );
           }
 

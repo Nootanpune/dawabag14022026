@@ -1,16 +1,24 @@
-// ─── product_detail_screen.dart ───────────────────────────────────────────────
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../services/api_service.dart';
-import '../../providers/cart_actions.dart';
-import '../../config/theme.dart';
-import '../../utils/formatters.dart';
 
+import '../../config/theme.dart';
+import '../../providers/cart_actions.dart';
+import '../../services/api_service.dart';
+import '../../widgets/error_retry_view.dart';
+import '../../widgets/product_image.dart';
+import 'widgets/product_badges.dart';
+import 'widgets/product_declarations.dart';
+import 'widgets/product_price.dart';
+
+/// GET /products/:id — the public product page (server data only).
 final productDetailProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, id) async {
   final res = await apiService.dio.get('/products/$id');
   return res.data['data'] as Map<String, dynamic>;
 });
+
+const _rxSchedules = ['Schedule H', 'Schedule H1'];
+const _notOnline = ['NDPS', 'Schedule X'];
 
 class ProductDetailScreen extends ConsumerWidget {
   final String productId;
@@ -24,155 +32,125 @@ class ProductDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Product details')),
       body: productAsync.when(
         loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (product) {
-          final inStock = product['in_stock'] ?? false;
-          return ListView(
-            children: [
-              Container(
-                height: 200, color: AppTheme.brandGreen50,
-                child: const Center(child: Text('💊', style: TextStyle(fontSize: 72))),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(product['name'] ?? '', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    if (product['marketed_by'] != null)
-                      Text(product['marketed_by'], style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _ScheduleBadge(schedule: product['drug_schedule'] ?? 'OTC'),
-                        const SizedBox(width: 8),
-                        if (product['cold_chain'] == true)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(color: const Color(0xFFE6F1FB), borderRadius: BorderRadius.circular(20)),
-                            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(Icons.ac_unit, size: 12, color: Color(0xFF185FA5)),
-                              SizedBox(width: 4),
-                              Text('Cold chain', style: TextStyle(fontSize: 11, color: Color(0xFF0C447C), fontWeight: FontWeight.w600)),
-                            ]),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(formatPrice(product['offer_price_paise'] ?? 0),
-                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: AppTheme.brandGreen600)),
-                        const SizedBox(width: 10),
-                        if ((product['discount_pct'] ?? 0) > 0) ...[
-                          Text(formatPrice(product['mrp_paise'] ?? 0),
-                            style: TextStyle(fontSize: 15, color: Colors.grey.shade400, decoration: TextDecoration.lineThrough)),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(6)),
-                            child: Text('${product['discount_pct']}% off',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.green)),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (!inStock)
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
-                        child: const Text('Out of stock', style: TextStyle(fontSize: 13, color: Colors.red, fontWeight: FontWeight.w600)),
-                      ),
-                    const Divider(height: 28),
-                    const Text('Product details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                    const SizedBox(height: 10),
-                    _DetailRow('Generic name', product['generic_name']),
-                    _DetailRow('SKU', product['sku']),
-                    _DetailRow('Category', product['category']),
-                    _DetailRow('Schedule', product['drug_schedule']),
-                    if (product['composition'] != null) _DetailRow('Composition', product['composition']),
-                    if (product['storage_instructions'] != null) _DetailRow('Storage', product['storage_instructions']),
-                    if (['Schedule H','Schedule H1'].contains(product['drug_schedule']))
-                      Container(
-                        margin: const EdgeInsets.only(top: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: const Color(0xFFFAEEDA), borderRadius: BorderRadius.circular(10)),
-                        child: const Text('Prescription required. A valid doctor\'s prescription must be uploaded before this item can be dispatched.',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF633806))),
-                      ),
-                    const SizedBox(height: 100),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+        error: (e, _) => ErrorRetryView(
+          message: ApiService.errorMessage(e, fallback: 'Could not load this product'),
+          onRetry: () => ref.invalidate(productDetailProvider(productId)),
+        ),
+        data: (product) => _Body(product: product),
       ),
       bottomNavigationBar: productAsync.maybeWhen(
-        data: (product) {
-          final cannotOrder = ['NDPS', 'Schedule X'].contains(product['drug_schedule']);
-          final inStock = product['in_stock'] ?? false;
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: ElevatedButton.icon(
-                onPressed: cannotOrder || !inStock ? null : () async {
-                  final added = await addProductToCart(context, ref, product);
-                  if (added && context.mounted) context.push('/cart');
-                },
-                icon: const Icon(Icons.shopping_cart),
-                label: Text(cannotOrder ? 'Not available online' : !inStock ? 'Out of stock' : 'Add to cart'),
-              ),
-            ),
-          );
-        },
+        data: (product) => _AddToCartBar(product: product),
         orElse: () => const SizedBox.shrink(),
       ),
     );
   }
 }
 
-class _ScheduleBadge extends StatelessWidget {
-  final String schedule;
-  const _ScheduleBadge({required this.schedule});
+class _Body extends StatelessWidget {
+  final Map<String, dynamic> product;
+  const _Body({required this.product});
 
   @override
   Widget build(BuildContext context) {
-    final isH = schedule.contains('H');
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: isH ? const Color(0xFFFAEEDA) : AppTheme.brandGreen50,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(schedule, style: TextStyle(
-        fontSize: 11, fontWeight: FontWeight.w600,
-        color: isH ? const Color(0xFF633806) : AppTheme.brandGreen700,
-      )),
+    final inStock = product['in_stock'] == true;
+    final marketedBy = product['marketed_by']?.toString();
+    // Product copy is sent only once a pharmacist has approved it (C-19);
+    // until then nothing is shown, and no staff-facing notice either.
+    final description = product['description']?.toString().trim();
+    return ListView(
+      children: [
+        ProductImage.fromProduct(product, height: 200, width: double.infinity, borderRadius: BorderRadius.zero),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(product['name']?.toString() ?? '',
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+              if (marketedBy != null && marketedBy.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(marketedBy, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+              ],
+              const SizedBox(height: 12),
+              ProductBadges(
+                schedule: product['drug_schedule']?.toString() ?? 'OTC',
+                coldChain: product['cold_chain'] == true,
+              ),
+              const SizedBox(height: 16),
+              ProductPrice(product: product),
+              if (!inStock)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
+                  child: Text('Out of stock',
+                      style: TextStyle(fontSize: 13, color: Colors.red.shade800, fontWeight: FontWeight.w600)),
+                ),
+              if (_rxSchedules.contains(product['drug_schedule'])) const _RxNotice(),
+              if (description != null && description.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(description, style: const TextStyle(fontSize: 14, height: 1.45)),
+              ],
+              ProductDeclarations(product: product),
+              const SizedBox(height: 100),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final dynamic value;
-  const _DetailRow(this.label, this.value);
+/// Prescription-only medicine: a pharmacist verifies the prescription before
+/// dispatch (C-08).
+class _RxNotice extends StatelessWidget {
+  const _RxNotice();
 
   @override
   Widget build(BuildContext context) {
-    if (value == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: AppTheme.amberBadge, borderRadius: BorderRadius.circular(10)),
+      child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 100, child: Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade500))),
-          Expanded(child: Text(value.toString(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+          Icon(Icons.description_outlined, size: 18, color: AppTheme.amberText),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Prescription required. Upload a photo of a valid prescription at checkout; '
+              'our pharmacist checks it before dispatch.',
+              style: TextStyle(fontSize: 12, color: AppTheme.amberText),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _AddToCartBar extends ConsumerWidget {
+  final Map<String, dynamic> product;
+  const _AddToCartBar({required this.product});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cannotOrder = product['cannot_order_online'] == true || _notOnline.contains(product['drug_schedule']);
+    final inStock = product['in_stock'] == true;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: ElevatedButton.icon(
+          onPressed: cannotOrder || !inStock
+              ? null
+              : () async {
+                  final added = await addProductToCart(context, ref, product);
+                  if (added && context.mounted) context.push('/cart');
+                },
+          icon: const Icon(Icons.shopping_cart),
+          label: Text(cannotOrder ? 'Not available online' : !inStock ? 'Out of stock' : 'Add to cart'),
+        ),
       ),
     );
   }

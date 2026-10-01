@@ -16,7 +16,7 @@ class CartPrescriptionNotice extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Text('📋', style: TextStyle(fontSize: 18)),
+          const Icon(Icons.description_outlined, size: 20, color: Color(0xFF633806)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -26,7 +26,8 @@ class CartPrescriptionNotice extends StatelessWidget {
                     style: TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF633806))),
                 const SizedBox(height: 2),
-                Text("You'll upload your prescription during checkout.",
+                // The pharmacist verifies it before dispatch (C-08)
+                Text("You'll upload a photo of it at checkout; our pharmacist checks it before dispatch.",
                     style: TextStyle(fontSize: 12, color: Colors.brown.shade600)),
               ],
             ),

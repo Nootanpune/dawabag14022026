@@ -9,6 +9,7 @@ import '../screens/auth/register/register_screen.dart';
 import '../screens/auth/otp_screen.dart';
 import '../screens/shop/home_screen.dart';
 import '../screens/shop/product_detail_screen.dart';
+import '../screens/search/search_screen.dart';
 import '../screens/cart/cart_screen.dart';
 import '../screens/checkout/checkout_screen.dart';
 import '../screens/orders/orders_screen.dart';
@@ -67,16 +68,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // Shell route with bottom nav
+      // Customer shell with the bottom navigation (Home, Search, Orders, Account)
       ShellRoute(
         builder: (context, state, child) => MainScaffold(child: child),
         routes: [
           GoRoute(path: '/', builder: (c, s) => const HomeScreen()),
-          GoRoute(path: '/cart', builder: (c, s) => const CartScreen()),
+          GoRoute(
+            path: '/search',
+            builder: (c, s) => SearchScreen(initialQuery: s.uri.queryParameters['q'] ?? ''),
+          ),
           GoRoute(path: '/orders', builder: (c, s) => const OrdersScreen()),
           GoRoute(path: '/account', builder: (c, s) => const AccountScreen()),
         ],
       ),
+
+      // Cart opens full screen from the app-bar cart icon
+      GoRoute(path: '/cart', builder: (c, s) => const CartScreen()),
 
       // Full-screen routes (no bottom nav)
       GoRoute(path: '/auth/login', builder: (c, s) => const LoginScreen()),
