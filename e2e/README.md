@@ -7,7 +7,7 @@ browser storage (standing rule), and WCAG 2.1 AA accessibility of the public pag
 (axe; serious and critical problems fail).
 
     . scripts/dev-env.sh && scripts/dev-up.sh                 # API on :4000
-    (cd frontend-web && NEXT_PUBLIC_API_URL=$API_URL npm run build && npx next start -p 3000 &)
+    (cd frontend-web && NODE_ENV=production NEXT_PUBLIC_API_URL=$API_URL npm run build && NODE_ENV=production npx next start -p 3000 &)
     cd e2e && npm ci && npx playwright test
 
 Test people (mobiles 90000019xx) and products (SKU E2E-) are created before the run
