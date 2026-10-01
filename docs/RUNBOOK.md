@@ -96,23 +96,43 @@ consent and audit logs) are never purged by it.
 
 **Own riders (C-26, C-41).** Give each rider a `delivery` login. At dispatch the packer
 picks either one of our riders or a courier; a rider shipment gets an AWB `DWR…`. A rider
-sees only their own run sheet (no medicine names) and only the invoices of parcels
-they carry; delivery staff cannot open orders. Reassign a dispatched parcel from the
+sees only their own run sheet (no medicine names); riders cannot open or list orders or
+invoices — the invoice travels inside the sealed pack. Reassign a dispatched parcel from the
 fulfilment queue if a rider is unavailable.
 
 **WhatsApp.** Set `MSG91_WHATSAPP_NUMBER` and map each notification type to an approved
 MSG91 template in Admin → Settings → `whatsapp.templates` (`name`, `language`, `vars`).
 Messages go only to customers who switched on WhatsApp updates (separate consent,
-withdrawable any time); others keep SMS and push.
+withdrawable any time); others keep SMS and push. Only order and account updates can be
+sent on WhatsApp, with order number, status, AWB, courier, tracking link, amount, date,
+delivery code, ticket or return number — never medicine names, prescription or recall
+details (C-41).
+
+**Recall alerts (C-28).** When CDSCO publishes its monthly NSQ list, or FDA Maharashtra or
+a manufacturer sends a recall, enter it the same day in Admin → Recall alerts: upload the
+list as .xlsx or .csv (columns: drug name, batch number, manufacturer, reason) or type the
+lines in, with the time it was received. Every batch on the list is matched (letters and
+digits only) against Dawabag and partner batches held or sold. Within 4 hours of receipt,
+decide each match: **Recall** (blocks the batch, tells every buyer to stop using it) or
+**Not this product** with a note. Admins are alerted at entry and again if the 4 hours
+pass with matches undecided. A goods receipt, partner listing or opening stock of a batch
+on any alert is refused until an admin clears it for that product (Recall alerts → the
+line → "Clear a product refused at receipt").
 
 **GST period lock (C-31).** After filing GSTR-1/3B for a month, set Admin → Settings →
 `accounts.locked_until` to the last day of that month. Goods receipts and supplier
 credit notes dated on or before it are refused; correct a filed month in the next
 period's return.
 
+**Video calls (C-23).** Consultations run on Agora; nothing is recorded. Each join gives a
+token for that person and that channel for at most 30 minutes; the apps renew it while the
+consultation is open, so a cancelled or ended consultation loses its call within 30
+minutes.
+
 **Go-live switches.** Turn off `catalogue.opening_stock_open` once opening stock is in:
 afterwards stock enters only by goods receipt. Set `TRUST_PROXY_HOPS` to the number of
-proxies in front of the API (1 behind an AWS load balancer) so rate limits see real
+proxies in front of the API (1 behind an AWS load balancer, 0 if none; production refuses to
+start without it) so rate limits see real
 client addresses.
 
 ## 3. Build the images

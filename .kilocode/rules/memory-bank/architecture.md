@@ -158,3 +158,13 @@
   (setting `accounts.locked_until`; GRN supplier invoice date, supplier credit note date),
   `notifications/channels/whatsapp` (MSG91 outbound templates from `whatsapp.templates`, only
   with latest consent purpose `whatsapp`; PUT /privacy/consents/whatsapp). Migration 16.
+- **Sprint 14:** `services/recallAlerts/` — `parse` (xlsx/csv in memory, headings by text), `batchKey`
+  (letters+digits upper case; SQL twin), `match` (own + partner batches held/sold by key), `alert.service`
+  (create, list/get, recallMatch via `recall.service.recallBatchTx`, clearMatch, clearProductForLine, job
+  `recall_alert_watch`), `receiptGate.assertBatchReceivable` (GRN, partner inventory, opening stock: recalled
+  for the product or on an alert not cleared for it). Tables recall_alerts / _lines / _matches (migration 17,
+  final-record triggers, due_at = received_at + 4 h). Routes /recalls/alerts*. Review fixes: riders have no
+  order list or invoices; consultation refunds settle on `processed` and `consultationRefundEvent` handles
+  refund webhooks; WhatsApp allow-lists `WHATSAPP_TYPES`/`WHATSAPP_VARS`; settlements call `assertOpenPeriod`;
+  dispatch notification after commit; call tokens ≤ 30 min. Web/mobile: Agora calls (`useAgoraCall`,
+  `video_call_service.dart`).
