@@ -43,6 +43,8 @@ const login = async (p) => (await call('POST', '/auth/login', { body: { mobile: 
 
 async function main() {
   await db.connect();
+  // Test clean-up may delete final records (H1, credit notes, audit); the API never sets this
+  await db.query("SET dawabag.maintenance = 'on'");
   await cleanup(q);
   await q(`INSERT INTO pincode_serviceability (pincode, city, state, latitude, longitude, dawabag_delivery_hours, cold_chain_available)
            VALUES ($1, 'Nashik', 'Maharashtra', 20.0110, 73.7900, 12, FALSE)`, [PIN]);

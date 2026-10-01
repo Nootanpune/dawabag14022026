@@ -40,6 +40,7 @@ import privacyRoutes from './routes/privacy.routes';
 import recallRoutes from './routes/recall.routes';
 import returnRoutes from './routes/return.routes';
 import complianceRoutes from './routes/compliance.routes';
+import catalogueRoutes from './routes/catalogue.routes';
 import eInvoiceRouter from './controllers/einvoice.controller';
 
 import { errorHandler } from './middleware/errorHandler';
@@ -137,6 +138,7 @@ app.use(`${api}/privacy`, privacyRoutes);
 app.use(`${api}/recalls`, recallRoutes);
 app.use(`${api}/returns`, returnRoutes);
 app.use(`${api}/compliance`, complianceRoutes);
+app.use(`${api}/catalogue`, catalogueRoutes);
 app.use(`${api}/einvoice`, eInvoiceRouter);
 
 // ─── Error Handling ─────────────────────────────────────────────────────────

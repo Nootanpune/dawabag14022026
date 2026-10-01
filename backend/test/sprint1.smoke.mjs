@@ -119,6 +119,8 @@ function pdfBlob() {
 
 async function main() {
   await db.connect();
+  // Test clean-up may delete final records (H1, credit notes, audit); the API never sets this
+  await db.query("SET dawabag.maintenance = 'on'");
   await cleanup();
   const products = await seedProducts();
 
