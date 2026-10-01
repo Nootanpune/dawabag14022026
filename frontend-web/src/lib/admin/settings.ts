@@ -24,6 +24,8 @@ export interface SettingMeta {
   options?: { value: string; label: string }[];
   /** shown under the input, e.g. the allowed range */
   hint?: string;
+  /** a blank value saves null (the server reads null as "off") */
+  nullable?: boolean;
   /** 'boolean' only: what the confirmation dialog says before switching on / off */
   confirm?: { on: string; off: string };
 }
@@ -39,6 +41,9 @@ export const SETTING_KINDS: Record<string, SettingMeta> = {
   // Sprint 7 — purchasing and stock (C-16, C-28)
   'purchasing.min_shelf_life_days': { kind: 'int', label: 'Minimum shelf life on receipt', unit: 'days', hint: '30–730 days' },
   'stock.near_expiry_days': { kind: 'int', label: 'Near-expiry warning', unit: 'days', hint: '15–365 days' },
+  // Sprint 20 — retail free delivery (owner decision: ₹499)
+  'delivery.free_above_paise': { kind: 'paise', label: 'Free delivery from', nullable: true,
+    hint: 'Retail orders whose medicines (after coupon, before GST) reach this amount are delivered free. Leave blank to switch off. Update the shipping policy to match (C-39).' },
   // Sprint 8 — courier booking
   'courier.provider': {
     kind: 'choice',

@@ -2,6 +2,7 @@ import { ArrowRight } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import type { CartView } from '@/lib/cart';
 import DeliveryChargeLine from './DeliveryChargeLine';
+import FreeDeliveryProgress from './FreeDeliveryProgress';
 
 interface Props {
   cart: CartView;
@@ -26,7 +27,8 @@ export default function CartSummary({ cart, onCheckout }: Props) {
             <span>–{formatPrice(cart.discount_paise)}</span>
           </div>
         )}
-        <DeliveryChargeLine />
+        <DeliveryChargeLine free={cart.free_delivery?.remaining_paise === 0} />
+        {cart.free_delivery && <FreeDeliveryProgress offer={cart.free_delivery} />}
         <p className="text-xs text-gray-500 pt-1">
           Final delivery charge and GST are confirmed for your delivery address when you place the order.
         </p>

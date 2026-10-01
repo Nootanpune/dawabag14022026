@@ -27,12 +27,20 @@ export interface CartCoupon {
   message: string | null;
 }
 
+/** Retail free delivery from the server: the amount and how much more is needed (0 = free) */
+export interface FreeDelivery {
+  above_paise: number;
+  remaining_paise: number;
+}
+
 export interface CartView {
   items: CartLine[];
   coupon: CartCoupon | null;
   pricing_type: string;
   subtotal_paise: number;
   discount_paise: number;
+  /** null for trade buyers or when the owner has switched it off */
+  free_delivery: FreeDelivery | null;
   requires_prescription: boolean;
   item_count: number;
 }

@@ -14,6 +14,7 @@ import { startFakes } from './fakes/server.mjs';
 import { cleanup, setup } from './sprint5/fixtures.mjs';
 import { runCompliance } from './sprint5/compliance.mjs';
 import { runAftercare } from './sprint5/aftercare.mjs';
+import { runFreeDelivery } from './sprint5/freeDelivery.mjs';
 
 let fakes;
 async function main() {
@@ -25,6 +26,7 @@ async function main() {
   const ctx = await setup();
   await runCompliance(ctx);
   await runAftercare(ctx);
+  await runFreeDelivery(ctx);
   await cleanup();
   console.log(state.failures ? `\n${state.failures} check(s) FAILED` : '\nAll Sprint 5 checks passed');
 }

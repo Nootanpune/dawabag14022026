@@ -6,6 +6,7 @@ import { pool, query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { BuyerType, priceField, requiresPrescription } from '../utils/customerType';
 import { evaluateCoupon } from './coupon.service';
+import { freeDeliveryAbovePaise, freeDeliveryProgress } from './delivery/freeDelivery';
 
 const BLOCKED_SCHEDULES = ['Schedule X', 'NDPS'];
 
@@ -95,12 +96,17 @@ export async function getCart(userId: string, pricingType: BuyerType) {
     }
   }
 
+  const discount = coupon?.valid ? coupon.discount_paise : 0;
+  // Retail only: trade buyers' free delivery is decided when the order is placed
+  const freeDelivery = pricingType === 'customer' ? freeDeliveryProgress(await freeDeliveryAbovePaise(), subtotal - discount) : null;
+
   return {
     items,
     coupon,
     pricing_type: pricingType,
     subtotal_paise: subtotal,
-    discount_paise: coupon?.valid ? coupon.discount_paise : 0,
+    discount_paise: discount,
+    free_delivery: freeDelivery,
     requires_prescription: items.some((i) => i.available && i.requires_prescription),
     item_count: items.reduce((s, i) => s + i.quantity, 0),
   };

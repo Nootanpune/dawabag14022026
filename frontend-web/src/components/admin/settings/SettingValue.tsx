@@ -9,6 +9,7 @@ export default function SettingValue({ kind, value, unit, options }: { kind?: Se
   }
   if (kind === 'boolean') return <>{value === true ? 'On' : 'Off'}</>;
   if (kind === 'paise' && typeof value === 'number') return <>{formatPrice(value)}</>;
+  if (kind === 'paise' && value === null) return <>Off</>;
   if (kind === 'premises' && value && typeof value === 'object') {
     const p = value as { pincode?: string; latitude?: number; longitude?: number };
     return (

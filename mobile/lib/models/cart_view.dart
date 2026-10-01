@@ -88,12 +88,34 @@ class CartCoupon {
       );
 }
 
+/// Retail free delivery from the server (setting delivery.free_above_paise):
+/// the amount and how much more is needed; 0 remaining means free.
+class FreeDelivery {
+  final int abovePaise;
+  final int remainingPaise;
+
+  const FreeDelivery({required this.abovePaise, required this.remainingPaise});
+
+  bool get reached => remainingPaise == 0;
+
+  /// 0.0–1.0 for a progress bar
+  double get progress =>
+      abovePaise <= 0 ? 1 : ((abovePaise - remainingPaise) / abovePaise).clamp(0.0, 1.0);
+
+  static FreeDelivery? fromJson(Object? j) {
+    if (j is! Map) return null;
+    return FreeDelivery(abovePaise: _int(j['above_paise']), remainingPaise: _int(j['remaining_paise']));
+  }
+}
+
 class CartView {
   final List<CartLine> items;
   final CartCoupon? coupon;
   final String? pricingType;
   final int subtotalPaise;
   final int discountPaise;
+  /// null for trade buyers or when the owner has switched it off
+  final FreeDelivery? freeDelivery;
   final bool requiresPrescription;
   final int itemCount;
 
@@ -103,6 +125,7 @@ class CartView {
     this.pricingType,
     this.subtotalPaise = 0,
     this.discountPaise = 0,
+    this.freeDelivery,
     this.requiresPrescription = false,
     this.itemCount = 0,
   });
@@ -140,6 +163,7 @@ class CartView {
       pricingType: j['pricing_type']?.toString(),
       subtotalPaise: _int(j['subtotal_paise']),
       discountPaise: _int(j['discount_paise']),
+      freeDelivery: FreeDelivery.fromJson(j['free_delivery']),
       requiresPrescription: j['requires_prescription'] == true,
       itemCount: _int(j['item_count']),
     );

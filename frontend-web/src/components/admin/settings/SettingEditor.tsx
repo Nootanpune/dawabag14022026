@@ -24,7 +24,7 @@ function Field({ label, value, onChange, ...rest }: { label: string; value: stri
 }
 
 export default function SettingEditor({ setting, meta, onClose }: Props) {
-  const { kind, label, unit, options, hint } = meta;
+  const { kind, label, unit, options, hint, nullable } = meta;
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft>(() => toDraft(kind, setting.value));
   const [error, setError] = useState('');
@@ -41,7 +41,7 @@ export default function SettingEditor({ setting, meta, onClose }: Props) {
   });
 
   const submit = () => {
-    const out = fromDraft(kind, draft);
+    const out = fromDraft(kind, draft, nullable);
     if ('error' in out) return setError(out.error);
     setError('');
     save.mutate(out.value);

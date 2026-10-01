@@ -4,12 +4,13 @@ import '../../../config/theme.dart';
 import '../../../models/cart_view.dart';
 import '../../../utils/formatters.dart';
 import '../../../widgets/summary_row.dart';
+import 'free_delivery_progress.dart';
 
 /// Server amounts only (subtotal, discount). The cart API does not return a
 /// delivery charge: the server works it out per shipment from the delivery
 /// pincode at checkout (POST /orders/preview), so it is named here as a line
-/// and shown with its amount on the checkout summary. No free-delivery
-/// threshold is shown: the server has none for consumers.
+/// and shown with its amount on the checkout summary. Retail free delivery
+/// (amount and how much more is needed) comes from the cart API too.
 class CartSummaryCard extends StatelessWidget {
   final CartView cart;
 
@@ -35,7 +36,12 @@ class CartSummaryCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 8),
-            SummaryRow('Delivery charge', 'Shown at checkout', valueColor: Colors.grey.shade700),
+            SummaryRow('Delivery charge', cart.freeDelivery?.reached == true ? 'Free' : 'Shown at checkout',
+                valueColor: cart.freeDelivery?.reached == true ? AppTheme.brandGreen600 : Colors.grey.shade700),
+            if (cart.freeDelivery != null) ...[
+              const SizedBox(height: 10),
+              FreeDeliveryProgress(offer: cart.freeDelivery!),
+            ],
             const SizedBox(height: 8),
             Text('The delivery charge depends on your delivery pincode. You see the full '
                 'total, with delivery and GST, before you pay.',

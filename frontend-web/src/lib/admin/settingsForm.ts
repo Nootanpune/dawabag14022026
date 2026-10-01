@@ -11,13 +11,14 @@ export function toDraft(kind: SettingKind, value: unknown): Draft {
     return { ...d, pincode: p.pincode ?? '', latitude: String(p.latitude ?? ''), longitude: String(p.longitude ?? '') };
   }
   if (kind === 'choice' || kind === 'text') return { ...d, single: typeof value === 'string' ? value : '' };
+  if (value === null || value === undefined) return d;
   const n = Number(value);
   if (!Number.isFinite(n)) return d;
   return { ...d, single: kind === 'paise' ? (n / 100).toString() : String(n) };
 }
 
 /** Returns the value to PUT, or an error string. Ranges are enforced by the server. */
-export function fromDraft(kind: SettingKind, d: Draft): { value: unknown } | { error: string } {
+export function fromDraft(kind: SettingKind, d: Draft, nullable = false): { value: unknown } | { error: string } {
   if (kind === 'premises') {
     const latitude = Number(d.latitude);
     const longitude = Number(d.longitude);
@@ -26,7 +27,7 @@ export function fromDraft(kind: SettingKind, d: Draft): { value: unknown } | { e
     if (d.longitude.trim() === '' || !Number.isFinite(longitude)) return { error: 'Enter a valid longitude' };
     return { value: { pincode: d.pincode.trim(), latitude, longitude } };
   }
-  if (d.single.trim() === '') return { error: 'Enter a value' };
+  if (d.single.trim() === '') return nullable ? { value: null } : { error: 'Enter a value' };
   if (kind === 'choice' || kind === 'text') return { value: d.single.trim() };
   if (kind === 'paise') {
     const paise = rupeesToPaise(d.single);

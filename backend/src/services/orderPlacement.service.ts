@@ -14,6 +14,7 @@ import { Allocation, allocateAndReserve } from './allocation.service';
 import { createShipmentsAndLines } from './shipment.service';
 import { OrderPreview, buildCheckoutSummary } from './checkoutSummary.service';
 import { moveOrderToFulfilment } from './paymentCapture.service';
+import { freeDeliveryAbovePaise, qualifiesForFreeDelivery } from './delivery/freeDelivery';
 
 export const createOrderSchema = z.object({
   patient_id:           z.string().uuid().optional(),
@@ -187,13 +188,15 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
       if (!took.rowCount) throw new AppError('This coupon has been fully used', 400);
     }
 
-    // Shipping — free for B2B orders above Rs.5000
+    // Shipping — free for B2B orders above Rs.5000, and for retail above the set amount
     const pincodeRes = await client.query(
       'SELECT shipping_charge_paise FROM pincode_serviceability WHERE pincode = $1',
       [data.pincode]
     );
     let shippingPaise = pincodeRes.rows[0]?.shipping_charge_paise ?? 4900;
     if (isB2B && subtotalPaise >= 500000) shippingPaise = 0;
+    // Retail: free above the owner's amount, judged on the medicines after any coupon
+    if (!isB2B && qualifiesForFreeDelivery(await freeDeliveryAbovePaise(client), subtotalPaise - discountPaise)) shippingPaise = 0;
 
     // Wallet
     let walletUsedPaise = 0;
