@@ -2,13 +2,24 @@
 
 ## Current state (2026-10-01)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–15 are done (Sprint 14 video calls wired on web and mobile) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–16 are done (Sprint 14 video calls wired on web and mobile) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Done in Sprint 16 (dependencies, mobile build, images, indexes)
+- npm audit 0 on backend and web: Next.js 15.5.27 + React 19 (14.x unpatched: RCE/SSRF/DoS), PostCSS
+  override, nodemailer replaced by the SES API, uuid 11 override. CI fails on high/critical advisories.
+- Mobile analysed and unit-tested in CI for the first time (Flutter stable): 1 error fixed, warnings
+  fixed; cached_network_image dropped (its on-device SQLite cache broke the no-local-storage rule).
+  Remaining infos: DropdownButtonFormField `value` deprecation kept on purpose (initialValue would stop
+  following state); prefer_const style notes.
+- CI builds both Docker images; the API image migrates an empty DB and answers /ready, the web image
+  serves the home page.
+- Migration 18: indexes for hot child lookups and recall batch keys.
 
 ## Done in Sprint 15 (engineering readiness)
 - `scripts/dev-env.sh` + `scripts/dev-up.sh`: one command from a fresh machine (or this container after a
