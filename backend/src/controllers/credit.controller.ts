@@ -55,11 +55,14 @@ export async function settleCreditOrder(req: Request, res: Response, next: NextF
 
     const result = await withTransaction(async (client) => {
       const o = (await client.query(
-        `SELECT id, user_id, order_number, total_paise, payment_terms, credit_due_date, credit_settled_at
+        `SELECT id, user_id, order_number, status, total_paise, credit_adjusted_paise, payment_terms, credit_due_date, credit_settled_at
          FROM orders WHERE id = $1 FOR UPDATE`, [orderId])).rows[0];
       if (!o) throw new AppError('Order not found', 404);
       if (!o.credit_due_date) throw new AppError('This is not a credit order', 400);
       if (o.credit_settled_at) throw new AppError('Credit for this order is already settled', 409);
+      // Cancellations and returns already reduced the bill (refund.service credit_adjustment)
+      const due = Number(o.total_paise) - Number(o.credit_adjusted_paise);
+      if (o.status === 'cancelled' || due <= 0) throw new AppError('Nothing is due on this order', 409);
 
       await client.query(
         `UPDATE orders SET credit_settled_at = NOW(), credit_settled_by = $2, updated_at = NOW() WHERE id = $1`,
@@ -67,14 +70,14 @@ export async function settleCreditOrder(req: Request, res: Response, next: NextF
       );
       await client.query(
         `UPDATE users SET credit_used_paise = GREATEST(credit_used_paise - $2, 0), updated_at = NOW() WHERE id = $1`,
-        [o.user_id, o.total_paise]
+        [o.user_id, due]
       );
       await writeAuditTx(client, {
         userId: o.user_id, action: 'credit_settled', performedBy: req.user!.id, ip: req.ip,
-        newValue: { order_id: orderId, order_number: o.order_number, amount_paise: o.total_paise, payment_reference },
+        newValue: { order_id: orderId, order_number: o.order_number, amount_paise: due, payment_reference },
         notes,
       });
-      return { order_id: orderId, settled: true, amount_paise: o.total_paise };
+      return { order_id: orderId, settled: true, amount_paise: due };
     });
     res.json({ success: true, data: result });
   } catch (err) { next(err); }

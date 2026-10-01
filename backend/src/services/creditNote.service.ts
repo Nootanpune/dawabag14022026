@@ -26,8 +26,9 @@ export async function issueCreditNote(
   if (!shipment) throw new AppError('Shipment not found', 404);
 
   const items = (await client.query(
-    `SELECT id, quantity, line_total_paise, gst_amount_paise, cgst_paise, sgst_paise, igst_paise
-     FROM order_items WHERE shipment_id = $1 AND id = ANY($2::uuid[])`,
+    `SELECT oi.id, oi.quantity, oi.line_total_paise, oi.gst_amount_paise, oi.cgst_paise, oi.sgst_paise, oi.igst_paise,
+            COALESCE((SELECT SUM(ci.quantity) FROM credit_note_items ci WHERE ci.order_item_id = oi.id), 0)::int AS credited
+     FROM order_items oi WHERE oi.shipment_id = $1 AND oi.id = ANY($2::uuid[]) FOR UPDATE OF oi`,
     [input.shipmentId, input.lines.map((l) => l.order_item_id)])).rows;
   const byId = new Map(items.map((i: any) => [i.id, i]));
 
@@ -35,8 +36,10 @@ export async function issueCreditNote(
   const computed = input.lines.map((l) => {
     const it: any = byId.get(l.order_item_id);
     if (!it) throw new AppError('Line is not on this shipment', 400);
-    if (l.quantity > it.quantity) throw new AppError('Credit quantity exceeds the invoiced quantity', 400);
-    const share = (v: number) => Math.round((Number(v) * l.quantity) / it.quantity);
+    if (it.credited + l.quantity > it.quantity) throw new AppError('Credit quantity exceeds what is left on the invoice line', 400);
+    // Cumulative rounding: credits for a line add up to exactly the invoiced amount
+    const upTo = (v: number, q: number) => Math.round((Number(v) * q) / it.quantity);
+    const share = (v: number) => upTo(v, it.credited + l.quantity) - upTo(v, it.credited);
     const lineGst = share(it.gst_amount_paise);
     const lineTaxable = share(it.line_total_paise) - lineGst;
     const c = share(it.cgst_paise), s = share(it.sgst_paise), i = share(it.igst_paise);

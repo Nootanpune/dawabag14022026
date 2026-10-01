@@ -156,10 +156,15 @@ router.get('/:consultationId/join', authenticate, async (req, res, next) => {
 router.patch('/:consultationId/end', authenticate, authorize('doctor'), async (req, res, next) => {
   try {
     const { notes } = req.body;
-    await query(
-      'UPDATE consultations SET status = $1, ended_at = NOW(), notes = $2 WHERE id = $3',
-      ['completed', notes || null, req.params.consultationId]
+    // Only the consultation's own doctor, and only while it is running
+    const ended = await query(
+      `UPDATE consultations SET status = $1, ended_at = NOW(), notes = $2
+       WHERE id = $3 AND status = 'in_progress'
+         AND doctor_id = (SELECT id FROM doctor_profiles WHERE user_id = $4)
+       RETURNING id`,
+      ['completed', typeof notes === 'string' ? notes.slice(0, 5000) : null, req.params.consultationId, req.user!.id]
     );
+    if (!ended.length) throw new AppError('Consultation not found or not in progress', 404);
     res.json({ success: true, message: 'Consultation ended' });
   } catch (e) { next(e); }
 });

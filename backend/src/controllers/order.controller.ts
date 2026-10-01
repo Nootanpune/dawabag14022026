@@ -29,54 +29,17 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 }
 
+// PATCH /orders/:id/status — admin cancellation only. Every other status change
+// happens through its own guarded step (payment capture, pharmacist review,
+// pack/dispatch/deliver), so no one can skip payment or the prescription gate.
 export async function updateOrderStatus(req: Request, res: Response, next: NextFunction) {
   try {
-    const { id } = req.params;
-    const { status, awb_number, courier_partner } = req.body;
-    const validStatuses = ['confirmed','packed','dispatched','delivered','cancelled'];
-    if (!validStatuses.includes(status)) throw new AppError(`Invalid status`, 400);
-
-    // Cancellation has its own rules: credit notes, refunds, prescription quantities (C-37)
-    if (status === 'cancelled') {
-      const reason = typeof req.body.reason === 'string' && req.body.reason.trim().length >= 3 ? req.body.reason.trim() : 'Cancelled by Dawabag';
-      return res.json({ success: true, data: await cancelOrder(id, { id: req.user!.id, staff: true }, reason) });
+    const { status } = req.body;
+    if (status !== 'cancelled') {
+      throw new AppError('Only cancellation is allowed here; use the fulfilment steps to move an order forward', 400);
     }
-
-    const orderResult = await queryOne<any>(
-      'SELECT id, order_number, status, user_id, buyer_gstin, e_invoice_status FROM orders WHERE id = $1', [id]
-    );
-    if (!orderResult) throw new AppError('Order not found', 404);
-
-    await withTransaction(async (client) => {
-      await client.query(
-        `UPDATE orders SET status=$1, awb_number=COALESCE($2,awb_number),
-         courier_partner=COALESCE($3,courier_partner), updated_at=NOW() WHERE id=$4`,
-        [status, awb_number||null, courier_partner||null, id]
-      );
-    });
-
-    // Trigger e-invoice when packed (for B2B orders with GSTIN)
-    if (status === 'packed' && orderResult.buyer_gstin && orderResult.e_invoice_status === 'pending') {
-      logger.info(`IRN generation triggered for order ${id} (status: packed)`);
-      // In production: await EInvoiceService.generateIRN(id)
-      // or: eInvoiceQueue.add('generate', { orderId: id })
-    }
-
-    await query(
-      `INSERT INTO audit_logs (user_id, action, new_value, performed_by)
-       VALUES ($1,'order_status_updated',$2,$3)`,
-      [orderResult.user_id, JSON.stringify({order_id:id, new_status:status}), req.user!.id]
-    );
-
-    // Templates exist for packed/dispatched/delivered; other statuses use the generic one
-    await queueNotification({
-      userId: orderResult.user_id,
-      type: ['packed', 'dispatched', 'delivered'].includes(status) ? status : 'order_status',
-      status, orderId: id, orderNumber: orderResult.order_number,
-      awbNumber: awb_number, courierPartner: courier_partner,
-    });
-
-    res.json({ success: true, data: { id, status } });
+    const reason = typeof req.body.reason === 'string' && req.body.reason.trim().length >= 3 ? req.body.reason.trim() : 'Cancelled by Dawabag';
+    res.json({ success: true, data: await cancelOrder(req.params.id, { id: req.user!.id, staff: true }, reason) });
   } catch (err) { next(err); }
 }
 
@@ -84,7 +47,13 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
   try {
     const { id } = req.params;
     const userId  = req.user!.id;
-    const isAdmin = ['admin','super_admin','pharmacist_rx','pharmacist_pack','delivery'].includes(req.user!.role);
+    const isAdmin = ['admin','super_admin','pharmacist_rx','pharmacist_pack'].includes(req.user!.role);
+    // Delivery staff see only orders that are out for delivery
+    if (req.user!.role === 'delivery') {
+      const out = await queryOne(`SELECT 1 FROM order_shipments WHERE order_id = $1 AND status = 'dispatched'`, [id]);
+      if (!out) throw new AppError('Order not found', 404);
+    }
+    const canSeeAll = isAdmin || req.user!.role === 'delivery';
 
     const orderResult = await queryOne<any>(
       `SELECT o.*, a.address_line1, a.city, a.state, a.pincode,
@@ -94,8 +63,8 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
        JOIN addresses a ON o.address_id = a.id
        JOIN users u ON o.user_id = u.id
        LEFT JOIN user_profiles up ON up.user_id = u.id
-       WHERE o.id = $1 ${isAdmin ? '' : 'AND o.user_id = $2'}`,
-      isAdmin ? [id] : [id, userId]
+       WHERE o.id = $1 ${canSeeAll ? '' : 'AND o.user_id = $2'}`,
+      canSeeAll ? [id] : [id, userId]
     );
     if (!orderResult) throw new AppError('Order not found', 404);
 

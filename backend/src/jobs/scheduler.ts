@@ -40,13 +40,19 @@ export async function runJob(job: JobDefinition, triggeredBy: string | null = nu
   }
 }
 
+const tasks: cron.ScheduledTask[] = [];
+
+export function stopScheduler(): void {
+  for (const t of tasks.splice(0)) t.stop();
+}
+
 export function startScheduler(): void {
   if (process.env.DISABLE_SCHEDULER === 'true') {
     logger.warn('Scheduler disabled (DISABLE_SCHEDULER=true)');
     return;
   }
   for (const job of JOBS) {
-    cron.schedule(job.cron, () => { void runJob(job); }, { timezone: 'Asia/Kolkata' });
+    tasks.push(cron.schedule(job.cron, () => { void runJob(job); }, { timezone: 'Asia/Kolkata' }));
   }
   logger.info(`Scheduler started: ${JOBS.map((j) => `${j.name} [${j.cron} IST]`).join(', ')}`);
 }

@@ -13,7 +13,7 @@ router.get('/my', authenticate, getMyOrders);
 router.get('/queue', authenticate, authorize('pharmacist_rx', 'pharmacist_pack', 'delivery', 'admin', 'super_admin'), getOrderQueue);
 router.get('/:id', authenticate, getOrder);
 router.post('/:id/cancel', authenticate, postCancelOrder);
-router.patch('/:id/status', authenticate, authorize('pharmacist_rx', 'pharmacist_pack', 'delivery', 'admin', 'super_admin'), updateOrderStatus);
+router.patch('/:id/status', authenticate, authorize('admin', 'super_admin'), updateOrderStatus);
 
 router.post('/:id/settle-credit', authenticate, authorize('admin', 'super_admin'), settleCreditOrder);
 

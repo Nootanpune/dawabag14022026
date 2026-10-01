@@ -7,6 +7,7 @@
 // instead. NOT exercised against Razorpay in this environment (no keys) —
 // test in Razorpay test mode before enabling.
 import { PoolClient } from 'pg';
+import { recordRefund, sendGatewayRefunds } from './refund.service';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { logger } from '../config/logger';
@@ -100,31 +101,41 @@ export async function handleRecurringCapture(event: string, payload: any): Promi
   const p = payload?.payment?.entity;
   if (!p?.order_id) return;
 
-  await withTransaction(async (client: PoolClient) => {
+  const lateRefundIds = await withTransaction(async (client: PoolClient): Promise<string[]> => {
     const mandate = (await client.query(
       `SELECT id, user_id FROM payment_mandates WHERE gateway_order_id = $1 AND status = 'pending' FOR UPDATE`,
       [p.order_id])).rows[0];
     if (mandate) {
-      if (!p.token_id) return;
+      if (!p.token_id) return [];
       await client.query(
         `UPDATE payment_mandates SET status = 'active', gateway_token_id = $2, activated_at = NOW() WHERE id = $1`,
         [mandate.id, p.token_id]);
       await writeAuditTx(client, { userId: mandate.user_id, action: 'mandate_activated', newValue: { mandate_id: mandate.id } });
-      return;
+      return [];
     }
 
     const pay = (await client.query(
       `SELECT order_id, amount_paise, status FROM payments WHERE gateway_order_id = $1 FOR UPDATE`, [p.order_id])).rows[0];
-    if (!pay || pay.status === 'captured') return;
+    if (!pay || ['captured', 'partially_refunded', 'refunded'].includes(pay.status)) return [];
     if (Number(p.amount) !== Number(pay.amount_paise)) {
       logger.error(`Captured amount mismatch for gateway order ${p.order_id}`);
-      return;
+      return [];
     }
     await client.query(
       `UPDATE payments SET status = 'captured', gateway_payment_id = $2, method = $3, paid_at = NOW()
        WHERE gateway_order_id = $1`, [p.order_id, p.id, p.method]);
+    // Money arriving for an order that was already cancelled goes straight back
+    const order = (await client.query('SELECT status FROM orders WHERE id = $1 FOR UPDATE', [pay.order_id])).rows[0];
+    if (!['pending_payment', 'payment_failed'].includes(order.status)) {
+      const back = await recordRefund(client, { orderId: pay.order_id, amountPaise: Number(p.amount), source: 'cancellation', userId: null });
+      await writeAuditTx(client, { userId: null, action: 'payment_after_close_refunded',
+        newValue: { order_id: pay.order_id, order_status: order.status, gateway_payment_id: p.id } });
+      return back.gatewayRefundIds;
+    }
     const status = await moveOrderToFulfilment(client, pay.order_id);
     await writeAuditTx(client, { userId: null, action: 'payment_captured_webhook',
       newValue: { order_id: pay.order_id, gateway_payment_id: p.id, order_status: status } });
+    return [];
   });
+  await sendGatewayRefunds(lateRefundIds);
 }

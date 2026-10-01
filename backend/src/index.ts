@@ -5,12 +5,13 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import { rateLimit } from 'express-rate-limit';
-import dotenv from 'dotenv';
+import 'dotenv/config';
 
 import { logger } from './config/logger';
-import { connectDB } from './config/database';
-import { connectRedis } from './config/redis';
-import { startScheduler } from './jobs/scheduler';
+import { connectDB, getDB } from './config/database';
+import { checkEnv } from './config/env';
+import { connectRedis, getRedis } from './config/redis';
+import { startScheduler, stopScheduler } from './jobs/scheduler';
 
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -44,7 +45,6 @@ import eInvoiceRouter from './controllers/einvoice.controller';
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
 
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -93,15 +93,18 @@ app.use(morgan('combined', {
   stream: { write: (msg) => logger.http(msg.trim()) },
 }));
 
-// ─── Health Check ───────────────────────────────────────────────────────────
+// ─── Health checks ──────────────────────────────────────────────────────────
+// /health: the process is up (liveness). /ready: it can serve — database and
+// Redis answer (load balancer readiness).
 app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'dawabag-api',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-  });
+  res.json({ status: 'ok', service: 'dawabag-api', timestamp: new Date().toISOString() });
+});
+app.get('/ready', async (_req, res) => {
+  const checks: Record<string, string> = {};
+  try { await getDB().query('SELECT 1'); checks.database = 'ok'; } catch { checks.database = 'down'; }
+  try { checks.redis = (await getRedis().ping()) === 'PONG' ? 'ok' : 'down'; } catch { checks.redis = 'down'; }
+  const ok = Object.values(checks).every((v) => v === 'ok');
+  res.status(ok ? 200 : 503).json({ status: ok ? 'ready' : 'not_ready', checks });
 });
 
 // ─── API Routes ─────────────────────────────────────────────────────────────
@@ -143,6 +146,13 @@ app.use(errorHandler);
 // ─── Bootstrap ──────────────────────────────────────────────────────────────
 async function bootstrap() {
   try {
+    const env = checkEnv();
+    env.warnings.forEach((w) => logger.warn(`Config: ${w}`));
+    if (env.errors.length) {
+      env.errors.forEach((e) => logger.error(`Config: ${e}`));
+      throw new Error('Configuration is not valid; see the messages above');
+    }
+
     await connectDB();
     logger.info('PostgreSQL connected');
 
@@ -151,9 +161,23 @@ async function bootstrap() {
 
     startScheduler();
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       logger.info(`Dawabag API running on port ${PORT} [${process.env.NODE_ENV}]`);
     });
+
+    // Finish in-flight requests, then close connections (container stop / deploy)
+    const shutdown = (signal: string) => {
+      logger.info(`${signal} received: shutting down`);
+      stopScheduler();
+      server.close(async () => {
+        await getDB().end().catch(() => undefined);
+        await getRedis().quit().catch(() => undefined);
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(1), 15_000).unref();
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);

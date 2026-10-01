@@ -8,16 +8,15 @@ export function connectRedis(): Promise<void> {
     redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,
-      retryStrategy: (times) => {
-        if (times > 3) return null;
-        return Math.min(times * 200, 2000);
-      },
+      // Keep reconnecting after a Redis restart instead of giving up for good
+      retryStrategy: (times) => Math.min(times * 200, 5000),
     });
 
-    redis.on('ready', () => resolve());
+    let started = false;
+    redis.on('ready', () => { started = true; resolve(); });
     redis.on('error', (err) => {
       logger.error('Redis error:', err);
-      reject(err);
+      if (!started) reject(err);   // only the first connection is fatal
     });
   });
 }

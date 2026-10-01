@@ -50,12 +50,15 @@ export async function checkHandover(shipmentId: string, input: HandoverInput, ac
     if (!['admin', 'super_admin'].includes(actorRole)) throw new AppError('Only an admin can deliver without the code', 403);
     return { override: input.override_reason };
   }
-  if (s.handover_attempts >= MAX_ATTEMPTS) throw new AppError('Too many wrong codes; ask an admin to confirm this delivery', 423);
   if (!input.code) throw new AppError("Enter the buyer's delivery code", 400);
+  // Count the attempt before comparing, atomically, so parallel guesses cannot exceed the limit
+  const counted = await query(
+    `UPDATE order_shipments SET handover_attempts = handover_attempts + 1
+     WHERE id = $1 AND handover_attempts < $2 RETURNING handover_attempts`, [shipmentId, MAX_ATTEMPTS]);
+  if (!counted.length) throw new AppError('Too many wrong codes; ask an admin to confirm this delivery', 423);
   const expected = Buffer.from(handoverCode(s.id, s.dispatched_at));
   const given = Buffer.from(String(input.code));
   if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) {
-    await query(`UPDATE order_shipments SET handover_attempts = handover_attempts + 1 WHERE id = $1`, [shipmentId]);
     throw new AppError('Wrong delivery code', 400);
   }
   return { override: null };

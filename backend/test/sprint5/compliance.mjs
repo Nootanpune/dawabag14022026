@@ -129,7 +129,7 @@ export async function runCompliance({ t, P, addr, ids }) {
   check('buyer gets a 5-minute signed invoice link', /\?exp=\d+&sig=[0-9a-f]{64}$/.test(url || ''), r.json);
   r = await call('GET', url, { raw: true, absolute: true });
   check('signed link opens the PDF without a login', r.status === 200 && r.buf.subarray(0, 4).toString() === '%PDF', r.status);
-  r = await call('GET', url.replace(/sig=./, 'sig=0'), { raw: true, absolute: true });
+  r = await call('GET', url.replace(/sig=(.)/, (_, c) => `sig=${c === '0' ? '1' : '0'}`), { raw: true, absolute: true });
   check('tampered link refused', r.status === 404, r.status);
   r = await call('GET', `/invoices/shipments/${ship}/link`, { token: t.trader });
   check("no link for someone else's invoice", r.status === 404, r.json);

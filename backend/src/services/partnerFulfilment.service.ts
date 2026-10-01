@@ -1,7 +1,7 @@
 // src/services/partnerFulfilment.service.ts
 // Partner shipments: what a partner must ship, dispatch with AWB, delivery.
 // Dispatch consumes the reserved batch stock.
-import { query, withTransaction } from '../config/database';
+import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
@@ -82,7 +82,12 @@ export async function markShipmentDelivered(
   shipmentId: string, actor: { id: string; role: string }, vendorId?: string, handover: HandoverInput = {},
 ) {
   const userId = actor.id;
-  // Delivery code and receiver checked first, so wrong attempts are counted (C-26)
+  // Ownership first: nobody can spend another seller's code attempts
+  if (vendorId) {
+    const own = await queryOne('SELECT 1 FROM order_shipments WHERE id = $1 AND partner_id = $2', [shipmentId, vendorId]);
+    if (!own) throw new AppError('Shipment not found', 404);
+  }
+  // Delivery code and receiver checked before the transaction, so wrong attempts are counted (C-26)
   const { override } = await checkHandover(shipmentId, handover, actor.role);
   return withTransaction(async (client) => {
     const s = (await client.query(

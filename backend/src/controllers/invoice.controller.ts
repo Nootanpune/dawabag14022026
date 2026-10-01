@@ -10,16 +10,17 @@ import { signPath, verifySignedPath } from '../utils/signedLink';
 import { InvoiceData, loadCreditNote, loadInvoice } from '../services/invoiceData.service';
 import { renderInvoicePdf } from '../services/invoicePdf';
 
-const STAFF = ['admin', 'super_admin', 'pharmacist_rx', 'pharmacist_pack', 'delivery'];
+const STAFF = ['admin', 'super_admin', 'pharmacist_rx', 'pharmacist_pack'];
 const uuid = z.string().uuid();
 
 async function canSee(req: Request, shipmentId: string): Promise<boolean> {
   const u = req.user;
   if (!u) return false;
-  const s = await queryOne<{ user_id: string; partner_id: string | null }>(
-    `SELECT o.user_id, s.partner_id FROM order_shipments s JOIN orders o ON o.id = s.order_id WHERE s.id = $1`, [shipmentId]);
+  const s = await queryOne<{ user_id: string; partner_id: string | null; status: string }>(
+    `SELECT o.user_id, s.partner_id, s.status FROM order_shipments s JOIN orders o ON o.id = s.order_id WHERE s.id = $1`, [shipmentId]);
   if (!s) return false;
   if (s.user_id === u.id || STAFF.includes(u.role)) return true;
+  if (u.role === 'delivery') return s.status === 'dispatched';   // only packs they are carrying
   if (u.role === 'partner' && s.partner_id) {
     return !!(await queryOne('SELECT 1 FROM vendor_users WHERE user_id = $1 AND vendor_id = $2', [u.id, s.partner_id]));
   }

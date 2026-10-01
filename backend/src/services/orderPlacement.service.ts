@@ -13,6 +13,7 @@ import { evaluateCoupon } from './coupon.service';
 import { Allocation, allocateAndReserve } from './allocation.service';
 import { createShipmentsAndLines } from './shipment.service';
 import { OrderPreview, buildCheckoutSummary } from './checkoutSummary.service';
+import { moveOrderToFulfilment } from './paymentCapture.service';
 
 export const createOrderSchema = z.object({
   patient_id:           z.string().uuid().optional(),
@@ -20,7 +21,9 @@ export const createOrderSchema = z.object({
   items: z.array(z.object({
     product_id: z.string().uuid(),
     quantity:   z.number().int().min(1),
-  })).min(1),
+  })).min(1)
+    // One line per product, so per-order quantity limits cannot be split across lines
+    .refine((items) => new Set(items.map((i) => i.product_id)).size === items.length, 'Each product may appear only once'),
   coupon_code:          z.string().optional(),
   wallet_amount_paise:  z.number().int().min(0).optional().default(0),
   pincode:              z.string().length(6),
@@ -67,6 +70,17 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
   }
 
   const order = await withTransaction(async (client) => {
+    // The address and patient must be the buyer's own; the delivery PIN code is
+    // the address's, never a separate value from the request
+    const addr = (await client.query(
+      'SELECT pincode FROM addresses WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL', [data.address_id, userId])).rows[0];
+    if (!addr) throw new AppError('Delivery address not found', 404);
+    data = { ...data, pincode: addr.pincode };
+    if (data.patient_id) {
+      const pat = (await client.query(
+        'SELECT 1 FROM patients WHERE id = $1 AND owner_user_id = $2 AND deleted_at IS NULL', [data.patient_id, userId])).rows[0];
+      if (!pat) throw new AppError('Patient not found', 404);
+    }
     let subtotalPaise = 0;
     let gstPaise      = 0;
     let discountPaise = 0;
@@ -161,7 +175,16 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
       })));
       discountPaise = coupon.discountPaise;
       couponId = coupon.couponId;
-      await client.query('UPDATE coupons SET uses_count = uses_count + 1 WHERE id = $1', [couponId]);
+      // Per-buyer limit, then an atomic use count so concurrent orders cannot overrun the total
+      const lim = (await client.query(
+        `SELECT c.per_user_limit, (SELECT COUNT(*) FROM coupon_redemptions r JOIN orders o ON o.id = r.order_id
+            WHERE r.coupon_id = c.id AND r.user_id = $2 AND o.status <> 'cancelled')::int AS used
+         FROM coupons c WHERE c.id = $1`, [couponId, userId])).rows[0];
+      if (lim?.per_user_limit != null && lim.used >= lim.per_user_limit) throw new AppError('You have already used this coupon', 400);
+      const took = await client.query(
+        `UPDATE coupons SET uses_count = uses_count + 1 WHERE id = $1 AND (uses_limit IS NULL OR uses_count < uses_limit) RETURNING id`,
+        [couponId]);
+      if (!took.rowCount) throw new AppError('This coupon has been fully used', 400);
     }
 
     // Shipping — free for B2B orders above Rs.5000
@@ -179,7 +202,9 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
         'SELECT wallet_balance_paise FROM user_profiles WHERE user_id = $1 FOR UPDATE',
         [userId]
       );
-      walletUsedPaise = Math.min(data.wallet_amount_paise, profile.rows[0]?.wallet_balance_paise ?? 0);
+      // Never more than the order costs
+      const payable = Math.max(0, subtotalPaise + gstPaise + shippingPaise - discountPaise);
+      walletUsedPaise = Math.min(data.wallet_amount_paise, profile.rows[0]?.wallet_balance_paise ?? 0, payable);
       if (walletUsedPaise > 0) {
         await client.query(
           'UPDATE user_profiles SET wallet_balance_paise = wallet_balance_paise - $1 WHERE user_id = $2',
@@ -220,7 +245,7 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
     const buyerRow = await client.query('SELECT gstin, pan_number, drug_license_number FROM users WHERE id = $1', [userId]);
     const buyerGstin = buyerRow.rows[0]?.gstin || null;
 
-    const orderStatus = data.payment_terms === 'prepaid' ? 'pending_payment' : 'confirmed';
+    let orderStatus = data.payment_terms === 'prepaid' ? 'pending_payment' : 'confirmed';
     const orderNumber = generateOrderNumber();
 
     const newOrder = await client.query(
@@ -258,6 +283,13 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
 
     if (registeredType === 'doc_hospital') {
       await client.query('UPDATE orders SET practitioner_declared_at = NOW() WHERE id = $1', [orderId]);
+    }
+    if (couponId) {
+      await client.query('INSERT INTO coupon_redemptions (coupon_id, user_id, order_id) VALUES ($1, $2, $3)', [couponId, userId, orderId]);
+    }
+    // Fully paid from the wallet: nothing to collect, so it goes straight to fulfilment
+    if (orderStatus === 'pending_payment' && totalPaise === 0) {
+      orderStatus = await moveOrderToFulfilment(client, orderId);
     }
     if (opts.preview) {
       throw new OrderPreview(await buildCheckoutSummary(client, orderId, data.pincode, isB2B));

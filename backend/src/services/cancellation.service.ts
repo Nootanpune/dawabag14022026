@@ -7,7 +7,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { creditWholeShipment } from './creditNote.service';
 import { queueNotification } from './notification.service';
-import { recordRefund, sendGatewayRefunds } from './refund.service';
+import { recordRefund, refundableAmount, sendGatewayRefunds } from './refund.service';
 import { releaseOrderReservations } from './shipment.service';
 
 const OPEN = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing', 'packed'];
@@ -29,12 +29,8 @@ export async function cancelOrder(orderId: string, actor: { id: string; staff: b
       throw new AppError(actor.staff ? 'Part of this order has already been dispatched' : 'Packing has started; please contact support to cancel', 409);
     }
 
-    // What the buyer actually paid (nothing for an unpaid prepaid order except wallet)
-    const captured = Number((await client.query(
-      `SELECT COALESCE(SUM(amount_paise - COALESCE(refund_amount_paise, 0)), 0) AS n FROM payments
-       WHERE order_id = $1 AND status IN ('captured', 'partially_refunded')`, [orderId])).rows[0].n);
-    const onCredit = o.payment_terms !== 'prepaid';
-    const refundable = (onCredit ? o.total_paise : captured) + o.wallet_used_paise;
+    // Everything paid and not yet refunded (refund.service is the single authority)
+    const refundable = await refundableAmount(client, orderId);
 
     await releaseOrderReservations(client, orderId);
     // Give the prescription quantities back

@@ -9,7 +9,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { issueCreditNote } from './creditNote.service';
 import { queueNotification } from './notification.service';
-import { recordRefund, sendGatewayRefunds } from './refund.service';
+import { recordRefund, refundableAmount, sendGatewayRefunds } from './refund.service';
 import { getSetting } from './settings.service';
 
 export const RETURN_REASONS = ['damaged', 'wrong_item', 'missing_item', 'expired', 'near_expiry', 'quality_issue', 'recalled'] as const;
@@ -144,7 +144,9 @@ export async function decideReturn(staffId: string, id: string, approve: boolean
     // Buyer gets back what they paid for these goods: invoice value less their share of any order discount
     const o = (await client.query(`SELECT subtotal_paise, gst_paise, discount_paise FROM orders WHERE id = $1`, [r.order_id])).rows[0];
     const goods = Number(o.subtotal_paise) + Number(o.gst_paise);
-    const refundPaise = goods > 0 ? Math.round(cn.total_paise * (goods - Number(o.discount_paise)) / goods) : 0;
+    const share = goods > 0 ? Math.round(cn.total_paise * (goods - Number(o.discount_paise)) / goods) : 0;
+    // Never more than is still refundable on the order (earlier refunds count)
+    const refundPaise = Math.min(share, await refundableAmount(client, r.order_id));
     const refund = await recordRefund(client, { orderId: r.order_id, amountPaise: refundPaise, source: 'return', returnId: id, userId: staffId });
     if (cn.partner_id) {
       await client.query(

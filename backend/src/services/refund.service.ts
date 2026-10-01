@@ -18,11 +18,30 @@ export type RefundSource = 'cancellation' | 'return' | 'admin';
 
 interface Leg { method: 'credit_adjustment' | 'gateway' | 'wallet' | 'manual'; amount: number; paymentId?: string }
 
+// What can still be refunded on an order: what was actually paid (captured
+// gateway payments, or the credit bill for B2B terms) plus wallet used, less
+// every refund already recorded that has not failed. Caller holds the order lock.
+export async function refundableAmount(client: PoolClient, orderId: string): Promise<number> {
+  const r = (await client.query(
+    `SELECT o.total_paise, o.wallet_used_paise, o.payment_terms,
+            COALESCE((SELECT SUM(p.amount_paise) FROM payments p WHERE p.order_id = o.id
+                      AND p.status IN ('captured', 'partially_refunded', 'refunded')), 0) AS captured,
+            COALESCE((SELECT SUM(f.amount_paise) FROM refunds f WHERE f.order_id = o.id AND f.status <> 'failed'), 0) AS refunded
+     FROM orders o WHERE o.id = $1`, [orderId])).rows[0];
+  if (!r) throw new AppError('Order not found', 404);
+  const paid = (r.payment_terms !== 'prepaid' ? Number(r.total_paise) : Number(r.captured)) + Number(r.wallet_used_paise);
+  return Math.max(paid - Number(r.refunded), 0);
+}
+
 async function planLegs(client: PoolClient, orderId: string, amount: number): Promise<Leg[]> {
   const o = (await client.query(
     `SELECT total_paise, wallet_used_paise, payment_terms, credit_settled_at, credit_adjusted_paise
      FROM orders WHERE id = $1 FOR UPDATE`, [orderId])).rows[0];
   if (!o) throw new AppError('Order not found', 404);
+  const refundable = await refundableAmount(client, orderId);
+  if (amount > refundable) {
+    throw new AppError(`Only ₹${(refundable / 100).toFixed(2)} can still be refunded on this order`, 409);
+  }
   const legs: Leg[] = [];
   let left = amount;
   const take = (method: Leg['method'], cap: number, paymentId?: string) => {
@@ -30,20 +49,23 @@ async function planLegs(client: PoolClient, orderId: string, amount: number): Pr
     if (a > 0) { legs.push({ method, amount: a, paymentId }); left -= a; }
   };
 
-  if (o.payment_terms !== 'prepaid' && !o.credit_settled_at) {
+  const onCredit = o.payment_terms !== 'prepaid';
+  if (onCredit && !o.credit_settled_at) {
     take('credit_adjustment', o.total_paise - o.credit_adjusted_paise);
   }
   const pays = (await client.query(
-    `SELECT p.gateway_payment_id, p.amount_paise - COALESCE(p.refund_amount_paise, 0)
+    `SELECT p.gateway_payment_id, p.amount_paise
             - COALESCE((SELECT SUM(r.amount_paise) FROM refunds r WHERE r.gateway_payment_id = p.gateway_payment_id
-                        AND r.method = 'gateway' AND r.status = 'pending'), 0) AS refundable
+                        AND r.method = 'gateway' AND r.status <> 'failed'), 0) AS refundable
      FROM payments p WHERE p.order_id = $1 AND p.status IN ('captured', 'partially_refunded')
-       AND p.gateway_payment_id IS NOT NULL`, [orderId])).rows;
+       AND p.gateway_payment_id IS NOT NULL FOR UPDATE OF p`, [orderId])).rows;
   for (const p of pays) take('gateway', Number(p.refundable), p.gateway_payment_id);
   const walletBack = Number((await client.query(
     `SELECT COALESCE(SUM(amount_paise), 0) AS n FROM refunds WHERE order_id = $1 AND method = 'wallet'`, [orderId])).rows[0].n);
   take('wallet', o.wallet_used_paise - walletBack);
-  if (left > 0) legs.push({ method: 'manual', amount: left });
+  // Only a settled credit bill (paid by bank transfer) is refunded by hand
+  if (left > 0 && onCredit && o.credit_settled_at) { legs.push({ method: 'manual', amount: left }); left = 0; }
+  if (left > 0) throw new AppError('Refund could not be matched to how the order was paid', 409);
   return legs;
 }
 

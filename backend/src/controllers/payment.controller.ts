@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { getRazorpay, validWebhookSignature } from '../services/razorpay.client';
 import { handleRecurringCapture } from '../services/mandate.service';
 import { moveOrderToFulfilment } from '../services/paymentCapture.service';
-import { recordRefund, sendGatewayRefunds, settleGatewayLeg } from '../services/refund.service';
+import { recordRefund, refundableAmount, sendGatewayRefunds, settleGatewayLeg } from '../services/refund.service';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { queueNotification } from '../services/notification.service';
@@ -26,8 +26,8 @@ export async function createPaymentOrder(req: Request, res: Response, next: Next
 
     if (!order) throw new AppError('Order not found', 404);
     if (order.user_id !== userId) throw new AppError('Access denied', 403);
-    if (order.status !== 'pending_payment') {
-      throw new AppError('Order is not pending payment', 400);
+    if (!['pending_payment', 'payment_failed'].includes(order.status)) {
+      throw new AppError('Order is not waiting for payment', 400);
     }
     if (order.total_paise <= 0) {
       throw new AppError('Invalid order amount', 400);
@@ -36,6 +36,7 @@ export async function createPaymentOrder(req: Request, res: Response, next: Next
     const rzpOrder = await getRazorpay().orders.create({
       amount: order.total_paise,
       currency: 'INR',
+      payment_capture: true,          // capture on success; verify also captures an authorisation
       receipt: order.order_number,
       notes: { order_id: order.id, user_id: userId },
     });
@@ -94,21 +95,26 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
       .update(body)
       .digest('hex');
 
-    if (expectedSig !== razorpay_signature) {
+    const given = Buffer.from(String(razorpay_signature));
+    const expected = Buffer.from(expectedSig);
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
       throw new AppError('Payment verification failed — invalid signature', 400);
     }
 
     // Fetch payment details from Razorpay
-    const payment = await getRazorpay().payments.fetch(razorpay_payment_id);
-
-    if (payment.status !== 'captured' && payment.status !== 'authorized') {
+    let payment: any = await getRazorpay().payments.fetch(razorpay_payment_id);
+    // An authorisation alone is not money received: capture it, or refuse
+    if (payment.status === 'authorized') {
+      payment = await getRazorpay().payments.capture(razorpay_payment_id, Number(payment.amount), 'INR');
+    }
+    if (payment.status !== 'captured') {
       throw new AppError(`Payment not captured. Status: ${payment.status}`, 400);
     }
     if (payment.order_id !== razorpay_order_id || Number(payment.amount) !== owned.amount_paise) {
       throw new AppError('Payment does not match this order', 400);
     }
 
-    await withTransaction(async (client) => {
+    const lateRefund = await withTransaction(async (client) => {
       // Update payment record
       await client.query(
         `UPDATE payments
@@ -118,6 +124,15 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
         [razorpay_payment_id, razorpay_signature, payment.method, razorpay_order_id]
       );
 
+      // Paid after the order was cancelled (or otherwise closed): refund at once
+      const current = (await client.query('SELECT status FROM orders WHERE id = $1 FOR UPDATE', [order_id])).rows[0];
+      if (!['pending_payment', 'payment_failed'].includes(current.status)) {
+        const back = await recordRefund(client, { orderId: order_id, amountPaise: Number(payment.amount), source: 'cancellation', userId: null });
+        await writeAuditTx(client, { userId: req.user!.id, action: 'payment_after_close_refunded', performedBy: null,
+          newValue: { order_id, order_status: current.status, gateway_payment_id: razorpay_payment_id } });
+        return back.gatewayRefundIds;
+      }
+
       // rx_pending for prescription lines (buyer's exemption applied), else packing
       const newStatus = await moveOrderToFulfilment(client, order_id);
 
@@ -125,7 +140,12 @@ export async function verifyPayment(req: Request, res: Response, next: NextFunct
         userId: req.user!.id, action: 'payment_captured', performedBy: req.user!.id, ip: req.ip,
         newValue: { order_id, gateway_order_id: razorpay_order_id, gateway_payment_id: razorpay_payment_id, order_status: newStatus },
       });
+      return null;
     });
+    if (lateRefund) {
+      await sendGatewayRefunds(lateRefund);
+      throw new AppError('This order was already closed, so the payment is being refunded', 409);
+    }
 
     // Get order details for notification
     const orderData = await queryOne<{ user_id: string; order_number: string; status: string }>(
@@ -178,9 +198,10 @@ export async function handleWebhook(req: Request, res: Response, next: NextFunct
     if (event === 'payment.failed') {
       const paymentEntity = payload.payment?.entity;
       if (paymentEntity?.order_id) {
+        // A late or replayed failure never overrides a payment that went through
         await query(
           `UPDATE payments SET status = 'failed'
-           WHERE gateway_order_id = $1`,
+           WHERE gateway_order_id = $1 AND status NOT IN ('captured', 'partially_refunded', 'refunded')`,
           [paymentEntity.order_id]
         );
         const order = await queryOne<{ id: string; user_id: string; order_number: string }>(
@@ -191,7 +212,7 @@ export async function handleWebhook(req: Request, res: Response, next: NextFunct
         );
         if (order) {
           await query(
-            `UPDATE orders SET status = 'payment_failed' WHERE id = $1`,
+            `UPDATE orders SET status = 'payment_failed' WHERE id = $1 AND status = 'pending_payment'`,
             [order.id]
           );
         }
@@ -222,14 +243,13 @@ export async function initiateRefund(req: Request, res: Response, next: NextFunc
     const { order_id, reason, amount_paise } = req.body;
     if (typeof order_id !== 'string') throw new AppError('order_id is required', 422);
     const refund = await withTransaction(async (client) => {
-      const o = (await client.query(
-        `SELECT o.total_paise + o.wallet_used_paise - COALESCE((SELECT SUM(amount_paise) FROM refunds r
-           WHERE r.order_id = o.id AND r.status <> 'failed'), 0) AS left
-         FROM orders o WHERE o.id = $1`, [order_id])).rows[0];
+      // Lock first so two refunds on one order cannot both pass the check
+      const o = (await client.query('SELECT id FROM orders WHERE id = $1 FOR UPDATE', [order_id])).rows[0];
       if (!o) throw new AppError('Order not found', 404);
-      const amount = amount_paise === undefined ? Number(o.left) : Number(amount_paise);
-      if (!Number.isInteger(amount) || amount <= 0 || amount > Number(o.left)) {
-        throw new AppError(`Refund must be between 1 and ${o.left} paise`, 400);
+      const left = await refundableAmount(client, order_id);
+      const amount = amount_paise === undefined ? left : Number(amount_paise);
+      if (!Number.isInteger(amount) || amount <= 0 || amount > left) {
+        throw new AppError(left === 0 ? 'Nothing is left to refund on this order' : `Refund must be between 1 and ${left} paise`, 400);
       }
       const r = await recordRefund(client, { orderId: order_id, amountPaise: amount, source: 'admin', userId: req.user!.id });
       await writeAuditTx(client, { userId: null, action: 'refund_initiated', performedBy: req.user!.id,
