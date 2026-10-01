@@ -7,6 +7,11 @@ on:
   push:
   pull_request:
 
+# The jobs only read the code: the workflow token gets no write access (and fork pull
+# requests never see secrets; this workflow uses none)
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -151,7 +156,10 @@ jobs:
       # Debug APK for testers; API address from the repository variable MOBILE_API_URL
       # (Settings → Secrets and variables → Actions → Variables), else the Android emulator's host
       - name: Build debug APK
-        run: flutter build apk --debug --dart-define=API_URL=${{ vars.MOBILE_API_URL || 'http://10.0.2.2:4000' }}
+        # Passed through the environment, never pasted into the script
+        env:
+          MOBILE_API_URL: ${{ vars.MOBILE_API_URL || 'http://10.0.2.2:4000' }}
+        run: flutter build apk --debug --dart-define=API_URL="$MOBILE_API_URL"
       - uses: actions/upload-artifact@v4
         with:
           name: dawabag-debug-apk
@@ -168,7 +176,7 @@ jobs:
       API_DOMAIN: api.dawabag.test
       CURL_EXTRA: >-
         -k --resolve www.dawabag.test:443:127.0.0.1 --resolve api.dawabag.test:443:127.0.0.1
-        --resolve www.dawabag.test:80:127.0.0.1 --resolve api.dawabag.test:5432:127.0.0.1
+        --resolve www.dawabag.test:80:127.0.0.1 --resolve api.dawabag.test:5432:127.0.0.1 --resolve api.dawabag.test:6379:127.0.0.1
     steps:
       - uses: actions/checkout@v4
       - name: Throwaway staging settings

@@ -2,13 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
+import '../config/api_url.dart';
 import 'api_utils.dart';
 import 'session_store.dart';
-
-const String _baseUrl = String.fromEnvironment(
-  'API_URL',
-  defaultValue: 'http://10.0.2.2:4000', // Android emulator localhost
-);
 
 /// HTTP client + session.
 ///
@@ -36,7 +32,7 @@ class ApiService {
 
   ApiService._internal() {
     final options = BaseOptions(
-      baseUrl: '$_baseUrl/api/v1',
+      baseUrl: '${apiBaseUrl()}/api/v1',
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       headers: {'Content-Type': 'application/json'},

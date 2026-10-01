@@ -23,7 +23,12 @@ acao=$(c -D - -o /dev/null -X OPTIONS -H "Origin: $WEB" -H 'Access-Control-Reque
 check "API allows the website's origin (CORS)" "$(echo "$acao" | grep -q "$WEB" && echo ok)" "${acao:-none}"
 acao=$(c -D - -o /dev/null -X OPTIONS -H "Origin: https://evil.example" -H 'Access-Control-Request-Method: POST' "$API/api/v1/auth/login" | tr -d '\r' | grep -i '^access-control-allow-origin')
 check "…and no other origin" "$([ -z "$acao" ] && echo ok)" "$acao"
-code=$(c -o /dev/null -w '%{http_code}' --connect-timeout 3 "http://$API_DOMAIN:5432/" 2>/dev/null)
-check "database port not exposed" "$([ "$code" = 000 ] && echo ok)" "$code"
+# A port is closed when the connection is refused (curl exit 7) or never answers (28).
+# PostgreSQL and Redis drop an HTTP request without a reply (exit 52), which is "open".
+closed() { c -o /dev/null --connect-timeout 3 "http://$API_DOMAIN:$1/" 2>/dev/null; local rc=$?; [ $rc = 7 ] || [ $rc = 28 ]; }
+check "database port not exposed" "$(closed 5432 && echo ok)" "port 5432 answers"
+check "Redis port not exposed" "$(closed 6379 && echo ok)" "port 6379 answers"
+xfo=$(c -D - -o /dev/null "$WEB/" | tr -d '\r' | grep -i '^x-frame-options')
+check "website cannot be framed by other sites" "$(echo "$xfo" | grep -qi deny && echo ok)" "${xfo:-missing}"
 
 [ $fail = 0 ] && echo "Staging checks passed" || { echo "Staging checks FAILED"; exit 1; }

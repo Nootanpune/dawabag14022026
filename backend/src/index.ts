@@ -1,3 +1,4 @@
+import './config/timezone';               // first: the process runs in UTC (see the file)
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

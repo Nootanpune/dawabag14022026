@@ -4,7 +4,7 @@
 import { query, queryOne } from '../../config/database';
 import { NotificationPayload, buildMessage, smsVariables } from './templates';
 import { sendDltSms } from './channels/sms';
-import { sendEmailMessage } from './channels/email';
+import { escapeHtml, sendEmailMessage } from './channels/email';
 import { sendPushTo } from './channels/push';
 import { sendWhatsApp, whatsappOptedIn } from './channels/whatsapp';
 import { ChannelResult } from './channels/result';
@@ -33,7 +33,10 @@ export async function dispatchNotification(payload: NotificationPayload): Promis
   if (await whatsappOptedIn(payload.userId)) {
     jobs.push(sendWhatsApp(user.mobile, payload.type, smsVariables(payload)).then((r) => (r ? log('whatsapp', r) : undefined)));
   }
-  if (message.email && user.email) jobs.push(sendEmailMessage(user.email, message.email.subject, message.email.body).then((r) => log('email', r)));
+  // Template bodies are plain text that can carry staff- or provider-supplied words (a
+  // rejection reason, a product name, a failing job's error): escaped so none of it
+  // becomes markup or a link in a mail sent from Dawabag's own address
+  if (message.email && user.email) jobs.push(sendEmailMessage(user.email, message.email.subject, escapeHtml(String(message.email.body ?? ''))).then((r) => log('email', r)));
   if (message.push) {
     const devices = await query<{ fcm_token: string }>('SELECT fcm_token FROM user_devices WHERE user_id = $1', [payload.userId]);
     jobs.push(sendPushTo(devices.map((d) => d.fcm_token), message.push.title, message.push.body, payload)

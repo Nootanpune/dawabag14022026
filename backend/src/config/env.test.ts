@@ -30,4 +30,19 @@ describe('checkEnv', () => {
   it('refuses test-only provider addresses in production', () => {
     expect(checkEnv({ ...prod, SHIPROCKET_BASE_URL: 'http://127.0.0.1:4890' } as NodeJS.ProcessEnv).errors.join(' ')).toMatch(/SHIPROCKET_BASE_URL/);
   });
+  it('refuses the staging template\'s change-me values in production (Sprint 21 review)', () => {
+    const r = checkEnv({ ...prod, DB_PASSWORD: 'change-me-long-random',
+      JWT_ACCESS_SECRET: 'change-me-at-least-32-random-characters', JWT_REFRESH_SECRET: 'change-me-a-different-32-random-characters' } as NodeJS.ProcessEnv);
+    expect(r.errors.join(' ')).toMatch(/JWT_ACCESS_SECRET/);
+    expect(r.errors.join(' ')).toMatch(/JWT_REFRESH_SECRET/);
+    expect(r.errors.join(' ')).toMatch(/DB_PASSWORD/);
+  });
+  it('refuses the fake object store in production; another S3 endpoint only on a closed staging stack', () => {
+    expect(checkEnv({ ...prod, AWS_S3_BUCKET: 'dawabag-fake-bucket' } as NodeJS.ProcessEnv).errors.join(' ')).toMatch(/AWS_S3_BUCKET/);
+    expect(checkEnv({ ...prod, AWS_ACCESS_KEY_ID: 'fake' } as NodeJS.ProcessEnv).errors.join(' ')).toMatch(/AWS_ACCESS_KEY_ID/);
+    expect(checkEnv({ ...prod, S3_ENDPOINT: 'http://127.0.0.1:4890' } as NodeJS.ProcessEnv).errors.join(' ')).toMatch(/S3_ENDPOINT/);
+    const staging = checkEnv({ ...prod, S3_ENDPOINT: 'https://minio.internal', ALLOW_MISSING_INTEGRATIONS: 'true' } as NodeJS.ProcessEnv);
+    expect(staging.errors).toEqual([]);
+    expect(staging.warnings.join(' ')).toMatch(/S3_ENDPOINT/);
+  });
 });

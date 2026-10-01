@@ -4,7 +4,9 @@
 // (set ALLOW_MISSING_INTEGRATIONS=true only for a closed staging environment).
 import { z } from 'zod';
 
-const PLACEHOLDER = /change_this|your_|example|placeholder/i;
+// Also the staging template's "change-me-…" values (deploy/staging/staging.env.example):
+// a stack started from the template unchanged would sign tokens with a published key
+const PLACEHOLDER = /change[-_ ]?(this|me)|your_|example|placeholder/i;
 const secret = (name: string) => z.string({ required_error: `${name} is required` })
   .min(32, `${name} must be at least 32 characters`)
   .refine((v) => !PLACEHOLDER.test(v), `${name} still has the example value`);
@@ -55,6 +57,16 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
   if (production) {
     const overridden = ['MSG91_BASE_URL', 'GOOGLE_OAUTH_TOKEN_URL', 'FCM_BASE_URL', 'SHIPROCKET_BASE_URL', 'RAZORPAY_BASE_URL'].filter((k) => env[k]);
     if (overridden.length) errors.push(`${overridden.join(', ')} must not be set in production (test-only provider addresses)`);
+    // Prescriptions and KYC files go only to S3 in ap-south-1 (C-41, C-44). Another
+    // S3-compatible store is for a closed staging stack only; the in-memory test fake
+    // (backend/test/fakes/s3.mjs, scripts/record-journeys.sh) never.
+    if (env.S3_ENDPOINT) {
+      const msg = 'S3_ENDPOINT must not be set in production (documents go only to AWS S3 in ap-south-1)';
+      (env.ALLOW_MISSING_INTEGRATIONS === 'true' ? warnings : errors).push(msg);
+    }
+    if (/fake/i.test(String(env.AWS_S3_BUCKET ?? '')) || /^fake$/i.test(String(env.AWS_ACCESS_KEY_ID ?? ''))) {
+      errors.push('AWS_S3_BUCKET / AWS_ACCESS_KEY_ID are the test fakes; set the real bucket and keys');
+    }
   }
   const missing = INTEGRATIONS.filter((k) => !env[k] || PLACEHOLDER.test(String(env[k])));
   if (missing.length) {

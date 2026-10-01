@@ -13,13 +13,24 @@
 		Referrer-Policy strict-origin-when-cross-origin
 		-Server
 	}
+	# Access logs never carry an e-prescription check code (it opens the prescription);
+	# the API's own log redacts it the same way. Cookies and Authorization are redacted
+	# by Caddy itself (C-41, C-43)
 	log {
 		output stdout
+		format filter {
+			request>uri regexp (/eprescriptions/verify/)[^/?]+ ${1}[code]
+		}
 	}
 }
 
 {$WEB_DOMAIN} {
 	import common
+	# No other site may frame the shop (clickjacking of checkout, admin and portals)
+	header {
+		X-Frame-Options DENY
+		Content-Security-Policy "frame-ancestors 'none'"
+	}
 	reverse_proxy web:3000
 }
 
