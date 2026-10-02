@@ -298,6 +298,10 @@ to add items from the cart.
   it) crashes the API process — not fixed here.
 
 ## Sprint 24 — trial server (2026-10-01, merged to main via PR #1)
+- **Trial status (2026-10-02 pm):** Sprints 26-29 live (deploy run 37003151653): demo checkout
+  per method, partner stock upload (MediVision Platinum), admin Add partner, catalogue drafts +
+  pharmacist queue. Owner given a one-paste server script to add Nootan Pharmaceuticals as
+  partner (real GSTIN/licences/pharmacists/logins kept only in the trial DB, never in the repo).
 - **Trial moved to https://trial.dawabag.com (2026-10-02, deploy run 36966803021):**
   dawabag.com DNS moved from dead Comodo DNS (ns*.nudns.com) to BigRock (dns1-4.bigrock.in);
   A records trial/api.trial/files.trial → 64.227.172.8; Vercel apex record removed by owner.
