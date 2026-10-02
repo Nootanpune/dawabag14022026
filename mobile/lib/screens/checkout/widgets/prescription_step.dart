@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../config/theme.dart';
-import '../../../utils/ist.dart';
+import '../../prescriptions/widgets/prescription_upload_card.dart';
+import 'rx_choice_card.dart';
 import 'rx_policy_note.dart';
 
 /// Bottom sheet: take a photo or pick from the gallery.
@@ -34,145 +34,132 @@ Future<XFile?> pickPrescriptionImage(BuildContext context) async {
   return ImagePicker().pickImage(source: source, imageQuality: 85);
 }
 
-/// valid_until as an India calendar date ("31 Dec 2026"), or a dash.
-String _validUntil(Object? raw) {
-  return istCalendarDay(raw) == null ? '—' : formatDateIst(raw);
-}
-
-// ── Prescription step ──────────────────────────────────────────────────────────
-class PrescriptionStep extends StatelessWidget {
-  final XFile? prescriptionFile;
-  final List savedPrescriptions;
-  final String? selectedSavedId;
-  final VoidCallback onPickFile;
-  final void Function(String) onSelectSaved;
+// ── Prescription step (Sprint 32: before review, as the web) ─────────────────
+/// Which prescription goes with this order: one uploaded earlier (picture,
+/// date and time, status) or a new upload, which is then chosen. Chosen before
+/// the order is placed, so review and payment can say which one is attached;
+/// a pharmacist checks it with the order before dispatch (C-08). Also used
+/// after placing when the chosen one could not be used ([error]).
+class PrescriptionStep extends StatefulWidget {
   /// "Amoxicillin 500 mg Capsule × 1": the lines that need a prescription (C-08)
   final List<String> rxItems;
+  /// The buyer's prescriptions usable at checkout (GET /prescriptions/my)
+  final List<Map<String, dynamic>> prescriptions;
+  final bool loading;
+  final String? selectedId;
+  final ValueChanged<String> onSelect;
+  final VoidCallback onPhoto;
+  final VoidCallback onPdf;
+  final bool uploading;
+  /// e.g. the server said the chosen prescription cannot be used
+  final String? error;
+  final RxLinkLoader? loadLink;
 
   const PrescriptionStep({
     super.key,
-    required this.prescriptionFile, required this.savedPrescriptions,
-    required this.selectedSavedId, required this.onPickFile, required this.onSelectSaved,
-    this.rxItems = const [],
+    required this.rxItems,
+    required this.prescriptions,
+    required this.selectedId,
+    required this.onSelect,
+    required this.onPhoto,
+    required this.onPdf,
+    this.loading = false,
+    this.uploading = false,
+    this.error,
+    this.loadLink,
   });
+
+  /// How many cards show before "Show all".
+  static const shown = 4;
+
+  @override
+  State<PrescriptionStep> createState() => _PrescriptionStepState();
+}
+
+class _PrescriptionStepState extends State<PrescriptionStep> {
+  bool _all = false;
 
   @override
   Widget build(BuildContext context) {
+    final w = widget;
+    final usable = w.prescriptions;
+    final listed = _all ? [...usable] : usable.take(PrescriptionStep.shown).toList();
+    final chosen = usable.where((r) => r['id']?.toString() == w.selectedId);
+    if (chosen.isNotEmpty && !listed.contains(chosen.first)) listed.add(chosen.first);
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Prescription needed',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text('Prescription needed', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
-        Text(rxItems.isEmpty ? 'Some medicines in this order need a doctor’s prescription.' : 'These medicines need a doctor’s prescription:',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-        for (final item in rxItems)
+        Text(
+            w.rxItems.isEmpty
+                ? 'Some medicines in this order need a doctor’s prescription.'
+                : 'These medicines need a doctor’s prescription:',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+        for (final item in w.rxItems)
           Padding(
             padding: const EdgeInsets.only(top: 4, left: 8),
             child: Text('• $item', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           ),
         const SizedBox(height: 16),
-        const Text('Upload a new one, or choose one you uploaded earlier below.',
-          style: TextStyle(fontSize: 12)),
-        const SizedBox(height: 8),
-
-        // Upload zone
-        GestureDetector(
-          onTap: onPickFile,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: prescriptionFile != null ? AppTheme.brandGreen : Colors.grey.shade300,
-                width: 1.5,
-                style: BorderStyle.solid,
+        if (w.loading)
+          Row(children: [
+            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 8),
+            Text('Loading your prescriptions…', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          ])
+        else if (usable.isNotEmpty) ...[
+          const Text('Choose one of your prescriptions', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          for (final rx in listed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: RxChoiceCard(
+                rx: rx,
+                selected: rx['id']?.toString() == w.selectedId,
+                onSelect: () => w.onSelect(rx['id']?.toString() ?? ''),
+                loadLink: w.loadLink,
               ),
-              borderRadius: BorderRadius.circular(12),
-              color: prescriptionFile != null ? AppTheme.brandGreen50 : Colors.grey.shade50,
             ),
-            child: Column(
-              children: [
-                Icon(
-                  prescriptionFile != null ? Icons.check_circle : Icons.upload_file,
-                  size: 44,
-                  color: prescriptionFile != null ? AppTheme.brandGreen : Colors.grey.shade400,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  prescriptionFile != null ? prescriptionFile!.name : 'Tap to upload or take photo',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 14,
-                    color: prescriptionFile != null ? AppTheme.brandGreen700 : Colors.grey.shade600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text('JPEG, PNG or PDF · Max 10 MB',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
-              ],
+          if (usable.length > PrescriptionStep.shown && !_all)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => setState(() => _all = true),
+                child: Text('Show all ${usable.length} prescriptions'),
+              ),
             ),
-          ),
+        ],
+        const SizedBox(height: 8),
+        PrescriptionUploadCard(
+          title: usable.isEmpty ? 'Upload your prescription' : 'Or upload a new one',
+          busy: w.uploading,
+          onPhoto: w.onPhoto,
+          onPdf: w.onPdf,
         ),
-
-        if (savedPrescriptions.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          const Text('Or use a prescription you uploaded earlier',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-          const SizedBox(height: 4),
-          // Verified and unexpired, or uploaded earlier and not yet checked; the
-          // server checks it can be used and a pharmacist confirms it (C-08).
-          Text('Our pharmacist checks it with this order before dispatch.',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-          const SizedBox(height: 10),
-          ...savedPrescriptions.whereType<Map>().map((rx) => GestureDetector(
-            onTap: () => onSelectSaved(rx['id']?.toString() ?? ''),
+        const SizedBox(height: 8),
+        Text(
+          'It must show the doctor’s name and registration number, the date, the patient’s name and these medicines.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 12),
+        const RxPolicyNote(),
+        if (w.error != null) ...[
+          const SizedBox(height: 12),
+          Semantics(
+            liveRegion: true,
             child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: selectedSavedId == rx['id']?.toString() ? AppTheme.brandGreen : Colors.grey.shade200,
-                  width: selectedSavedId == rx['id']?.toString() ? 2 : 1,
-                ),
+                color: Colors.red.shade50,
+                border: Border.all(color: Colors.red.shade200),
                 borderRadius: BorderRadius.circular(10),
-                color: selectedSavedId == rx['id']?.toString() ? AppTheme.brandGreen50 : Colors.white,
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.description, color: AppTheme.brandGreen, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(rx['doctor_name'] != null ? 'Prescription from Dr ${rx['doctor_name']}' : rx['file_type'] == 'pdf' ? 'Prescription (PDF)' : 'Prescription photo',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13,
-                            color: AppTheme.brandGreen700)),
-                        Text('Uploaded ${formatDateTimeIst(rx['created_at'])}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-                        Text(rx['status'] == 'pending'
-                            ? 'Not checked yet — our pharmacist checks it with this order'
-                            : 'Checked · valid until ${_validUntil(rx['valid_until'])}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                      ],
-                    ),
-                  ),
-                  if (selectedSavedId == rx['id']?.toString())
-                    const Column(children: [
-                      Icon(Icons.check_circle, color: AppTheme.brandGreen),
-                      Text('Chosen', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
-                    ])
-                  else
-                    Icon(Icons.radio_button_unchecked, color: Colors.grey.shade400),
-                ],
-              ),
+              child: Text(w.error!, style: TextStyle(fontSize: 13, color: Colors.red.shade900)),
             ),
-          )),
+          ),
         ],
-
-        const SizedBox(height: 16),
-        const RxPolicyNote(),
       ],
     );
   }

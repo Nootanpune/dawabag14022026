@@ -11,12 +11,16 @@ class AuthState {
   final bool isLoading;
   final Map<String, dynamic>? user;
   final String? error;
+  /// A temporary password from Dawabag's admin must be replaced before anything
+  /// else (Sprint 28 server rule; Sprint 32 app screen). From the server only.
+  final bool mustChangePassword;
 
   const AuthState({
     this.isAuthenticated = false,
     this.isLoading = false,
     this.user,
     this.error,
+    this.mustChangePassword = false,
   });
 
   AuthState copyWith({
@@ -24,12 +28,14 @@ class AuthState {
     bool? isLoading,
     Map<String, dynamic>? user,
     String? error,
+    bool? mustChangePassword,
   }) =>
       AuthState(
         isAuthenticated: isAuthenticated ?? this.isAuthenticated,
         isLoading: isLoading ?? this.isLoading,
         user: user ?? this.user,
         error: error,
+        mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       );
 
   /// 'customer' | 'b2b_retailer' | 'b2b_wholesaler' | 'doc_hospital'
@@ -42,6 +48,7 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier() : super(const AuthState()) {
     apiService.onSessionExpired = _onSessionExpired;
+    apiService.onPasswordChangeRequired = requirePasswordChange;
     _restoreSession();
   }
 
@@ -70,7 +77,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       });
       final data = ApiService.dataOf(res);
       await apiService.setSessionFromAuthData(data);
-      completeSignIn(data);
+      // The login response has no mobile; the change-password rules need it
+      completeSignIn({...data, 'mobile': data['mobile'] ?? mobile});
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
@@ -102,14 +110,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Publishes a signed-in session from a login / verify-otp / refresh
   /// response map, then loads the full profile from GET /users/me.
   void completeSignIn(Map<String, dynamic> authData) {
+    final mustChange = authData['must_change_password'] == true;
     state = state.copyWith(
       isAuthenticated: true,
       isLoading: false,
       user: userFromAuthData(authData),
       error: null,
+      mustChangePassword: mustChange,
     );
+    // Until the temporary password is replaced the server refuses everything else
+    if (mustChange) return;
     fetchMe();
     // Push: register this device with the server (POST /users/me/devices).
+    PushDeviceService.register();
+  }
+
+  /// The server answered 403 PASSWORD_CHANGE_REQUIRED: show the change screen.
+  void requirePasswordChange() {
+    if (mounted && state.isAuthenticated && !state.mustChangePassword) {
+      state = state.copyWith(mustChangePassword: true);
+    }
+  }
+
+  /// POST /auth/change-password succeeded: the new session (already stored by
+  /// the API client) is published and the account opens.
+  void passwordChanged(Map<String, dynamic> authData) {
+    final fresh = userFromAuthData(authData)..removeWhere((_, v) => v == null);
+    final user = {...?state.user, ...fresh};
+    state = state.copyWith(user: user, mustChangePassword: false, error: null);
+    fetchMe();
     PushDeviceService.register();
   }
 

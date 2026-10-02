@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../config/password_gate.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
 import '../../models/drug_licence.dart';
@@ -178,6 +179,7 @@ class AccountScreen extends ConsumerWidget {
           _Section('Account', [
             _MenuItem(icon: Icons.person_outline, label: 'Edit profile', onTap: () {}),
             _MenuItem(icon: Icons.notifications_outlined, label: 'Notification settings', onTap: () {}),
+            _MenuItem(icon: Icons.lock_outline, label: 'Change password', onTap: () => context.push(kChangePasswordPath)),
             _MenuItem(
               icon: Icons.logout,
               label: 'Sign out',

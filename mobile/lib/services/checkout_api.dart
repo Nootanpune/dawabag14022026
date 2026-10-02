@@ -1,5 +1,3 @@
-import 'package:dio/dio.dart';
-
 import '../models/checkout_summary.dart';
 import '../models/json_utils.dart';
 import 'api_service.dart';
@@ -69,20 +67,6 @@ extension CheckoutApi on ApiService {
     final res = await dio.post('/orders', data: body);
     final order = apiData(res)['order'];
     return order is Map ? Map<String, dynamic>.from(order) : <String, dynamic>{};
-  }
-
-  /// POST /prescriptions/upload (multipart) — the file goes straight to the
-  /// server's object store; the app keeps no copy (C-41).
-  Future<void> uploadOrderPrescription({
-    required String filePath,
-    required String filename,
-    required String orderId,
-  }) async {
-    final formData = FormData.fromMap({
-      'prescription': await MultipartFile.fromFile(filePath, filename: filename),
-      'order_id': orderId,
-    });
-    await dio.post('/prescriptions/upload', data: formData);
   }
 
   /// POST /payments/create-order { order_id } → razorpay_key_id, amount,

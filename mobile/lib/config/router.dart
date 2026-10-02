@@ -21,6 +21,7 @@ import '../screens/account/grievances/grievance_list_screen.dart';
 import '../screens/account/grievances/new_grievance_screen.dart';
 import '../screens/account/addresses/address_form_screen.dart';
 import '../screens/account/addresses/address_list_screen.dart';
+import '../screens/account/licences/licence_renewal_screen.dart';
 import '../screens/account/licences/licences_screen.dart';
 import '../screens/account/legal/legal_screen.dart';
 import '../screens/account/legal/policy_screen.dart';
@@ -41,7 +42,9 @@ import '../screens/doctor/doctor_portal_screen.dart';
 import '../screens/doctor/portal/doctor_consultations_screen.dart';
 import '../screens/admin/admin_screen.dart';
 import '../screens/prescriptions/prescriptions_screen.dart';
+import '../screens/account/password/change_password_screen.dart';
 import '../widgets/main_scaffold.dart';
+import 'password_gate.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Re-run redirects when the signed-in state flips, instead of rebuilding
@@ -49,7 +52,8 @@ final routerProvider = Provider<GoRouter>((ref) {
   // '/' whenever isLoading toggled, e.g. in the middle of registration).
   final authRefresh = ValueNotifier<int>(0);
   ref.listen<AuthState>(authProvider, (previous, next) {
-    if (previous?.isAuthenticated != next.isAuthenticated) {
+    if (previous?.isAuthenticated != next.isAuthenticated ||
+        previous?.mustChangePassword != next.mustChangePassword) {
       authRefresh.value++;
     }
   });
@@ -58,8 +62,13 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     refreshListenable: authRefresh,
     redirect: (context, state) {
-      final isLoggedIn = ref.read(authProvider).isAuthenticated;
+      final auth = ref.read(authProvider);
+      final isLoggedIn = auth.isAuthenticated;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
+
+      // A temporary password from Dawabag's admin must be replaced first (Sprint 32, C-44)
+      final gate = passwordGateRedirect(state.uri, loggedIn: isLoggedIn, mustChange: auth.mustChangePassword);
+      if (gate != null) return gate;
 
       // Protected routes
       final protectedRoutes = ['/checkout', '/orders', '/account', '/consultations', '/doctor/portal', '/doctor/consultations', '/admin'];
@@ -104,6 +113,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['orderId']!),
       ),
       GoRoute(path: '/account/refills', builder: (c, s) => const RefillScreen()),
+      // Change password: from Account, or forced for a temporary password (Sprint 32)
+      GoRoute(
+        path: kChangePasswordPath,
+        builder: (c, s) => ChangePasswordScreen(
+          required: s.uri.queryParameters['required'] == '1',
+          next: s.uri.queryParameters['next'],
+        ),
+      ),
       // Upload a prescription any time (Sprint 25); signed-in only via the /account prefix
       GoRoute(path: '/account/prescriptions', builder: (c, s) => const PrescriptionsScreen()),
       // Complaints (C-36). '/new' is listed before '/:id' so it is not taken as an id.
@@ -123,8 +140,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/account/privacy', builder: (c, s) => const PrivacyScreen()),
       // Saved addresses ('/new' before '/:id/edit')
       GoRoute(path: '/account/addresses', builder: (c, s) => const AddressListScreen()),
-      // Sprint 30: a business / doctor account's drug licences (read-only in the app)
+      // Sprint 30: a business / doctor account's drug licences
       GoRoute(path: '/account/licences', builder: (c, s) => const LicencesScreen()),
+      // Sprint 32: send a renewed or another licence from the app
+      GoRoute(path: '/account/licences/renew', builder: (c, s) => const LicenceRenewalScreen()),
       GoRoute(path: '/account/addresses/new', builder: (c, s) => const AddressFormScreen()),
       GoRoute(
         path: '/account/addresses/:id/edit',

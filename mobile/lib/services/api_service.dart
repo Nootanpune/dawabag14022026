@@ -30,6 +30,10 @@ class ApiService {
   /// Called when the server rejects the refresh token (session is over).
   void Function()? onSessionExpired;
 
+  /// Called when the server answers 403 PASSWORD_CHANGE_REQUIRED: a login with
+  /// a temporary password from Dawabag's admin must choose its own first (Sprint 32).
+  void Function()? onPasswordChangeRequired;
+
   ApiService._internal() {
     final options = BaseOptions(
       baseUrl: '${apiBaseUrl()}/api/v1',
@@ -66,6 +70,7 @@ class ApiService {
   }
 
   Future<void> _onError(DioException error, ErrorInterceptorHandler handler) async {
+    if (isPasswordChangeRequired(error)) onPasswordChangeRequired?.call();
     final request = error.requestOptions;
     final isUnauthorized = error.response?.statusCode == 401;
     final isAuthCall = request.path.startsWith('/auth/');
@@ -105,6 +110,10 @@ class ApiService {
         accessToken: data['access_token'] as String,
         refreshToken: data['refresh_token'] as String?,
       );
+
+  /// The keychain refresh token, sent when changing the password so the server
+  /// can end the old session (C-44). Never shown or logged.
+  Future<String?> storedRefreshToken() => _sessionStore.readRefreshToken();
 
   Future<void> clearSession() async {
     _accessToken = null;

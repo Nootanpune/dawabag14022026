@@ -6,6 +6,7 @@ import '../../../config/theme.dart';
 import '../../../utils/formatters.dart';
 import '../../../widgets/cart_quantity_control.dart';
 import '../../../widgets/product_image.dart';
+import '../../../widgets/schedule_badge.dart';
 
 /// One search result: thumbnail, name, generic name, price and Add.
 class SearchResultTile extends ConsumerWidget {
@@ -15,8 +16,6 @@ class SearchResultTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final generic = product['generic_name']?.toString();
-    final schedule = product['drug_schedule']?.toString();
-    final rx = schedule == 'Schedule H' || schedule == 'Schedule H1';
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -46,11 +45,9 @@ class SearchResultTile extends ConsumerWidget {
                       // The buyer's own price from the server (offer / PTR / PTS / institutional)
                       Text(formatPrice(product['display_price_paise'] ?? product['offer_price_paise'] ?? 0),
                           style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
-                      // Prescription-only medicine (C-08)
-                      if (rx) ...[
-                        const SizedBox(width: 8),
-                        const Text('Rx', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.amberText)),
-                      ],
+                      // Rx for Schedule H / H1 (C-08), or Non-scheduled (Sprint 31)
+                      const SizedBox(width: 8),
+                      ScheduleBadge(product['drug_schedule']?.toString()),
                     ]),
                   ],
                 ),

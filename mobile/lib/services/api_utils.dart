@@ -79,3 +79,19 @@ String apiErrorMessage(
   }
   return fallback;
 }
+
+/// Code the server sends (403) while a login still has the temporary password
+/// an admin set (Sprint 28, backend auth.middleware): every route but
+/// POST /auth/change-password and /auth/logout is refused until it is changed.
+const kPasswordChangeRequired = 'PASSWORD_CHANGE_REQUIRED';
+
+/// The machine-readable `code` of an API error envelope, if any.
+String? apiErrorCode(Object error) {
+  if (error is! DioException) return null;
+  final data = error.response?.data;
+  return data is Map ? data['code']?.toString() : null;
+}
+
+/// True when the server refused the call until the password is changed.
+bool isPasswordChangeRequired(Object error) =>
+    error is DioException && error.response?.statusCode == 403 && apiErrorCode(error) == kPasswordChangeRequired;

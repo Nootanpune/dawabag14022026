@@ -7,7 +7,9 @@ import '../../../utils/ist.dart';
 /// (expired in red, renew soon in amber).
 class LicenceTile extends StatelessWidget {
   final DrugLicence licence;
-  const LicenceTile({super.key, required this.licence});
+  /// Shown for a licence still waiting for the check (Sprint 32)
+  final VoidCallback? onUploadCopy;
+  const LicenceTile({super.key, required this.licence, this.onUploadCopy});
 
   Color _chipColour() {
     if (licence.status == 'rejected' || licence.validity == 'expired') return Colors.red.shade100;
@@ -42,6 +44,17 @@ class LicenceTile extends StatelessWidget {
               Text('Valid till ${formatDateIst(l.validUpto)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
             if (l.status == 'rejected' && (l.rejectionReason ?? '').isNotEmpty)
               Text('Reason: ${l.rejectionReason}', style: TextStyle(fontSize: 12, color: Colors.red.shade700)),
+            if (l.hasDocument)
+              Text('Copy on file', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+            if (onUploadCopy != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onUploadCopy,
+                  icon: const Icon(Icons.upload_outlined, size: 18),
+                  label: Text(l.hasDocument ? 'Replace copy' : 'Upload copy'),
+                ),
+              ),
           ],
         ),
       ),

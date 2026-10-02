@@ -10,7 +10,7 @@ import '../../widgets/home/category_tiles.dart';
 import '../../widgets/home/consult_doctor_tile.dart';
 import '../../widgets/home/free_delivery_note.dart';
 import '../../widgets/home/prescription_cta.dart';
-import '../../widgets/home/search_entry.dart';
+import '../../widgets/home/home_search_box.dart';
 import '../../widgets/home/section_header.dart';
 import '../../widgets/home/trust_strip.dart';
 import '../../widgets/legal/legal_summary_tile.dart';
@@ -64,7 +64,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onPincodeChanged: (p) => ref.read(typedPincodeProvider.notifier).state = p,
                 ),
                 const SizedBox(height: 12),
-                SearchEntry(onTap: () => context.go('/search')),
+                // Suggestions as you type; submit / "See all results" opens the Search tab (Sprint 32)
+                HomeSearchBox(
+                  pincode: pincode,
+                  onSubmitQuery: (q) => context.go(Uri(path: '/search', queryParameters: {'q': q}).toString()),
+                  onOpenProduct: (id) => context.push('/shop/$id'),
+                ),
                 const FreeDeliveryNote(),
                 const SizedBox(height: 10),
                 const TrustStrip(),

@@ -67,14 +67,14 @@ void main() {
 
   testWidgets('prescription step lists the medicines that need one and marks the chosen prescription', (tester) async {
     await tester.pumpWidget(_wrap(PrescriptionStep(
-      prescriptionFile: null,
-      savedPrescriptions: const [
-        {'id': 'rx1', 'status': 'pending', 'created_at': '2026-10-02T04:26:00Z', 'file_type': 'jpg'},
-      ],
-      selectedSavedId: 'rx1',
-      onPickFile: () {},
-      onSelectSaved: (_) {},
-      rxItems: const ['Amoxicillin 500 mg Capsule × 1'],
+        prescriptions: const [
+          {'id': 'rx1', 'status': 'pending', 'created_at': '2026-10-02T04:26:00Z', 'file_type': 'jpg'},
+        ],
+        selectedId: 'rx1',
+        onSelect: (_) {},
+        onPhoto: () {},
+        onPdf: () {},
+        rxItems: const ['Amoxicillin 500 mg Capsule × 1'],
     )));
     expect(find.text('Prescription needed'), findsOneWidget);
     expect(find.textContaining('Amoxicillin 500 mg Capsule × 1'), findsOneWidget);

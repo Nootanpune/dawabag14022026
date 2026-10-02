@@ -13,6 +13,8 @@ class DrugLicence {
   final String validity; // valid | expiring | expired | no_date
   final String? rejectionReason;
   final String? issuedBy;
+  /// A copy (scan / photo) is on file in the server's private store
+  final bool hasDocument;
 
   const DrugLicence({
     required this.id,
@@ -24,6 +26,7 @@ class DrugLicence {
     required this.validity,
     this.rejectionReason,
     this.issuedBy,
+    this.hasDocument = false,
   });
 
   factory DrugLicence.fromJson(Map<String, dynamic> j) => DrugLicence(
@@ -36,6 +39,7 @@ class DrugLicence {
         validity: asString(j['validity']) ?? 'no_date',
         rejectionReason: asString(j['rejection_reason']),
         issuedBy: asString(j['issued_by']),
+        hasDocument: j['has_document'] == true,
       );
 
   /// Plain words for the status chip.

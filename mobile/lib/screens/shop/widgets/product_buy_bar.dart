@@ -4,10 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../providers/cart_actions.dart';
 import '../../../providers/cart_provider.dart';
+import '../../../utils/drug_schedule.dart';
 import '../../../utils/formatters.dart';
 import '../../../widgets/cart_quantity_control.dart';
-
-const _notOnline = ['NDPS', 'Schedule X'];
 
 /// Product page bottom bar (Sprint 26): choose how many, then "Add N to cart";
 /// once in the server cart, − qty + and "Go to cart".
@@ -32,7 +31,7 @@ class _ProductBuyBarState extends ConsumerState<ProductBuyBar> {
   Widget build(BuildContext context) {
     final p = widget.product;
     final id = p['id']?.toString() ?? '';
-    final cannotOrder = p['cannot_order_online'] == true || _notOnline.contains(p['drug_schedule']);
+    final cannotOrder = p['cannot_order_online'] == true || isNeverOnline(p['drug_schedule']?.toString());
     final inStock = p['in_stock'] == true;
     final inCart = ref.watch(cartProvider.select((s) => s.view.lineFor(id)?.quantity ?? 0));
     final busy = ref.watch(cartProvider.select((s) => s.isUpdating));

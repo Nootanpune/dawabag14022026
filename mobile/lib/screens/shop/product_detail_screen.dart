@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/theme.dart';
 import '../../services/api_service.dart';
+import '../../utils/drug_schedule.dart';
 import '../../widgets/error_retry_view.dart';
 import '../../widgets/product_image.dart';
 import 'widgets/product_badges.dart';
@@ -15,8 +16,6 @@ final productDetailProvider = FutureProvider.family<Map<String, dynamic>, String
   final res = await apiService.dio.get('/products/$id');
   return res.data['data'] as Map<String, dynamic>;
 });
-
-const _rxSchedules = ['Schedule H', 'Schedule H1'];
 
 class ProductDetailScreen extends ConsumerWidget {
   final String productId;
@@ -84,7 +83,7 @@ class _Body extends StatelessWidget {
                   child: Text('Out of stock',
                       style: TextStyle(fontSize: 13, color: Colors.red.shade800, fontWeight: FontWeight.w600)),
                 ),
-              if (_rxSchedules.contains(product['drug_schedule'])) const _RxNotice(),
+              if (isRxSchedule(product['drug_schedule']?.toString())) const _RxNotice(),
               if (description != null && description.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(description, style: const TextStyle(fontSize: 14, height: 1.45)),

@@ -1,69 +1,66 @@
-import 'package:image_picker/image_picker.dart';
-
 import '../../services/api_service.dart';
 import '../../services/checkout_api.dart';
+import '../../services/prescription_api.dart';
 import '../../utils/ist.dart';
+import '../../utils/prescription_describe.dart';
 
-/// The prescription chosen for an Rx order: a new photo, uploaded straight
-/// to the server's object store and never kept by the app (C-41), or one of
-/// the buyer's pharmacist-verified, unexpired prescriptions (C-08). Held in
-/// memory only; the server's order is the record.
+/// The prescription chosen for an Rx order (Sprint 32, as the web since Sprint 26):
+/// chosen BEFORE the order is placed — one the buyer uploaded earlier, or a new
+/// upload (POST /prescriptions/upload without an order, then chosen) — and sent
+/// with the order right after it is placed (POST /prescriptions/:id/use-for-order).
+/// The pharmacist checks it before dispatch (C-08). Files go only to the server's
+/// object store (C-41). Held in memory only; the server's order is the record.
 class CheckoutPrescription {
-  XFile? file;
-  String? savedId;
+  /// Usable at checkout: verified and still valid, or uploaded and not yet checked
   List<Map<String, dynamic>> saved = const [];
+  String? selectedId;
+  bool loaded = false;
 
-  bool get hasChoice => file != null || savedId != null;
+  bool get hasChoice => selected != null;
 
-  /// For the payment step: "photo uploaded 02 Oct 2026, 9:56 am" (Sprint 26).
-  String? get label {
-    if (file != null) return 'new photo, sent with this order';
-    final id = savedId;
+  Map<String, dynamic>? get selected {
+    final id = selectedId;
     if (id == null) return null;
     for (final rx in saved) {
-      if (rx['id']?.toString() == id) {
-        final kind = rx['doctor_name'] != null ? 'from Dr ${rx['doctor_name']}' : rx['file_type'] == 'pdf' ? 'PDF' : 'photo';
-        return '$kind uploaded ${formatDateTimeIst(rx['created_at'])}';
-      }
+      if (rx['id']?.toString() == id) return rx;
     }
-    return 'chosen';
+    return null;
   }
 
-  /// GET /prescriptions/my (verified and still valid only). Failures leave
-  /// the list empty; the buyer can still upload a photo.
+  /// For review and payment: "photo uploaded 02 Oct 2026, 9:56 am".
+  String? get label {
+    final rx = selected;
+    if (rx == null) return null;
+    return '${prescriptionKind(rx)} uploaded ${formatDateTimeIst(rx['created_at'])}';
+  }
+
+  /// GET /prescriptions/my (usable ones). A failure leaves the list empty; the
+  /// buyer can still upload a new one.
   Future<void> loadSaved() async {
     try {
       saved = await apiService.getVerifiedPrescriptions();
     } catch (_) {
       saved = const [];
     }
-    final id = savedId;
-    if (id != null && !saved.any((rx) => rx['id']?.toString() == id)) savedId = null;
+    loaded = true;
+    if (selected == null) selectedId = null;
   }
 
-  void pick(XFile picked) {
-    file = picked;
-    savedId = null;
+  void select(String id) => selectedId = id;
+
+  /// Uploads a new prescription (no order yet), reloads the list and chooses it.
+  Future<void> uploadNew({required String filePath, required String filename}) async {
+    final created = await apiService.uploadPrescription(filePath: filePath, filename: filename);
+    await loadSaved();
+    final id = created['id']?.toString();
+    if (id != null) selectedId = id;
   }
 
-  void selectSaved(String id) {
-    savedId = id;
-    file = null;
-  }
-
-  /// Sends the choice for [orderId]: uploads the new photo, or offers the
-  /// saved prescription via POST /prescriptions/:id/use-for-order (C-08).
-  /// Either way the pharmacist confirms it before dispatch. Throws on an API
-  /// error (e.g. 400 "expired" / "does not cover: …") for the screen to show.
-  Future<void> submit(String orderId) async {
-    final f = file;
-    if (f != null) {
-      await apiService.uploadOrderPrescription(filePath: f.path, filename: f.name, orderId: orderId);
-      return;
-    }
-    final id = savedId;
-    if (id != null) {
-      await apiService.useSavedPrescriptionForOrder(prescriptionId: id, orderId: orderId);
-    }
+  /// Sends the chosen prescription with [orderId] (C-08). Throws on an API error
+  /// (e.g. 400 "expired" / "does not cover: …") for the screen to show.
+  Future<void> attachTo(String orderId) async {
+    final id = selectedId;
+    if (id == null) return;
+    await apiService.useSavedPrescriptionForOrder(prescriptionId: id, orderId: orderId);
   }
 }

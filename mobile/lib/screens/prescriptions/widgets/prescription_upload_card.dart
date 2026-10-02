@@ -7,7 +7,15 @@ class PrescriptionUploadCard extends StatelessWidget {
   final bool busy;
   final VoidCallback onPhoto;
   final VoidCallback onPdf;
-  const PrescriptionUploadCard({super.key, required this.busy, required this.onPhoto, required this.onPdf});
+  /// e.g. "Or upload a new one" at checkout (Sprint 32)
+  final String title;
+  const PrescriptionUploadCard({
+    super.key,
+    required this.busy,
+    required this.onPhoto,
+    required this.onPdf,
+    this.title = 'Upload a prescription',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +29,7 @@ class PrescriptionUploadCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Upload a prescription', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           const Text(
             "A clear photo or PDF of the whole prescription: doctor's name and registration number, date, your name and the medicines.",

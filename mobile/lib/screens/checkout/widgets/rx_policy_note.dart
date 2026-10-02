@@ -25,7 +25,9 @@ class RxPolicyNote extends StatelessWidget {
 /// "Prescription (photo) uploaded 02 Oct 2026, 9:56 am ✓ — our pharmacist checks it before dispatch."
 class RxAttachedNote extends StatelessWidget {
   final String label;
-  const RxAttachedNote({super.key, required this.label});
+  /// Review step, before the order is placed: go back and choose another one
+  final VoidCallback? onChange;
+  const RxAttachedNote({super.key, required this.label, this.onChange});
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +45,12 @@ class RxAttachedNote extends StatelessWidget {
           child: Text('Prescription ($label) ✓ — our pharmacist checks it before dispatch.',
               style: TextStyle(fontSize: 13, color: Colors.green.shade900, fontWeight: FontWeight.w600)),
         ),
+        if (onChange != null)
+          TextButton(
+            onPressed: onChange,
+            style: TextButton.styleFrom(minimumSize: const Size(48, 32), padding: const EdgeInsets.symmetric(horizontal: 8)),
+            child: const Text('Change'),
+          ),
       ]),
     );
   }

@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/theme.dart';
+import '../utils/drug_schedule.dart';
 import 'auth_provider.dart';
 import 'cart_provider.dart';
-
-const List<String> _notOrderableOnline = ['NDPS', 'Schedule X'];
 
 /// Shared "Add to cart" action for product lists and detail pages.
 /// Guests are sent to sign in (there is no guest cart). Returns true when
@@ -21,7 +20,7 @@ Future<bool> addProductToCart(
 }) async {
   final messenger = ScaffoldMessenger.of(context);
   final schedule = product['drug_schedule'] as String? ?? 'OTC';
-  if (_notOrderableOnline.contains(schedule)) {
+  if (isNeverOnline(schedule)) {
     messenger.showSnackBar(const SnackBar(
       content: Text('This medicine cannot be ordered online'),
       backgroundColor: Colors.red,

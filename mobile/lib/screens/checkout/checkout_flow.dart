@@ -4,33 +4,109 @@ import '../../services/checkout_api.dart';
 import '../../utils/formatters.dart';
 import '../orders/widgets/order_shipments_card.dart';
 
-/// address → review (C-35 summary, POST /orders on confirm) →
-/// prescription (Rx orders only) → payment → confirmed.
-enum CheckoutStep { address, review, prescription, payment, confirmed }
+/// Checkout order (Sprint 32 — the same as the web since Sprint 26):
+/// address → prescription (Rx orders only, chosen BEFORE the order exists) →
+/// review (C-35 summary) → place order (POST /orders, then the chosen
+/// prescription is sent with it) → payment → confirmed.
+/// [rxFix]: the order is placed but the chosen prescription could not go with
+/// it; the buyer chooses or uploads another one.
+enum CheckoutStep { address, prescription, review, rxFix, payment, confirmed }
 
 /// Step-bar labels; the prescription step appears only for Rx orders.
 List<String> checkoutBarLabels(bool hasRx) => hasRx
-    ? const ['Address', 'Review', 'Prescription', 'Payment']
+    ? const ['Address', 'Prescription', 'Review', 'Payment']
     : const ['Address', 'Review', 'Payment'];
+
+/// Where the bottom button leads (before the order exists, review places it).
+CheckoutStep checkoutNextStep(CheckoutStep step, {required bool hasRx}) => switch (step) {
+      CheckoutStep.address => hasRx ? CheckoutStep.prescription : CheckoutStep.review,
+      CheckoutStep.prescription => CheckoutStep.review,
+      CheckoutStep.review => CheckoutStep.payment,
+      CheckoutStep.rxFix => CheckoutStep.payment,
+      CheckoutStep.payment => CheckoutStep.confirmed,
+      CheckoutStep.confirmed => CheckoutStep.confirmed,
+    };
+
+/// Where Back leads inside checkout, or null to leave the checkout screen.
+/// Once the order is placed, address and prescription can no longer change.
+CheckoutStep? checkoutPreviousStep(CheckoutStep step, {required bool hasRx, required bool orderPlaced}) => switch (step) {
+      CheckoutStep.address => null,
+      CheckoutStep.prescription => CheckoutStep.address,
+      CheckoutStep.review => orderPlaced ? null : (hasRx ? CheckoutStep.prescription : CheckoutStep.address),
+      CheckoutStep.rxFix => null,
+      CheckoutStep.payment => CheckoutStep.review,
+      CheckoutStep.confirmed => null,
+    };
 
 extension CheckoutStepX on CheckoutStep {
   /// Position in the step bar (-1 once confirmed; the bar is then hidden).
   int barIndex(bool hasRx) => switch (this) {
         CheckoutStep.address => 0,
-        CheckoutStep.review => 1,
-        CheckoutStep.prescription => 2,
+        CheckoutStep.prescription || CheckoutStep.rxFix => 1,
+        CheckoutStep.review => hasRx ? 2 : 1,
         CheckoutStep.payment => hasRx ? 3 : 2,
         CheckoutStep.confirmed => -1,
       };
 
   /// Bottom-button label; amounts are the server's figures.
-  String buttonLabel({required int totalPaise, required bool orderPlaced}) => switch (this) {
-        CheckoutStep.address => 'Review order',
-        CheckoutStep.review => orderPlaced ? 'Continue' : 'Place order',
-        CheckoutStep.prescription => 'Continue to payment',
+  String buttonLabel({
+    required int totalPaise,
+    required bool orderPlaced,
+    bool hasRx = false,
+    bool rxChosen = false,
+  }) =>
+      switch (this) {
+        CheckoutStep.address => hasRx ? 'Continue to prescription' : 'Review order',
+        CheckoutStep.prescription => rxChosen ? 'Continue to review' : 'Choose or upload a prescription',
+        CheckoutStep.review => orderPlaced ? 'Continue to payment' : 'Place order and pay',
+        CheckoutStep.rxFix => rxChosen ? 'Continue to payment' : 'Choose or upload a prescription',
         CheckoutStep.payment => 'Pay ${formatPrice(totalPaise)} securely',
         CheckoutStep.confirmed => '',
       };
+}
+
+/// What happened when the order was placed.
+class PlaceOutcome {
+  final PlacedOrder order;
+  final CheckoutStep next; // payment, or rxFix when the prescription did not go with it
+  final String? rxError;
+  const PlaceOutcome(this.order, this.next, [this.rxError]);
+}
+
+/// Places the order, then sends the prescription chosen earlier with it — the
+/// web's order of calls: POST /orders, then POST /prescriptions/:id/use-for-order
+/// (C-08). A refusal of the prescription never undoes the order: the buyer
+/// chooses another one for it ([CheckoutStep.rxFix]).
+Future<PlaceOutcome> placeOrderThenAttachRx({
+  required Future<PlacedOrder> Function() place,
+  required Future<void> Function(String orderId) attach,
+  required bool rxChosen,
+  required String Function(Object error) errorText,
+}) async {
+  final order = await place();
+  if (!order.requiresPrescription) return PlaceOutcome(order, CheckoutStep.payment);
+  return attachRxToPlacedOrder(order, attach: attach, rxChosen: rxChosen, errorText: errorText);
+}
+
+/// Sends the chosen prescription with an order already placed (also the retry
+/// from [CheckoutStep.rxFix]).
+Future<PlaceOutcome> attachRxToPlacedOrder(
+  PlacedOrder order, {
+  required Future<void> Function(String orderId) attach,
+  required bool rxChosen,
+  required String Function(Object error) errorText,
+}) async {
+  final number = order.orderNumber ?? '';
+  if (!rxChosen || order.id == null) {
+    return PlaceOutcome(order, CheckoutStep.rxFix, 'Please choose or upload a prescription for order $number.');
+  }
+  try {
+    await attach(order.id!);
+    return PlaceOutcome(order, CheckoutStep.payment);
+  } catch (e) {
+    return PlaceOutcome(order, CheckoutStep.rxFix,
+        '${errorText(e)} Please choose or upload another one for order $number.');
+  }
 }
 
 /// The order as returned by POST /orders. Held in memory for the rest of

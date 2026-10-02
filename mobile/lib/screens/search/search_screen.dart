@@ -39,6 +39,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  // The home search box opens this tab with ?q= (Sprint 32); a new query replaces the old one
+  @override
+  void didUpdateWidget(covariant SearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialQuery != oldWidget.initialQuery && widget.initialQuery.trim().isNotEmpty) {
+      _debounce?.cancel();
+      _controller.text = widget.initialQuery;
+      _query = widget.initialQuery.trim();
+    }
+  }
+
   void _clear() {
     _debounce?.cancel();
     _controller.clear();

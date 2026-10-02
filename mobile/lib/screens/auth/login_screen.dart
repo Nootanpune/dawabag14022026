@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../config/password_gate.dart';
 import '../../config/theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -35,14 +36,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      final role = ref.read(authProvider).user?['role'];
-      if (role == 'admin' || role == 'super_admin') {
-        context.go('/admin');
-      } else if (role == 'doctor') {
-        context.go('/doctor/portal');
-      } else {
-        context.go('/');
-      }
+      final auth = ref.read(authProvider);
+      final role = auth.user?['role'];
+      final home = role == 'admin' || role == 'super_admin'
+          ? '/admin'
+          : role == 'doctor'
+              ? '/doctor/portal'
+              : '/';
+      // A temporary password from Dawabag's admin is replaced first (Sprint 32)
+      context.go(auth.mustChangePassword ? changePasswordLocation(required: true, next: home) : home);
     } else {
       final error = ref.read(authProvider).error;
       if (error?.contains('OTP') == true) {

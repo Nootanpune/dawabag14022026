@@ -4,6 +4,7 @@ import '../../../config/theme.dart';
 import '../../../models/checkout_summary.dart';
 import 'review_charges_card.dart';
 import 'review_shipment_card.dart';
+import 'rx_policy_note.dart';
 
 /// Review before placing the order (C-35): one block per seller, the charge
 /// break-up, returns note and policy links, all from POST /orders/preview.
@@ -15,6 +16,10 @@ class ReviewStep extends StatelessWidget {
   final bool declared;
   final ValueChanged<bool> onDeclared;
   final bool orderPlaced;
+  /// The prescription chosen for this order, e.g. "photo uploaded 02 Oct 2026, 9:56 am" (C-08)
+  final String? rxLabel;
+  /// Back to the prescription step (only before the order is placed)
+  final VoidCallback? onChangeRx;
 
   const ReviewStep({
     super.key,
@@ -23,6 +28,8 @@ class ReviewStep extends StatelessWidget {
     required this.declared,
     required this.onDeclared,
     required this.orderPlaced,
+    this.rxLabel,
+    this.onChangeRx,
   });
 
   @override
@@ -45,6 +52,12 @@ class ReviewStep extends StatelessWidget {
           ),
         for (var i = 0; i < s.shipments.length; i++)
           ReviewShipmentCard(shipment: s.shipments[i], index: i, count: s.shipments.length),
+        if (rxLabel != null) ...[
+          RxAttachedNote(label: rxLabel!, onChange: orderPlaced ? null : onChangeRx),
+          const SizedBox(height: 8),
+          const RxPolicyNote(),
+          const SizedBox(height: 12),
+        ],
         ReviewChargesCard(summary: s),
         if (isPractitioner) ...[
           const SizedBox(height: 8),
