@@ -26,6 +26,30 @@ export async function contentQueue() {
      ORDER BY updated_at LIMIT 200`), 'image_key');
 }
 
+/**
+ * A change to a live product's buyer copy (e.g. the description added after a new
+ * product was approved, Sprint 31): saved, hidden from buyers and sent back to the
+ * pharmacist's "Product copy" queue — the same as an edit in the product form (C-19).
+ */
+export async function changeLiveCopyTx(client: PoolClient, userId: string, productId: string,
+  changes: Partial<Record<(typeof COPY_FIELDS)[number], string | null>>) {
+  const keys = (Object.keys(changes) as (typeof COPY_FIELDS)[number][]).filter((k) => (COPY_FIELDS as readonly string[]).includes(k));
+  const p = (await client.query(`SELECT * FROM products WHERE id = $1 FOR UPDATE`, [productId])).rows[0];
+  if (!p) throw new AppError('Product not found', 404);
+  if (p.catalogue_state !== 'live') throw new AppError('Only a product in the catalogue has copy for buyers', 409);
+  const changed = keys.filter((k) => (p[k] ?? null) !== (changes[k] ?? null));
+  if (!changed.length) return { id: productId, content_status: p.content_status as string, changed: false };
+  const after = { ...p, ...changes };
+  await client.query(
+    `UPDATE products SET ${changed.map((k, i) => `${k} = $${i + 3}`).join(', ')}, content_status = 'pending_review',
+            content_flags = $2, updated_at = NOW() WHERE id = $1`,
+    [productId, JSON.stringify(copyFlags(after)), ...changed.map((k) => changes[k] ?? null)]);
+  await writeAuditTx(client, { userId: null, action: 'product_copy_changed', performedBy: userId,
+    oldValue: Object.fromEntries(changed.map((k) => [k, p[k] ?? null])),
+    newValue: { product_id: productId, ...Object.fromEntries(changed.map((k) => [k, changes[k] ?? null])) } });
+  return { id: productId, content_status: 'pending_review', changed: true };
+}
+
 export async function reviewContent(pharmacistId: string, productId: string, approve: boolean, notes: string) {
   return withTransaction((client) => reviewContentTx(client, pharmacistId, productId, approve, notes));
 }

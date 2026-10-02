@@ -3,7 +3,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { createDraftsFromRequests, MAX_DRAFT_BATCH } from '../services/catalogueDrafts/create.service';
-import { bulkSetDrafts, draftOptions, getDraft, listDrafts, saveDraft } from '../services/catalogueDrafts/queue.service';
+import { bulkSetDrafts, draftOptions, getDraft, listDrafts, saveDraft, saveDraftDescription } from '../services/catalogueDrafts/queue.service';
 import { approveDraft, rejectDraft } from '../services/catalogueDrafts/decide.service';
 import { DOSAGE_FORMS, GST_RATES, HSN_RE, SCHEDULES } from '../services/catalogueDrafts/rules';
 
@@ -45,7 +45,7 @@ export async function getDrafts(req: Request, res: Response, next: NextFunction)
 }
 
 export async function getDraftOptions(_req: Request, res: Response, next: NextFunction) {
-  try { res.json({ success: true, data: await draftOptions() }); } catch (err) { next(err); }
+  try { res.json({ success: true, data: draftOptions() }); } catch (err) { next(err); }
 }
 
 export async function getOneDraft(req: Request, res: Response, next: NextFunction) {
@@ -76,6 +76,15 @@ const saveSchema = z.object({
 export async function patchDraft(req: Request, res: Response, next: NextFunction) {
   try {
     res.json({ success: true, data: await saveDraft(uuid.parse(req.params.productId), req.user!.id, saveSchema.parse(req.body ?? {})) });
+  } catch (err) { next(err); }
+}
+
+// Sprint 31: the description for buyers at any time — optional when saving and approving;
+// on an approved product the change goes back to the pharmacist's copy review (C-19)
+export async function patchDraftDescription(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { description } = z.object({ description: text(2000) }).strict().parse(req.body ?? {});
+    res.json({ success: true, data: await saveDraftDescription(uuid.parse(req.params.productId), req.user!.id, description) });
   } catch (err) { next(err); }
 }
 

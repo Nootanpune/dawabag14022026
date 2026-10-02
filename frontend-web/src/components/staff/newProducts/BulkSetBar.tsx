@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { BULK_FIELDS, type BulkKey } from '@/lib/admin/catalogueDrafts';
+import CategoryPicker from '@/components/catalogueLists/CategoryPicker';
+import HsnPicker from '@/components/catalogueLists/HsnPicker';
 import { useBulkSet } from './useDraftActions';
 
 /** "Set for all chosen": non-clinical details only. The schedule is never set in bulk. */
@@ -9,7 +11,6 @@ export default function BulkSetBar({ ids, onDone, onClear }: { ids: string[]; on
   const [value, setValue] = useState('');
   const bulk = useBulkSet(() => { setValue(''); onDone(); });
   if (!ids.length) return null;
-  const list = key === 'category' ? 'draft-categories' : key === 'hsn_code' ? 'draft-hsn' : undefined;
 
   return (
     <form
@@ -20,13 +21,22 @@ export default function BulkSetBar({ ids, onDone, onClear }: { ids: string[]; on
       <p className="text-sm font-medium w-full sm:w-auto">{ids.length} chosen — set for all:</p>
       <div className="text-xs">
         <label htmlFor="bulk-key" className="block text-gray-700">Detail</label>
-        <select id="bulk-key" value={key} onChange={(e) => setKey(e.target.value as BulkKey)} className="input text-sm py-1.5">
+        <select id="bulk-key" value={key} onChange={(e) => { setKey(e.target.value as BulkKey); setValue(''); }} className="input text-sm py-1.5">
           {BULK_FIELDS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
         </select>
       </div>
       <div className="text-xs flex-1 min-w-[10rem]">
-        <label htmlFor="bulk-value" className="block text-gray-700">Value</label>
-        <input id="bulk-value" value={value} onChange={(e) => setValue(e.target.value)} list={list} className="input text-sm py-1.5" />
+        {/* Category and HSN come from their lists (Alt+C / "+ New" adds one, Sprint 31) */}
+        {key === 'category' ? (
+          <CategoryPicker id="bulk-value" label="Value" value={value || null} onChange={(v) => setValue(v ?? '')} />
+        ) : key === 'hsn_code' ? (
+          <HsnPicker id="bulk-value" label="Value" value={value || null} onChange={(v) => setValue(v ?? '')} />
+        ) : (
+          <>
+            <label htmlFor="bulk-value" className="block text-gray-700">Value</label>
+            <input id="bulk-value" value={value} onChange={(e) => setValue(e.target.value)} className="input text-sm py-1.5" />
+          </>
+        )}
       </div>
       <button type="submit" disabled={bulk.isPending} className="btn-primary text-sm py-1.5 px-3 disabled:opacity-50">Set</button>
       <button type="button" onClick={onClear} className="btn-outline text-sm py-1.5 px-3">Clear choice</button>

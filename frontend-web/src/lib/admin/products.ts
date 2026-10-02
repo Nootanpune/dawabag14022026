@@ -4,7 +4,8 @@
 import api from '../api';
 import type { ProductDetail } from '../products/api';
 
-export const DRUG_SCHEDULES = ['OTC', 'Schedule G', 'Schedule H', 'Schedule H1', 'Schedule X', 'NDPS'] as const;
+// 'Non-scheduled' (Sprint 31): in no schedule — no prescription, sold online; not the same as OTC
+export const DRUG_SCHEDULES = ['OTC', 'Non-scheduled', 'Schedule G', 'Schedule H', 'Schedule H1', 'Schedule X', 'NDPS'] as const;
 export type DrugSchedule = (typeof DRUG_SCHEDULES)[number];
 
 export interface AdminProductRow {
@@ -39,7 +40,6 @@ export type ProductBody = Record<string, string | number | boolean | null>;
 export const adminProductKeys = {
   list: (q: string, page: number) => ['admin', 'products', q, page] as const,
   one: (id: string) => ['admin', 'products', 'one', id] as const,
-  categories: ['products', 'categories'] as const,
 };
 
 /** GET /products/admin/list — every product, active or not, for admins. */
@@ -49,12 +49,6 @@ export async function fetchAdminProducts(q: string, page: number, limit = 20): P
     products: data.data?.products ?? [],
     pagination: data.data?.pagination ?? { page, limit, total: 0, pages: 0 },
   };
-}
-
-export async function fetchCategories(): Promise<string[]> {
-  const { data } = await api.get('/products/categories');
-  const rows: { category: string | null }[] = Array.isArray(data.data) ? data.data : [];
-  return rows.map((r) => r.category).filter((c): c is string => !!c);
 }
 
 /** Full admin record (GET /products/:id/admin): all prices, limits, status and copy. */

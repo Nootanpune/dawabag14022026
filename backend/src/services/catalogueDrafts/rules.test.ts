@@ -24,9 +24,17 @@ describe('approvalProblems', () => {
     expect(approvalProblems({ ...complete, gst_rate: 7 }, true).join(' ')).toMatch(/GST/);
     expect(approvalProblems({ ...complete, gst_rate: null }, true).join(' ')).toMatch(/GST/);
   });
-  it('the C-17 declarations and a description are needed for a listed product', () => {
+  it('the C-17 declarations are needed for a listed product', () => {
     const p = approvalProblems({ ...complete, manufacturer_address: null, description: '', net_quantity: null }, true);
-    expect(p).toEqual(expect.arrayContaining(['Add the manufacturer address', 'Add a short description for buyers', 'Add the net quantity (pack)']));
+    expect(p).toEqual(expect.arrayContaining(['Add the manufacturer address', 'Add the net quantity (pack)']));
+  });
+  it('the description for buyers is optional (Sprint 31) but, when written, says something', () => {
+    expect(approvalProblems({ ...complete, description: null }, true)).toEqual([]);
+    expect(approvalProblems({ ...complete, description: '   ' }, true)).toEqual([]);
+    expect(approvalProblems({ ...complete, description: 'Tab.' }, true).join(' ')).toMatch(/at least 10 characters, or leave it empty/);
+  });
+  it('Non-scheduled is a schedule like any other listed one (Sprint 31)', () => {
+    expect(approvalProblems({ ...complete, drug_schedule: 'Non-scheduled' }, true)).toEqual([]);
   });
   it('Schedule X / NDPS need only the generic name: they are never listed (C-10)', () => {
     const bare = { ...complete, drug_schedule: 'Schedule X', category: null, hsn_code: null, description: null, manufacturer_address: null };
@@ -37,7 +45,7 @@ describe('approvalProblems', () => {
 
 describe('prescriptionFor (derived from the schedule, C-08)', () => {
   it.each([
-    ['OTC', 'not needed'], ['Schedule G', 'not needed'], ['Schedule H', 'needed'], ['Schedule H1', 'needed'],
+    ['OTC', 'not needed'], ['Non-scheduled', 'not needed'], ['Schedule G', 'not needed'], ['Schedule H', 'needed'], ['Schedule H1', 'needed'],
     ['Schedule X', 'never sold online'], ['NDPS', 'never sold online'], [null, null],
   ])('%s → %s', (s, want) => expect(prescriptionFor(s)).toBe(want));
 });
@@ -58,6 +66,11 @@ describe('draftWarnings', () => {
   });
   it('a claim in the copy is pointed out (C-19)', () => {
     expect(draftWarnings({ ...complete, description: 'Cures diabetes permanently.' }).join(' ')).toMatch(/claim/);
+  });
+  it('an HSN whose usual GST differs from the product is pointed out, GST unchanged (Sprint 31)', () => {
+    expect(draftWarnings({ ...complete, hsn_gst_rate: 12 }).join(' ')).toMatch(/HSN 30049099 usually has GST 12%, but this product is set to 5%/);
+    expect(draftWarnings({ ...complete, hsn_gst_rate: 5 })).toEqual([]);
+    expect(draftWarnings({ ...complete, hsn_gst_rate: null })).toEqual([]);
   });
   it('clean copy has no warnings', () => {
     expect(draftWarnings(complete)).toEqual([]);

@@ -18,6 +18,11 @@ describe('catalogue import rows', () => {
     const r = checkProduct({ ...base, manufacturer_address: '' });
     expect(r.record?.is_active).toBe(false);
   });
+  it.each(['Non-scheduled', 'non scheduled', 'NONSCHEDULED', 'NS', 'Non  Scheduled'])('reads "%s" as Non-scheduled (Sprint 31), not OTC', (v) => {
+    const r = checkProduct({ ...base, drug_schedule: v });
+    expect(r.errors).toEqual([]);
+    expect(r.record).toMatchObject({ drug_schedule: 'Non-scheduled', is_active: true });
+  });
   it('never lists Schedule X for sale', () => {
     expect(checkProduct({ ...base, drug_schedule: 'Schedule X' }).record?.is_active).toBe(false);
   });

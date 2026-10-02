@@ -33,6 +33,11 @@ export default function EditProductPage() {
               Product copy is waiting for pharmacist approval (C-19); the description is hidden until then — leave it blank to keep it.
             </p>
           )}
+          {data.content_reviewed && !data.description && (
+            <p className="text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-2 mb-3" data-testid="no-description">
+              No description yet — add one under Product copy below (optional). A pharmacist approves it before buyers see it (C-19).
+            </p>
+          )}
           <ProductPhotoPanel
             productId={id}
             name={data.name}

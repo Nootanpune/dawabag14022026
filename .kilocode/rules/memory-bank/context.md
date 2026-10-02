@@ -10,6 +10,55 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 31 — queue quick-create (Alt+C) and optional buyer copy (2026-10-02, uncommitted)
+Owner, for "New products to complete": "Category — create new by ALT+C", "HSN code — create new
+by ALT+C", "Description for buyers — enter it while editing after save, not mandatory while save",
+"Drug schedule, create new Non scheduled also".
+- Before: products.category / hsn_code were free text; pick-lists were "what live products use"
+  (datalists). Now DB `26_sprint31_catalogue_lists.sql`: `product_categories` (name, generated
+  name_key = lower + collapsed spaces, UNIQUE; is_active, created_by/at) and `hsn_codes` (code PK
+  CHECK 4/6/8 digits, description, usual gst_rate slab or NULL, is_active, created_by/at), both
+  back-filled from products (HSN with its most common GST). Trigger `products_catalogue_lists`
+  (BEFORE INSERT/UPDATE OF category, hsn_code) spells a product's category as listed and adds
+  any new category / valid HSN from other paths (import, seed, fixtures). products keep the
+  name/code (shop filters by name). products_drug_schedule_check now includes 'Non-scheduled'.
+- `services/catalogueLists/` rules (pure: tidyName, categoryKey, categoryNameProblems 2–60 chars,
+  letters/marks/digits & , . - ' ( ) / +; tidyHsn, hsnProblems, findDuplicateCategory,
+  hsnGstMismatch; GST_RATES / HSN_RE now live here, re-exported by catalogueDrafts/rules) and
+  lists.service (list, create — duplicate returns the existing entry + note, an HSN taken from
+  the catalogue without words gets them filled; requireCategory / requireHsn for the queue;
+  registerFromProductForm for POST/PATCH /products: admins' new names are added, audited).
+  Audit: product_category_created / _reactivated, hsn_code_created / _completed (C-46).
+- API `/catalogue-lists/categories` and `/hsn-codes` (GET, POST; pharmacist_rx/admin/super_admin).
+  Queue PATCH and bulk-set refuse a category / HSN not in the list ("add it with + New (Alt+C)");
+  `/catalogue-drafts/options` now only schedules/forms/GST. Draft view joins hsn_codes →
+  hsn_gst_rate; draftWarnings adds "HSN x usually has GST y%, but this product is set to z%"
+  (GST never changed).
+- Description: no longer required to approve (no C-17/C-19 code rule needs one; the product form
+  never did); if written it must be ≥10 chars. `PATCH /catalogue-drafts/:id/description`: open
+  draft = ordinary save; approved = `changeLiveCopyTx` (productContent.service: content_status
+  pending_review + flags + audit product_copy_changed) → Product copy queue (C-19); not_listed →
+  409. Admin product page edits it as before (same C-19 path) and says "No description yet".
+- Non-scheduled: SCHEDULES / product z.enum / web DRUG_SCHEDULES; import accepts non-scheduled,
+  non scheduled, nonscheduled, NS; Rx logic unchanged (only H/H1 need a prescription); NOT put in
+  telemedicine List O automatically (trigger keeps OTC only, C-23). Web badge "Non-scheduled"
+  (neutral); mobile `utils/drug_schedule.dart` (isRxSchedule etc.) for badges / order lines.
+- Web: `components/catalogueLists/` SearchableSelect (ARIA combobox, accepts list entries only,
+  "+ Add …" option), QuickCreateArea (Alt+C / Option+C inside the field only, preventDefault
+  only when our dialog opens; ignores keys typed in the dialog), NewButton "+ New" (title
+  "New … (Alt+C)"), QuickCreateHint, NewCategoryDialog / NewHsnDialog (portals — the field can
+  sit inside a form), CategoryPicker / HsnPicker ("File says … use it / add it to the list and
+  use it", GST note), `lib/catalogueLists.ts`. Used in DraftFieldsGrid, BulkSetBar and the admin
+  ProductForm (ProductFieldGrid `custom`). DraftCard: "No description yet — add one";
+  BuyerDescription on approved rows. fetchCategories (lib/admin/products) removed.
+- Tests: jest catalogueLists/rules (8) + drafts rules / import / customerType additions;
+  `test/sprint31.smoke.mjs` (41 checks, in test:smoke; sprint29 smoke now adds its category/HSN
+  first and approves without a description); Playwright partnerDrafts (Alt+C desktop, "+ New"
+  phone, approve without description, add it after, Non-scheduled) and admin.spec (form Alt+C);
+  flutter drug_schedule_test.
+- Not built: renaming / deactivating list entries in the UI (is_active exists); HSN master data
+  import; per-category tiles in the shop from the list.
+
 ## Sprint 30 — drug licences for every party (2026-10-02, uncommitted)
 Owner: "All the Drug Licences should be saved and displayed" — retailers, wholesalers,
 suppliers/companies, partners (first partner Nootan Pharmaceuticals, Pune: 20, 21, 20B, 21B).

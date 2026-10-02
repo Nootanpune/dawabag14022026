@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import {
-  approveDraft, bulkSetDrafts, draftKeys, rejectDraft, saveDraft, type BulkKey, type Draft, type DraftList, type DraftPatch,
+  approveDraft, bulkSetDrafts, draftKeys, rejectDraft, saveDraft, saveDraftDescription, type BulkKey, type Draft, type DraftList, type DraftPatch,
 } from '@/lib/admin/catalogueDrafts';
 
 /** Save / approve / reject for one draft; the list is refreshed from the server's answer. */
@@ -31,7 +31,16 @@ export function useDraftActions(draftId: string) {
     onSuccess: () => { toast.success('Closed: not listed'); refreshAll(); },
     onError: (e) => toast.error(getApiErrorMessage(e, 'Could not close it')),
   });
-  return { save, approve, reject };
+  const describe = useMutation({
+    mutationFn: (description: string | null) => saveDraftDescription(draftId, description),
+    onSuccess: (d) => {
+      replace(d);
+      toast.success(d.status === 'open' ? 'Description saved'
+        : 'Description saved: buyers see it once a pharmacist approves it in Product copy (C-19)');
+    },
+    onError: (e) => toast.error(getApiErrorMessage(e, 'Could not save the description')),
+  });
+  return { save, approve, reject, describe };
 }
 
 export function useBulkSet(onDone: () => void) {

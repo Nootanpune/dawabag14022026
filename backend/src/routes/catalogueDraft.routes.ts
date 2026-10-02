@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
-  getDraftOptions, getDrafts, getOneDraft, patchDraft, postApproveDraft, postBulkSet, postRejectDraft,
+  getDraftOptions, getDrafts, getOneDraft, patchDraft, patchDraftDescription, postApproveDraft, postBulkSet, postRejectDraft,
 } from '../controllers/catalogueDraft.controller';
 
 const router = Router();
@@ -17,6 +17,7 @@ router.get('/options', staff, getDraftOptions);
 router.post('/bulk', staff, postBulkSet);
 router.get('/:productId', staff, getOneDraft);
 router.patch('/:productId', staff, patchDraft);
+router.patch('/:productId/description', staff, patchDraftDescription);   // Sprint 31, C-19 review when live
 router.post('/:productId/approve', authorize('pharmacist_rx'), postApproveDraft);   // C-19
 router.post('/:productId/reject', staff, postRejectDraft);
 

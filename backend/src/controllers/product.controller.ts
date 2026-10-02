@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { query, queryOne } from '../config/database';
+import { query, queryOne, withTransaction } from '../config/database';
 import { cacheGet, cacheSet } from '../config/redis';
 import { AppError } from '../utils/AppError';
 import { writeAudit } from '../utils/audit';
@@ -11,6 +11,8 @@ import { COPY_FIELDS, contentQueue, copyFlags, reviewContent } from '../services
 import { withImageUrls } from '../services/productImage.service';
 import { parseSearchSort, searchCatalogue } from '../services/search/productSearch.service';
 import { didYouMean } from '../services/search/didYouMean';
+import { registerFromProductForm } from '../services/catalogueLists/lists.service';
+import { SCHEDULES } from '../services/catalogueDrafts/rules';
 
 // ─── Search Products ─────────────────────────────────────────────────────────
 export async function searchProducts(req: Request, res: Response, next: NextFunction) {
@@ -112,7 +114,7 @@ const productFields = {
   name: z.string().min(2).max(500),
   generic_name: z.string().max(500).nullable().optional(),
   category: z.string().min(2).max(100),
-  drug_schedule: z.enum(['OTC', 'Schedule G', 'Schedule H', 'Schedule H1', 'Schedule X', 'NDPS']),
+  drug_schedule: z.enum(SCHEDULES),   // incl. 'Non-scheduled' (Sprint 31)
   hsn_code: z.string().regex(/^\d{4,8}$/, 'HSN must be 4–8 digits').nullable().optional(),
   gst_rate: z.number().int().min(0).max(28),
   marketed_by: z.string().max(255).nullable().optional(),
@@ -171,6 +173,8 @@ export async function createProduct(req: Request, res: Response, next: NextFunct
 
     const existing = await queryOne('SELECT id FROM products WHERE sku = $1', [data.sku]);
     if (existing) throw new AppError('SKU already exists', 409);
+    // Category / HSN spelled as in their lists; a new one is added with an audit entry (Sprint 31, C-46)
+    Object.assign(data, await withTransaction((c) => registerFromProductForm(c, req.user!.id, data)));
 
     // New copy waits for the pharmacist (C-19); likely forbidden claims are flagged for them
     const row: Record<string, unknown> = { ...data, content_status: 'pending_review', content_flags: JSON.stringify(copyFlags(data)) };
@@ -204,6 +208,9 @@ export async function updateProduct(req: Request, res: Response, next: NextFunct
     }
     assertPrices({ ...before, ...updates });
     await assertBelowShelfMrp(productId, { ...before, ...updates });
+    // Category / HSN spelled as in their lists; a new one is added with an audit entry (Sprint 31, C-46)
+    Object.assign(updates, await withTransaction((c) => registerFromProductForm(c, req.user!.id,
+      { category: updates.category, hsn_code: updates.hsn_code, gst_rate: updates.gst_rate ?? before.gst_rate })));
 
     // Changed copy goes back to the pharmacist (C-19)
     const copyChanged = COPY_FIELDS.some((k) => k in updates && (updates as any)[k] !== before[k]);

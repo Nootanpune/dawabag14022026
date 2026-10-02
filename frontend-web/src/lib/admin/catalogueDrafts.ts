@@ -39,6 +39,10 @@ export interface Draft {
   country_of_origin: string | null;
   mrp_paise: number;
   status: 'open' | 'approved' | 'not_listed' | 'rejected';
+  /** C-19 copy review of the live product: 'pending_review' while a changed description waits for the pharmacist */
+  content_status: string | null;
+  /** the usual GST rate of the chosen HSN in the HSN list (Sprint 31) */
+  hsn_gst_rate: number | null;
   from_file: FromFileEntry & { requests?: FromFileEntry[] };
   decided_at: string | null;
   decided_by_name: string | null;
@@ -71,8 +75,6 @@ export interface DraftOptions {
   schedules: string[];
   dosage_forms: string[];
   gst_rates: number[];
-  categories: string[];
-  hsn_codes: { hsn_code: string; n: number }[];
 }
 
 export type DraftPatch = Partial<Pick<Draft, 'name' | 'generic_name' | 'composition' | 'strength' | 'dosage_form' | 'drug_schedule'
@@ -116,6 +118,12 @@ export async function fetchDraftOptions(): Promise<DraftOptions> {
 
 export async function saveDraft(id: string, patch: DraftPatch): Promise<Draft> {
   const { data } = await api.patch(`/catalogue-drafts/${id}`, patch);
+  return data.data;
+}
+
+/** The description for buyers at any time (Sprint 31): optional; on an approved product it goes back to the pharmacist (C-19). */
+export async function saveDraftDescription(id: string, description: string | null): Promise<Draft> {
+  const { data } = await api.patch(`/catalogue-drafts/${id}/description`, { description });
   return data.data;
 }
 

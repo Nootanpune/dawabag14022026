@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../config/theme.dart';
 import '../../../models/checkout_summary.dart';
+import '../../../utils/drug_schedule.dart';
 import '../../../utils/formatters.dart';
 
 /// One seller's block on the review step (C-35): seller of record, drug
@@ -102,7 +103,7 @@ class _LineRow extends StatelessWidget {
                   style: grey,
                 ),
                 Text(details, style: grey),
-                if (l.drugSchedule != null && l.drugSchedule!.isNotEmpty && l.drugSchedule != 'OTC')
+                if (isNotableSchedule(l.drugSchedule))
                   Text(l.drugSchedule!, style: grey.copyWith(color: Colors.orange.shade800)),
               ],
             ),

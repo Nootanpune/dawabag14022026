@@ -35,6 +35,7 @@ describe('requiresPrescription', () => {
     expect(requiresPrescription('customer', 'Schedule H')).toBe(true);
     expect(requiresPrescription('customer', 'Schedule H1')).toBe(true);
     expect(requiresPrescription('customer', 'OTC')).toBe(false);
+    expect(requiresPrescription('customer', 'Non-scheduled')).toBe(false);   // Sprint 31
   });
 
   it('exempts licensed buyers', () => {

@@ -27,6 +27,8 @@ const scheduleColors: Record<string, string> = {
   'Schedule H': 'badge-schedule-h',
   'Schedule H1': 'badge-schedule-h',
   'Schedule G': 'text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium',
+  // No prescription needed: a neutral badge (Sprint 31)
+  'Non-scheduled': 'text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium',
 };
 
 export default function ProductCard({ product }: Props) {

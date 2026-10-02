@@ -1,8 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { DRUG_SCHEDULES, adminProductKeys, fetchCategories } from '@/lib/admin/products';
+import { DRUG_SCHEDULES } from '@/lib/admin/products';
+import CategoryPicker from '@/components/catalogueLists/CategoryPicker';
+import HsnPicker from '@/components/catalogueLists/HsnPicker';
+import { QuickCreateHint } from '@/components/catalogueLists/QuickCreateArea';
 import {
   COPY_FIELDS,
   DECLARATION_FIELDS,
@@ -26,7 +28,6 @@ interface Props {
 /** Create / edit form for one catalogue product. */
 export default function ProductForm({ initial, editing, pending, error, fieldErrors, submitLabel, onSubmit }: Props) {
   const [v, setV] = useState<ProductFormValues>(initial);
-  const { data: categories } = useQuery({ queryKey: adminProductKeys.categories, queryFn: fetchCategories, staleTime: 300000 });
   const setText = (key: string, value: string) => setV((s) => ({ ...s, text: { ...s.text, [key]: value } }));
   const grid = { values: v.text, onChange: setText, editing, fieldErrors };
 
@@ -63,6 +64,9 @@ export default function ProductForm({ initial, editing, pending, error, fieldErr
           {(v.drug_schedule === 'Schedule X' || v.drug_schedule === 'NDPS') && (
             <span className="block text-xs text-amber-700 mt-1">Never sold online — it will not appear in the shop.</span>
           )}
+          {v.drug_schedule === 'Non-scheduled' && (
+            <span className="block text-xs text-gray-500 mt-1">In no schedule: no prescription needed, sold online (not the same as OTC).</span>
+          )}
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={v.cold_chain} onChange={(e) => setV({ ...v, cold_chain: e.target.checked })} />
@@ -74,10 +78,13 @@ export default function ProductForm({ initial, editing, pending, error, fieldErr
         </label>
       </section>
 
-      <ProductFieldGrid title="Product" fields={TEXT_FIELDS} listId={{ category: 'product-categories' }} {...grid} />
-      <datalist id="product-categories">
-        {categories?.map((c) => <option key={c} value={c} />)}
-      </datalist>
+      {/* Category and HSN come from the server's lists; Alt+C or "+ New" adds one (Sprint 31) */}
+      <ProductFieldGrid title="Product" fields={TEXT_FIELDS} {...grid} custom={{
+        category: <CategoryPicker id="product-category" value={v.text.category || null} onChange={(c) => setText('category', c ?? '')} />,
+        hsn_code: <HsnPicker id="product-hsn" value={v.text.hsn_code || null} productGst={v.text.gst_rate} hint="optional"
+          onChange={(c) => setText('hsn_code', c ?? '')} />,
+      }} />
+      <QuickCreateHint />
       <ProductFieldGrid
         title="Prices"
         note="Every price must be at or below MRP, and MRP at or below the NPPA ceiling where one applies (C-16)."

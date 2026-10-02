@@ -65,6 +65,8 @@ export async function cleanup() {
   await q('DELETE FROM cart_items WHERE product_id = ANY($1)', [products]);
   await q('DELETE FROM catalogue_drafts WHERE product_id = ANY($1)', [products]);
   await q('DELETE FROM products WHERE id = ANY($1)', [products]);
+  await q(`DELETE FROM audit_logs WHERE action = 'product_category_created' AND new_value->>'name' = 'S29 Smoke'`);
+  await q(`DELETE FROM product_categories WHERE name_key = 's29 smoke'`);
   await q('DELETE FROM users WHERE id = ANY($1)', [ids]);
   await q('DELETE FROM vendors WHERE id = ANY($1)', [vendorIds]);
   await q('DELETE FROM pincode_serviceability WHERE pincode = $1', [PIN]);
@@ -190,6 +192,9 @@ export async function run({ t, V, ids }) {
 
   r = await call('POST', '/catalogue-drafts/bulk', { token: t.pharmacist, body: { product_ids: [D.quortanil.id], set: { drug_schedule: 'OTC' } } });
   check('bulk-set refuses the schedule', invalid(r) && /drug_schedule/.test(r.json.message), r.json);
+  // Category and HSN come from their managed lists (Sprint 31): add them first
+  await call('POST', '/catalogue-lists/categories', { token: t.pharmacist, body: { name: 'S29 Smoke' } });
+  await call('POST', '/catalogue-lists/hsn-codes', { token: t.pharmacist, body: { code: '30049099', description: 'Other medicaments in measured doses', gst_rate: 12 } });
   r = await call('POST', '/catalogue-drafts/bulk', { token: t.pharmacist, body: { product_ids: [D.quortanil.id, D.velmira.id, D.xantrodex.id], set: {
     category: 'S29 Smoke', hsn_code: '30049099', manufacturer_name: 'S29 Remedies Pvt Ltd', manufacturer_address: 'Plot 29, Demo Industrial Area, Pune', country_of_origin: 'India',
   } } });
@@ -204,8 +209,9 @@ export async function run({ t, V, ids }) {
   r = await call('PATCH', `/catalogue-drafts/${D.quortanil.id}`, { token: t.pharmacist, body: {
     drug_schedule: 'OTC', generic_name: 'Quortanil', strength: '5 mg', dosage_form: 'Tablet', cold_chain: false,
   } });
-  check('saved as you go; prescription derived (OTC: not needed)', r.status === 200 && r.json.data?.requires_prescription === 'not needed'
-    && r.json.data.problems.join() === 'Add a short description for buyers' && r.json.data.suggested_description === 'Quortanil 5 mg tablet. Pack: 10 TAB.', r.json.data);
+  check('saved as you go; prescription derived (OTC: not needed); the description is optional (Sprint 31)', r.status === 200
+    && r.json.data?.requires_prescription === 'not needed' && r.json.data.problems.length === 0
+    && r.json.data.suggested_description === 'Quortanil 5 mg tablet. Pack: 10 TAB.', r.json.data);
   r = await call('PATCH', `/catalogue-drafts/${D.quortanil.id}`, { token: t.pharmacist, body: { name: 'Quortanil 5 mg Tablet', description: r.json.data.suggested_description } });
   check('ready to approve', r.status === 200 && r.json.data.problems.length === 0, r.json.data?.problems);
   r = await call('POST', `/catalogue-drafts/${D.quortanil.id}/approve`, { token: t.admin, body: {} });

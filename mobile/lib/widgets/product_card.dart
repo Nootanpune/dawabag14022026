@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../utils/formatters.dart';
 import 'product_image.dart';
+import '../utils/drug_schedule.dart';
 
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
@@ -17,7 +18,7 @@ class ProductCard extends StatelessWidget {
     final schedule = product['drug_schedule'] as String? ?? 'OTC';
     final inStock = product['in_stock'] as bool? ?? false;
     final discountPct = product['discount_pct'] as int? ?? 0;
-    final isH = schedule.contains('H');
+    final isH = isRxSchedule(schedule);   // Non-scheduled / OTC: plain badge (Sprint 31)
 
     return GestureDetector(
       onTap: onTap,

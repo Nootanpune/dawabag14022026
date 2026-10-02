@@ -1,4 +1,5 @@
 'use client';
+import type { ReactNode } from 'react';
 import type { FieldSpec } from '@/lib/admin/productForm';
 
 interface Props {
@@ -11,16 +12,26 @@ interface Props {
   editing?: boolean;
   fieldErrors?: Record<string, string>;
   listId?: Record<string, string>;
+  /** fields drawn by the caller (e.g. category / HSN pickers, Sprint 31) */
+  custom?: Record<string, ReactNode>;
 }
 
 /** One titled section of the product form. */
-export default function ProductFieldGrid({ title, note, fields, values, onChange, editing, fieldErrors = {}, listId = {} }: Props) {
+export default function ProductFieldGrid({ title, note, fields, values, onChange, editing, fieldErrors = {}, listId = {}, custom = {} }: Props) {
   return (
     <section className="card">
       <h2 className="font-semibold text-sm mb-1">{title}</h2>
       {note && <p className="text-xs text-gray-500 mb-3">{note}</p>}
       <div className="grid sm:grid-cols-2 gap-3 text-sm mt-2">
         {fields.map((f) => {
+          if (custom[f.key]) {
+            return (
+              <div key={f.key}>
+                {custom[f.key]}
+                {fieldErrors[f.key] && <span className="block text-xs text-red-500 mt-1">{fieldErrors[f.key]}</span>}
+              </div>
+            );
+          }
           // The admin record fills every field, so blanks are real changes (no 'keep' hint)
           const keepHint = '';
           const hint = [f.hint, keepHint, !f.required && !keepHint ? 'optional' : ''].filter(Boolean).join(' · ');

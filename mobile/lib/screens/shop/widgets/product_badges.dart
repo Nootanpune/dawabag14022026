@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../config/theme.dart';
+import '../../../utils/drug_schedule.dart';
 
 /// Schedule badge plus a cold-chain badge when the product needs it.
 class ProductBadges extends StatelessWidget {
@@ -10,7 +11,8 @@ class ProductBadges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isH = schedule.contains('H');
+    // Amber for prescription schedules; Non-scheduled and OTC are plain (Sprint 31)
+    final isH = isRxSchedule(schedule);
     return Wrap(
       spacing: 8,
       runSpacing: 6,

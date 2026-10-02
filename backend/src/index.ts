@@ -47,6 +47,7 @@ import returnRoutes from './routes/return.routes';
 import complianceRoutes from './routes/compliance.routes';
 import catalogueRoutes from './routes/catalogue.routes';
 import catalogueDraftRoutes from './routes/catalogueDraft.routes';
+import catalogueListRoutes from './routes/catalogueLists.routes';
 import accountsRoutes from './routes/accounts.routes';
 import purchasingRoutes from './routes/purchasing.routes';
 import stockControlRoutes from './routes/stockControl.routes';
@@ -173,6 +174,7 @@ app.use(`${api}/returns`, returnRoutes);
 app.use(`${api}/compliance`, complianceRoutes);
 app.use(`${api}/catalogue`, catalogueRoutes);
 app.use(`${api}/catalogue-drafts`, catalogueDraftRoutes);   // Sprint 29: new products to complete
+app.use(`${api}/catalogue-lists`, catalogueListRoutes);     // Sprint 31: categories and HSN codes
 app.use(`${api}/accounts`, accountsRoutes);
 app.use(`${api}/purchasing`, purchasingRoutes);
 app.use(`${api}/stock`, stockControlRoutes);

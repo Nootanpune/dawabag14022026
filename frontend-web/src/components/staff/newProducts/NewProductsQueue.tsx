@@ -10,6 +10,7 @@ import Pager from '@/components/admin/Pager';
 import DraftCard from './DraftCard';
 import DraftFiltersBar from './DraftFiltersBar';
 import BulkSetBar from './BulkSetBar';
+import { QuickCreateHint } from '@/components/catalogueLists/QuickCreateArea';
 
 const TABS = [
   { value: 'open', label: 'To complete' },
@@ -50,6 +51,7 @@ export default function NewProductsQueue() {
           </div>
         </div>
       )}
+      <div className="mb-3"><QuickCreateHint /></div>
       <StatusTabs tabs={TABS} value={filters.status} onChange={(status) => change({ status })} />
       <DraftFiltersBar filters={filters} companies={list.data?.companies ?? []} onChange={change} />
       {filters.status === 'open' && drafts.length > 0 && (
@@ -69,8 +71,6 @@ export default function NewProductsQueue() {
         ))}
       </ul>
       {list.data && <Pager page={list.data.page} limit={list.data.limit} total={list.data.total} onPage={(page) => setFilters((f) => ({ ...f, page }))} />}
-      <datalist id="draft-categories">{(options.data?.categories ?? []).map((c) => <option key={c} value={c} />)}</datalist>
-      <datalist id="draft-hsn">{(options.data?.hsn_codes ?? []).map((h) => <option key={h.hsn_code} value={h.hsn_code}>{`${h.n} products`}</option>)}</datalist>
     </div>
   );
 }

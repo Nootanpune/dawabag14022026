@@ -8,6 +8,7 @@ import Modal from '@/components/admin/Modal';
 import FromFilePanel from './FromFilePanel';
 import DraftFieldsGrid from './DraftFieldsGrid';
 import { useDraftActions } from './useDraftActions';
+import BuyerDescription from './BuyerDescription';
 
 const DONE_LABEL: Record<Draft['status'], string> = {
   open: 'To complete', approved: 'Approved — in the catalogue', not_listed: 'Approved — never sold online (C-10)', rejected: 'Not listed',
@@ -21,7 +22,7 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { save, approve, reject } = useDraftActions(draft.id);
+  const { save, approve, reject, describe } = useDraftActions(draft.id);
   const [rejecting, setRejecting] = useState(false);
   const [notesFor, setNotesFor] = useState(false);
   const [notes, setNotes] = useState('');
@@ -43,6 +44,12 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
         ) : null}
         {!open && <span className="text-xs font-medium">{DONE_LABEL[draft.status]}</span>}
       </div>
+      {open && !neverOnline && !draft.description && (
+        <button type="button" className="text-xs underline text-brand-700 mb-2"
+          onClick={() => document.getElementById(`d-${draft.id}-description`)?.focus()}>
+          No description yet — add one
+        </button>
+      )}
 
       <div className="grid gap-3 md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
         <FromFilePanel draft={draft} />
@@ -53,6 +60,10 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
             <p>{[draft.drug_schedule, draft.generic_name, draft.strength, draft.dosage_form, draft.category].filter(Boolean).join(' · ')}</p>
             {draft.decided_at && <p>Decided {formatDateTimeIST(draft.decided_at)}{draft.decided_by_name ? ` by ${draft.decided_by_name}` : ''}</p>}
             {draft.decision_note && <p>Note: {draft.decision_note}</p>}
+            {draft.status === 'approved' && (
+              <BuyerDescription draft={draft} pending={describe.isPending}
+                onSave={(text, done) => describe.mutate(text, { onSuccess: done })} />
+            )}
           </div>
         )}
       </div>

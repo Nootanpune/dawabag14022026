@@ -1,6 +1,9 @@
 // Sprint 29 — an admin turns partners' new-product requests into draft products in one
 // go; a pharmacist completes one in "New products to complete" and approves it, and
 // closes another as "not a medicine we list". Desktop and phone.
+// Sprint 31 — a new category and HSN code are added from the queue (Alt+C on desktop,
+// "+ New" on the phone), the product is saved and approved without a description and
+// one is added afterwards (back to the C-19 copy review); "Non-scheduled" is offered.
 // Data: vendor 'E2E S29 Partner <project>', made-up items 'E2E ZYLOPRIN…' / 'E2E GLIMMER…'
 // (company code E2EQ<project>); removed here and by the global cleanup (vendors 'E2E %',
 // drafts named 'E2E %').
@@ -13,6 +16,9 @@ test.describe.configure({ mode: 'serial' });
 
 let company = '';
 let vendorName = '';
+let project = '';
+let categoryName = '';
+let hsnCode = '';
 
 async function removeOld(c: ReturnType<typeof db>) {
   const vendors = (await c.query('SELECT id FROM vendors WHERE name = $1', [vendorName])).rows.map((r) => r.id);
@@ -27,10 +33,18 @@ async function removeOld(c: ReturnType<typeof db>) {
   await c.query('DELETE FROM catalogue_drafts WHERE product_id = ANY($1)', [products]);
   await c.query('DELETE FROM products WHERE id = ANY($1)', [products]);
   await c.query('DELETE FROM vendors WHERE id = ANY($1)', [vendors]);
+  // Sprint 31: the category and HSN code this project added
+  await c.query(`DELETE FROM audit_logs WHERE (action = 'product_category_created' AND new_value->>'name' = $1)
+                 OR (action IN ('hsn_code_created', 'hsn_code_completed') AND new_value->>'code' = $2)`, [categoryName, hsnCode]);
+  await c.query('DELETE FROM product_categories WHERE lower(name) = lower($1)', [categoryName]);
+  await c.query('DELETE FROM hsn_codes WHERE code = $1', [hsnCode]);
 }
 
 test.beforeAll(async ({}, info) => {
+  project = info.project.name;
   company = `E2EQ${info.project.name.toUpperCase()}`;
+  categoryName = `E2E Pain relief ${info.project.name}`;
+  hsnCode = info.project.name === 'phone' ? '99311902' : '99311901';
   vendorName = `E2E S29 Partner ${info.project.name}`;
   const c = db();
   await c.connect();
@@ -104,11 +118,27 @@ test('the pharmacist completes and approves one new product and closes another',
   const cards = page.getByRole('list', { name: 'New products' });
   await expect(cards.getByTestId('draft-card')).toHaveCount(2);
 
-  // Bulk: a non-clinical detail for both
+  // Sprint 31: the keyboard help for quick-create
+  await expect(page.getByTestId('quick-create-hint')).toContainText('Alt');
+
+  // Bulk: a non-clinical detail for both — a category not yet in the list is added on the spot
   await page.getByLabel('Choose all on this page').check();
   const bulk = page.getByRole('form', { name: 'Set for all chosen' });
   await bulk.getByLabel('Detail').selectOption('category');
-  await bulk.getByLabel('Value').fill('E2E Pain relief');
+  const value = bulk.getByRole('combobox', { name: 'Value' });
+  if (project === 'phone') {
+    await bulk.getByRole('button', { name: '+ New category' }).click();
+  } else {
+    await value.fill(categoryName);
+    await value.press('Alt+KeyC');   // Alt+C in the category field
+  }
+  const catDialog = page.getByRole('dialog').filter({ hasText: 'New category' });
+  await expect(catDialog).toBeVisible();
+  if (project === 'phone') await catDialog.getByLabel('Category name').fill(categoryName);
+  else await expect(catDialog.getByLabel('Category name')).toHaveValue(categoryName);
+  await catDialog.getByRole('button', { name: 'Add and choose' }).click();
+  await expect(page.getByText(`Category “${categoryName}” added and chosen`)).toBeVisible();
+  await expect(value).toHaveValue(categoryName);
   await bulk.getByRole('button', { name: 'Set', exact: true }).click();
   await expect(page.getByText('Set on 2 products')).toBeVisible();
 
@@ -117,25 +147,45 @@ test('the pharmacist completes and approves one new product and closes another',
   await expect(card.getByText(/Still needed: Choose the drug schedule/)).toBeVisible();
   await choose(page, card, 'Drug schedule', 'Schedule H');
   await expect(card.getByText('Prescription needed for patients (C-08)')).toBeVisible();
+  await expect(card.getByRole('combobox', { name: 'Category' })).toHaveValue(categoryName);
   await saveText(page, card, 'Generic name', 'Zyloprin');
   await saveText(page, card, 'Strength', '5 mg');
   await choose(page, card, 'Dosage form', 'Tablet');
   await choose(page, card, 'Cold chain (2–8 °C)', 'no');
-  await saveText(page, card, 'HSN code', '30049099');
   await choose(page, card, 'GST rate', '5');
+
+  // A new HSN code from the HSN field: Alt+C on desktop, "+ New" on the phone
+  const hsn = card.getByRole('combobox', { name: 'HSN code' });
+  if (project === 'phone') await card.getByRole('button', { name: '+ New HSN code' }).click();
+  else { await hsn.focus(); await hsn.press('Alt+KeyC'); }
+  const hsnDialog = page.getByRole('dialog').filter({ hasText: 'New HSN code' });
+  await expect(hsnDialog).toBeVisible();
+  await hsnDialog.getByLabel('HSN code').fill(hsnCode);
+  await hsnDialog.getByLabel('Short description').fill('E2E made-up medicaments');
+  await hsnDialog.getByLabel('Usual GST rate (optional)').selectOption('12');
+  await Promise.all([
+    page.waitForResponse((r) => /\/catalogue-drafts\/[0-9a-f-]{36}$/.test(r.url()) && r.request().method() === 'PATCH' && r.ok()),
+    hsnDialog.getByRole('button', { name: 'Add and choose' }).click(),
+  ]);
+  await expect(hsn).toHaveValue(new RegExp(`^${hsnCode}`));
+  // The HSN's usual GST (12%) differs from the product's (5%): a plain warning, GST unchanged
+  await expect(card.getByText(`HSN ${hsnCode} usually has GST 12%, but this product is set to 5%`)).toBeVisible();
+  await expect(card.getByLabel('GST rate', { exact: true })).toHaveValue('5');
+
   await saveText(page, card, 'Manufacturer name', 'E2E Zylo Remedies Pvt Ltd');
   await saveText(page, card, 'Manufacturer address', 'Plot 29, Demo Industrial Area, Pune 411026');
   await saveText(page, card, 'Country of origin', 'India');
-  await Promise.all([
-    page.waitForResponse((r) => /\/catalogue-drafts\//.test(r.url()) && r.request().method() === 'PATCH' && r.ok()),
-    card.getByRole('button', { name: /^Use: “Zyloprin 5 mg tablet/ }).click(),
-  ]);
+  // No description: saved and ready all the same (it is optional)
+  await expect(card.getByRole('button', { name: 'No description yet — add one' })).toBeVisible();
   await expect(card.getByText('Ready to approve')).toBeVisible();
   await card.getByRole('button', { name: 'Approve', exact: true }).click();
   await expect(page.getByText('Approved: now in the catalogue')).toBeVisible();
   await expect(cards.getByRole('listitem', { name: 'E2E ZYLOPRIN 5MG TAB' })).toHaveCount(0);
 
   const other = cards.getByRole('listitem', { name: 'E2E GLIMMER CREAM 20GM' });
+  // Sprint 31: "Non-scheduled" is offered and needs no prescription
+  await choose(page, other, 'Drug schedule', 'Non-scheduled');
+  await expect(other.getByText('No prescription needed')).toBeVisible();
   await other.getByRole('button', { name: 'Not a medicine we list' }).click();
   await page.getByRole('dialog').getByRole('textbox').fill('Cosmetic, not a medicine we list');
   await page.getByRole('dialog').getByRole('button', { name: 'Close it' }).click();
@@ -144,6 +194,14 @@ test('the pharmacist completes and approves one new product and closes another',
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(cards.getByText('Approved — in the catalogue')).toBeVisible();
   await expect(cards.getByText('Not listed', { exact: true })).toBeVisible();
+
+  // The description is added after approval; it goes back to the pharmacist's copy check (C-19)
+  const approved = cards.getByRole('listitem', { name: 'E2E ZYLOPRIN 5MG TAB' });
+  await approved.getByRole('button', { name: 'No description yet — add one' }).click();
+  await approved.getByLabel('Description for buyers (optional)').fill('Zyloprin 5 mg tablet. Pack: 10 TAB.');
+  await approved.getByRole('button', { name: 'Save description' }).click();
+  await expect(page.getByText(/Description saved: buyers see it once a pharmacist approves it/)).toBeVisible();
+  await expect(approved.getByText(/Waiting for a pharmacist to approve it in Product copy/)).toBeVisible();
 
   // Now a buyer finds the approved product; the closed one stays out
   const search = await call('GET', '/products/search?q=Zyloprin');

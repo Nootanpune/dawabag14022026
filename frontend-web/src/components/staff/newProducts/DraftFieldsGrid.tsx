@@ -1,5 +1,7 @@
 'use client';
 import { COLD_CHAIN_STORAGE, NEVER_ONLINE, type Draft, type DraftOptions, type DraftPatch } from '@/lib/admin/catalogueDrafts';
+import CategoryPicker from '@/components/catalogueLists/CategoryPicker';
+import HsnPicker from '@/components/catalogueLists/HsnPicker';
 import { DraftSelect, DraftText } from './DraftInputs';
 
 const RX_TEXT: Record<string, string> = {
@@ -60,14 +62,13 @@ export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
             <legend className="text-xs font-semibold text-gray-700 mb-1">Product and tax</legend>
             <DraftText id={id('name')} label="Product name" value={draft.name} {...common} className="sm:col-span-2"
               onSave={(v) => { if (v) onSave({ name: v }); }} />
-            <DraftText id={id('category')} label="Category" value={draft.category} list="draft-categories" maxLength={100} {...common}
-              onSave={(v) => onSave({ category: v })} />
+            <CategoryPicker id={id('category')} value={draft.category} {...common} onChange={(v) => onSave({ category: v })} />
             <DraftText id={id('pack')} label="Pack (net quantity)" value={draft.net_quantity} maxLength={50} {...common}
               onSave={(v) => onSave({ net_quantity: v })} />
-            <DraftText id={id('hsn')} label="HSN code" value={draft.hsn_code} list="draft-hsn" maxLength={8} {...common}
-              hint={draft.from_file.hsn_code && !draft.hsn_code ? <>File says {draft.from_file.hsn_code}{' '}
-                <button type="button" className="underline" onClick={() => onSave({ hsn_code: draft.from_file.hsn_code })}>use it</button></> : '4, 6 or 8 digits'}
-              onSave={(v) => onSave({ hsn_code: v })} />
+            {/* The GST note for a differing HSN rate is in the card's warnings (server) */}
+            <HsnPicker id={id('hsn')} value={draft.hsn_code} {...common} productGst={draft.gst_rate} showGstNote={false}
+              suggested={draft.from_file.hsn_code && !draft.hsn_code ? { code: draft.from_file.hsn_code, gst_rate: draft.from_file.gst_rate } : null}
+              hint="4, 6 or 8 digits" onChange={(v) => onSave({ hsn_code: v })} />
             <DraftSelect id={id('gst')} label="GST rate" value={draft.gst_rate == null ? '' : String(draft.gst_rate)} {...common}
               options={(options?.gst_rates ?? []).map((g) => ({ value: String(g), label: `${g}%` }))}
               onSave={(v) => onSave({ gst_rate: v === '' ? null : Number(v) })} />
@@ -84,8 +85,10 @@ export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
             <DraftText id={id('marketed')} label="Marketed by (company)" value={draft.marketed_by} maxLength={255} {...common}
               hint="The file's company code; write it out in full if you know it" onSave={(v) => onSave({ marketed_by: v })} />
             <div className="sm:col-span-2 lg:col-span-3">
-              <DraftText id={id('description')} label="Description for buyers" value={draft.description} multiline maxLength={2000} {...common}
-                hint="Keep it to the generic name, strength, form and pack — no claims (C-19)" onSave={(v) => onSave({ description: v })} />
+              <DraftText id={id('description')} label="Description for buyers (optional)" value={draft.description} multiline maxLength={2000} {...common}
+                placeholder="No description yet — you can add one now or after approval"
+                hint="Not needed to save or approve. Keep it to the generic name, strength, form and pack — no claims (C-19)"
+                onSave={(v) => onSave({ description: v })} />
               {draft.suggested_description && draft.description !== draft.suggested_description && (
                 <button type="button" disabled={disabled} onClick={() => onSave({ description: draft.suggested_description })}
                   className="text-xs underline text-brand-700 mt-0.5">

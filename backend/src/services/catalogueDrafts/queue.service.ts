@@ -6,6 +6,9 @@ import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
+import { cacheDel } from '../../config/redis';
+import { requireCategory, requireHsn } from '../catalogueLists/lists.service';
+import { changeLiveCopyTx } from '../productContent.service';
 import { approvalProblems, draftWarnings, prescriptionFor, suggestedDescription, DOSAGE_FORMS, GST_RATES, SCHEDULES } from './rules';
 
 /** Fields a person may save on a draft (all optional; null clears). */
@@ -24,8 +27,9 @@ const COLUMNS = `p.id, p.sku, p.name, p.generic_name, p.composition, p.strength,
   p.hsn_code, p.gst_rate, p.category, p.description, p.storage_instructions, p.net_quantity, p.marketed_by,
   p.manufacturer_name, p.manufacturer_address, p.country_of_origin, p.mrp_paise, p.catalogue_state, p.content_status,
   d.from_file, d.cold_chain_decided, d.status, d.created_at, d.updated_at, d.decided_at, d.decision_note,
-  up.full_name AS decided_by_name`;
-const FROM = `FROM catalogue_drafts d JOIN products p ON p.id = d.product_id LEFT JOIN user_profiles up ON up.user_id = d.decided_by`;
+  up.full_name AS decided_by_name, h.gst_rate AS hsn_gst_rate, h.description AS hsn_description`;
+const FROM = `FROM catalogue_drafts d JOIN products p ON p.id = d.product_id LEFT JOIN user_profiles up ON up.user_id = d.decided_by
+  LEFT JOIN hsn_codes h ON h.code = p.hsn_code`;
 
 function view(r: any) {
   const fields = { ...r, gst_rate: r.gst_rate === null ? null : Number(r.gst_rate) };
@@ -86,20 +90,18 @@ export async function getDraft(productId: string) {
   return view(r);
 }
 
-/** Choices for the queue's pickers: schedules, forms, GST slabs, categories and HSN codes the catalogue already uses. */
-export async function draftOptions() {
-  const [categories, hsn] = await Promise.all([
-    query<{ category: string }>(
-      `SELECT category FROM products WHERE catalogue_state = 'live' AND deleted_at IS NULL AND category IS NOT NULL AND category <> ''
-       GROUP BY category ORDER BY COUNT(*) DESC, category LIMIT 100`),
-    query<{ hsn_code: string; n: number }>(
-      `SELECT hsn_code, COUNT(*)::int AS n FROM products WHERE catalogue_state = 'live' AND deleted_at IS NULL AND hsn_code IS NOT NULL
-       GROUP BY hsn_code ORDER BY COUNT(*) DESC, hsn_code LIMIT 30`),
-  ]);
-  return {
-    schedules: SCHEDULES, dosage_forms: DOSAGE_FORMS, gst_rates: GST_RATES,
-    categories: categories.map((c) => c.category), hsn_codes: hsn,
-  };
+/** Choices for the queue's fixed pickers. Categories and HSN codes come from their
+ *  managed lists (GET /catalogue-lists/categories, /catalogue-lists/hsn-codes, Sprint 31). */
+export function draftOptions() {
+  return { schedules: SCHEDULES, dosage_forms: DOSAGE_FORMS, gst_rates: GST_RATES };
+}
+
+/** Category and HSN must be entries of their lists (spelled as listed); null clears. */
+async function checkListed<T extends { category?: unknown; hsn_code?: unknown }>(c: Pick<PoolClient, 'query'>, v: T): Promise<T> {
+  const out = { ...v };
+  if ('category' in v) out.category = await requireCategory(c, v.category as string | null);
+  if ('hsn_code' in v) out.hsn_code = await requireHsn(c, v.hsn_code as string | null);
+  return out;
 }
 
 /** The open draft, locked for this transaction (409 once decided). */
@@ -113,11 +115,12 @@ export async function lockOpenDraft(c: Pick<PoolClient, 'query'>, productId: str
 }
 
 /** Save as you go: only the fields sent change; the server re-checks what is still missing. */
-export async function saveDraft(productId: string, userId: string, updates: Partial<Record<DraftField, unknown>>) {
-  const keys = Object.keys(updates) as DraftField[];
+export async function saveDraft(productId: string, userId: string, sent: Partial<Record<DraftField, unknown>>) {
+  const keys = Object.keys(sent) as DraftField[];
   if (!keys.length) throw new AppError('Nothing to save', 400);
   await withTransaction(async (c) => {
     const before = await lockOpenDraft(c, productId);
+    const updates = await checkListed(c, sent);
     const changed = keys.filter((k) => (before[k] ?? null) !== (updates[k] ?? null));
     if (changed.length) {
       await c.query(
@@ -138,10 +141,11 @@ export async function saveDraft(productId: string, userId: string, updates: Part
 }
 
 /** "Set for all selected": non-clinical fields only, open drafts only. */
-export async function bulkSetDrafts(productIds: string[], userId: string, set: Partial<Record<BulkField, string | null>>) {
-  const keys = (Object.keys(set) as BulkField[]).filter((k) => (BULK_FIELDS as readonly string[]).includes(k));
+export async function bulkSetDrafts(productIds: string[], userId: string, sent: Partial<Record<BulkField, string | null>>) {
+  const keys = (Object.keys(sent) as BulkField[]).filter((k) => (BULK_FIELDS as readonly string[]).includes(k));
   if (!keys.length) throw new AppError('Choose what to set', 400);
   return withTransaction(async (c) => {
+    const set = await checkListed(c, sent);
     const { rows } = await c.query<{ id: string }>(
       `UPDATE products p SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = NOW()
        FROM catalogue_drafts d
@@ -154,4 +158,20 @@ export async function bulkSetDrafts(productIds: string[], userId: string, set: P
       newValue: { product_ids: rows.map((r) => r.id), ...Object.fromEntries(keys.map((k) => [k, set[k] ?? null])) } });
     return { updated: rows.length };
   });
+}
+
+/**
+ * The description for buyers, written or changed at any time (Sprint 31): on an open
+ * draft it is saved like any detail; on an approved product it is a change to live
+ * copy and goes back to the pharmacist's C-19 review ("Product copy") before buyers
+ * see it. Never sold online (C-10) or closed products have no buyer copy.
+ */
+export async function saveDraftDescription(productId: string, userId: string, description: string | null) {
+  const d = await queryOne<{ status: string }>('SELECT status FROM catalogue_drafts WHERE product_id = $1', [productId]);
+  if (!d) throw new AppError('New product not found', 404);
+  if (d.status === 'open') return saveDraft(productId, userId, { description });
+  if (d.status !== 'approved') throw new AppError('This product is not sold online, so it has no description for buyers', 409);
+  await withTransaction((c) => changeLiveCopyTx(c, userId, productId, { description }));
+  await cacheDel(`product:${productId}`);
+  return getDraft(productId);
 }

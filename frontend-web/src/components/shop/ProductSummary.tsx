@@ -2,7 +2,7 @@
 import { Snowflake } from 'lucide-react';
 import type { ProductDetail } from '@/lib/products/api';
 import { formatPrice } from '@/lib/utils';
-import { scheduleBadge } from '@/lib/drugSchedule';
+import { isNonScheduled, scheduleBadge } from '@/lib/drugSchedule';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole } from '@/lib/admin/roles';
 import { STAFF_ROLES } from '@/lib/layout/portalPaths';
@@ -24,7 +24,11 @@ export default function ProductSummary({ p }: { p: ProductDetail }) {
           {p.generic_name && <p className="text-sm text-gray-500">{p.generic_name}</p>}
           {p.composition && <p className="text-xs text-gray-500 mt-1">Composition: {p.composition}</p>}
           <div className="flex flex-wrap gap-1 mt-2">
-            {badge && <span className="badge-schedule-h">{badge}</span>}
+            {badge && (
+              <span className={isNonScheduled(p.drug_schedule) ? 'text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium' : 'badge-schedule-h'}>
+                {badge}
+              </span>
+            )}
             {p.cold_chain && (
               <span className="badge-cold inline-flex items-center gap-1">
                 <Snowflake className="w-3 h-3" /> Cold chain

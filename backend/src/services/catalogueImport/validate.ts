@@ -25,6 +25,9 @@ export interface Checked<T> { row: number; sku: string; record: T | null; errors
 const SCHEDULES: Record<string, string> = {
   otc: 'OTC', 'schedule g': 'Schedule G', 'schedule h': 'Schedule H', 'schedule h1': 'Schedule H1',
   'schedule x': 'Schedule X', ndps: 'NDPS', g: 'Schedule G', h: 'Schedule H', h1: 'Schedule H1', x: 'Schedule X',
+  // Sprint 31: in no schedule — no prescription, sold online (C-08); not the same as OTC
+  'non-scheduled': 'Non-scheduled', 'non scheduled': 'Non-scheduled', nonscheduled: 'Non-scheduled', ns: 'Non-scheduled',
+  'non-schedule': 'Non-scheduled', 'non schedule': 'Non-scheduled',
 };
 
 const text = (v: unknown) => { const s = String(v ?? '').trim(); return s && s !== '—' ? s : null; };
@@ -55,7 +58,7 @@ export function checkProduct(r: Row): Checked<ProductRecord> {
   const warnings: string[] = [];
   const sku = text(r.sku)?.toUpperCase() ?? '';
   const name = text(r.name);
-  const schedule = SCHEDULES[String(r.drug_schedule ?? '').trim().toLowerCase()];
+  const schedule = SCHEDULES[String(r.drug_schedule ?? '').trim().toLowerCase().replace(/\s+/g, ' ')];
   const mrp = paise(r.mrp), offer = paise(r.offer_price);
   const prices: Record<string, number | null> = {
     ptr: paise(r.ptr_price), pts: paise(r.pts_price), institutional: paise(r.institutional_price), nppa: paise(r.nppa_ceiling_price),
@@ -66,7 +69,7 @@ export function checkProduct(r: Row): Checked<ProductRecord> {
   if (!/^[A-Z0-9][A-Z0-9-]{2,99}$/.test(sku)) errors.push('SKU must be 3–100 letters, digits or hyphens');
   if (!name || name.length < 2) errors.push('Medicine name is required');
   if (!text(r.category)) errors.push('Category is required');
-  if (!schedule) errors.push('Drug schedule must be OTC, Schedule G, H, H1, X or NDPS');
+  if (!schedule) errors.push('Drug schedule must be OTC, Non-scheduled, Schedule G, H, H1, X or NDPS');
   if (mrp === null || Number.isNaN(mrp) || mrp <= 0) errors.push('MRP must be a positive amount');
   if (offer === null || Number.isNaN(offer) || offer <= 0) errors.push('Offer price must be a positive amount');
   if (gst === null || ![0, 5, 12, 18, 28].includes(gst)) errors.push('GST rate must be 0, 5, 12, 18 or 28');
