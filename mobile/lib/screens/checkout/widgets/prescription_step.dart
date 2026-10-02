@@ -105,12 +105,12 @@ class PrescriptionStep extends StatelessWidget {
 
         if (savedPrescriptions.isNotEmpty) ...[
           const SizedBox(height: 20),
-          const Text('Or use a saved prescription',
+          const Text('Or use a prescription you uploaded earlier',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 4),
-          // Only verified, unexpired prescriptions are listed; the server
-          // checks it covers this order and a pharmacist confirms it (C-08).
-          Text('Verified by our pharmacist and still valid.',
+          // Verified and unexpired, or uploaded earlier and not yet checked; the
+          // server checks it can be used and a pharmacist confirms it (C-08).
+          Text('Our pharmacist checks it with this order before dispatch.',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
           const SizedBox(height: 10),
           ...savedPrescriptions.whereType<Map>().map((rx) => GestureDetector(
@@ -137,7 +137,9 @@ class PrescriptionStep extends StatelessWidget {
                         Text(rx['doctor_name'] != null ? 'Dr. ${rx['doctor_name']}' : 'Uploaded prescription',
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13,
                             color: AppTheme.brandGreen700)),
-                        Text('Valid until ${_validUntil(rx['valid_until'])}',
+                        Text(rx['status'] == 'pending'
+                            ? 'Uploaded ${formatDateIst(rx['created_at'])} · not checked yet'
+                            : 'Checked · valid until ${_validUntil(rx['valid_until'])}',
                           style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                       ],
                     ),

@@ -1,6 +1,6 @@
 # Active Context
 
-## Current state (2026-10-01)
+## Current state (2026-10-02)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 (built in a Claude chat, 30 Mar 2026). Sprints 1–20 are done (Sprint 14 video calls wired on web and mobile) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
@@ -9,6 +9,44 @@ the lawyer/CA sign-off.
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Sprint 25 — shop like Amazon (2026-10-02, uncommitted)
+Owner's trial feedback: search not working, prescription upload not reachable, no way
+to add items from the cart.
+- **Cause of "search not working" on the trial:** data, not code. The demo catalogue
+  has generic names only (no brands, by design) but the web/app hints said "Try Dolo
+  650"; `dolo` correctly returns 0. Demo seed checked locally: all 42 products active
+  and searchable (paracetamol/para/paracitamol/cetrizine/amlo all hit). Hints now use
+  generic examples (`SEARCH_EXAMPLES` web, `SearchEntry.hint` app). No brands added.
+- API: `GET /products/search` optional `sort` (relevance default | price_asc |
+  price_desc, by the buyer's own price; shape unchanged); `GET /products/search/suggest
+  ?q=` "did you mean" (`services/search/didYouMean.ts`: pg_trgm similarity ≥ 0.35 on
+  generic names and the brand word, sellable only, C-10; "dolo" no longer suggests
+  domperidone); `GET /cart/buy-again` (delivered orders, not in cart, active, not X/NDPS)
+  and `GET /cart/cheaper-options` (`services/shopping/`: `sameMedicine.ts` matches
+  generic + every strength number + form + release type + schedule + pack; in stock,
+  cheaper; suggestion only). `/prescriptions/my` adds file_type, rejection_reason,
+  order_number. `rxReuse`: a pending upload with no order can be offered for an order
+  (attached exactly like an upload at checkout; pharmacist checks it, C-08); one already
+  with an order → 409.
+- Web: header search on every shopping page (`components/search/` SearchCombobox =
+  ARIA combobox/listbox, 250 ms debounce, 6 suggestions, quick Add; hidden on `/`,
+  checkout, auth, portals and for staff roles); `/search?q=&category=&sort=` (URL is the
+  state, chips, sort, "Show more", NoResults with did-you-mean + popular + upload link);
+  BottomNav Search → /search. `/prescriptions` (upload photo/PDF, camera on phones, list
+  with status, signed view link, "now add the medicines"); login `?next=` (safe paths
+  only) and RequireAuth returns there. Cart: "Add more medicines", Buy again row,
+  cheaper option per line ("Switch to this", only on tap), Rx notice says whether an
+  uploaded prescription is ready, richer empty cart. Checkout lists unchecked uploads.
+- App: Search tab sort chips, "did you mean" + upload link, price now
+  display_price_paise (was offer price for trade buyers); `/account/prescriptions`
+  screen (image_picker / file_picker, already deps); home CTA → it (old steps sheet
+  removed); cart "Add more medicines" sheet + Rx notice with upload. Buy again / cheaper
+  option not on the app yet.
+- Tests: jest `sameMedicine.test.ts`, `sortAndSuggest.test.ts`; `test/sprint25.smoke.mjs`
+  (in test:smoke); e2e `shop.spec.ts` + search tests in public/a11y (54 e2e). e2e now runs
+  the fake object store when S3_ENDPOINT is set (global-setup; CI browser job sets it).
+  Flutter `sprint25_shop_test.dart`.
 
 ## Sprint 23 — search and free-delivery banner (2026-10-01, uncommitted)
 - Search (GET /products/search, response shape unchanged) forgives typos and finds

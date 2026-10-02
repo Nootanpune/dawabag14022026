@@ -124,9 +124,12 @@ export async function getMyPrescriptions(req: Request, res: Response, next: Next
     const prescriptions = await query(
       `SELECT p.id, p.status, p.valid_until, p.created_at,
               p.is_digital, p.doctor_name, p.order_id, p.prescriber_name, p.prescribed_on,
+              p.file_type, p.original_filename, p.rejection_reason,   -- for the /prescriptions page (Sprint 25)
+              o.order_number,
               pt.full_name as patient_name
        FROM prescriptions p
        LEFT JOIN patients pt ON pt.id = p.patient_id
+       LEFT JOIN orders o ON o.id = p.order_id
        WHERE p.user_id = $1
        ORDER BY p.created_at DESC`,
       [userId]

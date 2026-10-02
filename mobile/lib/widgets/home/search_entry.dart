@@ -8,7 +8,8 @@ class SearchEntry extends StatelessWidget {
   final VoidCallback onTap;
   const SearchEntry({super.key, required this.onTap});
 
-  static const hint = 'Search medicines, e.g. Dolo 650';
+  // Generic example only: a brand named here may not be in the catalogue (Sprint 25)
+  static const hint = 'Search medicines, e.g. paracetamol';
 
   @override
   Widget build(BuildContext context) {

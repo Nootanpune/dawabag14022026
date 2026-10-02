@@ -8,6 +8,7 @@ import '../../providers/cart_provider.dart';
 import 'widgets/cart_coupon_card.dart';
 import 'widgets/cart_line_card.dart';
 import 'widgets/cart_prescription_notice.dart';
+import 'widgets/add_more_sheet.dart';
 import 'widgets/cart_summary_card.dart';
 import '../../widgets/empty_state.dart';
 
@@ -73,13 +74,23 @@ class CartScreen extends ConsumerWidget {
     if (cart.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Cart')),
-        body: EmptyState(
-          icon: Icons.shopping_cart_outlined,
-          title: 'Your cart is empty',
-          hint: 'Search for a medicine or browse by category to add it here.',
-          actionLabel: 'Search medicines',
-          onAction: () => context.go('/search'),
-        ),
+        body: ListView(children: [
+          EmptyState(
+            icon: Icons.shopping_cart_outlined,
+            title: 'Your cart is empty',
+            hint: 'Search for a medicine by brand or generic name and add it here.',
+            actionLabel: 'Search medicines',
+            onAction: () => showAddMoreSheet(context),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/account/prescriptions'),
+              icon: const Icon(Icons.upload_file, size: 20),
+              label: const Text('Have a prescription? Upload it'),
+            ),
+          ),
+        ]),
       );
     }
 
@@ -110,6 +121,12 @@ class CartScreen extends ConsumerWidget {
                 onQuantityChange: (q) => _run(context, notifier.setQuantity(line.productId, q)),
                 onRemove: () => _run(context, notifier.remove(line.productId)),
               ),
+            // Search and add without leaving the cart (Sprint 25)
+            OutlinedButton.icon(
+              onPressed: busy ? null : () => showAddMoreSheet(context),
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text('Add more medicines'),
+            ),
             const SizedBox(height: 12),
             if (cart.requiresPrescription) const CartPrescriptionNotice(),
             CartCouponCard(

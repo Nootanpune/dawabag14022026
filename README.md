@@ -97,7 +97,8 @@ Base URL: `http://localhost:4000/api/v1`
 ### Products
 | Method | Endpoint                  | Description             | Auth       |
 |--------|---------------------------|-------------------------|------------|
-| GET    | `/products/search`        | Search + filter         | Optional   |
+| GET    | `/products/search`        | Search + filter; optional `sort` = relevance / price_asc / price_desc | Optional |
+| GET    | `/products/search/suggest`| "Did you mean" names for a search with no results | Public |
 | GET    | `/products/categories`    | All categories          | Optional   |
 | GET    | `/products/:id`           | Product detail          | Optional   |
 | POST   | `/products`               | Create product          | Admin      |
@@ -112,6 +113,15 @@ Base URL: `http://localhost:4000/api/v1`
 | GET    | `/orders/:id`             | Order detail            | Customer     |
 | PATCH  | `/orders/:id/status`      | Update order status     | Staff/Admin  |
 
+### Cart
+| Method | Endpoint                  | Description             | Auth       |
+|--------|---------------------------|-------------------------|------------|
+| GET    | `/cart`                   | The server cart         | Bearer     |
+| PUT    | `/cart/items/:productId`  | Set quantity (0 removes)| Bearer     |
+| PUT    | `/cart/coupon`            | Apply / remove coupon   | Bearer     |
+| GET    | `/cart/buy-again`         | Delivered medicines not in the cart | Bearer |
+| GET    | `/cart/cheaper-options`   | Same medicine, lower price, per line (suggestion only) | Bearer |
+
 ### Payments
 | Method | Endpoint                  | Description             | Auth       |
 |--------|---------------------------|-------------------------|------------|
@@ -123,7 +133,8 @@ Base URL: `http://localhost:4000/api/v1`
 ### Prescriptions
 | Method | Endpoint                      | Description                 | Auth            |
 |--------|-------------------------------|-----------------------------|-----------------|
-| POST   | `/prescriptions/upload`       | Upload prescription (S3)    | Customer        |
+| POST   | `/prescriptions/upload`       | Upload prescription (S3); `order_id` optional | Customer |
+| POST   | `/prescriptions/:id/use-for-order` | Offer a verified, or uploaded and unchecked, prescription for an order | Customer |
 | GET    | `/prescriptions/my`           | My prescriptions            | Customer        |
 | GET    | `/prescriptions/queue`        | Pending Rx queue            | Pharmacist Rx   |
 | GET    | `/prescriptions/:id/url`      | Signed S3 URL               | Owner/Staff     |
@@ -160,7 +171,9 @@ npm run build  # production build
 | `/`                     | Home — search, categories, products  |
 | `/auth/login`           | Login with OTP flow                  |
 | `/auth/register`        | Registration                         |
-| `/cart`                 | Cart with coupon + price summary     |
+| `/search`               | Results: `?q=&category=&sort=`, load more, "did you mean" |
+| `/prescriptions`        | Upload a prescription any time; list with status |
+| `/cart`                 | Cart: coupon, add more, buy again, cheaper option |
 | `/checkout`             | 3-step: address → Rx → payment       |
 | `/orders`               | Order history                        |
 | `/orders/[orderId]`     | Order detail + timeline              |

@@ -4,15 +4,16 @@ import '../models/checkout_summary.dart';
 import '../models/json_utils.dart';
 import 'api_service.dart';
 import 'api_utils.dart';
-import '../utils/ist.dart';
+import '../utils/prescription_status.dart';
 
 /// Checkout requests (order placement, prescription upload or saved-
 /// prescription reuse, Razorpay).
 /// The server computes prices and totals; nothing is cached on the device.
 extension CheckoutApi on ApiService {
-  /// GET /prescriptions/my → only the buyer's prescriptions a pharmacist has
-  /// verified and that are still valid today, the only ones that can be
-  /// offered for an order (C-08). The server re-checks both on use.
+  /// GET /prescriptions/my → the buyer's prescriptions that can be offered for
+  /// an order: verified and still valid today, or uploaded on the
+  /// Prescriptions screen and not yet checked (Sprint 25). The server
+  /// re-checks on use and the pharmacist checks it with the order (C-08).
   Future<List<Map<String, dynamic>>> getVerifiedPrescriptions() async {
     final res = await dio.get('/prescriptions/my');
     final body = res.data;
@@ -20,13 +21,8 @@ extension CheckoutApi on ApiService {
     return list.where(isUsableSavedPrescription).toList();
   }
 
-  /// True for a verified prescription whose valid_until is today or later
-  /// (compared as an India calendar date). No date counts as expired, as on
-  /// the server (C-08).
-  static bool isUsableSavedPrescription(Map<String, dynamic> rx) {
-    if (rx['status'] != 'verified') return false;
-    return isOnOrAfterTodayIst(rx['valid_until']);
-  }
+  /// See [isUsableAtCheckout] (utils/prescription_status.dart).
+  static bool isUsableSavedPrescription(Map<String, dynamic> rx) => isUsableAtCheckout(rx);
 
   /// POST /prescriptions/:id/use-for-order { order_id } — offers a saved,
   /// verified prescription for [orderId]; a pharmacist still confirms it

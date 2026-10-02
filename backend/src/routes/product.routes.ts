@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   searchProducts, getProductDetail, getCategories, createProduct, updateProduct, getContentQueue, postContentReview, setTelemedicineList,
-  getAdminProducts, getAdminProduct,
+  getAdminProducts, getAdminProduct, getSearchSuggestions,
 } from '../controllers/product.controller';
 import { deleteProductImage, productImageUpload, putProductImage } from '../controllers/productImage.controller';
 import { bulkPhotoLimiter, bulkPhotoUpload, postBulkProductImages } from '../controllers/productImageBulk.controller';
@@ -10,6 +10,7 @@ import { authenticate, authorize, optionalAuth } from '../middleware/auth.middle
 const router = Router();
 
 router.get('/search', optionalAuth, searchProducts);
+router.get('/search/suggest', getSearchSuggestions);
 router.get('/categories', getCategories);
 router.get('/admin/list', authenticate, authorize('admin', 'super_admin', 'pharmacist_pack', 'pharmacist_rx'), getAdminProducts);
 router.get('/:productId/admin', authenticate, authorize('admin', 'super_admin'), getAdminProduct);

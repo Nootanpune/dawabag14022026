@@ -1,12 +1,10 @@
 'use client';
-import type { MouseEvent } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { House, Search, ClipboardList, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
 import { isPortalPath, PORTAL_ROLES } from '@/lib/layout/portalPaths';
-import { HOME_SEARCH_ID } from '@/components/home/HomeHero';
 
 /** Phone-only tab bar for shoppers and guests (hidden from md up and in staff portals). */
 export default function BottomNav() {
@@ -16,18 +14,10 @@ export default function BottomNav() {
   if (isPortalPath(pathname) || pathname.startsWith('/checkout')) return null;
   if (user?.role && PORTAL_ROLES.includes(user.role)) return null;
 
-  const focusSearch = (e: MouseEvent) => {
-    const input = document.getElementById(HOME_SEARCH_ID);
-    if (pathname === '/' && input) {
-      e.preventDefault();
-      input.focus();
-      input.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-  };
-
   const items = [
     { href: '/', label: 'Home', icon: House, active: pathname === '/' },
-    { href: '/?focus=search', label: 'Search', icon: Search, active: false, onClick: focusSearch },
+    // The search results page (Sprint 25); its search box is focused when empty
+    { href: '/search', label: 'Search', icon: Search, active: pathname.startsWith('/search') },
     {
       href: isAuthenticated ? '/orders' : '/auth/login',
       label: 'Orders',
@@ -51,11 +41,10 @@ export default function BottomNav() {
         className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]"
       >
         <ul className="grid grid-cols-4 h-16">
-          {items.map(({ href, label, icon: Icon, active, onClick }) => (
+          {items.map(({ href, label, icon: Icon, active }) => (
             <li key={label}>
               <Link
                 href={href}
-                onClick={onClick}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'h-full flex flex-col items-center justify-center gap-0.5 text-xs font-medium',

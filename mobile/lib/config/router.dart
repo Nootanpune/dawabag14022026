@@ -39,6 +39,7 @@ import '../screens/doctor/doctor_list_screen.dart';
 import '../screens/doctor/doctor_portal_screen.dart';
 import '../screens/doctor/portal/doctor_consultations_screen.dart';
 import '../screens/admin/admin_screen.dart';
+import '../screens/prescriptions/prescriptions_screen.dart';
 import '../widgets/main_scaffold.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -102,6 +103,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['orderId']!),
       ),
       GoRoute(path: '/account/refills', builder: (c, s) => const RefillScreen()),
+      // Upload a prescription any time (Sprint 25); signed-in only via the /account prefix
+      GoRoute(path: '/account/prescriptions', builder: (c, s) => const PrescriptionsScreen()),
       // Complaints (C-36). '/new' is listed before '/:id' so it is not taken as an id.
       GoRoute(path: '/account/complaints', builder: (c, s) => const GrievanceListScreen()),
       GoRoute(

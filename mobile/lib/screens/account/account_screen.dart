@@ -138,6 +138,7 @@ class AccountScreen extends ConsumerWidget {
           // Menu sections
           _Section('Orders', [
             _MenuItem(icon: Icons.receipt_long, label: 'My orders', onTap: () => context.go('/orders')),
+            _MenuItem(icon: Icons.description_outlined, label: 'Prescriptions', onTap: () => context.push('/account/prescriptions')),
             _MenuItem(icon: Icons.replay, label: 'Refill subscriptions', onTap: () => context.push('/account/refills')),
             // C-37 returns and refunds; C-29 side-effect reports
             _MenuItem(icon: Icons.assignment_return_outlined, label: 'Returns & refunds', onTap: () => context.push('/account/returns')),

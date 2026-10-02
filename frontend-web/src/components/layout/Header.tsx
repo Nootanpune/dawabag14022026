@@ -7,8 +7,14 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { staffHome } from '@/lib/fulfilment/roles';
+import HeaderSearch from '@/components/search/HeaderSearch';
 
-export default function Header() {
+interface Props {
+  /** the query of the search results page, shown in the header's search box */
+  searchQuery?: string;
+}
+
+export default function Header({ searchQuery }: Props = {}) {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { data: cart } = useCart();
   const queryClient = useQueryClient();
@@ -31,10 +37,10 @@ export default function Header() {
 
   return (
     <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 min-h-16 flex flex-wrap items-center justify-between gap-x-3">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 h-16">
           <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center">
             <span className="text-white font-bold">D</span>
           </div>
@@ -46,6 +52,9 @@ export default function Header() {
             </span>
           </span>
         </Link>
+
+        {/* Medicine search on every shopping page (Sprint 25) */}
+        <HeaderSearch query={searchQuery} />
 
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
@@ -78,7 +87,7 @@ export default function Header() {
         </nav>
 
         {/* Right actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 h-16">
           {/* Cart */}
           <Link href="/cart" aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'} className="relative p-2 hover:bg-gray-100 rounded-lg">
             <ShoppingCart className="w-5 h-5 text-gray-600" />

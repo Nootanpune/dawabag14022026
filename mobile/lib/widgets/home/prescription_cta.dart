@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../config/theme.dart';
 
-/// "Have a prescription?" card. The app uploads a prescription as part of an
-/// order (checkout's prescription step, POST /prescriptions/upload), and a
-/// registered pharmacist checks it before the order is dispatched (C-08).
-/// [onUpload] leads the user into that existing flow.
+/// "Have a prescription?" card. [onUpload] opens the Prescriptions screen,
+/// where it is uploaded any time and chosen at checkout; a registered
+/// pharmacist checks it with the order before dispatch (C-08).
 class PrescriptionCta extends StatelessWidget {
   final VoidCallback onUpload;
   const PrescriptionCta({super.key, required this.onUpload});

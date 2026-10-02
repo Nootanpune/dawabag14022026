@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../config/theme.dart';
-import '../../providers/cart_provider.dart';
 import '../../providers/catalog_provider.dart';
 import '../../providers/delivery_offer_provider.dart';
 import '../../widgets/cart_action_button.dart';
@@ -11,7 +10,6 @@ import '../../widgets/home/category_tiles.dart';
 import '../../widgets/home/consult_doctor_tile.dart';
 import '../../widgets/home/free_delivery_note.dart';
 import '../../widgets/home/prescription_cta.dart';
-import '../../widgets/home/prescription_steps_sheet.dart';
 import '../../widgets/home/search_entry.dart';
 import '../../widgets/home/section_header.dart';
 import '../../widgets/home/trust_strip.dart';
@@ -33,15 +31,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _category = '';
 
-  void _onUploadPrescription() {
-    final cartHasItems = ref.read(cartProvider).itemCount > 0;
-    showPrescriptionStepsSheet(
-      context,
-      cartHasItems: cartHasItems,
-      onGoToCart: () => context.push('/cart'),
-      onSearch: () => context.go('/search'),
-    );
-  }
+  // Upload any time on the Prescriptions screen (Sprint 25); signing in first if needed
+  void _onUploadPrescription() => context.push('/account/prescriptions');
 
   @override
   Widget build(BuildContext context) {

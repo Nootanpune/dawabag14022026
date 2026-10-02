@@ -15,6 +15,30 @@ test('home search forgives a misspelt generic name', async ({ page }) => {
   await expect(page.getByText('E2E Paracetamol 500').first()).toBeVisible();
 });
 
+test('the results page finds a misspelt medicine; the URL holds the search', async ({ page }) => {
+  await page.goto('/search?q=E2E%20Paracetmol');
+  await expect(page.getByRole('heading', { name: /Results for “E2E Paracetmol”/ })).toBeVisible();
+  await expect(page.getByText('E2E Paracetamol 500').first()).toBeVisible();
+  await expect(page.getByText(/\d+ medicines? found/)).toBeVisible();
+  await page.getByLabel('Sort by').selectOption('price_asc');
+  await expect(page).toHaveURL(/sort=price_asc/);
+  await expect(page.getByText('E2E Paracetamol 500').first()).toBeVisible();
+});
+
+test('a search with no results says so and offers the prescription upload', async ({ page }) => {
+  await page.goto('/search?q=qzxwvkj');
+  await expect(page.getByRole('heading', { name: 'No medicines found for “qzxwvkj”' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Upload a prescription instead/ })).toHaveAttribute('href', '/prescriptions');
+});
+
+test('pressing Enter in the home search opens the full results page', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('searchbox', { name: 'Search medicines' }).fill('E2E Paracetamol');
+  await page.getByRole('searchbox', { name: 'Search medicines' }).press('Enter');
+  await expect(page).toHaveURL(/\/search\?q=E2E\+Paracetamol/);
+  await expect(page.getByText('E2E Paracetamol 500').first()).toBeVisible();
+});
+
 test('home page shows the free-delivery amount the server sets, and nothing when it is off', async ({ page, request }) => {
   const offer = (await (await request.get(`${API}/delivery/offer`)).json()).data.free_delivery_above_paise;
   await page.goto('/');

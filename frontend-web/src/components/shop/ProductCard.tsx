@@ -5,13 +5,13 @@ import { formatPrice } from '@/lib/utils';
 import { scheduleBadge } from '@/lib/drugSchedule';
 import ProductImage from './ProductImage';
 
-interface Product {
-  id: string; name: string; generic_name?: string; sku: string;
+export interface Product {
+  id: string; name: string; generic_name?: string | null; sku: string;
   marketed_by?: string; drug_schedule: string; mrp_paise: number;
   offer_price_paise: number; discount_pct: number; in_stock: boolean;
   /** buyer-specific price from the server (offer / PTR / PTS / institutional) */
   display_price_paise: number;
-  cold_chain: boolean; s3_image_key?: string; max_qty_per_order: number;
+  cold_chain: boolean; s3_image_key?: string | null; max_qty_per_order: number;
   /** signed link to the pharmacist-approved pack photo (C-19), or null */
   image_url?: string | null;
 }

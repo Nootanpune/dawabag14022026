@@ -6,10 +6,10 @@ import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import {
   fetchMyPrescriptions,
-  isReusable,
   offerSavedPrescription,
   prescriptionKeys,
   uploadPrescription,
+  usableAtCheckout,
 } from '@/lib/prescriptions/api';
 import SavedPrescriptionList from './SavedPrescriptionList';
 
@@ -19,7 +19,8 @@ interface Props {
 }
 
 // Prescription for Schedule H / H1 lines (C-08): upload a new one, or offer a saved
-// verified one. Either way a pharmacist checks it before anything is dispensed.
+// one (verified, or uploaded earlier and not yet checked). Either way a pharmacist
+// checks it with this order before anything is dispensed.
 export default function PrescriptionStep({ orderId, onDone }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -27,7 +28,8 @@ export default function PrescriptionStep({ orderId, onDone }: Props) {
   const [error, setError] = useState('');
 
   const { data: rxData } = useQuery({ queryKey: prescriptionKeys.mine, queryFn: fetchMyPrescriptions });
-  const reusable = (rxData ?? []).filter((r) => isReusable(r));
+  // Verified ones still valid, and ones uploaded on /prescriptions not yet checked (Sprint 25)
+  const reusable = usableAtCheckout(rxData ?? []);
 
   const handleContinue = async () => {
     if (!file && !savedId) {
@@ -42,7 +44,7 @@ export default function PrescriptionStep({ orderId, onDone }: Props) {
         toast.success('Prescription uploaded');
       } else if (savedId) {
         await offerSavedPrescription(savedId, orderId);
-        toast.success('Saved prescription sent to our pharmacist');
+        toast.success('Prescription sent to our pharmacist with this order');
       }
       onDone();
     } catch (err) {

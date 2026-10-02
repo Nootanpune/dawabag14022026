@@ -119,6 +119,8 @@ jobs:
       - name: API, website and browser tests
         run: |
           . scripts/dev-env.sh
+          # Uploads (prescriptions) go to the fake object store that e2e/support/global-setup.ts runs
+          export AWS_S3_BUCKET=dawabag-fake-bucket S3_ENDPOINT="http://127.0.0.1:$FAKE_PROVIDERS_PORT" AWS_ACCESS_KEY_ID=fake AWS_SECRET_ACCESS_KEY=fake
           (cd backend && npm ci --no-audit --no-fund)
           scripts/dev-up.sh
           # dev-env.sh sets NODE_ENV=development for the API; the website is built and served as production

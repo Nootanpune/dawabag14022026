@@ -44,7 +44,8 @@ class SearchResultTile extends ConsumerWidget {
                           style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                     const SizedBox(height: 4),
                     Row(children: [
-                      Text(formatPrice(product['offer_price_paise'] ?? 0),
+                      // The buyer's own price from the server (offer / PTR / PTS / institutional)
+                      Text(formatPrice(product['display_price_paise'] ?? product['offer_price_paise'] ?? 0),
                           style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
                       // Prescription-only medicine (C-08)
                       if (rx) ...[

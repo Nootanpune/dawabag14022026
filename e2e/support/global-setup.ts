@@ -1,6 +1,20 @@
+import type { FullConfig } from '@playwright/test';
+import { resolve } from 'path';
 import { call, cleanup, db, people, PIN, redis } from './data';
 
-export default async function globalSetup() {
+// With the API pointed at the fake object store (S3_ENDPOINT, e2e/README.md), run the
+// fakes in this process for the whole test run — uploads live in memory only
+const esm = new Function('p', 'return import(p)') as (p: string) => Promise<any>;
+// (the R2 journeys run the fakes inside their own test process instead: journeys/lib/fakes.ts)
+async function startFakeProvidersIfUsed(config: FullConfig) {
+  if (!process.env.S3_ENDPOINT || !process.env.FAKE_PROVIDERS_PORT) return;
+  if (/journeys/.test(config.configFile ?? '')) return;
+  const { startFakes } = await esm(resolve(__dirname, '../../backend/test/fakes/server.mjs'));
+  await startFakes();
+}
+
+export default async function globalSetup(config: FullConfig) {
+  await startFakeProvidersIfUsed(config);
   const c = db(); const r = redis();
   await c.connect();
   try {

@@ -3,16 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/catalog_provider.dart';
-import '../../services/api_service.dart';
 import '../../widgets/cart_action_button.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/error_retry_view.dart';
 import '../../widgets/home/search_entry.dart';
-import 'widgets/search_result_tile.dart';
+import 'widgets/search_results_list.dart';
+import 'widgets/search_sort_bar.dart';
 
 /// Search tab: server search by brand or generic name as the user types
-/// (debounced). The query lives in memory only.
+/// (debounced), sortable by price, with "Did you mean" and the prescription
+/// upload when nothing is found. The query lives in memory only.
 class SearchScreen extends ConsumerStatefulWidget {
   final String initialQuery;
   const SearchScreen({super.key, this.initialQuery = ''});
@@ -25,6 +24,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   late final TextEditingController _controller = TextEditingController(text: widget.initialQuery);
   Timer? _debounce;
   late String _query = widget.initialQuery.trim();
+  String _sort = 'relevance';
+
+  void _useSuggestion(String text) {
+    _debounce?.cancel();
+    _controller.text = text;
+    setState(() => _query = text);
+  }
 
   void _onChanged(String text) {
     _debounce?.cancel();
@@ -83,43 +89,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ? const EmptyState(
               icon: Icons.search,
               title: 'Search for a medicine',
-              hint: 'Type a brand or generic name, e.g. Dolo 650 or paracetamol.',
+              hint: 'Type a brand or generic name, e.g. paracetamol or cetirizine.',
             )
-          : _Results(query: _query),
+          : Column(children: [
+              SearchSortBar(value: _sort, onChanged: (s) => setState(() => _sort = s)),
+              Expanded(child: SearchResultsList(query: _query, sort: _sort, onSuggestion: _useSuggestion)),
+            ]),
     );
   }
 }
 
-class _Results extends ConsumerWidget {
-  final String query;
-  const _Results({required this.query});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final key = productsQueryKey(q: query, pincode: ref.watch(browsePincodeProvider));
-    final async = ref.watch(productsProvider(key));
-    return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorRetryView(
-        message: ApiService.errorMessage(e, fallback: 'Could not search right now'),
-        onRetry: () => ref.invalidate(productsProvider(key)),
-      ),
-      data: (data) {
-        final list = ((data['products'] as List?) ?? const []).cast<Map<String, dynamic>>();
-        if (list.isEmpty) {
-          return EmptyState(
-            icon: Icons.search_off,
-            title: 'No medicines found for "$query"',
-            hint: 'Check the spelling, or try the generic name (e.g. paracetamol).',
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) => SearchResultTile(product: list[i]),
-        );
-      },
-    );
-  }
-}

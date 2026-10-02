@@ -1,5 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { searchHref } from '@/lib/search/searchUrl';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAddToCart } from '@/hooks/useCart';
@@ -19,6 +21,7 @@ export default function HomePage() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   const { pincode, setPincode } = usePincode();
   const { addToCart, isPending: isAdding, pendingProductId } = useAddToCart();
 
@@ -80,7 +83,13 @@ export default function HomePage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-6xl mx-auto px-4 py-5 sm:py-6">
-        <HomeHero query={searchQuery} onQueryChange={setSearchQuery} inputRef={searchRef} note={<FreeDeliveryNote />} />
+        <HomeHero
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          inputRef={searchRef}
+          note={<FreeDeliveryNote />}
+          onSubmit={() => searchQuery.trim() && router.push(searchHref({ q: searchQuery, category: selectedCategory }))}
+        />
         <TrustStrip />
         <PinCodeBanner pincode={pincode} onPincodeChange={setPincode} pincodeInfo={data?.pincode_info} />
         <PrescriptionCta />

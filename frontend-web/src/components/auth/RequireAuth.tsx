@@ -3,6 +3,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { loginHref } from '@/lib/auth/nextPath';
 
 interface Props {
   children: ReactNode;
@@ -23,7 +24,8 @@ export default function RequireAuth({ children, roles }: Props) {
   const forbidden = status === 'signed_in' && !!roles && !roles.includes(role ?? '');
 
   useEffect(() => {
-    if (signedOut) router.replace('/auth/login');
+    // Back to this page after signing in
+    if (signedOut) router.replace(loginHref(`${window.location.pathname}${window.location.search}`));
     else if (forbidden) router.replace('/');
   }, [signedOut, forbidden, router]);
 

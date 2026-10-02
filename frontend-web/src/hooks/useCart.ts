@@ -83,3 +83,23 @@ export function useAddToCart() {
 
   return { addToCart, isPending: mutation.isPending, pendingProductId: mutation.variables?.productId };
 }
+
+/** The buyer chose a cheaper option for a line: add it with the same quantity, then remove the
+ *  old line (only once the new one was accepted). Never done without the buyer asking. */
+export function useSwitchCartLine() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ fromId, toId, quantity }: { fromId: string; toId: string; quantity: number; toName: string }) => {
+      await putCartItem(toId, quantity);
+      return putCartItem(fromId, 0);
+    },
+    onSuccess: (cart, { toName }) => {
+      queryClient.setQueryData(CART_QUERY_KEY, cart);
+      toast.success(`Switched to ${toName}`);
+    },
+    onError: (err) => {
+      toast.error(getApiErrorMessage(err, 'Could not switch'));
+      queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY });
+    },
+  });
+}

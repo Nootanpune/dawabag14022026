@@ -1,11 +1,12 @@
 'use client';
 import Link from 'next/link';
-import { ClipboardList, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText, Stethoscope } from 'lucide-react';
+import { ClipboardList, FileUp, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText, Stethoscope } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 
 const LINKS = [
   { href: '/orders', label: 'My orders', icon: ClipboardList },
+  { href: '/prescriptions', label: 'Prescriptions', icon: FileUp },
   { href: '/account/addresses', label: 'Saved addresses', icon: MapPin },
   { href: '/account/returns', label: 'Returns & refunds', icon: Undo2 },
   { href: '/account/refills', label: 'Refills & automatic payment', icon: Repeat },

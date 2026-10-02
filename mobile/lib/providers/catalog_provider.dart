@@ -13,6 +13,8 @@ final productsProvider = FutureProvider.family<Map<String, dynamic>, String>(
       if (params['q']?.isNotEmpty == true) 'q': params['q']!,
       if (params['category']?.isNotEmpty == true) 'category': params['category']!,
       if (params['pincode']?.isNotEmpty == true) 'pincode': params['pincode']!,
+      // relevance (default), price_asc or price_desc — the server sorts (Sprint 25)
+      if (params['sort']?.isNotEmpty == true && params['sort'] != 'relevance') 'sort': params['sort']!,
       'limit': '20',
     };
     final res = await apiService.dio.get('/products/search', queryParameters: queryParams);
@@ -38,5 +40,17 @@ final browsePincodeProvider = Provider<String>((ref) {
 });
 
 /// Builds the [productsProvider] key.
-String productsQueryKey({String q = '', String category = '', String pincode = ''}) =>
-    Uri(queryParameters: {'q': q, 'category': category, 'pincode': pincode}).query;
+String productsQueryKey({String q = '', String category = '', String pincode = '', String sort = ''}) =>
+    Uri(queryParameters: {'q': q, 'category': category, 'pincode': pincode, if (sort.isNotEmpty) 'sort': sort}).query;
+
+/// "Did you mean" names for a search that found nothing (server side; never
+/// Schedule X / NDPS, C-10). Empty on any failure.
+final searchSuggestionsProvider = FutureProvider.autoDispose.family<List<String>, String>((_, q) async {
+  try {
+    final res = await apiService.dio.get('/products/search/suggest', queryParameters: {'q': q});
+    final list = (res.data['data']?['suggestions'] as List?) ?? const [];
+    return list.map((e) => e.toString()).toList();
+  } catch (_) {
+    return const [];
+  }
+});

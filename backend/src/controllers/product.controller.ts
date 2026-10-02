@@ -9,7 +9,8 @@ import { productDetail } from '../services/productDetail.service';
 import { adminGetProduct, adminListProducts } from '../services/productAdmin.service';
 import { COPY_FIELDS, contentQueue, copyFlags, reviewContent } from '../services/productContent.service';
 import { withImageUrls } from '../services/productImage.service';
-import { searchCatalogue } from '../services/search/productSearch.service';
+import { parseSearchSort, searchCatalogue } from '../services/search/productSearch.service';
+import { didYouMean } from '../services/search/didYouMean';
 
 // ─── Search Products ─────────────────────────────────────────────────────────
 export async function searchProducts(req: Request, res: Response, next: NextFunction) {
@@ -34,6 +35,7 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
     // Matching, ranking and the listing rules (C-10) live in services/search
     const { products, total } = await searchCatalogue({
       q, category, schedule, pricingType: req.user?.pricing_type ?? 'customer', limit, offset,
+      sort: parseSearchSort(req.query.sort),   // optional; relevance by default (Sprint 25)
     });
 
     res.json({
@@ -56,6 +58,17 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
         },
       },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /products/search/suggest?q= — "Did you mean" for a search that found nothing:
+// up to 3 names close to what was typed, from sellable products only (C-10)
+export async function getSearchSuggestions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const q = String(req.query.q ?? '').slice(0, 100);
+    res.json({ success: true, data: { suggestions: await didYouMean(q) } });
   } catch (error) {
     next(error);
   }

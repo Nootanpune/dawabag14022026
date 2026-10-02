@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode, RefObject } from 'react';
 import { Search, X } from 'lucide-react';
+import { SEARCH_EXAMPLES } from '@/lib/search/api';
 
 interface Props {
   query: string;
@@ -8,12 +9,14 @@ interface Props {
   inputRef: RefObject<HTMLInputElement | null>;
   /** A line under the search box (the free-delivery offer). */
   note?: ReactNode;
+  /** Enter: the full results page (/search?q=…) */
+  onSubmit?: () => void;
 }
 
 export const HOME_SEARCH_ID = 'home-search';
 
 /** Headline and the main medicine search. */
-export default function HomeHero({ query, onQueryChange, inputRef, note }: Props) {
+export default function HomeHero({ query, onQueryChange, inputRef, note, onSubmit }: Props) {
   return (
     <section className="rounded-2xl bg-gradient-to-br from-brand-50 to-white border border-brand-100 px-4 py-6 sm:px-8 sm:py-8 mb-5">
       <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight">
@@ -22,7 +25,7 @@ export default function HomeHero({ query, onQueryChange, inputRef, note }: Props
       <p className="text-sm sm:text-base text-gray-600 mt-1.5 mb-4">
         Search by brand or generic name and get them delivered to your door.
       </p>
-      <div className="relative" role="search">
+      <form className="relative" role="search" onSubmit={(e) => { e.preventDefault(); onSubmit?.(); }}>
         <label htmlFor={HOME_SEARCH_ID} className="sr-only">
           Search medicines
         </label>
@@ -33,8 +36,10 @@ export default function HomeHero({ query, onQueryChange, inputRef, note }: Props
           type="search"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="Try Dolo 650 or paracetamol"
+          // Generic examples only: a brand named here may not be in the catalogue (Sprint 25)
+          placeholder={`Try ${SEARCH_EXAMPLES[0]} or ${SEARCH_EXAMPLES[1]}`}
           autoComplete="off"
+          enterKeyHint="search"
           className="w-full pl-12 pr-11 py-3.5 rounded-xl border border-gray-300 bg-white text-base
                      focus:outline-none focus:ring-2 focus:ring-brand-400 shadow-sm scroll-mt-24"
         />
@@ -48,7 +53,7 @@ export default function HomeHero({ query, onQueryChange, inputRef, note }: Props
             <X className="w-4 h-4" />
           </button>
         )}
-      </div>
+      </form>
       {note}
     </section>
   );

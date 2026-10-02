@@ -10,6 +10,10 @@ import { toast } from 'sonner';
 import api, { getApiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { staffHome } from '@/lib/fulfilment/roles';
+import { safeNextPath } from '@/lib/auth/nextPath';
+
+// Shoppers return to the page that sent them here (?next=/prescriptions); staff go to their portal
+const nextPath = () => (typeof window === 'undefined' ? null : safeNextPath(new URLSearchParams(window.location.search).get('next')));
 
 const loginSchema = z.object({
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
@@ -48,7 +52,7 @@ export default function LoginPage() {
       else if (['pharmacist_rx', 'pharmacist_pack', 'delivery'].includes(role)) router.push(staffHome(role));
       // Marketplace partner logins work only in the partner portal
       else if (role === 'partner') router.push('/partner');
-      else router.push('/');
+      else router.push(nextPath() ?? '/');
     } catch (err: any) {
       const msg = getApiErrorMessage(err, 'Login failed');
       if (msg.includes('OTP sent')) {
@@ -69,7 +73,7 @@ export default function LoginPage() {
       const res = await api.post('/auth/verify-otp', { mobile: mobileForOTP, otp: data.otp });
       login(res.data.data);
       toast.success('Mobile verified! Welcome to Dawabag.');
-      router.push(res.data.data.role === 'partner' ? '/partner' : '/');
+      router.push(res.data.data.role === 'partner' ? '/partner' : nextPath() ?? '/');
     } catch (err: any) {
       toast.error(getApiErrorMessage(err, 'Invalid OTP'));
     } finally {

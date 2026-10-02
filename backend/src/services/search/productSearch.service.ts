@@ -18,9 +18,26 @@ export interface CatalogueSearch {
   pricingType: string;
   limit: number;
   offset: number;
+  /** relevance (default) or by the buyer's own price; ties keep the relevance order */
+  sort?: SearchSort;
 }
 
-function buyerColumns(customerType: string) {
+export const SEARCH_SORTS = ['relevance', 'price_asc', 'price_desc'] as const;
+export type SearchSort = typeof SEARCH_SORTS[number];
+
+/** Unknown values fall back to relevance (the default), never an error. */
+export function parseSearchSort(v: unknown): SearchSort {
+  return (SEARCH_SORTS as readonly string[]).includes(String(v)) ? (v as SearchSort) : 'relevance';
+}
+
+/** Where to put the buyer's price in the ORDER BY, before the relevance keys. */
+export function sortPrefix(sort: SearchSort | undefined, t: string): string {
+  if (sort === 'price_asc') return `${t}.sort_price ASC, `;
+  if (sort === 'price_desc') return `${t}.sort_price DESC, `;
+  return '';
+}
+
+export function buyerColumns(customerType: string) {
   // GAP-01: the price and quantities for the customer's type
   const displayPrice = customerType === 'b2b_retailer'
     ? 'COALESCE(p.ptr_price_paise, p.offer_price_paise)'
@@ -92,12 +109,14 @@ async function run(db: Db, s: CatalogueSearch, text: SearchText | null, fuzzy: b
   // and photo only for the page being shown. A search ranks in-stock first, so step 1
   // works out the stock (an index probe per match); browsing sorts by name only, so
   // the stock is worked out for the page alone.
-  const rankCols = text
+  const byPrice = s.sort === 'price_asc' || s.sort === 'price_desc';
+  const rankCols = (text
     ? `${tier} AS search_tier, ${score} AS search_score, ${stockQty} AS stock_qty`
-    : '0 AS search_tier, 0 AS search_score, NULL::bigint AS stock_qty';
-  const rank = (t: string) => text
+    : '0 AS search_tier, 0 AS search_score, NULL::bigint AS stock_qty')
+    + (byPrice ? `, (${displayPrice}) AS sort_price` : '');
+  const rank = (t: string) => sortPrefix(s.sort, t) + (text
     ? `${t}.search_tier, ${t}.search_score DESC, ${t}.stock_qty > 0 DESC, ${t}.name`
-    : `${t}.name`;
+    : `${t}.name`);
   const sql =
     `WITH m AS (
        SELECT p.id, p.name, ${rankCols} FROM products p ${where}

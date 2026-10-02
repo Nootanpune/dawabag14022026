@@ -1,4 +1,5 @@
 'use client';
+import type { ReactNode } from 'react';
 import { Trash2, Plus, Minus, AlertTriangle, Snowflake } from 'lucide-react';
 import { formatPrice, cn } from '@/lib/utils';
 import type { CartLine } from '@/lib/cart';
@@ -9,10 +10,12 @@ interface Props {
   line: CartLine;
   disabled?: boolean;
   onQuantityChange: (quantity: number) => void;
+  /** e.g. a cheaper option with the same medicine (Sprint 25) */
+  suggestion?: ReactNode;
 }
 
 /** One cart line exactly as the server priced it. */
-export default function CartLineItem({ line, disabled, onQuantityChange }: Props) {
+export default function CartLineItem({ line, disabled, onQuantityChange, suggestion }: Props) {
   const isRx = ['Schedule H', 'Schedule H1'].includes(line.drug_schedule);
   const minQty = Math.max(1, line.min_qty || 1);
 
@@ -51,22 +54,23 @@ export default function CartLineItem({ line, disabled, onQuantityChange }: Props
               onClick={() => onQuantityChange(line.quantity <= minQty ? 0 : line.quantity - 1)}
               disabled={disabled}
               className="p-1.5 hover:bg-gray-100 text-gray-600 disabled:opacity-30"
-              aria-label="Decrease quantity"
+              aria-label={`Decrease quantity of ${line.name}`}
             >
               <Minus className="w-3.5 h-3.5" />
             </button>
-            <span className="text-sm font-medium w-6 text-center">{line.quantity}</span>
+            <span className="text-sm font-medium w-6 text-center" aria-label={`Quantity ${line.quantity}`} aria-live="polite">{line.quantity}</span>
             <button
               onClick={() => onQuantityChange(line.quantity + 1)}
               disabled={disabled || line.quantity >= line.max_qty}
               className="p-1.5 hover:bg-gray-100 text-gray-600 disabled:opacity-30"
-              aria-label="Increase quantity"
+              aria-label={`Increase quantity of ${line.name}`}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
           <span className="font-semibold text-brand-600">{formatPrice(line.line_subtotal_paise)}</span>
         </div>
+        {suggestion}
       </div>
       <button
         onClick={() => onQuantityChange(0)}
