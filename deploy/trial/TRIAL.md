@@ -88,10 +88,13 @@ next deploy (the database keeps the password it was created with).
 ### Razorpay test keys (so checkout and consultation fees can be paid with test money)
 
 *Optional.* Until these keys are added, the trial shows a **demo payment** instead:
-"Demo payment — no money moves", with UPI / Card / Netbanking / Wallet tiles and the
-buttons **Pay (demo)** and **Simulate failure**. Pay (demo) marks the order paid exactly as
-a real payment would (pharmacist check, packing, invoice), and it is recorded as a demo
-payment. To hide it, add `DEMO_PAYMENTS=false` to `TRIAL_ENV`. A real (production) server
+"Demo payment — no money moves". It looks like Razorpay's window: choose UPI, Card,
+Netbanking or Wallet, and that method's own step opens (UPI id or a demo QR picture; a
+read-only test card and a demo bank OTP; a demo bank page; a wallet). The last screen has
+**Approve / Submit / Success** and **Decline / Fail / Failure** buttons. Approving marks
+the order paid exactly as a real payment would (pharmacist check, packing, invoice), and
+it is recorded as a demo payment. No real card can be typed in, and nothing is sent to a
+bank or wallet. To hide it, add `DEMO_PAYMENTS=false` to `TRIAL_ENV`. A real (production) server
 refuses this setting and never offers the demo. Once the keys below are added, "Pay
 securely" opens Razorpay's own payment window instead.
 

@@ -4,7 +4,8 @@ import { Loader2, CreditCard, Lock } from 'lucide-react';
 import api from '@/lib/api';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { formatPrice } from '@/lib/utils';
-import { payOrderDemo, type PaymentMethod } from '@/lib/payments/api';
+import { payOrderDemo, type DemoChoice } from '@/lib/payments/api';
+import { paidByLabel, type DemoOutcome } from '@/lib/payments/demoCheckout';
 import { openCheckout, PaymentWindowError } from '@/lib/payments/razorpayCheckout';
 import { usePaymentOptions } from '@/hooks/usePaymentOptions';
 import DemoPaymentPanel from '@/components/payments/DemoPaymentPanel';
@@ -17,7 +18,8 @@ interface Props {
   order: PlacedOrder;
   /** the prescription sent with this order, if it needs one (C-08) */
   rx: ChosenRx | null;
-  onPaid: (o: { demo: boolean }) => void;
+  /** paidBy: how the demo payment was made, e.g. "HDFC netbanking (demo)" */
+  onPaid: (o: { demo: boolean; paidBy?: string }) => void;
 }
 
 type Notice = { tone: 'error' | 'info'; text: string } | null;
@@ -29,7 +31,7 @@ type Notice = { tone: 'error' | 'info'; text: string } | null;
  */
 export default function PaymentStep({ order, rx, onPaid }: Props) {
   const { data: options, isLoading } = usePaymentOptions();
-  const [busy, setBusy] = useState<'success' | 'failure' | 'razorpay' | null>(null);
+  const [busy, setBusy] = useState<'razorpay' | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
   const payWithRazorpay = async () => {
@@ -59,17 +61,17 @@ export default function PaymentStep({ order, rx, onPaid }: Props) {
     }
   };
 
-  const payDemo = async (method: PaymentMethod, outcome: 'success' | 'failure') => {
-    setBusy(outcome);
+  // Called only from the demo checkout's last screen (Approve / Decline …); its own
+  // screens say when a payment did not go through, so only request errors are noted here.
+  const payDemo = async (choice: DemoChoice, outcome: 'success' | 'failure'): Promise<DemoOutcome> => {
     setNotice(null);
     try {
-      const r = await payOrderDemo(order.id, method, outcome);
-      if (r.paid) onPaid({ demo: true });
-      else setNotice({ tone: 'error', text: 'Demo payment failed (simulated). No money was taken. Your order is saved — press “Pay (demo)” to try again.' });
+      const r = await payOrderDemo(order.id, choice, outcome);
+      if (r.paid) { onPaid({ demo: true, paidBy: paidByLabel(choice) }); return 'paid'; }
+      return 'not_paid';
     } catch (err) {
       setNotice({ tone: 'error', text: getApiErrorMessage(err, 'We could not record the demo payment. Please try again.') });
-    } finally {
-      setBusy(null);
+      return 'error';
     }
   };
 
@@ -98,7 +100,7 @@ export default function PaymentStep({ order, rx, onPaid }: Props) {
       {isLoading ? (
         <p className="text-sm text-gray-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Getting payment options…</p>
       ) : options?.mode === 'demo' ? (
-        <DemoPaymentPanel amountPaise={order.total_paise} methods={options.methods} busy={busy === 'razorpay' ? null : busy} onPay={payDemo} />
+        <DemoPaymentPanel amountPaise={order.total_paise} methods={options.methods} providers={options.providers} onPay={payDemo} />
       ) : options?.mode === 'razorpay' ? (
         <>
           <p className="text-sm text-gray-700">You can pay by UPI, debit or credit card, netbanking or a wallet in Razorpay’s secure window.</p>

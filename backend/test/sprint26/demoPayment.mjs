@@ -101,14 +101,20 @@ export async function runTrialDemo(t) {
     let r = await callAt(b, 'GET', '/payments/options', { token: t.buyer });
     check('payment options: demo, UPI/card/netbanking/wallet, no cash on delivery', r.status === 200 && r.json.data?.mode === 'demo'
       && r.json.data.methods?.join() === 'upi,card,netbanking,wallet' && r.json.data.cash_on_delivery === false, r.json);
+    check('… with the demo checkout\'s banks and wallets (names only)', r.json.data?.providers?.netbanking?.join() === 'SBI,HDFC,ICICI,Axis,Kotak'
+      && r.json.data.providers.wallet?.join() === 'Paytm,PhonePe,Amazon Pay,Mobikwik', r.json.data?.providers);
     const order = await placeOrder(t, P.otc);
     r = await callAt(b, 'POST', '/payments/create-order', { token: t.buyer, body: { order_id: order.id } });
     check('Razorpay checkout without keys → a plain sentence, not a raw error', r.status === 503 && /not available right now/.test(r.json.message || ''), r.json);
 
     r = await callAt(b, 'POST', '/payments/demo', { token: t.other, body: { order_id: order.id, method: 'upi' } });
     check("another buyer's order → 404", r.status === 404, r.status);
+    r = await callAt(b, 'POST', '/payments/demo', { token: t.buyer, body: { order_id: order.id, method: 'wallet', provider: 'Some Bank' } });
+    check('a bank or wallet we do not list → 422', r.status === 422, r.status);
+    r = await callAt(b, 'POST', '/payments/demo', { token: t.buyer, body: { order_id: order.id, method: 'card', provider: '4111111111111111' } });
+    check('anything named with a card → 422 (no card data, ever)', r.status === 422, r.status);
     r = await callAt(b, 'POST', '/payments/demo', { token: t.buyer, body: { order_id: order.id, method: 'card', outcome: 'failure' } });
-    check('"Simulate failure" → not paid', r.status === 200 && r.json.data?.paid === false && r.json.data?.demo === true, r.json);
+    check('declined demo payment → not paid', r.status === 200 && r.json.data?.paid === false && r.json.data?.demo === true, r.json);
     let [o] = await q('SELECT status FROM orders WHERE id = $1', [order.id]);
     check('… the order is payment_failed, as after a failed Razorpay payment', o.status === 'payment_failed', o);
     let pays = await q(`SELECT gateway, status, method, gateway_order_id FROM payments WHERE order_id = $1`, [order.id]);
@@ -116,7 +122,7 @@ export async function runTrialDemo(t) {
       && /^demo_order_/.test(pays[0].gateway_order_id), pays);
 
     r = await callAt(b, 'POST', '/payments/demo', { token: t.buyer, body: { order_id: order.id, method: 'upi', outcome: 'success' } });
-    check('"Pay (demo)" → paid', r.status === 200 && r.json.data?.paid === true, r.json);
+    check('approved demo payment → paid', r.status === 200 && r.json.data?.paid === true, r.json);
     [o] = await q('SELECT status FROM orders WHERE id = $1', [order.id]);
     check('… the OTC order moves to packing (the captured-payment path)', o.status === 'packing', o);
     pays = await q(`SELECT gateway, status, method, gateway_payment_id FROM payments WHERE order_id = $1 AND status = 'captured'`, [order.id]);
@@ -133,9 +139,11 @@ export async function runTrialDemo(t) {
 
     // Prescription order: paid the same way, then it waits for the pharmacist (C-08)
     const rxOrder = await placeOrder(t, P.rx);
-    r = await callAt(b, 'POST', '/payments/demo', { token: t.buyer, body: { order_id: rxOrder.id, method: 'netbanking' } });
+    r = await callAt(b, 'POST', '/payments/demo', { token: t.buyer, body: { order_id: rxOrder.id, method: 'netbanking', provider: 'HDFC' } });
     [o] = await q('SELECT status FROM orders WHERE id = $1', [rxOrder.id]);
     check('a prescription order paid by demo goes to rx_pending (pharmacist queue)', r.json.data?.paid === true && o.status === 'rx_pending', o);
+    const [bank] = await q(`SELECT new_value->>'provider' AS provider FROM audit_logs WHERE action = 'demo_payment_captured' AND (new_value->>'order_id') = $1`, [rxOrder.id]);
+    check('… the chosen bank is in the demo audit entry only', bank?.provider === 'HDFC', bank);
 
     // Cancelling the paid OTC order: the demo refund is settled at once (no gateway, C-37)
     r = await callAt(b, 'POST', `/orders/${order.id}/cancel`, { token: t.buyer, body: { reason: 'S26 smoke' } });

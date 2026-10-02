@@ -66,6 +66,27 @@ Razorpay keys, fake object store). Causes and fixes:
   prescription named on review/payment) → 63 e2e; checkout/public/shop specs updated; Flutter
   `sprint26_journey_test.dart` (79). Journeys recorder flow updated (not re-recorded).
 
+- **Demo checkout like Razorpay (Sprint 26 follow-up, owner: "UPI click shows Order placed
+  and paid at once"):** choosing a tile now opens that method's own step; only the last screen
+  calls the demo endpoint. Web `components/payments/DemoPaymentPanel` (state machine) +
+  `payments/demo/*` (DemoBanner on every step, StepHeading focus, BackLink "Change method" /
+  "Go back", Escape steps back then closes the dialog; UpiStep: UPI ID demo@upi validated
+  name@handle or "Scan QR" = DemoQr drawing marked DEMO that encodes nothing → "Approve the
+  payment in your UPI app" 2:00 countdown, Approve/Decline (demo); CardStep: read-only test
+  card 4111…1111/12/yy/123/Demo Customer, never sent → Bank OTP 123456, Submit / Fail (demo);
+  ProviderStep netbanking SBI/HDFC/ICICI/Axis/Kotak → "<Bank> (demo) bank page" Success/Failure;
+  wallet Paytm/PhonePe/Amazon Pay/Mobikwik → Approve/Decline (demo)); decline → "Payment didn't
+  go through. No money was taken. You can try again." + Try again → step 1. Old "Simulate
+  failure"/"Pay (demo)" removed. `lib/payments/demoCheckout.ts` (paidByLabel); confirmation
+  "Paid by: UPI (demo) / Card ending 1111 (demo) / HDFC netbanking (demo) / PhonePe (demo)".
+  Same in the consultation dialog. API: options carries `providers` in demo mode
+  (`DEMO_PROVIDERS`), demo body takes optional `provider` (`demoProviderValid`: listed bank/
+  wallet only, none for upi/card → 422), kept only in the demo audit entry. App: same steps in
+  `widgets/payments/demo_checkout/` (DemoCheckout used inline in checkout — bottom Pay bar
+  hidden — and in `showDemoPaymentSheet(amountPaise, onPay)`; PopScope back steps back).
+  Tests: jest 136, sprint26 smoke + provider checks, e2e journey 14 (68 total), Flutter
+  `sprint27_demo_checkout_test.dart` (87 total). Phone walkthrough re-run (payment shots 26–37).
+
 ## Sprint 25 — shop like Amazon (2026-10-02, uncommitted)
 Owner's trial feedback: search not working, prescription upload not reachable, no way
 to add items from the cart.

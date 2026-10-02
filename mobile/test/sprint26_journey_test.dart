@@ -45,12 +45,11 @@ void main() {
       expect(o.methods, ['upi', 'card']);
       expect(const PaymentOptions().mode, 'unavailable');
     });
-    testWidgets('trial demo: labelled, method tiles and "Simulate failure"; the prescription is named', (tester) async {
-      var failed = false;
+    testWidgets('trial demo: labelled, method tiles (the demo checkout); the prescription is named', (tester) async {
       await tester.pumpWidget(_wrap(PaymentStep(
         orderNumber: 'DWB-1', totalPaise: 30000,
         options: const PaymentOptions(mode: 'demo', methods: ['upi', 'card', 'netbanking', 'wallet']),
-        onDemoMethod: (_) {}, onSimulateFailure: () => failed = true,
+        onDemoPay: (_, __) async => true,
         prescriptionLabel: 'photo uploaded 02 Oct 2026, 9:56 am',
       )));
       expect(find.textContaining('Demo payment — no money moves'), findsOneWidget);
@@ -59,11 +58,9 @@ void main() {
       }
       expect(find.textContaining('Prescription (photo uploaded 02 Oct 2026, 9:56 am) ✓'), findsOneWidget);
       expect(find.textContaining('get a full refund'), findsOneWidget);
-      await tester.tap(find.text('Simulate failure'));
-      expect(failed, isTrue);
     });
     testWidgets('no way to pay online: a plain sentence', (tester) async {
-      await tester.pumpWidget(_wrap(PaymentStep(orderNumber: 'DWB-2', totalPaise: 100, options: const PaymentOptions(), onDemoMethod: (_) {})));
+      await tester.pumpWidget(_wrap(const PaymentStep(orderNumber: 'DWB-2', totalPaise: 100, options: PaymentOptions())));
       expect(find.textContaining('Online payment is not available right now'), findsOneWidget);
     });
   });

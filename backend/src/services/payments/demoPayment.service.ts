@@ -13,7 +13,10 @@ import { applyCapture } from './capture.service';
 import { paymentFailed } from './webhook.service';
 import { DEMO_ORDER_PREFIX, DEMO_PAYMENT_PREFIX, demoPaymentsEnabled, type PaymentMethod } from './paymentMode';
 
-export interface DemoPaymentInput { method: PaymentMethod; outcome: 'success' | 'failure' }
+/** provider: the bank (netbanking) or wallet chosen in the demo checkout — audit only (Sprint 27) */
+export interface DemoPaymentInput { method: PaymentMethod; outcome: 'success' | 'failure'; provider?: string }
+
+const via = (input: DemoPaymentInput) => (input.provider ? { provider: input.provider } : {});
 
 export function assertDemoPayments(): void {
   // Same answer as "this route does not exist" outside a trial without keys
@@ -40,14 +43,14 @@ export async function payOrderDemo(userId: string, orderId: string, input: DemoP
     // As Razorpay's payment.failed webhook does: the payment fails, the order waits for another try
     await paymentFailed({ order_id: id.order });
     await writeAudit({ userId, action: 'demo_payment_failed', performedBy: userId,
-      newValue: { demo: true, order_id: order.id, gateway_order_id: id.order, method: input.method, amount_paise: order.total_paise } });
+      newValue: { demo: true, order_id: order.id, gateway_order_id: id.order, method: input.method, ...via(input), amount_paise: order.total_paise } });
     const o = await queryOne<{ status: string }>('SELECT status FROM orders WHERE id = $1', [order.id]);
     return { order_id: order.id, paid: false, demo: true, status: o?.status };
   }
   const r = await applyCapture({ id: id.payment, order_id: id.order, amount: order.total_paise, method: input.method, status: 'captured' }, userId);
   await writeAudit({ userId, action: 'demo_payment_captured', performedBy: userId,
     newValue: { demo: true, order_id: order.id, gateway_order_id: id.order, gateway_payment_id: id.payment, method: input.method,
-      amount_paise: order.total_paise, outcome: r.outcome } });
+      ...via(input), amount_paise: order.total_paise, outcome: r.outcome } });
   const o = await queryOne<{ status: string }>('SELECT status FROM orders WHERE id = $1', [order.id]);
   return { order_id: order.id, paid: true, demo: true, payment_id: id.payment, status: o?.status };
 }
@@ -65,12 +68,12 @@ export async function payConsultationDemo(userId: string, consultationId: string
   });
   if (input.outcome === 'failure') {
     await writeAudit({ userId, action: 'demo_payment_failed', performedBy: userId,
-      newValue: { demo: true, consultation_id: consultationId, gateway_order_id: id.order, method: input.method, amount_paise: c.fee_paise } });
+      newValue: { demo: true, consultation_id: consultationId, gateway_order_id: id.order, method: input.method, ...via(input), amount_paise: c.fee_paise } });
     return { id: consultationId, paid: false, demo: true, payment_status: 'unpaid' };
   }
   await applyCapture({ id: id.payment, order_id: id.order, amount: Number(c.fee_paise), method: input.method, status: 'captured' }, userId);
   await writeAudit({ userId, action: 'demo_payment_captured', performedBy: userId,
-    newValue: { demo: true, consultation_id: consultationId, gateway_order_id: id.order, gateway_payment_id: id.payment, method: input.method, amount_paise: c.fee_paise } });
+    newValue: { demo: true, consultation_id: consultationId, gateway_order_id: id.order, gateway_payment_id: id.payment, method: input.method, ...via(input), amount_paise: c.fee_paise } });
   const now = await queryOne<{ payment_status: string }>(`SELECT payment_status FROM consultations WHERE id = $1`, [consultationId]);
   return { id: consultationId, paid: now?.payment_status === 'paid', demo: true, payment_status: now?.payment_status };
 }

@@ -83,11 +83,20 @@ test('breadcrumbs on the product page (laptop)', async ({ page }) => {
   await expect(crumbs.getByText(PARA)).toBeVisible();
 });
 
-/** Mocks how this server takes payment, so each mode can be shown with the usual API. */
-async function mockPayments(page: Page, mode: 'demo' | 'unavailable', demoPaid = true) {
+/** Mocks how this server takes payment, so each mode can be shown with the usual API.
+ *  The demo endpoint answers as the trial does: paid on success, not paid on failure. */
+async function mockPayments(page: Page, mode: 'demo' | 'unavailable') {
+  const sent: any[] = [];
   await page.route('**/payments/options', (r) => r.fulfill({ json: { success: true,
-    data: { mode, methods: mode === 'demo' ? ['upi', 'card', 'netbanking', 'wallet'] : [], cash_on_delivery: false } } }));
-  await page.route('**/payments/demo', (r) => r.fulfill({ json: { success: true, data: { paid: demoPaid, demo: true, status: demoPaid ? 'packing' : 'payment_failed' } } }));
+    data: { mode, methods: mode === 'demo' ? ['upi', 'card', 'netbanking', 'wallet'] : [], cash_on_delivery: false,
+      ...(mode === 'demo' ? { providers: { netbanking: ['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak'], wallet: ['Paytm', 'PhonePe', 'Amazon Pay', 'Mobikwik'] } } : {}) } } }));
+  await page.route('**/payments/demo', (r) => {
+    const body = r.request().postDataJSON();
+    sent.push(body);
+    const paid = body.outcome === 'success';
+    return r.fulfill({ json: { success: true, data: { paid, demo: true, status: paid ? 'packing' : 'payment_failed' } } });
+  });
+  return sent;
 }
 
 async function placeOtcOrder(page: Page) {
@@ -98,20 +107,167 @@ async function placeOtcOrder(page: Page) {
   await page.getByRole('button', { name: /Place order/ }).click();
 }
 
-test('trial demo payment: tiles, "Simulate failure" says so plainly, "Pay (demo)" confirms the order', async ({ page }) => {
+const FAILED = "Payment didn't go through. No money was taken. You can try again.";
+const banner = (page: Page) => expect(page.getByText('Demo payment — no money moves.')).toBeVisible();
+
+test('demo checkout (trial): choosing UPI opens its own step; UPI ID → approve → order paid', async ({ page }) => {
   await signIn(page, 'buyer');
-  await mockPayments(page, 'demo', false);
+  const sent = await mockPayments(page, 'demo');
   await placeOtcOrder(page);
-  await expect(page.getByText('Demo payment — no money moves.')).toBeVisible();
-  for (const m of ['UPI', 'Card', 'Netbanking', 'Wallet']) await expect(page.getByRole('radio', { name: new RegExp(m) })).toBeVisible();
-  await page.getByRole('radio', { name: /Card/ }).click();
-  await page.getByRole('button', { name: 'Simulate failure' }).click();
-  await expect(page.getByText('Demo payment failed (simulated). No money was taken.')).toBeVisible();
-  await page.unroute('**/payments/demo');
-  await mockPayments(page, 'demo', true);
-  await page.getByRole('button', { name: /Pay .*\(demo\)/ }).click();
+  await banner(page);
+  for (const m of ['UPI', 'Card', 'Netbanking', 'Wallet']) await expect(page.getByRole('button', { name: new RegExp(`^${m}`) })).toBeVisible();
+  await page.getByRole('button', { name: /^UPI/ }).click();
+  // The method's own step — nothing paid yet
+  await expect(page.getByRole('heading', { name: 'Pay by UPI' })).toBeFocused();
+  expect(sent).toHaveLength(0);
+  await banner(page);
+  // "Change method" (and Escape) go back to the tiles
+  await page.getByRole('button', { name: 'Change method' }).click();
+  await expect(page.getByRole('heading', { name: /Choose how to pay/ })).toBeVisible();
+  await page.getByRole('button', { name: /^UPI/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: /Choose how to pay/ })).toBeVisible();
+  await page.getByRole('button', { name: /^UPI/ }).click();
+
+  const vpa = page.getByLabel('Your UPI ID');
+  await expect(vpa).toHaveValue('demo@upi');
+  await vpa.fill('not-an-id');
+  await vpa.blur();
+  await expect(page.getByText('Write it as name@bank')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Pay ₹/ })).toBeDisabled();
+  await page.getByRole('tab', { name: 'Scan QR' }).click();
+  await expect(page.getByRole('img', { name: /Demo QR picture — not a real payment code/ })).toBeVisible();
+  await page.getByRole('tab', { name: 'Pay by UPI ID' }).click();
+  await page.getByLabel('Your UPI ID').fill('ravi.k@okbank');
+  await page.getByRole('button', { name: /^Pay ₹/ }).click();
+  await expect(page.getByRole('heading', { name: 'Approve the payment in your UPI app' })).toBeFocused();
+  await expect(page.getByText(/Waiting for approval… \d:\d\d left/)).toBeVisible();
+  expect(sent).toHaveLength(0);
+  await banner(page);
+  await page.getByRole('button', { name: 'Approve (demo)' }).click();
   await expect(page.getByRole('heading', { name: 'Order confirmed!' })).toBeVisible();
+  await expect(page.getByText('Paid by UPI (demo)')).toBeVisible();
   await expect(page.getByText('Demo payment — no money moved')).toBeVisible();
+  expect(sent).toEqual([expect.objectContaining({ method: 'upi', outcome: 'success' })]);
+  expect(sent[0].provider).toBeUndefined();
+});
+
+test('demo checkout: UPI decline says so plainly; Try again returns to the ways to pay', async ({ page }) => {
+  await signIn(page, 'buyer');
+  const sent = await mockPayments(page, 'demo');
+  await placeOtcOrder(page);
+  await page.getByRole('button', { name: /^UPI/ }).click();
+  await page.getByRole('button', { name: /^Pay ₹/ }).click();
+  await page.getByRole('button', { name: 'Decline (demo)' }).click();
+  await expect(page.getByText(FAILED)).toBeVisible();
+  await banner(page);
+  expect(sent).toEqual([expect.objectContaining({ method: 'upi', outcome: 'failure' })]);
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByRole('heading', { name: /Choose how to pay/ })).toBeFocused();
+  await expect(page.getByRole('button', { name: /^Card/ })).toBeVisible();
+});
+
+test('demo checkout: card is a read-only test card, then a bank OTP screen; Submit pays', async ({ page }) => {
+  await signIn(page, 'buyer');
+  const sent = await mockPayments(page, 'demo');
+  await placeOtcOrder(page);
+  await page.getByRole('button', { name: /^Card/ }).click();
+  await expect(page.getByText('Demo — do not enter a real card.')).toBeVisible();
+  const number = page.getByLabel('Card number');
+  await expect(number).toHaveValue('4111 1111 1111 1111');
+  await expect(number).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('CVV')).toHaveValue('123');
+  await expect(page.getByLabel('Name on card')).toHaveValue('Demo Customer');
+  await page.getByRole('button', { name: /^Pay ₹/ }).click();
+  await expect(page.getByRole('heading', { name: 'Bank OTP (demo)' })).toBeFocused();
+  await expect(page.getByLabel('One-time password (OTP)')).toHaveValue('123456');
+  await expect(page.getByRole('button', { name: 'Fail (demo)' })).toBeVisible();
+  // Go back returns to the card step without paying
+  await page.getByRole('button', { name: 'Go back' }).click();
+  await expect(page.getByRole('heading', { name: 'Pay by card' })).toBeVisible();
+  await page.getByRole('button', { name: /^Pay ₹/ }).click();
+  await page.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByRole('heading', { name: 'Order confirmed!' })).toBeVisible();
+  await expect(page.getByText('Card ending 1111 (demo)')).toBeVisible();
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toEqual({ order_id: expect.any(String), method: 'card', outcome: 'success' }); // nothing about the card is sent
+});
+
+test('demo checkout: netbanking — choose a bank, its demo page, Success', async ({ page }) => {
+  await signIn(page, 'buyer');
+  const sent = await mockPayments(page, 'demo');
+  await placeOtcOrder(page);
+  await page.getByRole('button', { name: /^Netbanking/ }).click();
+  for (const b of ['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak']) await expect(page.getByRole('radio', { name: b })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Pay ₹/ })).toBeDisabled();
+  await page.getByRole('radio', { name: 'HDFC' }).click();
+  await page.getByRole('button', { name: /^Pay ₹/ }).click();
+  await expect(page.getByRole('heading', { name: 'HDFC (demo) bank page' })).toBeFocused();
+  await banner(page);
+  await page.getByRole('button', { name: 'Success' }).click();
+  await expect(page.getByText('HDFC netbanking (demo)')).toBeVisible();
+  expect(sent).toEqual([expect.objectContaining({ method: 'netbanking', provider: 'HDFC', outcome: 'success' })]);
+});
+
+test('demo checkout: wallet — choose PhonePe, Decline → nothing taken, try again', async ({ page }) => {
+  await signIn(page, 'buyer');
+  const sent = await mockPayments(page, 'demo');
+  await placeOtcOrder(page);
+  await page.getByRole('button', { name: /^Wallet/ }).click();
+  await page.getByRole('radio', { name: 'PhonePe' }).click();
+  await page.getByRole('button', { name: /^Pay ₹/ }).click();
+  await expect(page.getByRole('heading', { name: 'PhonePe wallet (demo)' })).toBeFocused();
+  await page.getByRole('button', { name: 'Decline (demo)' }).click();
+  await expect(page.getByText(FAILED)).toBeVisible();
+  expect(sent).toEqual([expect.objectContaining({ method: 'wallet', provider: 'PhonePe', outcome: 'failure' })]);
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await page.getByRole('button', { name: /^Wallet/ }).click();
+  await page.getByRole('radio', { name: 'Paytm' }).click();
+  await page.getByRole('button', { name: /^Pay ₹/ }).click();
+  await page.getByRole('button', { name: 'Approve (demo)' }).click();
+  await expect(page.getByText('Paytm (demo)')).toBeVisible();
+});
+
+test('consultation fee (trial): the same demo steps in the dialog; Escape steps back, then closes', async ({ page }) => {
+  await signIn(page, 'buyer');
+  await mockPayments(page, 'demo');
+  const id = '00000000-0000-4000-8000-0000000002a7';
+  let paid = false;
+  const sent: any[] = [];
+  await page.route('**/consultations/my', (r) => r.fulfill({ json: { success: true, data: [{ id, mode: 'video', status: 'booked',
+    consult_kind: 'new', fee_paise: 30000, payment_status: paid ? 'paid' : 'unpaid', chief_complaint: 'Fever', started_at: null, ended_at: null,
+    doctor_name: 'E2E Demo', qualification: 'MBBS', council: 'MMC', nmc_reg_number: 'E2E-1', speciality: 'General', slot_date: null, slot_start: null,
+    prescription_id: null }] } }));
+  await page.route(`**/consultations/${id}/pay/demo`, (r) => {
+    const body = r.request().postDataJSON();
+    sent.push(body);
+    paid = body.outcome === 'success';
+    return r.fulfill({ json: { success: true, data: { id, paid, demo: true, payment_status: paid ? 'paid' : 'unpaid' } } });
+  });
+  await page.goto('/account/consultations');
+  await page.getByRole('button', { name: /^Pay ₹300/ }).click();
+  const dialog = page.getByRole('dialog', { name: /Pay for: Consultation with Dr E2E Demo/ });
+  await expect(dialog.getByText('Demo payment — no money moves.')).toBeVisible();
+  await dialog.getByRole('button', { name: /^Netbanking/ }).click();
+  await expect(dialog.getByRole('heading', { name: 'Pay by netbanking' })).toBeFocused();
+  await page.keyboard.press('Escape'); // back to the ways to pay, dialog still open
+  await expect(dialog.getByRole('heading', { name: /Choose how to pay/ })).toBeFocused();
+  await page.keyboard.press('Escape'); // then closes
+  await expect(dialog).toHaveCount(0);
+  expect(sent).toHaveLength(0);
+
+  await page.getByRole('button', { name: /^Pay ₹300/ }).click();
+  await dialog.getByRole('button', { name: /^Card/ }).click();
+  await dialog.getByRole('button', { name: /^Pay ₹/ }).click();
+  await dialog.getByRole('button', { name: 'Fail (demo)' }).click();
+  await expect(dialog.getByText(FAILED)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Try again' }).click();
+  await dialog.getByRole('button', { name: /^Card/ }).click();
+  await dialog.getByRole('button', { name: /^Pay ₹/ }).click();
+  await dialog.getByRole('button', { name: 'Submit' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText('Fee paid — Card ending 1111 (demo), no money moved')).toBeVisible();
+  expect(sent.map((b) => `${b.method}:${b.outcome}`)).toEqual(['card:failure', 'card:success']);
 });
 
 test('no way to pay online: a plain sentence, never an error code', async ({ page }) => {

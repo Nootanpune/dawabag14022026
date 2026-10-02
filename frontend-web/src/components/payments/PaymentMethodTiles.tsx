@@ -1,29 +1,29 @@
 'use client';
-import { Building2, CreditCard, Smartphone, Wallet } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Building2, ChevronRight, CreditCard, Smartphone, Wallet } from 'lucide-react';
 import { METHOD_LABELS, type PaymentMethod } from '@/lib/payments/api';
 
 const ICONS: Record<PaymentMethod, typeof CreditCard> = { upi: Smartphone, card: CreditCard, netbanking: Building2, wallet: Wallet };
 
-/** The ways to pay, as large tiles (one chosen). */
-export default function PaymentMethodTiles({ methods, value, onChange }: { methods: PaymentMethod[]; value: PaymentMethod; onChange: (m: PaymentMethod) => void }) {
+/** The ways to pay, as large tiles; choosing one opens that method's step (as in Razorpay's window). */
+export default function PaymentMethodTiles({ methods, onChoose }: { methods: PaymentMethod[]; onChoose: (m: PaymentMethod) => void }) {
   return (
-    <div role="radiogroup" aria-label="Payment method" className="grid grid-cols-2 gap-2">
+    <ul aria-label="Ways to pay" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {methods.map((m) => {
         const Icon = ICONS[m];
-        const on = value === m;
         return (
-          <button key={m} type="button" role="radio" aria-checked={on} onClick={() => onChange(m)}
-            className={cn('text-left rounded-xl border-2 p-3 flex items-start gap-2 transition-colors',
-              on ? 'border-brand-600 bg-brand-50' : 'border-gray-200 hover:border-brand-300 bg-white')}>
-            <Icon className={cn('w-5 h-5 mt-0.5 shrink-0', on ? 'text-brand-700' : 'text-gray-500')} aria-hidden="true" />
-            <span>
-              <span className="block text-sm font-semibold text-gray-900">{METHOD_LABELS[m].title}</span>
-              <span className="block text-xs text-gray-600">{METHOD_LABELS[m].hint}</span>
-            </span>
-          </button>
+          <li key={m}>
+            <button type="button" onClick={() => onChoose(m)}
+              className="w-full text-left rounded-xl border-2 border-gray-200 hover:border-brand-400 bg-white p-3 flex items-center gap-2 transition-colors">
+              <Icon className="w-5 h-5 shrink-0 text-brand-700" aria-hidden="true" />
+              <span className="flex-1">
+                <span className="block text-sm font-semibold text-gray-900">{METHOD_LABELS[m].title}</span>
+                <span className="block text-xs text-gray-600">{METHOD_LABELS[m].hint}</span>
+              </span>
+              <ChevronRight className="w-4 h-4 text-gray-400" aria-hidden="true" />
+            </button>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }

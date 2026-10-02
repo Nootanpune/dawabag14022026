@@ -11,10 +11,12 @@ interface Props {
   shipments?: OrderShipment[];
   /** paid with the trial's demo payment (no money moved) */
   demo?: boolean;
+  /** how the demo payment was made, e.g. "Card ending 1111 (demo)" */
+  paidBy?: string;
   rx?: ChosenRx | null;
 }
 
-export default function OrderConfirmed({ orderNumber, totalPaise, shipments, demo, rx }: Props) {
+export default function OrderConfirmed({ orderNumber, totalPaise, shipments, demo, paidBy, rx }: Props) {
   const router = useRouter();
   return (
     <div className="card text-center py-10">
@@ -29,6 +31,7 @@ export default function OrderConfirmed({ orderNumber, totalPaise, shipments, dem
       <p className="text-gray-700 text-sm mb-1">
         Total paid: <strong>{formatPrice(totalPaise)}</strong> <span className="text-gray-500">incl. delivery and GST</span>
       </p>
+      {paidBy && <p className="text-gray-700 text-sm mb-1">Paid by: <strong>{paidBy}</strong></p>}
       {demo && (
         <p className="inline-flex items-center gap-1 text-xs font-medium text-amber-900 bg-amber-50 border border-amber-300 rounded-full px-3 py-1 my-2">
           <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" /> Demo payment — no money moved

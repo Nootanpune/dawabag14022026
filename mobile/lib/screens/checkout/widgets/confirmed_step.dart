@@ -13,7 +13,10 @@ class ConfirmedStep extends StatelessWidget {
   /// Paid with the trial's demo payment (no money moved)
   final bool demo;
 
-  const ConfirmedStep({super.key, required this.orderNumber, this.shipments = const [], this.demo = false});
+  /// How the demo payment was made, e.g. "Card ending 1111 (demo)"
+  final String? paidBy;
+
+  const ConfirmedStep({super.key, required this.orderNumber, this.shipments = const [], this.demo = false, this.paidBy});
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +33,11 @@ class ConfirmedStep extends StatelessWidget {
         const Text('Order confirmed!',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
+        if (paidBy != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text('Paid by: $paidBy', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          ),
         if (demo)
           Container(
             margin: const EdgeInsets.only(bottom: 8),

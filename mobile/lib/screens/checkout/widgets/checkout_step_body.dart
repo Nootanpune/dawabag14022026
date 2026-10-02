@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../models/checkout_summary.dart';
 import '../../../services/payment_api.dart';
+import '../../../widgets/payments/demo_checkout/demo_checkout.dart';
 import '../checkout_flow.dart';
 import 'address_step.dart';
 import 'confirmed_step.dart';
@@ -29,12 +30,12 @@ class CheckoutStepBody extends StatelessWidget {
   final PlacedOrder? order;
   final List<String> rxItems;
   final PaymentOptions? paymentOptions;
-  final String demoMethod;
-  final ValueChanged<String> onDemoMethod;
-  final VoidCallback? onSimulateFailure;
+  final DemoPay? onDemoPay;
   final String? prescriptionLabel;
   final String? paymentNotice;
   final bool paidDemo;
+  /// how the demo payment was made, e.g. "HDFC netbanking (demo)"
+  final String? paidBy;
 
   const CheckoutStepBody({
     super.key,
@@ -54,12 +55,11 @@ class CheckoutStepBody extends StatelessWidget {
     required this.order,
     this.rxItems = const [],
     this.paymentOptions,
-    this.demoMethod = 'upi',
-    required this.onDemoMethod,
-    this.onSimulateFailure,
+    this.onDemoPay,
     this.prescriptionLabel,
     this.paymentNotice,
     this.paidDemo = false,
+    this.paidBy,
   });
 
   @override
@@ -88,9 +88,7 @@ class CheckoutStepBody extends StatelessWidget {
             orderNumber: order?.orderNumber ?? '',
             totalPaise: order?.totalPaise ?? 0,
             options: paymentOptions,
-            demoMethod: demoMethod,
-            onDemoMethod: onDemoMethod,
-            onSimulateFailure: onSimulateFailure,
+            onDemoPay: onDemoPay,
             prescriptionLabel: prescriptionLabel,
             notice: paymentNotice,
           ),
@@ -98,6 +96,7 @@ class CheckoutStepBody extends StatelessWidget {
             orderNumber: order?.orderNumber ?? '',
             shipments: order?.shipments ?? const [],
             demo: paidDemo,
+            paidBy: paidBy,
           ),
       };
 }

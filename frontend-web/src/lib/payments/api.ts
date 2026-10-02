@@ -6,7 +6,14 @@ import api from '../api';
 export type PaymentMode = 'razorpay' | 'demo' | 'unavailable';
 export type PaymentMethod = 'upi' | 'card' | 'netbanking' | 'wallet';
 
-export interface PaymentOptions { mode: PaymentMode; methods: PaymentMethod[]; cash_on_delivery: boolean }
+/** providers: the demo checkout's banks and wallets, sent by the server in demo mode only */
+export interface PaymentOptions {
+  mode: PaymentMode; methods: PaymentMethod[]; cash_on_delivery: boolean;
+  providers?: { netbanking: string[]; wallet: string[] };
+}
+
+/** What the buyer chose in the demo checkout; provider = the bank or wallet (never card data). */
+export interface DemoChoice { method: PaymentMethod; provider?: string }
 
 export const METHOD_LABELS: Record<PaymentMethod, { title: string; hint: string }> = {
   upi: { title: 'UPI', hint: 'Google Pay, PhonePe, Paytm, BHIM' },
@@ -24,12 +31,12 @@ export async function fetchPaymentOptions(): Promise<PaymentOptions> {
 
 export interface DemoResult { paid: boolean; demo: true; status?: string; payment_status?: string }
 
-export async function payOrderDemo(orderId: string, method: PaymentMethod, outcome: 'success' | 'failure'): Promise<DemoResult> {
-  const { data } = await api.post('/payments/demo', { order_id: orderId, method, outcome });
+export async function payOrderDemo(orderId: string, choice: DemoChoice, outcome: 'success' | 'failure'): Promise<DemoResult> {
+  const { data } = await api.post('/payments/demo', { order_id: orderId, ...choice, outcome });
   return data.data;
 }
 
-export async function payConsultationDemo(consultationId: string, method: PaymentMethod, outcome: 'success' | 'failure'): Promise<DemoResult> {
-  const { data } = await api.post(`/consultations/${consultationId}/pay/demo`, { method, outcome });
+export async function payConsultationDemo(consultationId: string, choice: DemoChoice, outcome: 'success' | 'failure'): Promise<DemoResult> {
+  const { data } = await api.post(`/consultations/${consultationId}/pay/demo`, { ...choice, outcome });
   return data.data;
 }

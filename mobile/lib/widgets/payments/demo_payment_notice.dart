@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// "Demo payment — no money moves" (the owner's trial server, Sprint 26).
+/// "Demo payment — no money moves" (the owner's trial server, Sprint 26), shown
+/// on every step of the demo checkout.
 class DemoPaymentNotice extends StatelessWidget {
   const DemoPaymentNotice({super.key});
 
@@ -19,7 +20,7 @@ class DemoPaymentNotice extends StatelessWidget {
         Expanded(
           child: Text(
             'Demo payment — no money moves. This is the trial app, so real payment is switched off. '
-            'Choose how you would pay, then press “Pay (demo)”.',
+            'The steps look like a real payment, but nothing is sent to a bank, card or wallet.',
             style: TextStyle(fontSize: 12, color: Color(0xFF7A4B00)),
           ),
         ),

@@ -58,7 +58,8 @@ class _BookConsultationScreenState extends ConsumerState<BookConsultationScreen>
       onBusy: (busy) {
         if (mounted) setState(() => _busy = busy);
       },
-      chooseDemo: () => showDemoPaymentSheet(context, amountLabel: 'the fee'),
+      chooseDemo: (options, feePaise, pay) => showDemoPaymentSheet(context,
+          amountPaise: feePaise, methods: options.methods, providers: options.providers, onPay: pay),
     );
   }
 
@@ -125,7 +126,7 @@ class _BookConsultationScreenState extends ConsumerState<BookConsultationScreen>
 
   Future<void> _pay(ConsultBooking booking) async {
     final doctorName = ref.read(doctorDetailProvider(widget.doctorId)).valueOrNull?.fullName;
-    await _payment.pay(booking.id, doctorName: doctorName);
+    await _payment.pay(booking.id, doctorName: doctorName, feePaise: booking.feePaise);
   }
 
   @override

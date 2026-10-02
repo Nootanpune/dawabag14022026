@@ -10,44 +10,42 @@ const _icons = {
   'wallet': Icons.account_balance_wallet_outlined,
 };
 
-/// The ways to pay as tiles; one chosen.
+/// The ways to pay as tiles; tapping one opens that method's own step
+/// (as in Razorpay's window) — nothing is paid yet.
 class PaymentMethodTiles extends StatelessWidget {
   final List<String> methods;
-  final String selected;
   final ValueChanged<String> onSelect;
-  const PaymentMethodTiles({super.key, required this.methods, required this.selected, required this.onSelect});
+  const PaymentMethodTiles({super.key, required this.methods, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Column(
       children: [
         for (final m in methods)
-          SizedBox(
-            width: (MediaQuery.sizeOf(context).width - 32 - 8) / 2,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
             child: Semantics(
-              selected: m == selected,
               button: true,
               child: InkWell(
                 borderRadius: BorderRadius.circular(10),
                 onTap: () => onSelect(m),
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    border: Border.all(color: m == selected ? AppTheme.brandGreen : Colors.grey.shade300, width: m == selected ? 2 : 1),
+                    border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(10),
-                    color: m == selected ? AppTheme.brandGreen50 : Colors.white,
+                    color: Colors.white,
                   ),
                   child: Row(children: [
-                    Icon(_icons[m] ?? Icons.payment, size: 20, color: m == selected ? AppTheme.brandGreen700 : Colors.grey.shade600),
-                    const SizedBox(width: 8),
+                    Icon(_icons[m] ?? Icons.payment, size: 22, color: AppTheme.brandGreen700),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(paymentMethodLabels[m]?.$1 ?? m, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        Text(paymentMethodLabels[m]?.$1 ?? m, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                         Text(paymentMethodLabels[m]?.$2 ?? '', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                       ]),
                     ),
+                    Icon(Icons.chevron_right, color: Colors.grey.shade500),
                   ]),
                 ),
               ),

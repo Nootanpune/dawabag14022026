@@ -10,6 +10,7 @@ import '../../services/api_service.dart';
 import '../../services/checkout_api.dart';
 import '../../services/payment_api.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/payments/demo_checkout/demo_checkout.dart';
 import 'checkout_flow.dart';
 import 'checkout_prescription.dart';
 import 'checkout_razorpay.dart';
@@ -38,9 +39,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   bool _isLoading = false;
   late final CheckoutRazorpay _razorpay;
   PaymentOptions? _payOptions; // GET /payments/options (Sprint 26)
-  String _demoMethod = 'upi';
   String? _payNotice;
   bool _paidDemo = false;
+  String? _paidBy; // in memory only: how the demo payment was made
   List<String> _rxItems = const []; // the order's prescription lines, kept when the cart empties
 
   @override
@@ -181,29 +182,25 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     setState(() => _step = CheckoutStep.confirmed);
   }
 
-  /// Trial server without Razorpay keys: a labelled demo payment, no money moves.
-  Future<void> _payDemo({bool fail = false}) async {
+  /// Trial server without Razorpay keys: the demo checkout (no money moves) calls
+  /// this from its last screen. A decline is shown by the demo checkout itself.
+  Future<bool> _payDemo(DemoChoice choice, bool success) async {
     final orderId = _order?.id;
-    if (orderId == null) return;
+    if (orderId == null) return false;
     setState(() => _payNotice = null);
-    var paid = false;
-    await _busy(() async {
-      paid = await apiService.payOrderDemo(orderId, method: _demoMethod, fail: fail);
-    }, 'We could not record the demo payment. Please try again.');
-    if (!mounted) return;
-    if (paid) {
+    final paid = await apiService.payOrderDemo(orderId, method: choice.method, provider: choice.provider, fail: !success);
+    if (paid && mounted) {
       _paidDemo = true;
+      _paidBy = paidByLabel(choice);
       _onPaid();
-    } else {
-      setState(() => _payNotice = 'Demo payment failed (simulated). No money was taken. Your order is saved — tap “Pay (demo)” to try again.');
     }
+    return paid;
   }
 
   String _payLabel() {
     final total = formatPrice(_order?.totalPaise ?? 0);
     final o = _payOptions;
     if (o == null) return 'Getting payment options…';
-    if (o.isDemo) return 'Pay $total (demo)';
     if (o.isRazorpay) return 'Pay $total securely';
     return 'Online payment not available';
   }
@@ -211,7 +208,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   VoidCallback? _payAction() {
     final o = _payOptions;
     if (o == null) return null;
-    if (o.isDemo) return () => _payDemo();
     if (o.isRazorpay) return () => _razorpay.pay(_order?.id ?? '', orderNumber: _order?.orderNumber);
     return null;
   }
@@ -279,16 +275,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 order: _order,
                 rxItems: _rxItems,
                 paymentOptions: _payOptions,
-                demoMethod: _demoMethod,
-                onDemoMethod: (m) => setState(() => _demoMethod = m),
-                onSimulateFailure: _isLoading ? null : () => _payDemo(fail: true),
+                onDemoPay: _payDemo,
                 prescriptionLabel: _requiresPrescription ? _rx.label : null,
                 paymentNotice: _payNotice,
                 paidDemo: _paidDemo,
+                paidBy: _paidBy,
               ),
             ),
           ),
-          if (!confirmed)
+          // The demo checkout has its own Pay / Approve buttons
+          if (!confirmed && !(_step == CheckoutStep.payment && (_payOptions?.isDemo ?? false)))
             CheckoutBottomButton(
               label: _step == CheckoutStep.payment
                   ? _payLabel()

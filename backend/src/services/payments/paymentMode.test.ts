@@ -1,4 +1,4 @@
-import { demoPaymentsEnabled, isDemoPaymentId, paymentMode } from './paymentMode';
+import { DEMO_PROVIDERS, demoPaymentsEnabled, demoProviderValid, isDemoPaymentId, paymentMode } from './paymentMode';
 
 describe('payment mode (Sprint 26)', () => {
   const trial = { APP_ENV: 'trial' } as NodeJS.ProcessEnv;
@@ -25,5 +25,16 @@ describe('payment mode (Sprint 26)', () => {
     expect(isDemoPaymentId('demo_pay_ab12')).toBe(true);
     expect(isDemoPaymentId('pay_ab12')).toBe(false);
     expect(isDemoPaymentId(null)).toBe(false);
+  });
+  it('demo checkout: a listed bank or wallet only, and nothing named for UPI or cards (Sprint 27)', () => {
+    expect(DEMO_PROVIDERS.netbanking).toEqual(['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak']);
+    expect(demoProviderValid('netbanking', 'HDFC')).toBe(true);
+    expect(demoProviderValid('wallet', 'Amazon Pay')).toBe(true);
+    expect(demoProviderValid('wallet', undefined)).toBe(true);
+    expect(demoProviderValid('netbanking', 'Paytm')).toBe(false);
+    expect(demoProviderValid('wallet', 'Some Bank')).toBe(false);
+    expect(demoProviderValid('card', '4111111111111111')).toBe(false);
+    expect(demoProviderValid('upi', 'demo@upi')).toBe(false);
+    expect(demoProviderValid('upi', undefined)).toBe(true);
   });
 });

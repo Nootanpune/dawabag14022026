@@ -39,7 +39,7 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [rx, setRx] = useState<ChosenRx | null>(null);
   const [rxError, setRxError] = useState('');
-  const [paidDemo, setPaidDemo] = useState(false);
+  const [paidDemo, setPaidDemo] = useState<{ paidBy?: string } | null>(null); // in memory only: how the trial's demo payment was made
   // The prescription lines of the placed order (the cart no longer has them)
   const [orderedRxItems, setOrderedRxItems] = useState<{ name: string; quantity: number }[]>([]);
 
@@ -109,10 +109,10 @@ export default function CheckoutPage() {
 
   const content = () => {
     if (step === 'confirmed' && order) {
-      return <OrderConfirmed orderNumber={order.order_number} totalPaise={order.total_paise} shipments={order.shipments} demo={paidDemo} rx={order.requires_prescription ? rx : null} />;
+      return <OrderConfirmed orderNumber={order.order_number} totalPaise={order.total_paise} shipments={order.shipments} demo={!!paidDemo} paidBy={paidDemo?.paidBy} rx={order.requires_prescription ? rx : null} />;
     }
     if (step === 'payment' && order) {
-      return <PaymentStep order={order} rx={order.requires_prescription ? rx : null} onPaid={({ demo }) => { setPaidDemo(demo); setStep('confirmed'); }} />;
+      return <PaymentStep order={order} rx={order.requires_prescription ? rx : null} onPaid={({ demo, paidBy }) => { setPaidDemo(demo ? { paidBy } : null); setStep('confirmed'); }} />;
     }
     if (step === 'rx-fix' && order) {
       return (

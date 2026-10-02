@@ -178,13 +178,41 @@ for (const [device, use] of Object.entries(DEVICES)) {
       await shot('Payment screen', undefined, { fullPage: true });
     });
     await step('pay', async () => {
-      const fail = page.getByRole('button', { name: /Simulate failure/ });
-      if (await fail.isVisible().catch(() => false)) {
-        await page.getByRole('radio', { name: /Card/ }).click();
-        await fail.click();
-        await page.waitForTimeout(2000);
-        await shot('Demo payment - simulated failure', undefined, { fullPage: true });
-        await page.getByRole('button', { name: /Pay .*\(demo\)/ }).click();
+      const upi = page.getByRole('button', { name: /^UPI/ });
+      if (await upi.isVisible().catch(() => false)) {
+        // The trial's demo checkout (Sprint 27): each method opens its own step, like Razorpay's window
+        const pay = () => page.getByRole('button', { name: /^Pay ₹/ }).click();
+        const changeMethod = () => page.getByRole('button', { name: 'Change method' }).click();
+        await upi.click();
+        await shot('Demo payment - UPI step (UPI ID)', undefined, { fullPage: true });
+        await page.getByRole('tab', { name: 'Scan QR' }).click();
+        await shot('Demo payment - UPI step (demo QR)', undefined, { fullPage: true });
+        await page.getByRole('tab', { name: 'Pay by UPI ID' }).click();
+        await pay();
+        await shot('Demo payment - approve in your UPI app', undefined, { fullPage: true });
+        await page.getByRole('button', { name: 'Decline (demo)' }).click();
+        await page.getByText("Payment didn't go through. No money was taken.").waitFor();
+        await shot('Demo payment - UPI declined', undefined, { fullPage: true });
+        await page.getByRole('button', { name: 'Try again' }).click();
+        await page.getByRole('button', { name: /^Card/ }).click();
+        await shot('Demo payment - card step (test card, read-only)', undefined, { fullPage: true });
+        await pay();
+        await shot('Demo payment - bank OTP', undefined, { fullPage: true });
+        await page.getByRole('button', { name: 'Go back' }).click();
+        await changeMethod();
+        await page.getByRole('button', { name: /^Wallet/ }).click();
+        await page.getByRole('radio', { name: 'PhonePe' }).click();
+        await shot('Demo payment - wallet step', undefined, { fullPage: true });
+        await pay();
+        await shot('Demo payment - wallet approve', undefined, { fullPage: true });
+        await page.getByRole('button', { name: 'Go back' }).click();
+        await changeMethod();
+        await page.getByRole('button', { name: /^Netbanking/ }).click();
+        await page.getByRole('radio', { name: 'HDFC' }).click();
+        await shot('Demo payment - netbanking step (HDFC chosen)', undefined, { fullPage: true });
+        await pay();
+        await shot('Demo payment - HDFC demo bank page', undefined, { fullPage: true });
+        await page.getByRole('button', { name: 'Success' }).click();
       } else {
         await page.getByRole('button', { name: /Pay .* securely/ }).click();
       }

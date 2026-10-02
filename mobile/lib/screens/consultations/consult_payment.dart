@@ -4,6 +4,7 @@ import '../../services/consultation_api.dart';
 import '../../services/api_service.dart';
 import '../../services/payment_api.dart';
 import '../../utils/consult_format.dart';
+import '../../widgets/payments/demo_checkout/demo_checkout.dart';
 
 /// Razorpay payment for a consultation fee, wired the same way as the order
 /// checkout (CheckoutRazorpay): POST /consultations/:id/pay, the Razorpay
@@ -15,8 +16,9 @@ class ConsultPayment {
   final void Function() onPaid;
   final void Function(String message) onError;
   final void Function(bool busy) onBusy;
-  /// The trial's demo payment (Sprint 26): asks how to pay; null when closed.
-  final Future<({String method, bool success})?> Function()? chooseDemo;
+  /// The trial's demo checkout (Sprint 27): shows the steps for [feePaise] and
+  /// records the answer with [pay]; the choice once paid, null when closed.
+  final Future<DemoChoice?> Function(PaymentOptions options, int feePaise, DemoPay pay)? chooseDemo;
   String? _consultationId;
 
   ConsultPayment({required this.onPaid, required this.onError, required this.onBusy, this.chooseDemo}) {
@@ -25,10 +27,10 @@ class ConsultPayment {
   }
 
   /// Creates (or reuses) the server's Razorpay order and opens the sheet.
-  Future<void> pay(String consultationId, {String? doctorName}) async {
+  Future<void> pay(String consultationId, {String? doctorName, int feePaise = 0}) async {
     _consultationId = consultationId;
     final options = await apiService.getPaymentOptions();
-    if (options.isDemo) return _payDemo(consultationId);
+    if (options.isDemo) return _payDemo(consultationId, options, feePaise);
     if (!options.isRazorpay) {
       onError('Online payment is not available right now. Please try again later.');
       return;
@@ -60,23 +62,12 @@ class ConsultPayment {
     }
   }
 
-  /// Trial server without Razorpay keys: a labelled demo payment, no money moves.
-  Future<void> _payDemo(String consultationId) async {
-    final choice = await chooseDemo?.call();
-    if (choice == null) return;
-    onBusy(true);
-    try {
-      final paid = await apiService.payConsultationDemo(consultationId, method: choice.method, fail: !choice.success);
-      if (paid) {
-        onPaid();
-      } else {
-        onError('Demo payment failed (simulated). No money was taken; you can try again.');
-      }
-    } catch (e) {
-      onError(ApiService.errorMessage(e, fallback: 'We could not record the demo payment. Please try again.'));
-    } finally {
-      onBusy(false);
-    }
+  /// Trial server without Razorpay keys: the demo checkout, no money moves. A
+  /// decline is shown inside the sheet (Try again); request errors there too.
+  Future<void> _payDemo(String consultationId, PaymentOptions options, int feePaise) async {
+    final choice = await chooseDemo?.call(options, feePaise, (c, success) =>
+        apiService.payConsultationDemo(consultationId, method: c.method, provider: c.provider, fail: !success));
+    if (choice != null) onPaid();
   }
 
   Future<void> _onSuccess(PaymentSuccessResponse response) async {

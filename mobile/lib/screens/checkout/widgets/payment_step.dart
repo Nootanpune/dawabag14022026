@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../config/theme.dart';
 import '../../../services/payment_api.dart';
 import '../../../utils/formatters.dart';
-import '../../../widgets/payments/demo_payment_notice.dart';
-import '../../../widgets/payments/payment_method_tiles.dart';
+import '../../../widgets/payments/demo_checkout/demo_checkout.dart';
 import '../../../widgets/summary_row.dart';
 import 'rx_policy_note.dart';
 
@@ -16,9 +15,8 @@ class PaymentStep extends StatelessWidget {
   final String orderNumber;
   final int totalPaise;
   final PaymentOptions? options;
-  final String demoMethod;
-  final ValueChanged<String> onDemoMethod;
-  final VoidCallback? onSimulateFailure;
+  /// The trial's demo checkout records the answer here (paid or not)
+  final DemoPay? onDemoPay;
   /// e.g. "photo uploaded 02 Oct 2026, 9:56 am"; null when no prescription is needed
   final String? prescriptionLabel;
   final String? notice;
@@ -28,9 +26,7 @@ class PaymentStep extends StatelessWidget {
     required this.orderNumber,
     required this.totalPaise,
     this.options,
-    this.demoMethod = 'upi',
-    required this.onDemoMethod,
-    this.onSimulateFailure,
+    this.onDemoPay,
     this.prescriptionLabel,
     this.notice,
   });
@@ -74,16 +70,8 @@ class PaymentStep extends StatelessWidget {
         const SizedBox(height: 16),
         if (o == null)
           const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen))
-        else if (o.isDemo) ...[
-          const DemoPaymentNotice(),
-          const SizedBox(height: 12),
-          PaymentMethodTiles(methods: o.methods, selected: demoMethod, onSelect: onDemoMethod),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: onSimulateFailure,
-            icon: const Icon(Icons.cancel_outlined),
-            label: const Text('Simulate failure'),
-          ),
+        else if (o.isDemo && onDemoPay != null) ...[
+          DemoCheckout(amountPaise: totalPaise, methods: o.methods, providers: o.providers, onPay: onDemoPay!),
         ] else if (o.isRazorpay)
           Container(
             padding: const EdgeInsets.all(14),

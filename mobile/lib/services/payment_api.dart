@@ -6,7 +6,9 @@ import 'api_utils.dart';
 class PaymentOptions {
   final String mode;
   final List<String> methods;
-  const PaymentOptions({this.mode = 'unavailable', this.methods = const []});
+  /// The demo checkout's banks and wallets ({netbanking: [...], wallet: [...]}), demo mode only
+  final Map<String, List<String>> providers;
+  const PaymentOptions({this.mode = 'unavailable', this.methods = const [], this.providers = const {}});
 
   bool get isRazorpay => mode == 'razorpay';
   bool get isDemo => mode == 'demo';
@@ -14,6 +16,12 @@ class PaymentOptions {
   factory PaymentOptions.fromJson(Map<String, dynamic> j) => PaymentOptions(
         mode: j['mode']?.toString() ?? 'unavailable',
         methods: (j['methods'] is List) ? (j['methods'] as List).map((e) => e.toString()).toList() : const [],
+        providers: (j['providers'] is Map)
+            ? {
+                for (final e in (j['providers'] as Map).entries)
+                  if (e.value is List) e.key.toString(): (e.value as List).map((v) => v.toString()).toList(),
+              }
+            : const {},
       );
 }
 
@@ -38,15 +46,21 @@ extension PaymentApi on ApiService {
 
   /// POST /payments/demo — trial only; the server records it through the same
   /// path as a captured Razorpay payment. Returns whether it was paid.
-  Future<bool> payOrderDemo(String orderId, {required String method, bool fail = false}) async {
-    final res = await dio.post('/payments/demo', data: {'order_id': orderId, 'method': method, 'outcome': fail ? 'failure' : 'success'});
+  /// [provider]: the bank or wallet chosen (never card data); kept in the audit only.
+  Future<bool> payOrderDemo(String orderId, {required String method, String? provider, bool fail = false}) async {
+    final res = await dio.post('/payments/demo', data: {
+      'order_id': orderId,
+      'method': method,
+      if (provider != null) 'provider': provider,
+      'outcome': fail ? 'failure' : 'success',
+    });
     return apiData(res)['paid'] == true;
   }
 
   /// POST /consultations/:id/pay/demo — trial only.
-  Future<bool> payConsultationDemo(String consultationId, {required String method, bool fail = false}) async {
+  Future<bool> payConsultationDemo(String consultationId, {required String method, String? provider, bool fail = false}) async {
     final res = await dio.post('/consultations/${Uri.encodeComponent(consultationId)}/pay/demo',
-        data: {'method': method, 'outcome': fail ? 'failure' : 'success'});
+        data: {'method': method, if (provider != null) 'provider': provider, 'outcome': fail ? 'failure' : 'success'});
     return apiData(res)['paid'] == true;
   }
 }

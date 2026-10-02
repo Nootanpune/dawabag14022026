@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { payConsultation } from '@/lib/telemedicine/razorpay';
-import { payConsultationDemo, type PaymentMethod } from '@/lib/payments/api';
+import { payConsultationDemo, type DemoChoice } from '@/lib/payments/api';
+import { paidByLabel, type DemoOutcome } from '@/lib/payments/demoCheckout';
 import { teleKeys } from '@/lib/telemedicine/api';
 import { usePaymentOptions } from '@/hooks/usePaymentOptions';
 import DemoPaymentDialog from '@/components/payments/DemoPaymentDialog';
@@ -20,7 +21,6 @@ export function useConsultationPayment(): { pay: (c: Due) => Promise<void>; busy
   const { data: options } = usePaymentOptions();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [demoFor, setDemoFor] = useState<Due | null>(null);
-  const [demoBusy, setDemoBusy] = useState<'success' | 'failure' | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: teleKeys.all });
 
   const pay = async (c: Due) => {
@@ -42,24 +42,24 @@ export function useConsultationPayment(): { pay: (c: Due) => Promise<void>; busy
     }
   };
 
-  const payDemo = async (method: PaymentMethod, outcome: 'success' | 'failure') => {
-    if (!demoFor) return;
-    setDemoBusy(outcome);
+  // From the demo checkout's last screen; a decline is shown inside the dialog (Try again)
+  const payDemo = async (choice: DemoChoice, outcome: 'success' | 'failure'): Promise<DemoOutcome> => {
+    if (!demoFor) return 'error';
     try {
-      const r = await payConsultationDemo(demoFor.id, method, outcome);
-      if (r.paid) { toast.success('Fee paid (demo — no money moved)'); setDemoFor(null); }
-      else toast.error('Demo payment failed (simulated). No money was taken. Try “Pay (demo)” again.');
+      const r = await payConsultationDemo(demoFor.id, choice, outcome);
+      if (r.paid) { toast.success(`Fee paid — ${paidByLabel(choice)}, no money moved`); setDemoFor(null); return 'paid'; }
+      return 'not_paid';
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'We could not record the demo payment. Please try again.'));
+      return 'error';
     } finally {
-      setDemoBusy(null);
       refresh();
     }
   };
 
   const dialog = demoFor && options ? (
     <DemoPaymentDialog title={`Pay for: ${demoFor.label}`} amountPaise={demoFor.fee_paise} methods={options.methods}
-      busy={demoBusy} onPay={payDemo} onClose={() => setDemoFor(null)} />
+      providers={options.providers} onPay={payDemo} onClose={() => setDemoFor(null)} />
   ) : null;
   return { pay, busyId, dialog };
 }

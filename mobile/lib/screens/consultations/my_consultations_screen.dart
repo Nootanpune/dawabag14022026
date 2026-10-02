@@ -42,7 +42,8 @@ class _MyConsultationsScreenState extends ConsumerState<MyConsultationsScreen> {
       onBusy: (busy) {
         if (mounted) setState(() => _busy = busy);
       },
-      chooseDemo: () => showDemoPaymentSheet(context, amountLabel: 'the fee'),
+      chooseDemo: (options, feePaise, pay) => showDemoPaymentSheet(context,
+          amountPaise: feePaise, methods: options.methods, providers: options.providers, onPay: pay),
     );
     Future.microtask(_reload);
   }
@@ -127,7 +128,7 @@ class _MyConsultationsScreenState extends ConsumerState<MyConsultationsScreen> {
                     child: ConsultationCard(
                       consultation: c,
                       busy: _busy,
-                      onPay: () => _payment.pay(c.id, doctorName: c.doctorName),
+                      onPay: () => _payment.pay(c.id, doctorName: c.doctorName, feePaise: c.feePaise),
                       onJoin: () => _join(c),
                       onCancel: () => _cancel(c),
                       onPrescription: () =>

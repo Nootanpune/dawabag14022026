@@ -12,6 +12,24 @@ export type PaymentMode = 'razorpay' | 'demo' | 'unavailable';
 export const PAYMENT_METHODS = ['upi', 'card', 'netbanking', 'wallet'] as const;
 export type PaymentMethod = typeof PAYMENT_METHODS[number];
 
+/**
+ * Banks and wallets the trial's demo checkout offers (Sprint 27, mimics Razorpay's steps).
+ * Names only — a demo payment never reaches a bank or wallet; the chosen one is kept in
+ * the demo payment's audit entry (C-46). Cards: nothing about the card is ever sent.
+ */
+export const DEMO_PROVIDERS = {
+  netbanking: ['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak'],
+  wallet: ['Paytm', 'PhonePe', 'Amazon Pay', 'Mobikwik'],
+} as const;
+
+/** A provider is named for netbanking and wallet only, and must be one we offer. */
+export function demoProviderValid(method: PaymentMethod, provider: string | undefined): boolean {
+  if (method === 'netbanking' || method === 'wallet') {
+    return provider === undefined || (DEMO_PROVIDERS[method] as readonly string[]).includes(provider);
+  }
+  return provider === undefined;
+}
+
 const keysSet = (env: NodeJS.ProcessEnv) => !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
 
 /** Demo payments: only on a trial server, only without Razorpay keys, unless DEMO_PAYMENTS=false. */
