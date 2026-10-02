@@ -779,6 +779,12 @@ to add items from the cart.
   it) crashes the API process — not fixed here.
 
 ## Sprint 24 — trial server (2026-10-01, merged to main via PR #1)
+- **Trial status (2026-10-02 night):** Sprints 34-35 live (deploy run 37036192548): security
+  fixes, Schedule C/C1, pharmacist check on every order, DAWA BAG rebrand (web, app, PDFs),
+  OTP password reset, Razorpay TEST keys added by the owner (real test checkout; untested by a
+  person yet). Open: owner to confirm partner-pharmacist release and second-pharmacist approval
+  of medicine info; app still lacks the order 'Pharmacist check' step and order_on_hold handling;
+  DLT template for order_on_hold SMS.
 - **Trial status (2026-10-02 evening):** Sprints 30-33 live (deploy run 37025737154). Open owner
   question: trust page wording "How a pharmacist checks your order" vs a pharmacist check on
   every order. Rebrand to DAWA BAG waits for the logo file.
