@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { fetchApprovedPartners, partnerAdminKeys, type ApprovedVendor } from '@/lib/admin/partners';
 import QueryState from '../QueryState';
@@ -14,7 +15,11 @@ export default function PartnersSection() {
 
   return (
     <section className="mt-8">
-      <h2 className="text-base font-semibold mb-3">Marketplace partners</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 className="text-base font-semibold">Marketplace partners</h2>
+        {/* Sprint 28: onboard a partner directly, with licences, pharmacists and logins */}
+        <Link href="/admin/partners/new" className="btn-outline text-xs py-1.5 px-3">Add partner</Link>
+      </div>
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText="No approved marketplace partners" />
       {!!data?.length && (
         <div className="card overflow-x-auto p-0">

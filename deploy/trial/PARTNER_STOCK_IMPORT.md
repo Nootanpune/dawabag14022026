@@ -7,6 +7,44 @@ whose software is **MediVision Platinum** by Allied Softtech Pvt Ltd, Pune.
 The stock stays in **the partner's own stock ledger** on Dawabag (owner decision of
 1 Oct 2026). Uploading never changes Dawabag's own stock or another partner's stock.
 
+## Onboard Nootan on the trial (Sprint 28, about 10 minutes)
+
+On the trial there is no SMS, so a partner cannot sign up by itself. Instead the owner,
+signed in as the trial admin (9000090006), adds the partner directly. Have Nootan's GST
+certificate, drug licences and pharmacists' registration certificates in front of you.
+
+1. Deploy this branch first (Actions → **Deploy trial** → Run workflow; leave
+   **reset data** unticked) so the trial has the new screens.
+2. Sign in as the admin and open **Partners** in the admin menu (under *Catalogue &
+   stock*) → **Add partner**.
+3. **Business:** legal name exactly as on the GST certificate; shop/trade name if
+   different; contact person and contact mobile; **invoice prefix** — 2 to 4 capital
+   letters or digits that will start Nootan's own invoice numbers (not DWB or DWS; it
+   cannot change once invoices are issued).
+4. **GST:** the 15-character GSTIN. The page tells you at once if a character is
+   mistyped. It must start with **27** because the shop is in Maharashtra.
+5. **Drug licences:** tick each form Nootan holds — **Form 20** and **Form 21**
+   (retail) and **Form 20B** and **Form 21B** (wholesale) — and enter each licence
+   number and its **valid till** date from the licence. An expired licence is refused:
+   enter the renewed one.
+6. **Pharmacists:** one row per registered pharmacist — full name and Maharashtra
+   State Pharmacy Council registration number (**Add another pharmacist** for more).
+7. **Address:** the licensed shop address as on the licence, city, state
+   (Maharashtra) and PIN code.
+8. **Logins:** one row per person who will upload stock — their mobile number and
+   name. Each row already has a temporary password. The mobile must **not** already be
+   a Dawabag customer account (the page will say so); use a different number.
+9. Press **Add partner**. Nootan is approved at once. The next page shows each
+   temporary password **only this once** — press **Copy** and give each person their
+   own password privately (a phone call or a direct message, not a group).
+10. Each person signs in on the website with their mobile and temporary password. They
+    are asked to choose their own password first (at least 8 characters with a letter
+    and a number); then **Upload stock** is in their menu (steps below).
+
+Later: **Partners** → open Nootan to renew a licence, change pharmacists or the address,
+or **Add login** for another person. Every change is recorded in the audit log;
+passwords never are.
+
 ## What Nootan does (about 5 minutes)
 
 1. In MediVision Platinum, open the **Stock Report Of Batch-wise Products** (the report

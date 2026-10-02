@@ -3,6 +3,7 @@ import {
   API_BASE,
   CLIENT_HEADERS,
   getAccessToken,
+  notifyPasswordChangeRequired,
   notifySessionExpired,
   refreshSession,
 } from './session';
@@ -38,6 +39,10 @@ api.interceptors.response.use(
         return api(original);
       }
       notifySessionExpired();
+    }
+    // A temporary password must be replaced first (server rule); the gate shows the form
+    if (error.response?.status === 403 && (error.response.data as { code?: string } | undefined)?.code === 'PASSWORD_CHANGE_REQUIRED') {
+      notifyPasswordChangeRequired();
     }
     return Promise.reject(error);
   }

@@ -2,6 +2,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import SessionBootstrap from '@/components/auth/SessionBootstrap';
+import PasswordChangeGate from '@/components/auth/PasswordChangeGate';
 import { useTrackPages } from '@/lib/layout/navHistory';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -20,7 +21,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SessionBootstrap>{children}</SessionBootstrap>
+      <SessionBootstrap>
+        <PasswordChangeGate>{children}</PasswordChangeGate>
+      </SessionBootstrap>
     </QueryClientProvider>
   );
 }

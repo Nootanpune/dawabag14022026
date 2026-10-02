@@ -296,10 +296,10 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       id: string; role: string; password_hash: string;
       mobile_verified: boolean; is_active: boolean;
       failed_login_attempts: number; locked_until: Date | null;
-      customer_type: string; kyc_status: string;
+      customer_type: string; kyc_status: string; must_change_password: boolean;
     }>(
       `SELECT id, role, password_hash, mobile_verified, is_active,
-              failed_login_attempts, locked_until, customer_type, kyc_status
+              failed_login_attempts, locked_until, customer_type, kyc_status, must_change_password
        FROM users WHERE mobile = $1 AND deleted_at IS NULL`,
       [mobile]
     );
@@ -315,7 +315,8 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       throw new AppError(`Account locked. Try again in ${minutesLeft} minutes.`, 423);
     }
 
-    const isValid = await bcrypt.compare(password, user.password_hash);
+    // An erased account has no password hash: treat as wrong credentials, never crash
+    const isValid = !!user.password_hash && await bcrypt.compare(password, user.password_hash);
 
     if (!isValid) {
       const attempts = user.failed_login_attempts + 1;
@@ -369,6 +370,8 @@ export async function login(req: Request, res: Response, next: NextFunction) {
         customer_type: user.customer_type,
         kyc_status: user.kyc_status,
         full_name: profile?.full_name,
+        // Sprint 28: a temporary password from Dawabag's admin must be replaced first
+        must_change_password: user.must_change_password,
         ...issueSession(req, res, tokens),
       },
     });
@@ -387,8 +390,9 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
 
     const payload = await verifyRefreshToken(refresh_token);
 
-    const user = await queryOne<{ id: string; role: string; is_active: boolean; customer_type: string; kyc_status: string; mobile: string }>(
-      `SELECT id, role, is_active, customer_type, kyc_status, mobile
+    const user = await queryOne<{ id: string; role: string; is_active: boolean; customer_type: string; kyc_status: string; mobile: string;
+      must_change_password: boolean }>(
+      `SELECT id, role, is_active, customer_type, kyc_status, mobile, must_change_password
        FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [payload.sub]
     );
@@ -412,6 +416,7 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
         kyc_status: user.kyc_status,
         mobile: user.mobile,
         full_name: profile?.full_name,
+        must_change_password: user.must_change_password,
         ...issueSession(req, res, tokens),
       },
     });

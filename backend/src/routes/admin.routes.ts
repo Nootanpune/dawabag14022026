@@ -7,12 +7,13 @@ import { AppError } from '../utils/AppError';
 import { listOpenCredit, setCreditLimit } from '../controllers/credit.controller';
 import { listJobs, runJobNow } from '../controllers/jobs.controller';
 import {
-  getSettings, getSettlementDetail, getSettlements, linkPartnerUser, listPartners, postGenerateSettlements,
+  getSettings, getSettlementDetail, getSettlements, linkPartnerUser, postGenerateSettlements,
   postSettlementPaid, postShipmentDelivered, putSetting, setCommission,
 } from '../controllers/marketplaceAdmin.controller';
 import {
   adminGetStockImport, adminGetStockImportRows, adminListProductRequests, adminListStockImports, adminResolveProductRequest,
 } from '../controllers/partnerStockImport.controller';
+import { getPartnerDetail, getPartners, postPartner, postPartnerLogin, putPartner } from '../controllers/partnerAdmin.controller';
 
 const router = Router();
 
@@ -96,7 +97,12 @@ router.post('/jobs/:name/run', authenticate, authorize('super_admin'), runJobNow
 
 // ─── Sprint 3: marketplace, settlements, settings ───────────────────────────
 const managers = authorize('admin', 'super_admin');
-router.get('/partners', authenticate, managers, listPartners);
+// Sprint 28: the admin onboards a partner (approved at once), edits it, adds logins
+router.get('/partners', authenticate, managers, getPartners);
+router.post('/partners', authenticate, managers, postPartner);
+router.get('/partners/:vendorId', authenticate, managers, getPartnerDetail);
+router.put('/partners/:vendorId', authenticate, managers, putPartner);
+router.post('/partners/:vendorId/logins', authenticate, managers, postPartnerLogin);
 router.post('/partners/:vendorId/users', authenticate, managers, linkPartnerUser);
 router.put('/partners/:vendorId/commission', authenticate, managers, setCommission);
 // Partner stock imports (Sprint 27): read-only for admins; new-product requests resolved here

@@ -10,6 +10,55 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 28 — admin onboards partners (2026-10-02, uncommitted)
+Owner wants Nootan Pharmaceuticals, Pune as the first real partner on trial.dawabag.com, but
+partner self-registration needs an SMS OTP (no SMS on the trial). So the admin adds partners.
+- DB `23_sprint28_partner_onboarding.sql`: `vendor_licences` (vendor_id, licence_type
+  dl20/dl21/dl20b/dl21b, number, valid_upto; UNIQUE (vendor, type) and (type, number);
+  last_alert_days for a future alert job), `vendor_pharmacists` (name + State Pharmacy
+  Council reg. no., is_active; removed ones kept inactive), vendors.trade_name /
+  address_line2 / created_by, users.must_change_password / password_changed_at.
+  `business_licences` (Sprint 5) stays Dawabag's OWN register — partner licences are separate.
+- vendors.drug_license_no/_type/_expiry stay the summary every seller check reads
+  (assertPartnerCanSell, allocation, partnerStock): Form 20 first (else 21, 20B, 21B) and
+  the EARLIEST valid-till, so any lapsed licence stops selling until renewed (C-33).
+  Partner invoices now print all its licence numbers (invoiceData, " / ").
+- `utils/gstin.ts` (format, real state code, mod-36 check character; GSTIN state must match
+  the address state via gstStateCodes), `utils/passwordPolicy.ts` (8+, letter + digit, ≤ 72
+  bytes, not the mobile). `services/partnerOnboarding/{rules,logins,partnerAdmin.service}.ts`.
+- API (admin, super_admin): GET/POST `/admin/partners`, GET/PUT `/admin/partners/:id`, POST
+  `/admin/partners/:id/logins` (existing `/:id/users` link + `/:id/commission` unchanged).
+  Create = one transaction: vendor marketplace_partner approved + kyc approved, licences,
+  pharmacists, logins (new user role partner, mobile_verified, must_change_password, temp
+  password by admin) — a mobile of a customer/staff account is refused (409, roles never
+  changed); an unlinked partner login is linked keeping its password. Refusals: bad/expired
+  licence, GSTIN invalid or wrong state, duplicate prefix/GSTIN/licence number. Prefix cannot
+  change after invoices. Lat/long from pincode_serviceability when not given. Audit
+  partner_created / partner_updated / partner_login_created|linked / password_changed (no
+  passwords; errorHandler redacts temporary_password, logins, current/new_password).
+- Auth: login + refresh return must_change_password; `auth.middleware` refuses every route
+  except /auth/change-password and /auth/logout with 403 code PASSWORD_CHANGE_REQUIRED
+  (AppError has optional `code`; optionalAuth treats such logins as anonymous). POST
+  `/auth/change-password` (controllers/password.controller.ts): current + new, clears flag,
+  revokes old access/refresh tokens, issues a new session.
+- Web: Admin menu "Partners" → `/admin/partners` (list), `/new` (sections Business, GST
+  with live checksum hint, Drug licences 20/21/20B/21B rows with valid-till, Pharmacists
+  repeatable, Address, Logins repeatable with browser-generated temp password + copy; after
+  save the passwords are shown once from memory), `/[id]` (may sell to, licences status,
+  logins + Add login dialog, edit form). `components/admin/partners/*`,
+  `lib/admin/{partnerOnboarding,gstin}.ts`, `lib/auth/password.ts`. Forced change:
+  `components/auth/PasswordChangeGate` (in providers) + `/auth/change-password`; the api
+  interceptor flags the store on PASSWORD_CHANGE_REQUIRED. Vendors page links "Add partner".
+- Retail vs wholesale: NOT distinguished for partners anywhere in allocation / partner stock
+  (buyer type never filters partner sellers). Only shown: GET detail `selling_rights`
+  {retail: 20/21 in date, wholesale: 20B/21B in date}. Enforcing it needs buyer type in
+  allocation.partnerCandidates and partnerStockSql — not built.
+- Tests: jest gstin.test + partnerOnboarding/rules.test (42); `test/sprint28.smoke.mjs`
+  (54 checks, in test:smoke); e2e `partnerOnboarding.spec.ts` (desktop + phone).
+- Not built: partner licence expiry alerts (column ready), privacy-notice consent for
+  admin-created logins, mobile app change-password screen (app gets 403 code), partner
+  pharmacists offered as H1 pharmacist picker.
+
 ## Sprint 27 — partner stock import (2026-10-02, uncommitted)
 First partner: Nootan Pharmaceuticals, Pune (20/21 + 20B/21B), billing software MediVision
 Platinum (Allied Softtech). The owner's real export ("Stock Report Of Batch-wise Products",
@@ -944,3 +993,4 @@ deployment per docs/Dawabag_Beta_Deployment_Guide.docx.
 | 2026-10-01 | Sprint 7: purchasing, goods receipt, stock adjustments, destruction register, counts, expiry watch, AWS SDK v3 |
 | 2026-10-01 | Sprints 8–13: notifications, courier, e-invoicing, purchase returns, teleconsultation, payments, security review, languages, retention, riders, call tokens, GST lock, WhatsApp |
 | 2026-10-02 | Sprint 27: partner stock import (MediVision preset, matching, apply to partner ledger) |
+| 2026-10-02 | Sprint 28: admin onboards partners (licences, pharmacists, logins with forced password change) |

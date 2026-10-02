@@ -40,6 +40,7 @@ import {
   ListTree,
   AlertOctagon,
   Images,
+  Store,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
@@ -80,6 +81,8 @@ export const NAV_SECTIONS: NavSection[] = [
       // Sprint 22 — bulk pack photos by SKU; each photo goes to pharmacist review (C-19)
       { href: '/admin/products/photos', label: 'Pack photos', icon: Images, roles: MANAGER_ROLES },
       { href: '/staff/content-review', label: 'Product copy', icon: ClipboardCheck, roles: PHARMACIST_ROLES },
+      // Sprint 28 — Dawabag's admin adds partner pharmacies directly (licences, pharmacists, logins)
+      { href: '/admin/partners', label: 'Partners', icon: Store, roles: MANAGER_ROLES },
       { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },
       // Sprint 27 — partners' stock files and the items they ask Dawabag to add
       { href: '/admin/partner-stock', label: 'Partner stock files', icon: PackagePlus, roles: MANAGER_ROLES },

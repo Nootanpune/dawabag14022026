@@ -45,7 +45,9 @@ export default function LoginPage() {
       login(res.data.data);
       toast.success('Welcome back!');
       const role = res.data.data.role;
-      if (role === 'admin' || role === 'super_admin') router.push('/admin');
+      // A temporary password from Dawabag's admin is replaced before anything else (Sprint 28)
+      if (res.data.data.must_change_password) router.push('/auth/change-password');
+      else if (role === 'admin' || role === 'super_admin') router.push('/admin');
       // Teleconsultation doctors: the doctor portal home (app/doctor/page.tsx; C-22)
       else if (role === 'doctor') router.push('/doctor');
       // Pharmacists work the fulfilment queues; riders their own run sheet (Sprint 13)

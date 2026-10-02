@@ -39,7 +39,10 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
             a.full_name AS ship_name, concat_ws(', ', a.address_line1, a.city, a.state, a.pincode) AS ship_address, a.state AS ship_state,
             u.business_name, up.full_name AS buyer_name,
             v.name AS partner_name, concat_ws(', ', v.address_line1, v.city, v.state, v.pincode) AS partner_address,
-            v.state AS partner_state, v.gst_number AS partner_gstin, v.drug_license_no AS partner_dl
+            v.state AS partner_state, v.gst_number AS partner_gstin,
+            -- every licence the partner holds (Sprint 28 register), like Dawabag's own line (C-13, C-33)
+            COALESCE((SELECT string_agg(vl.licence_number, ' / ' ORDER BY array_position(ARRAY['dl20','dl21','dl20b','dl21b']::varchar[], vl.licence_type))
+                      FROM vendor_licences vl WHERE vl.vendor_id = v.id), v.drug_license_no) AS partner_dl
      FROM order_shipments s
      JOIN orders o ON o.id = s.order_id
      JOIN addresses a ON a.id = o.address_id

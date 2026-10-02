@@ -18,6 +18,8 @@ export interface AuthResponseData {
   kyc_status?: string;
   full_name?: string;
   mobile?: string;
+  /** Sprint 28: signed in with a temporary password from Dawabag's admin — must choose a new one first */
+  must_change_password?: boolean;
   access_token: string;
   /** only present for mobile clients; never stored by the web app */
   refresh_token?: string;
@@ -73,4 +75,16 @@ export function onSessionExpired(listener: Listener): () => void {
 export function notifySessionExpired(): void {
   setAccessToken(null);
   expiredListeners.forEach((l) => l());
+}
+
+// ─── Temporary password (Sprint 28): the server refuses everything else until changed ──
+const passwordChangeListeners = new Set<Listener>();
+
+export function onPasswordChangeRequired(listener: Listener): () => void {
+  passwordChangeListeners.add(listener);
+  return () => passwordChangeListeners.delete(listener);
+}
+
+export function notifyPasswordChangeRequired(): void {
+  passwordChangeListeners.forEach((l) => l());
 }

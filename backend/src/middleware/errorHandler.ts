@@ -5,7 +5,7 @@ import { logger } from '../config/logger';
 
 // Never write secrets, personal identifiers or health data from a request body to the logs (C-41)
 const REDACTED_FIELDS = new Set([
-  'password', 'otp', 'refresh_token', 'pan_number', 'gstin',
+  'password', 'otp', 'temporary_password', 'current_password', 'new_password', 'logins', 'refresh_token', 'pan_number', 'gstin',
   'drug_license_number', 'nmc_reg_number', 'email', 'mobile',
   'diagnosis', 'advice', 'chief_complaint', 'notes', 'items', 'reason', 'instructions', 'patient_name', 'address_line1', 'address_line2',
 ]);
@@ -44,7 +44,7 @@ export function errorHandler(
 
   // App errors (operational)
   if (err instanceof AppError) {
-    return fail(err.statusCode, err.message);
+    return fail(err.statusCode, err.message, err.code ? { code: err.code } : {});
   }
 
   // Upload limits (multer)

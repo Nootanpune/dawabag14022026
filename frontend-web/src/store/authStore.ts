@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import api from '../lib/api';
 import {
   notifySessionExpired,
+  onPasswordChangeRequired,
   onSessionExpired,
   refreshSession,
   setAccessToken,
@@ -23,6 +24,8 @@ export interface User {
   customer_type?: string;
   /** not_required | pending_otp | pending_kyc | approved | rejected | ... */
   kyc_status?: string;
+  /** true until a temporary password set by Dawabag's admin is replaced (Sprint 28) */
+  must_change_password?: boolean;
 }
 
 /** 'unknown' until the startup refresh has answered */
@@ -50,6 +53,7 @@ function userFromSession(d: AuthResponseData): User {
     mobile: d.mobile ?? '',
     customer_type: d.customer_type,
     kyc_status: d.kyc_status,
+    must_change_password: !!d.must_change_password,
   };
 }
 
@@ -102,3 +106,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
 // A failed refresh anywhere in the app signs the user out of the in-memory store.
 onSessionExpired(() => useAuthStore.setState(SIGNED_OUT));
+
+// The server says this login still has its temporary password: show the change form.
+onPasswordChangeRequired(() => {
+  const user = useAuthStore.getState().user;
+  if (user && !user.must_change_password) useAuthStore.setState({ user: { ...user, must_change_password: true } });
+});

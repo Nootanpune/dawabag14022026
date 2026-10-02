@@ -9,6 +9,7 @@
 import { pool } from '../config/database';
 import { logger } from '../config/logger';
 import { AppError } from '../utils/AppError';
+import { invoicePrefixProblem } from './partnerOnboarding/rules';
 
 // ── Vendor Approval ───────────────────────────────────────────────────────────
 export class VendorApprovalService {
@@ -27,8 +28,8 @@ export class VendorApprovalService {
     const prefix = params.invoicePrefix?.trim().toUpperCase();
     if (isPartner && !prefix) throw new AppError('invoice_prefix is required for marketplace partners', 400);
     // <prefix>C/2627/00001 must fit the 16-character limit (CGST Rule 46, IRP)
-    if (prefix && !/^[A-Z1-9][A-Z0-9]{1,3}$/.test(prefix)) throw new AppError('invoice_prefix must be 2–4 capital letters/digits, not starting with 0', 400);
-    if (prefix && ['DWB', 'DWS'].includes(prefix)) throw new AppError('That prefix is reserved for Dawabag', 400);
+    const prefixProblem = prefix ? invoicePrefixProblem(prefix) : null;
+    if (prefixProblem) throw new AppError(prefixProblem, 400);
 
     const result = await pool.query(
       `UPDATE vendors SET
