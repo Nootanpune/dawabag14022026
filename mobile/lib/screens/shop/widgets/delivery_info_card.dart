@@ -60,7 +60,7 @@ class _DeliveryInfoCardState extends ConsumerState<DeliveryInfoCard> {
         key: key,
         padding: const EdgeInsets.only(top: 8),
         child: Row(children: [
-          Icon(icon, size: 18, color: AppTheme.brandGreen),
+          Icon(icon, size: 18, color: AppTheme.brandTeal),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
         ]),
@@ -103,7 +103,7 @@ class _DeliveryInfoCardState extends ConsumerState<DeliveryInfoCard> {
       key: const ValueKey('delivery-eta'),
       padding: const EdgeInsets.only(top: 8),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.local_shipping_outlined, size: 18, color: AppTheme.brandGreen),
+        const Icon(Icons.local_shipping_outlined, size: 18, color: AppTheme.brandTeal),
         const SizedBox(width: 8),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

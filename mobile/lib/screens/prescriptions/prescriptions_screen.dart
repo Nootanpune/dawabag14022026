@@ -87,7 +87,7 @@ class _PrescriptionsScreenState extends ConsumerState<PrescriptionsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Prescriptions')),
       body: RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: () => ref.refresh(myPrescriptionsProvider.future),
         child: ListView(
           padding: const EdgeInsets.all(16),

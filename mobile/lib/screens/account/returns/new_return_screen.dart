@@ -82,7 +82,7 @@ class _NewReturnScreenState extends ConsumerState<NewReturnScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Report a problem')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load this order'),
           onRetry: () => ref.invalidate(orderDetailProvider(widget.orderId)),

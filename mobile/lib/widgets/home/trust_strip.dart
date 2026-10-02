@@ -38,20 +38,20 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.brandGreen50,
+        color: AppTheme.brandTeal50,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 15, color: AppTheme.brandGreen700),
+          Icon(icon, size: 15, color: AppTheme.brandTeal700),
           const SizedBox(width: 4),
           Flexible(
             child: Text(label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.brandGreen700)),
+                    fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.brandTeal700)),
           ),
         ],
       ),

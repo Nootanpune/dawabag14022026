@@ -225,7 +225,7 @@ class RxValiditySection extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: expired ? Colors.red.shade700 : AppTheme.brandGreen700,
+                color: expired ? Colors.red.shade700 : AppTheme.brandTeal700,
               ),
             ),
           if (rx.verificationCode != null && rx.verificationCode!.isNotEmpty) ...[
@@ -234,7 +234,7 @@ class RxValiditySection extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: AppTheme.brandGreen50,
+                color: AppTheme.brandTeal50,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
@@ -247,7 +247,7 @@ class RxValiditySection extends StatelessWidget {
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 3,
-                      color: AppTheme.brandGreen700,
+                      color: AppTheme.brandTeal700,
                     ),
                   ),
                 ],

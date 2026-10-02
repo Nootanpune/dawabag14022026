@@ -18,7 +18,7 @@ class NoResultsView extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Icon(Icons.search_off, size: 48, color: AppTheme.brandGreen),
+        const Icon(Icons.search_off, size: 48, color: AppTheme.brandTeal),
         const SizedBox(height: 12),
         Text('No medicines found for "$query"',
             textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),

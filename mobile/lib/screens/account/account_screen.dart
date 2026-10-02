@@ -73,10 +73,10 @@ class AccountScreen extends ConsumerWidget {
               children: [
                 Container(
                   width: 56, height: 56,
-                  decoration: const BoxDecoration(color: AppTheme.brandGreen50, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(color: AppTheme.brandTeal50, shape: BoxShape.circle),
                   child: Center(
                     child: Text(initials,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.brandGreen600)),
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.brandTeal)),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -103,7 +103,7 @@ class AccountScreen extends ConsumerWidget {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.brandGreen,
+              color: AppTheme.brandTeal,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(

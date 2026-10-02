@@ -50,7 +50,7 @@ class TypeaheadOption extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(children: [
                     Text(formatPrice(product['display_price_paise'] ?? product['offer_price_paise'] ?? 0),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.brandTeal700)),
                     if (!inStock) ...[
                       const SizedBox(width: 8),
                       Text('Out of stock', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red.shade700)),

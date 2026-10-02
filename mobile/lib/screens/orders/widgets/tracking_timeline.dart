@@ -32,7 +32,7 @@ class TrackingTimeline extends StatelessWidget {
             child: Text(
               'Tracking: ${trackingStatusLabel(current)}',
               style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.brandGreen700),
+                  fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.brandTeal700),
             ),
           ),
         if (tracking.isReturning) const _ReturningNotice(),
@@ -84,7 +84,7 @@ class _EventRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final problem = event.status == 'exception' || event.status == 'rto';
     final dotColor = latest
-        ? (problem ? AppTheme.errorRed : AppTheme.brandGreen)
+        ? (problem ? AppTheme.errorRed : AppTheme.brandTeal)
         : Colors.grey.shade400;
     final details = [
       if (event.location != null) event.location!,

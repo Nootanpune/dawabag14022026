@@ -53,7 +53,7 @@ class MyMedicinesScreen extends ConsumerWidget {
         label: const Text('Add a reminder'),
       ),
       body: reminders.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load your reminders'),
           onRetry: () => ref.invalidate(remindersProvider),

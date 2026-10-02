@@ -34,13 +34,13 @@ class LegalScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('About & legal')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load legal details'),
           onRetry: () => ref.invalidate(legalInfoProvider),
         ),
         data: (info) => RefreshIndicator(
-          color: AppTheme.brandGreen,
+          color: AppTheme.brandTeal,
           onRefresh: () {
             ref.invalidate(policiesProvider);
             return ref.refresh(legalInfoProvider.future);

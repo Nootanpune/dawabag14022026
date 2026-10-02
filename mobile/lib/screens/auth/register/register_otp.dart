@@ -65,7 +65,7 @@ extension RegisterOtp on RegisterController {
       update(() => authData = data);
 
       if (isCustomer) {
-        finish(message: 'Welcome to Dawabag!');
+        finish(message: 'Welcome to DAWA BAG!');
         return;
       }
       update(() {

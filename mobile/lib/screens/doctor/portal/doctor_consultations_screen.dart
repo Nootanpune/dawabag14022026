@@ -100,7 +100,7 @@ class _DoctorConsultationsScreenState extends ConsumerState<DoctorConsultationsS
     if (!state.loaded && state.isLoading) {
       list = const Padding(
         padding: EdgeInsets.only(top: 48),
-        child: Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        child: Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
       );
     } else if (state.error != null && state.consultations.isEmpty) {
       list = Padding(
@@ -131,7 +131,7 @@ class _DoctorConsultationsScreenState extends ConsumerState<DoctorConsultationsS
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: notifier.load)],
       ),
       body: RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: notifier.load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -149,7 +149,7 @@ class _DoctorConsultationsScreenState extends ConsumerState<DoctorConsultationsS
             ),
             const SizedBox(height: 12),
             if ((state.isLoading && state.loaded) || _busy)
-              const LinearProgressIndicator(color: AppTheme.brandGreen),
+              const LinearProgressIndicator(color: AppTheme.brandTeal),
             if (state.error != null && state.consultations.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),

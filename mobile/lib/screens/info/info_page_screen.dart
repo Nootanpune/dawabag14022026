@@ -18,7 +18,7 @@ class InfoPageScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(async.valueOrNull?.title ?? 'About Dawabag')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load this page'),
           onRetry: () => ref.invalidate(infoPageProvider(pageKey)),

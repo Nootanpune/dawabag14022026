@@ -17,16 +17,16 @@ class FreeDeliveryProgress extends StatelessWidget {
         : 'Add ${formatPrice(offer.remainingPaise)} more for free delivery';
     return Container(
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: AppTheme.brandGreen50, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: AppTheme.brandTeal50, borderRadius: BorderRadius.circular(8)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Icon(Icons.card_giftcard, size: 16, color: AppTheme.brandGreen700),
+            const Icon(Icons.card_giftcard, size: 16, color: AppTheme.brandTeal700),
             const SizedBox(width: 6),
             Expanded(
               child: Text(text,
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.brandGreen700)),
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.brandTeal700)),
             ),
           ]),
           const SizedBox(height: 8),
@@ -35,14 +35,14 @@ class FreeDeliveryProgress extends StatelessWidget {
             child: LinearProgressIndicator(
               value: offer.progress,
               minHeight: 6,
-              color: AppTheme.brandGreen600,
+              color: AppTheme.brandTeal,
               backgroundColor: Colors.white,
               semanticsLabel: 'Free delivery on medicines of ${formatPrice(offer.abovePaise)} or more',
             ),
           ),
           const SizedBox(height: 6),
           Text('Free delivery on medicines of ${formatPrice(offer.abovePaise)} or more.',
-              style: const TextStyle(fontSize: 12, color: AppTheme.brandGreen700)),
+              style: const TextStyle(fontSize: 12, color: AppTheme.brandTeal700)),
         ],
       ),
     );

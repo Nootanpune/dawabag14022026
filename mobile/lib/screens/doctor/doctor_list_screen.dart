@@ -41,12 +41,12 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
 
     Widget body;
     if (!state.loaded && state.isLoading) {
-      body = const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen));
+      body = const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal));
     } else if (state.error != null && state.doctors.isEmpty) {
       body = ErrorRetryView(message: state.error!, onRetry: notifier.reload);
     } else {
       body = RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: notifier.reload,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -78,7 +78,7 @@ class _DoctorListScreenState extends ConsumerState<DoctorListScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            if (state.isLoading) const LinearProgressIndicator(color: AppTheme.brandGreen),
+            if (state.isLoading) const LinearProgressIndicator(color: AppTheme.brandTeal),
             if (state.doctors.isEmpty && !state.isLoading)
               const _NoDoctors()
             else
@@ -134,7 +134,7 @@ class _FilterChip extends StatelessWidget {
           label: Text(label),
           selected: selected,
           onSelected: (_) => onTap(),
-          selectedColor: AppTheme.brandGreen100,
+          selectedColor: AppTheme.brandTeal100,
         ),
       );
 }

@@ -59,7 +59,7 @@ class _GrievanceDetailScreenState extends ConsumerState<GrievanceDetailScreen> {
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _reload)],
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load this complaint'),
           onRetry: _reload,
@@ -68,7 +68,7 @@ class _GrievanceDetailScreenState extends ConsumerState<GrievanceDetailScreen> {
           children: [
             Expanded(
               child: RefreshIndicator(
-                color: AppTheme.brandGreen,
+                color: AppTheme.brandTeal,
                 onRefresh: () => ref.refresh(grievanceDetailProvider(widget.grievanceId).future),
                 child: ListView(
                   padding: const EdgeInsets.all(16),
@@ -169,14 +169,14 @@ class _ResolutionCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppTheme.brandGreen50,
+          color: AppTheme.brandTeal50,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Resolution',
-                style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
+                style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandTeal700)),
             const SizedBox(height: 4),
             Text(text, style: const TextStyle(fontSize: 13)),
           ],

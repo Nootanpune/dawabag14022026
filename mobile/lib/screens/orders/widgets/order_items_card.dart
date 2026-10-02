@@ -43,10 +43,10 @@ class OrderItemsCard extends StatelessWidget {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: AppTheme.brandGreen50,
+                          color: AppTheme.brandTeal50,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.medication_outlined, color: AppTheme.brandGreen, size: 20),
+                        child: const Icon(Icons.medication_outlined, color: AppTheme.brandTeal, size: 20),
                       ),
                       const SizedBox(width: 10),
                       Expanded(

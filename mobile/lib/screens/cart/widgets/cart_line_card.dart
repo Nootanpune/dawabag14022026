@@ -127,7 +127,7 @@ class CartLineCard extends StatelessWidget {
             const Spacer(),
             Text(formatPrice(line.lineSubtotalPaise),
                 style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.brandGreen600)),
+                    fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.brandTeal)),
           ],
         ),
       ],

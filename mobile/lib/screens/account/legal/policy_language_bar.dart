@@ -20,7 +20,7 @@ class PolicyLanguageBar extends StatelessWidget {
                 label: Text(e.value),
                 selected: value == e.key,
                 onSelected: (_) => onChanged(e.key),
-                selectedColor: AppTheme.brandGreen100,
+                selectedColor: AppTheme.brandTeal100,
               ))
           .toList(),
     );

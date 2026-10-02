@@ -26,18 +26,18 @@ class CartSummaryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SummaryRow('Subtotal (${cart.itemCount} items)', formatPrice(cart.subtotalPaise),
-                bold: true, valueColor: AppTheme.brandGreen600),
+                bold: true, valueColor: AppTheme.brandTeal),
             if (cart.discountPaise > 0) ...[
               const SizedBox(height: 8),
               SummaryRow(
                 coupon != null ? 'Discount (${coupon.code})' : 'Discount',
                 '–${formatPrice(cart.discountPaise)}',
-                valueColor: Colors.green,
+                valueColor: AppTheme.brandLeafDark,
               ),
             ],
             const SizedBox(height: 8),
             SummaryRow('Delivery charge', cart.freeDelivery?.reached == true ? 'Free' : 'Shown at checkout',
-                valueColor: cart.freeDelivery?.reached == true ? AppTheme.brandGreen600 : Colors.grey.shade700),
+                valueColor: cart.freeDelivery?.reached == true ? AppTheme.brandTeal : Colors.grey.shade700),
             if (cart.freeDelivery != null) ...[
               const SizedBox(height: 10),
               FreeDeliveryProgress(offer: cart.freeDelivery!),

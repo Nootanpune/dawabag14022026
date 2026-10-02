@@ -1,5 +1,3 @@
-import 'package:dio/dio.dart';
-
 import 'api_service.dart';
 import 'api_utils.dart';
 import '../models/json_utils.dart';
@@ -16,15 +14,11 @@ extension PrescriptionApi on ApiService {
   }
 
   /// POST /prescriptions/upload (multipart) without an order: kept in the
-  /// account and chosen at checkout.
-  Future<Map<String, dynamic>> uploadPrescription({required String filePath, required String filename}) async {
-    final formData = FormData.fromMap({
-      'prescription': await MultipartFile.fromFile(filePath, filename: filename),
-    });
-    final res = await dio.post('/prescriptions/upload', data: formData,
-        options: Options(sendTimeout: const Duration(seconds: 60), receiveTimeout: const Duration(seconds: 60)));
-    return apiData(res);
-  }
+  /// account and chosen at checkout. Sent with the type its bytes show (a
+  /// HEIC photo is refused before upload — Sprint 35).
+  Future<Map<String, dynamic>> uploadPrescription({required String filePath, required String filename}) =>
+      uploadMultipart('/prescriptions/upload',
+          filePath: filePath, filename: filename, fileField: 'prescription', sendTimeout: const Duration(seconds: 60));
 
   /// GET /prescriptions/:id/url → a signed link valid for minutes (null for an e-prescription).
   Future<String?> prescriptionLink(String id) async {

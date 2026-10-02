@@ -54,7 +54,7 @@ class StepDocuments extends StatelessWidget {
           children: [
             Icon(
               file != null ? Icons.check_circle : Icons.description_outlined,
-              color: file != null ? AppTheme.brandGreen : Colors.grey.shade500,
+              color: file != null ? AppTheme.brandTeal : Colors.grey.shade500,
             ),
             const SizedBox(width: 12),
             Expanded(

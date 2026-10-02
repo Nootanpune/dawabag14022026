@@ -19,8 +19,8 @@ class ProductBadges extends StatelessWidget {
       children: [
         _Pill(
           text: schedule,
-          background: isH ? AppTheme.amberBadge : AppTheme.brandGreen50,
-          foreground: isH ? AppTheme.amberText : AppTheme.brandGreen700,
+          background: isH ? AppTheme.amberBadge : AppTheme.brandTeal50,
+          foreground: isH ? AppTheme.amberText : AppTheme.brandTeal700,
         ),
         if (coldChain)
           const _Pill(

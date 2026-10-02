@@ -17,15 +17,15 @@ class ProductPrice extends StatelessWidget {
       runSpacing: 4,
       children: [
         Text(formatPrice(product['offer_price_paise'] ?? 0),
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: AppTheme.brandTeal700)),
         if (discount > 0) ...[
           Text('MRP ${formatPrice(product['mrp_paise'] ?? 0)}',
               style: TextStyle(fontSize: 14, color: Colors.grey.shade600, decoration: TextDecoration.lineThrough)),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: AppTheme.brandGreen50, borderRadius: BorderRadius.circular(6)),
+            decoration: BoxDecoration(color: AppTheme.brandTeal50, borderRadius: BorderRadius.circular(6)),
             child: Text('$discount% off',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.brandTeal700)),
           ),
         ],
       ],

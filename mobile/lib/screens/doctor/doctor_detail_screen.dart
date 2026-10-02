@@ -50,7 +50,7 @@ class _DoctorDetailScreenState extends ConsumerState<DoctorDetailScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(async.valueOrNull?.fullName ?? 'Doctor')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load this doctor'),
           onRetry: _reload,
@@ -117,7 +117,7 @@ class _ProfileCard extends StatelessWidget {
                     children: [
                       Text(d.fullName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                       if (d.speciality != null && d.speciality!.isNotEmpty)
-                        Text(d.speciality!, style: const TextStyle(fontSize: 13, color: AppTheme.brandGreen700)),
+                        Text(d.speciality!, style: const TextStyle(fontSize: 13, color: AppTheme.brandTeal700)),
                     ],
                   ),
                 ),

@@ -55,7 +55,7 @@ class CartScreen extends ConsumerWidget {
     if (cartState.isLoading && cart.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Cart')),
-        body: const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        body: const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
       );
     }
 
@@ -109,7 +109,7 @@ class CartScreen extends ConsumerWidget {
         ],
       ),
       body: RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: notifier.load,
         child: ListView(
           padding: const EdgeInsets.all(16),

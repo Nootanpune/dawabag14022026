@@ -113,7 +113,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
           appBar: AppBar(title: const Text('Edit address')),
           body: Center(
             child: list == null
-                ? const CircularProgressIndicator(color: AppTheme.brandGreen)
+                ? const CircularProgressIndicator(color: AppTheme.brandTeal)
                 : const Text('This address is no longer saved.'),
           ),
         );
@@ -153,7 +153,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               onChanged: on ? (v) => setState(() => _isDefault = v) : null,
               title: const Text('Use as my default address', style: TextStyle(fontSize: 14)),
               contentPadding: EdgeInsets.zero,
-              activeThumbColor: AppTheme.brandGreen,
+              activeThumbColor: AppTheme.brandTeal,
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),

@@ -38,3 +38,12 @@ String? changePasswordProblem({
   if (next == current) return 'Choose a new password that is different from the current one';
   return null;
 }
+
+/// Forgot password (Sprint 35): the new password is valid and typed twice the
+/// same. Null when it can be sent.
+String? resetPasswordProblem({required String next, required String again, String? mobile}) {
+  final p = passwordProblem(next, mobile: mobile);
+  if (p != null) return p;
+  if (next != again) return 'The two new passwords are not the same';
+  return null;
+}

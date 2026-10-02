@@ -20,7 +20,7 @@ class CheckoutStepBar extends StatelessWidget {
             final done = currentIndex > i ~/ 2;
             return Expanded(
               child: Container(
-                  height: 1.5, color: done ? AppTheme.brandGreen : Colors.grey.shade200),
+                  height: 1.5, color: done ? AppTheme.brandTeal : Colors.grey.shade200),
             );
           }
           final si = i ~/ 2;
@@ -33,8 +33,8 @@ class CheckoutStepBar extends StatelessWidget {
                 height: 24,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: (done || active) ? AppTheme.brandGreen : Colors.grey.shade200,
-                  border: active ? Border.all(color: AppTheme.brandGreen, width: 2) : null,
+                  color: (done || active) ? AppTheme.brandTeal : Colors.grey.shade200,
+                  border: active ? Border.all(color: AppTheme.brandTeal, width: 2) : null,
                 ),
                 child: Center(
                   child: done
@@ -52,9 +52,9 @@ class CheckoutStepBar extends StatelessWidget {
                     fontSize: 12,
                     fontWeight: active ? FontWeight.w700 : FontWeight.normal,
                     color: active
-                        ? AppTheme.brandGreen600
+                        ? AppTheme.brandTeal
                         : done
-                            ? AppTheme.brandGreen
+                            ? AppTheme.brandTeal
                             : Colors.grey,
                   )),
             ],

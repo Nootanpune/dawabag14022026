@@ -57,12 +57,12 @@ class ProductCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: isH ? const Color(0xFFFAEEDA) : AppTheme.brandGreen50,
+                      color: isH ? const Color(0xFFFAEEDA) : AppTheme.brandTeal50,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(schedule, style: TextStyle(
                       fontSize: 10, fontWeight: FontWeight.w600,
-                      color: isH ? const Color(0xFF633806) : AppTheme.brandGreen700,
+                      color: isH ? const Color(0xFF633806) : AppTheme.brandTeal700,
                     )),
                   ),
                   const SizedBox(height: 6),
@@ -73,10 +73,10 @@ class ProductCard extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(formatPrice(product['offer_price_paise'] ?? 0),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.brandGreen600)),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.brandTeal)),
                       if (discountPct > 0)
                         Text('$discountPct% off',
-                          style: const TextStyle(fontSize: 10, color: AppTheme.brandGreen700, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(fontSize: 10, color: AppTheme.brandTeal700, fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 8),

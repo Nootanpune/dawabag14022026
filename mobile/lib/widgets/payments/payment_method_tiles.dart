@@ -37,7 +37,7 @@ class PaymentMethodTiles extends StatelessWidget {
                     color: Colors.white,
                   ),
                   child: Row(children: [
-                    Icon(_icons[m] ?? Icons.payment, size: 22, color: AppTheme.brandGreen700),
+                    Icon(_icons[m] ?? Icons.payment, size: 22, color: AppTheme.brandTeal700),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

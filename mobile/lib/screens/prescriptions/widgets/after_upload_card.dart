@@ -12,17 +12,17 @@ class AfterUploadCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.brandGreen50,
+        color: AppTheme.brandTeal50,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.brandGreen100),
+        border: Border.all(color: AppTheme.brandTeal100),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Row(children: [
-            Icon(Icons.check_circle, color: AppTheme.brandGreen700),
+            Icon(Icons.check_circle, color: AppTheme.brandTeal700),
             SizedBox(width: 8),
-            Text('Prescription uploaded', style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
+            Text('Prescription uploaded', style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandTeal700)),
           ]),
           const SizedBox(height: 6),
           const Text('Now add the medicines from your prescription to your cart.'),

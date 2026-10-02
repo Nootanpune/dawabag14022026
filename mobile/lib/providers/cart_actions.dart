@@ -51,7 +51,7 @@ Future<bool> addProductToCart(
   }
   messenger.showSnackBar(SnackBar(
     content: Text('${product['name'] ?? 'Item'} added to your cart'),
-    backgroundColor: AppTheme.brandGreen,
+    backgroundColor: AppTheme.brandTeal,
     duration: const Duration(seconds: 2),
   ));
   return true;

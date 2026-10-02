@@ -67,7 +67,7 @@ class _DawabagAppState extends ConsumerState<DawabagApp> {
     NotificationTapRouter.attach(router);
 
     return MaterialApp.router(
-      title: 'Dawabag',
+      title: 'DAWA BAG',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

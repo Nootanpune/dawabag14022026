@@ -19,7 +19,7 @@ class ConsultStatusChip extends StatelessWidget {
 
   factory ConsultStatusChip.status(String status) {
     final (Color bg, Color fg) = switch (status) {
-      'completed' => (AppTheme.brandGreen50, AppTheme.brandGreen700),
+      'completed' => (AppTheme.brandTeal50, AppTheme.brandTeal700),
       'in_progress' => (Colors.blue.shade50, Colors.blue.shade800),
       'cancelled' => (Colors.grey.shade200, Colors.grey.shade700),
       _ => (AppTheme.amberBadge, AppTheme.amberText),
@@ -29,7 +29,7 @@ class ConsultStatusChip extends StatelessWidget {
 
   factory ConsultStatusChip.payment(String paymentStatus) {
     final (Color bg, Color fg) = switch (paymentStatus) {
-      'paid' || 'waived' => (AppTheme.brandGreen50, AppTheme.brandGreen700),
+      'paid' || 'waived' => (AppTheme.brandTeal50, AppTheme.brandTeal700),
       'refunded' => (Colors.blue.shade50, Colors.blue.shade800),
       'refund_pending' => (Colors.amber.shade50, Colors.amber.shade900),
       _ => (Colors.red.shade50, Colors.red.shade700),
@@ -100,7 +100,7 @@ class ConsultationCard extends StatelessWidget {
               Text(registration, style: grey),
             ],
             if (c.speciality != null && c.speciality!.isNotEmpty)
-              Text(c.speciality!, style: const TextStyle(fontSize: 12, color: AppTheme.brandGreen700)),
+              Text(c.speciality!, style: const TextStyle(fontSize: 12, color: AppTheme.brandTeal700)),
             const SizedBox(height: 8),
             Row(
               children: [

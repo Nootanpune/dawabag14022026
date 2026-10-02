@@ -40,12 +40,12 @@ class _GrievanceListScreenState extends ConsumerState<GrievanceListScreen> {
 
     Widget body;
     if (!state.loaded && state.isLoading) {
-      body = const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen));
+      body = const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal));
     } else if (state.error != null && state.grievances.isEmpty) {
       body = ErrorRetryView(message: state.error!, onRetry: notifier.load);
     } else {
       body = RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: notifier.load,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -56,7 +56,7 @@ class _GrievanceListScreenState extends ConsumerState<GrievanceListScreen> {
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 12),
-            if (state.isLoading) const LinearProgressIndicator(color: AppTheme.brandGreen),
+            if (state.isLoading) const LinearProgressIndicator(color: AppTheme.brandTeal),
             if (state.grievances.isEmpty)
               const _EmptyComplaints()
             else
@@ -79,7 +79,7 @@ class _GrievanceListScreenState extends ConsumerState<GrievanceListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openNew,
-        backgroundColor: AppTheme.brandGreen,
+        backgroundColor: AppTheme.brandTeal,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('New complaint'),

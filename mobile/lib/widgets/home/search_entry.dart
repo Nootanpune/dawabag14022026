@@ -20,7 +20,7 @@ class SearchEntry extends StatelessWidget {
         color: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppTheme.brandGreen100, width: 1.5),
+          side: const BorderSide(color: AppTheme.brandTeal100, width: 1.5),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -29,7 +29,7 @@ class SearchEntry extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Row(
               children: [
-                const Icon(Icons.search, color: AppTheme.brandGreen, size: 22),
+                const Icon(Icons.search, color: AppTheme.brandTeal, size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(hint,

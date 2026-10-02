@@ -38,7 +38,7 @@ class DayBar extends StatelessWidget {
         ),
         Expanded(
           child: TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: AppTheme.brandGreen700),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.brandTeal700),
             onPressed: () => _pick(context),
             icon: const Icon(Icons.calendar_today, size: 16),
             label: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),

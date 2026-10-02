@@ -22,8 +22,8 @@ class ReturnsScreen extends ConsumerWidget {
           appBar: AppBar(
             title: const Text('Returns & refunds'),
             bottom: const TabBar(
-              labelColor: AppTheme.brandGreen,
-              indicatorColor: AppTheme.brandGreen,
+              labelColor: AppTheme.brandTeal,
+              indicatorColor: AppTheme.brandTeal,
               tabs: [Tab(text: 'Returns'), Tab(text: 'Refunds')],
             ),
           ),
@@ -39,13 +39,13 @@ class _ReturnsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(returnsProvider);
     return async.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+      loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
       error: (e, _) => ErrorRetryView(
         message: ApiService.errorMessage(e, fallback: 'Could not load your returns'),
         onRetry: () => ref.invalidate(returnsProvider),
       ),
       data: (returns) => RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: () => ref.refresh(returnsProvider.future),
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -91,13 +91,13 @@ class _RefundsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(myRefundsProvider);
     return async.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+      loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
       error: (e, _) => ErrorRetryView(
         message: ApiService.errorMessage(e, fallback: 'Could not load your refunds'),
         onRetry: () => ref.invalidate(myRefundsProvider),
       ),
       data: (refunds) => RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: () => ref.refresh(myRefundsProvider.future),
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -118,7 +118,7 @@ class _RefundsTab extends ConsumerWidget {
                     trailing: Text(refundStatusLabel(r.status),
                         style: TextStyle(
                             fontSize: 12,
-                            color: r.status == 'processed' ? AppTheme.brandGreen : Colors.orange.shade800)),
+                            color: r.status == 'processed' ? AppTheme.brandTeal : Colors.orange.shade800)),
                     onTap: r.orderId == null ? null : () => context.push('/orders/${r.orderId}'),
                   ),
                 )),

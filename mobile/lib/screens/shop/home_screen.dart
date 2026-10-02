@@ -47,7 +47,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         actions: const [CartActionButton()],
       ),
       body: RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: () async {
           ref.invalidate(categoriesProvider);
           ref.invalidate(freeDeliveryAboveProvider);

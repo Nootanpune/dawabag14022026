@@ -170,7 +170,7 @@ class _HomeSearchBoxState extends State<HomeSearchBox> {
               hintText: SearchEntry.hint,
               filled: true,
               fillColor: Colors.white,
-              prefixIcon: const Icon(Icons.search, color: AppTheme.brandGreen, size: 22),
+              prefixIcon: const Icon(Icons.search, color: AppTheme.brandTeal, size: 22),
               suffixIcon: ListenableBuilder(
                 listenable: _controller,
                 builder: (_, __) => _controller.text.isEmpty
@@ -179,11 +179,11 @@ class _HomeSearchBoxState extends State<HomeSearchBox> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.brandGreen100, width: 1.5),
+                borderSide: const BorderSide(color: AppTheme.brandTeal100, width: 1.5),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.brandGreen, width: 1.5),
+                borderSide: const BorderSide(color: AppTheme.brandTeal, width: 1.5),
               ),
             ),
           ),

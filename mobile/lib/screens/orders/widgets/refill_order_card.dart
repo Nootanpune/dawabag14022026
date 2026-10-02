@@ -76,7 +76,7 @@ class _RefillOrderCardState extends ConsumerState<RefillOrderCard> {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              const Icon(Icons.replay, color: AppTheme.brandGreen),
+              const Icon(Icons.replay, color: AppTheme.brandTeal),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text('Get these medicines again on a schedule',

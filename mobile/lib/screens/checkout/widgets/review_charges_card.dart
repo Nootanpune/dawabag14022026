@@ -40,15 +40,15 @@ class ReviewChargesCard extends StatelessWidget {
                 SummaryRow('Delivery', c.deliveryPaise == 0 ? 'Free' : formatPrice(c.deliveryPaise)),
                 if (c.discountPaise > 0) ...[
                   const SizedBox(height: 4),
-                  SummaryRow('Discount', '–${formatPrice(c.discountPaise)}', valueColor: Colors.green),
+                  SummaryRow('Discount', '–${formatPrice(c.discountPaise)}', valueColor: AppTheme.brandLeafDark),
                 ],
                 if (c.walletPaise > 0) ...[
                   const SizedBox(height: 4),
-                  SummaryRow('Wallet', '–${formatPrice(c.walletPaise)}', valueColor: Colors.green),
+                  SummaryRow('Wallet', '–${formatPrice(c.walletPaise)}', valueColor: AppTheme.brandLeafDark),
                 ],
                 const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
                 SummaryRow('Total payable', formatPrice(c.totalPayablePaise),
-                    bold: true, valueColor: AppTheme.brandGreen600),
+                    bold: true, valueColor: AppTheme.brandTeal),
                 const SizedBox(height: 4),
                 SummaryRow('Payment', termsLabel(summary.paymentTerms)),
               ],

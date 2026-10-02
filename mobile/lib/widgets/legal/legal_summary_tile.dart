@@ -21,7 +21,7 @@ class LegalSummaryTile extends StatelessWidget {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: const ExpansionTile(
-          leading: Icon(Icons.gavel_outlined, size: 20, color: AppTheme.brandGreen),
+          leading: Icon(Icons.gavel_outlined, size: 20, color: AppTheme.brandTeal),
           title: Text('Licences, pharmacist & grievance officer',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -42,7 +42,7 @@ class _LegalSummaryBody extends ConsumerWidget {
     return async.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(12),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.brandGreen)),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.brandTeal)),
       ),
       error: (_, __) => const _FullDetailsLink(
         lead: Text('Could not load the details just now.', style: TextStyle(fontSize: 12)),

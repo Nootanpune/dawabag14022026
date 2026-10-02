@@ -16,7 +16,7 @@ class PrescriptionCta extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.brandGreen100),
+        border: Border.all(color: AppTheme.brandTeal100),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -28,10 +28,10 @@ class PrescriptionCta extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppTheme.brandGreen50,
+                  color: AppTheme.brandTeal50,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.description_outlined, color: AppTheme.brandGreen700),
+                child: const Icon(Icons.description_outlined, color: AppTheme.brandTeal700),
               ),
               const SizedBox(width: 12),
               const Expanded(

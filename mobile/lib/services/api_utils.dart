@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import 'upload_file.dart' show UploadRefused;
+
 /// The `data` object of a `{ success, message, data }` API envelope.
 Map<String, dynamic> apiData(Response<dynamic> res) {
   final body = res.data;
@@ -46,6 +48,8 @@ String apiErrorMessage(
   Object error, {
   String fallback = 'Something went wrong. Please try again.',
 }) {
+  // Refused by the app before upload (HEIC, not PDF/JPG/PNG): the reason as is
+  if (error is UploadRefused) return error.message;
   if (error is DioException) {
     // A server fault's own text is technical: a plain sentence with what to do (Sprint 26)
     final status = error.response?.statusCode;

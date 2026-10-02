@@ -75,16 +75,16 @@ class _StepRow extends StatelessWidget {
               height: 14,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: done ? AppTheme.brandGreen : active ? Colors.white : Colors.grey.shade300,
+                color: done ? AppTheme.brandTeal : active ? Colors.white : Colors.grey.shade300,
                 border: Border.all(
-                  color: done || active ? AppTheme.brandGreen : Colors.grey.shade300,
+                  color: done || active ? AppTheme.brandTeal : Colors.grey.shade300,
                   width: active ? 2.5 : 1.5,
                 ),
               ),
               child: done && !active ? const Icon(Icons.check, size: 9, color: Colors.white) : null,
             ),
             if (!isLast)
-              Container(width: 2, height: 28, color: done ? AppTheme.brandGreen100 : Colors.grey.shade200),
+              Container(width: 2, height: 28, color: done ? AppTheme.brandTeal100 : Colors.grey.shade200),
           ],
         ),
         const SizedBox(width: 12),
@@ -117,7 +117,7 @@ class _StepRow extends StatelessWidget {
                         if (uri != null) launchUrl(uri);
                       },
                       child: const Text('Track shipment →',
-                          style: TextStyle(fontSize: 11, color: AppTheme.brandGreen, fontWeight: FontWeight.w600)),
+                          style: TextStyle(fontSize: 11, color: AppTheme.brandTeal, fontWeight: FontWeight.w600)),
                     ),
                 ],
               ],

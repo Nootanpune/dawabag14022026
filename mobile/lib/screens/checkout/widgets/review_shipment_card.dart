@@ -30,7 +30,7 @@ class ReviewShipmentCard extends StatelessWidget {
           children: [
             if (count > 1)
               Text('Shipment ${index + 1} of $count',
-                  style: const TextStyle(fontSize: 11, color: AppTheme.brandGreen700, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(fontSize: 11, color: AppTheme.brandTeal700, fontWeight: FontWeight.w600)),
             Text('Sold by $seller', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             if (s.sellerLicence != null) Text('Drug licence ${s.sellerLicence}', style: grey),
             if (s.shipsFrom != null) Text('Ships from ${s.shipsFrom}', style: grey),
@@ -39,10 +39,10 @@ class ReviewShipmentCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.schedule, size: 14, color: AppTheme.brandGreen),
+                    const Icon(Icons.schedule, size: 14, color: AppTheme.brandTeal),
                     const SizedBox(width: 4),
                     Text('Delivery ${s.deliveryEstimate!.toLowerCase()}',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.brandGreen700)),
+                        style: const TextStyle(fontSize: 12, color: AppTheme.brandTeal700)),
                   ],
                 ),
               ),

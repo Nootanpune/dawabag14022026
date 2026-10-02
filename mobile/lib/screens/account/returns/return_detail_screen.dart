@@ -23,13 +23,13 @@ class ReturnDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Return request')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load this return'),
           onRetry: () => ref.invalidate(returnDetailProvider(returnId)),
         ),
         data: (r) => RefreshIndicator(
-          color: AppTheme.brandGreen,
+          color: AppTheme.brandTeal,
           onRefresh: () => ref.refresh(returnDetailProvider(returnId).future),
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -43,7 +43,7 @@ class ReturnDetailScreen extends ConsumerWidget {
                 if (r.sellerName != null) SummaryRow('Seller', r.sellerName!),
                 if (r.createdAt != null) SummaryRow('Reported', formatDateTimeIst(r.createdAt!)),
                 if (r.refundPaise != null && r.refundPaise! > 0)
-                  SummaryRow('Refund', formatPrice(r.refundPaise!), valueColor: AppTheme.brandGreen),
+                  SummaryRow('Refund', formatPrice(r.refundPaise!), valueColor: AppTheme.brandTeal),
                 if (r.orderId != null)
                   Align(
                     alignment: Alignment.centerLeft,

@@ -4,6 +4,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../config/api_url.dart';
 import 'api_utils.dart';
+import 'upload_file.dart';
 import 'session_store.dart';
 
 /// HTTP client + session.
@@ -183,22 +184,27 @@ class ApiService {
 
   /// Generic multipart/form-data POST with a single file part.
   /// Pass [accessToken] to set the Bearer token explicitly.
+  ///
+  /// The content type and file name come from the file's own bytes (Sprint 35:
+  /// the server refuses a declared type that does not match them); HEIC and
+  /// other types are refused here with [UploadRefused] before anything is sent.
   Future<Map<String, dynamic>> uploadMultipart(
     String path, {
     required String filePath,
     required String filename,
     String fileField = 'file',
     Map<String, dynamic> fields = const {},
-    String? mimeType,
     String? accessToken,
+    Duration sendTimeout = const Duration(seconds: 90),
     ProgressCallback? onSendProgress,
   }) async {
+    final file = await prepareUpload(filePath, filename);
     final formData = FormData.fromMap({
       ...fields,
       fileField: await MultipartFile.fromFile(
-        filePath,
-        filename: filename,
-        contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+        file.path,
+        filename: file.filename,
+        contentType: MediaType.parse(file.contentType),
       ),
     });
     final res = await _dio.post(
@@ -207,7 +213,7 @@ class ApiService {
       onSendProgress: onSendProgress,
       options: Options(
         headers: accessToken != null ? {'Authorization': 'Bearer $accessToken'} : null,
-        sendTimeout: const Duration(seconds: 90),
+        sendTimeout: sendTimeout,
         receiveTimeout: const Duration(seconds: 60),
       ),
     );

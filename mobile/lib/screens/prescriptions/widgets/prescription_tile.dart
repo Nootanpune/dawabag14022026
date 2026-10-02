@@ -32,7 +32,7 @@ class PrescriptionTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.description_outlined, color: AppTheme.brandGreen, size: 28),
+            const Icon(Icons.description_outlined, color: AppTheme.brandTeal, size: 28),
             const SizedBox(width: 10),
             Expanded(
               child: Column(

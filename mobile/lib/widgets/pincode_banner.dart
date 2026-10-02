@@ -40,19 +40,19 @@ class _PinCodeBannerState extends State<PinCodeBanner> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppTheme.brandGreen50,
-            border: Border.all(color: AppTheme.brandGreen100, style: BorderStyle.solid),
+            color: AppTheme.brandTeal50,
+            border: Border.all(color: AppTheme.brandTeal100, style: BorderStyle.solid),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: AppTheme.brandGreen, size: 16),
+              const Icon(Icons.location_on_outlined, color: AppTheme.brandTeal, size: 16),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text('Enter pin code to check delivery',
-                  style: TextStyle(fontSize: 13, color: AppTheme.brandGreen700)),
+                  style: TextStyle(fontSize: 13, color: AppTheme.brandTeal700)),
               ),
-              const Icon(Icons.chevron_right, color: AppTheme.brandGreen, size: 18),
+              const Icon(Icons.chevron_right, color: AppTheme.brandTeal, size: 18),
             ],
           ),
         ),
@@ -63,13 +63,13 @@ class _PinCodeBannerState extends State<PinCodeBanner> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: AppTheme.brandGreen50,
-          border: Border.all(color: AppTheme.brandGreen),
+          color: AppTheme.brandTeal50,
+          border: Border.all(color: AppTheme.brandTeal),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
-            const Icon(Icons.location_on, color: AppTheme.brandGreen, size: 16),
+            const Icon(Icons.location_on, color: AppTheme.brandTeal, size: 16),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -88,7 +88,7 @@ class _PinCodeBannerState extends State<PinCodeBanner> {
                 onSubmitted: (_) => _save(),
               ),
             ),
-            IconButton(icon: const Icon(Icons.check, size: 18, color: AppTheme.brandGreen), onPressed: _save, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+            IconButton(icon: const Icon(Icons.check, size: 18, color: AppTheme.brandTeal), onPressed: _save, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
             const SizedBox(width: 4),
             IconButton(icon: Icon(Icons.close, size: 18, color: Colors.grey.shade500), onPressed: () => setState(() => _editing = false), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
           ],
@@ -101,17 +101,17 @@ class _PinCodeBannerState extends State<PinCodeBanner> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: AppTheme.brandGreen50,
-          border: Border.all(color: AppTheme.brandGreen100),
+          color: AppTheme.brandTeal50,
+          border: Border.all(color: AppTheme.brandTeal100),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
-            const Icon(Icons.location_on, color: AppTheme.brandGreen, size: 16),
+            const Icon(Icons.location_on, color: AppTheme.brandTeal, size: 16),
             const SizedBox(width: 8),
             Expanded(
               child: Text.rich(TextSpan(
-                style: const TextStyle(fontSize: 13, color: AppTheme.brandGreen700),
+                style: const TextStyle(fontSize: 13, color: AppTheme.brandTeal700),
                 children: [
                   const TextSpan(text: 'Delivering to '),
                   TextSpan(text: widget.pincode,
@@ -119,7 +119,7 @@ class _PinCodeBannerState extends State<PinCodeBanner> {
                 ],
               )),
             ),
-            const Text('Change', style: TextStyle(fontSize: 12, color: AppTheme.brandGreen, fontWeight: FontWeight.w600)),
+            const Text('Change', style: TextStyle(fontSize: 12, color: AppTheme.brandTeal, fontWeight: FontWeight.w600)),
           ],
         ),
       ),

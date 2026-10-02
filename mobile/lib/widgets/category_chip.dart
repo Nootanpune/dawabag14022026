@@ -16,10 +16,10 @@ class CategoryChip extends StatelessWidget {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.brandGreen : Colors.white,
+          color: selected ? AppTheme.brandTeal : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? AppTheme.brandGreen : Colors.grey.shade300,
+            color: selected ? AppTheme.brandTeal : Colors.grey.shade300,
           ),
         ),
         child: Text(

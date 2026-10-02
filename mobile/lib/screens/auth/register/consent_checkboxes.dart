@@ -64,7 +64,7 @@ class _ConsentCheckboxesState extends State<ConsentCheckboxes> {
                 TextSpan(
                   text: 'Privacy Notice',
                   style: const TextStyle(
-                    color: AppTheme.brandGreen,
+                    color: AppTheme.brandTeal,
                     fontWeight: FontWeight.w600,
                     decoration: TextDecoration.underline,
                   ),

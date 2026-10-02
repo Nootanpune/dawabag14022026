@@ -24,7 +24,7 @@ class StepUpload extends StatelessWidget {
       children: [
         Row(
           children: const [
-            Icon(Icons.verified, color: AppTheme.brandGreen),
+            Icon(Icons.verified, color: AppTheme.brandTeal),
             SizedBox(width: 8),
             Expanded(
               child: Text('Mobile verified',
@@ -87,7 +87,7 @@ class StepUpload extends StatelessWidget {
       );
       subtitle = 'Uploading…';
     } else if (status == UploadStatus.done) {
-      leading = const Icon(Icons.check_circle, color: AppTheme.brandGreen);
+      leading = const Icon(Icons.check_circle, color: AppTheme.brandTeal);
       subtitle = 'Uploaded';
     } else if (status == UploadStatus.failed) {
       leading = const Icon(Icons.error, color: AppTheme.errorRed);

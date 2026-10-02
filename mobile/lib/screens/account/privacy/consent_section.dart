@@ -38,7 +38,7 @@ class ConsentSection extends StatelessWidget {
             SwitchListTile(
               value: consents.marketingGranted,
               onChanged: busy ? null : onMarketingChanged,
-              activeThumbColor: AppTheme.brandGreen,
+              activeThumbColor: AppTheme.brandTeal,
               title: const Text('Offers and marketing messages', style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 marketing?.recordedAt != null
@@ -50,7 +50,7 @@ class ConsentSection extends StatelessWidget {
             SwitchListTile(
               value: consents.whatsappGranted,
               onChanged: busy ? null : onWhatsAppChanged,
-              activeThumbColor: AppTheme.brandGreen,
+              activeThumbColor: AppTheme.brandTeal,
               title: const Text('Send order and refill updates on WhatsApp', style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 whatsapp?.recordedAt != null
@@ -62,7 +62,7 @@ class ConsentSection extends StatelessWidget {
             ...others.map((c) => ListTile(
                   dense: true,
                   leading: Icon(c.granted ? Icons.check_circle : Icons.cancel,
-                      size: 20, color: c.granted ? AppTheme.brandGreen : Colors.grey),
+                      size: 20, color: c.granted ? AppTheme.brandTeal : Colors.grey),
                   title: Text(consentPurposeLabel(c.purpose), style: const TextStyle(fontSize: 13)),
                   subtitle: Text(_recordLine(c), style: const TextStyle(fontSize: 11)),
                 )),

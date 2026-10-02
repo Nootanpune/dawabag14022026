@@ -144,7 +144,7 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: active ? AppTheme.brandGreen50 : AppTheme.amberBadge,
+          color: active ? AppTheme.brandTeal50 : AppTheme.amberBadge,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -152,7 +152,7 @@ class _StatusChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: active ? AppTheme.brandGreen700 : AppTheme.amberText,
+            color: active ? AppTheme.brandTeal700 : AppTheme.amberText,
           ),
         ),
       );
@@ -179,7 +179,7 @@ class _AutoPayRow extends StatelessWidget {
     final canTurnOn = activeMandates.isNotEmpty;
     return Row(
       children: [
-        Icon(on ? Icons.autorenew : Icons.link, size: 16, color: on ? AppTheme.brandGreen : Colors.grey.shade500),
+        Icon(on ? Icons.autorenew : Icons.link, size: 16, color: on ? AppTheme.brandTeal : Colors.grey.shade500),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
@@ -188,12 +188,12 @@ class _AutoPayRow extends StatelessWidget {
                 : canTurnOn
                     ? 'Automatic payment off — we send a link to pay'
                     : 'Automatic payment off — turn it on below',
-            style: TextStyle(fontSize: 12, color: on ? AppTheme.brandGreen700 : Colors.grey.shade600),
+            style: TextStyle(fontSize: 12, color: on ? AppTheme.brandTeal700 : Colors.grey.shade600),
           ),
         ),
         Switch(
           value: on,
-          activeThumbColor: AppTheme.brandGreen,
+          activeThumbColor: AppTheme.brandTeal,
           onChanged: busy || (!on && !canTurnOn)
               ? null
               : (value) => onChanged(value ? activeMandates.first.id : null),

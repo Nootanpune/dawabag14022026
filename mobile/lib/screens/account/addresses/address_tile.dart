@@ -42,11 +42,11 @@ class AddressTile extends StatelessWidget {
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppTheme.brandGreen50,
+                      color: AppTheme.brandTeal50,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Text('Default',
-                        style: TextStyle(fontSize: 11, color: AppTheme.brandGreen700, fontWeight: FontWeight.w600)),
+                        style: TextStyle(fontSize: 11, color: AppTheme.brandTeal700, fontWeight: FontWeight.w600)),
                   ),
               ],
             ),
@@ -61,7 +61,7 @@ class AddressTile extends StatelessWidget {
                       : 'We deliver here')
                   : 'We do not deliver to this pincode yet',
               style: TextStyle(
-                  fontSize: 11, color: a.canDeliver ? AppTheme.brandGreen700 : Colors.orange.shade800),
+                  fontSize: 11, color: a.canDeliver ? AppTheme.brandTeal700 : Colors.orange.shade800),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,

@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../models/consultation.dart';
 import '../providers/auth_provider.dart';
+import '../screens/auth/forgot_password/forgot_password_screen.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/welcome_screen.dart';
 import '../screens/auth/register/register_screen.dart';
 import '../screens/auth/otp_screen.dart';
 import '../screens/shop/home_screen.dart';
@@ -64,7 +66,8 @@ final routerProvider = Provider<GoRouter>((ref) {
   });
 
   final router = GoRouter(
-    initialLocation: '/',
+    // Sprint 35: the brand welcome page first; a restored session moves on to the shop
+    initialLocation: '/welcome',
     refreshListenable: authRefresh,
     redirect: (context, state) {
       final auth = ref.read(authProvider);
@@ -80,7 +83,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isProtected = protectedRoutes.any((r) => state.matchedLocation.startsWith(r));
 
       if (!isLoggedIn && isProtected) return '/auth/login?from=${state.matchedLocation}';
-      if (isLoggedIn && isAuthRoute) return '/';
+      if (isLoggedIn && (isAuthRoute || state.matchedLocation == '/welcome')) return '/';
       return null;
     },
     routes: [
@@ -102,7 +105,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/cart', builder: (c, s) => const CartScreen()),
 
       // Full-screen routes (no bottom nav)
+      GoRoute(path: '/welcome', builder: (c, s) => const WelcomeScreen()),
       GoRoute(path: '/auth/login', builder: (c, s) => const LoginScreen()),
+      // Sprint 35: OTP to the registered mobile, then a new password
+      GoRoute(
+        path: '/auth/forgot-password',
+        builder: (c, s) => ForgotPasswordScreen(initialMobile: s.uri.queryParameters['mobile'] ?? ''),
+      ),
       GoRoute(path: '/auth/register', builder: (c, s) => const RegisterScreen()),
       GoRoute(
         path: '/auth/otp',

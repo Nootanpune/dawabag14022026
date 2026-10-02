@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../config/password_gate.dart';
 import '../../config/theme.dart';
+import '../../services/api_service.dart';
+import '../../services/registration_api.dart';
+import '../../utils/mobile_number.dart';
+import '../../widgets/brand/auth_page.dart';
+import '../../widgets/brand/labeled_field.dart';
 
+/// How the person signs in: mobile + password, or mobile + OTP.
+enum LoginMethod { password, otp }
+
+/// Sign in (Sprint 35 DAWA BAG restyle after the owner's mock-up). Same flows
+/// as before: mobile + password (an unverified mobile is sent to the OTP
+/// screen), or mobile + OTP (POST /auth/send-otp, then /auth/verify-otp).
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -17,6 +29,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _mobileCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _showPassword = false;
+  bool _sendingOtp = false;
+  LoginMethod _method = LoginMethod.password;
 
   @override
   void dispose() {
@@ -25,13 +39,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  void _showError(String message) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
     final success = await ref.read(authProvider.notifier).login(
-      _mobileCtrl.text.trim(),
-      _passwordCtrl.text,
-    );
+          _mobileCtrl.text.trim(),
+          _passwordCtrl.text,
+        );
 
     if (!mounted) return;
 
@@ -50,117 +68,135 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (error?.contains('OTP') == true) {
         context.push('/auth/otp?mobile=${_mobileCtrl.text.trim()}');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error ?? 'Login failed'), backgroundColor: Colors.red),
-        );
+        _showError(error ?? 'Login failed');
       }
     }
   }
 
+  /// Sign in with OTP: the server sends it, the OTP screen checks it.
+  Future<void> _sendOtp() async {
+    if (!_formKey.currentState!.validate()) return;
+    final mobile = _mobileCtrl.text.trim();
+    setState(() => _sendingOtp = true);
+    try {
+      await apiService.sendOtp(mobile);
+      if (mounted) context.push('/auth/otp?mobile=$mobile');
+    } catch (e) {
+      if (mounted) _showError(ApiService.errorMessage(e, fallback: 'Could not send the OTP'));
+    } finally {
+      if (mounted) setState(() => _sendingOtp = false);
+    }
+  }
+
+  Widget _spinner() => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final byPassword = _method == LoginMethod.password;
 
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+    return AuthPage(
+      showBack: true,
+      children: [
+        SegmentedButton<LoginMethod>(
+          segments: const [
+            ButtonSegment(value: LoginMethod.password, label: Text('Password'), icon: Icon(Icons.lock_outline)),
+            ButtonSegment(value: LoginMethod.otp, label: Text('OTP'), icon: Icon(Icons.sms_outlined)),
+          ],
+          selected: {_method},
+          showSelectedIcon: false,
+          onSelectionChanged: (s) => setState(() => _method = s.first),
+        ),
+        const SizedBox(height: 20),
+        Form(
+          key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 40),
-
-              // Logo
-              Container(
-                width: 64, height: 64,
-                decoration: BoxDecoration(
-                  color: AppTheme.brandGreen,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Center(
-                  child: Text('D', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 28)),
+              LabeledField(
+                label: 'Mobile number',
+                child: TextFormField(
+                  controller: _mobileCtrl,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  autofillHints: const [AutofillHints.telephoneNumberNational],
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    hintText: '9876543210',
+                    prefixText: '+91  ',
+                    counterText: '',
+                    suffixIcon: Icon(Icons.smartphone_outlined),
+                  ),
+                  validator: mobileProblem,
                 ),
               ),
               const SizedBox(height: 16),
-              Text('dawabag',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: AppTheme.brandGreen, fontWeight: FontWeight.w700,
-                )),
-              const SizedBox(height: 6),
-              Text('Your trusted online pharmacy',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
-              const SizedBox(height: 40),
-
-              // Form
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    // Mobile
-                    TextFormField(
-                      controller: _mobileCtrl,
-                      keyboardType: TextInputType.phone,
-                      maxLength: 10,
-                      decoration: const InputDecoration(
-                        labelText: 'Mobile number',
-                        hintText: '9876543210',
-                        prefixText: '+91  ',
-                        counterText: '',
+              if (byPassword) ...[
+                LabeledField(
+                  label: 'Password',
+                  child: TextFormField(
+                    controller: _passwordCtrl,
+                    obscureText: !_showPassword,
+                    autofillHints: const [AutofillHints.password],
+                    decoration: InputDecoration(
+                      suffixIcon: IconButton(
+                        tooltip: _showPassword ? 'Hide password' : 'Show password',
+                        icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, size: 20),
+                        onPressed: () => setState(() => _showPassword = !_showPassword),
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Mobile number required';
-                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(v)) return 'Enter valid 10-digit number';
-                        return null;
-                      },
                     ),
-                    const SizedBox(height: 16),
-
-                    // Password
-                    TextFormField(
-                      controller: _passwordCtrl,
-                      obscureText: !_showPassword,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        hintText: '••••••••',
-                        suffixIcon: IconButton(
-                          icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, size: 20),
-                          onPressed: () => setState(() => _showPassword = !_showPassword),
-                        ),
-                      ),
-                      validator: (v) => (v == null || v.isEmpty) ? 'Password required' : null,
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Login button
-                    ElevatedButton(
-                      onPressed: authState.isLoading ? null : _login,
-                      child: authState.isLoading
-                          ? const SizedBox(width: 20, height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Sign in'),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Register link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text("Don't have an account? ",
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-                        GestureDetector(
-                          onTap: () => context.push('/auth/register'),
-                          child: const Text('Register',
-                            style: TextStyle(color: AppTheme.brandGreen, fontWeight: FontWeight.w600, fontSize: 14)),
-                        ),
-                      ],
-                    ),
-                  ],
+                    validator: (v) => (v == null || v.isEmpty) ? 'Password required' : null,
+                  ),
                 ),
-              ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      final m = _mobileCtrl.text.trim();
+                      context.push(m.isEmpty ? '/auth/forgot-password' : '/auth/forgot-password?mobile=$m');
+                    },
+                    child: const Text('Forgot password?'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: authState.isLoading ? null : _login,
+                  child: authState.isLoading ? _spinner() : const Text('Sign in'),
+                ),
+              ] else ...[
+                Text('We will send a 6-digit OTP to this number.',
+                    style: TextStyle(fontSize: 13.5, color: AppTheme.muted(context))),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _sendingOtp ? null : _sendOtp,
+                  child: _sendingOtp ? _spinner() : const Text('Send OTP'),
+                ),
+              ],
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 20),
+        const _OrDivider(),
+        const SizedBox(height: 20),
+        OutlinedButton(
+          onPressed: () => context.push('/auth/register'),
+          child: const Text('Create an account'),
+        ),
+      ],
     );
   }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        const Expanded(child: Divider()),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text('OR', style: TextStyle(fontSize: 12, color: AppTheme.muted(context))),
+        ),
+        const Expanded(child: Divider()),
+      ]);
 }

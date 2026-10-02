@@ -36,14 +36,14 @@ class QuantityStepper extends StatelessWidget {
             tooltip: tip,
             padding: EdgeInsets.zero,
             iconSize: compact ? 16 : 20,
-            color: AppTheme.brandGreen700,
+            color: AppTheme.brandTeal700,
             onPressed: busy ? null : onTap,
             icon: Icon(icon),
           ),
         );
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: AppTheme.brandGreen, width: 1.5),
+        border: Border.all(color: AppTheme.brandTeal, width: 1.5),
         borderRadius: BorderRadius.circular(8),
         color: Colors.white,
       ),

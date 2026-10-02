@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../services/photo_picker.dart';
+
 import '../../prescriptions/widgets/prescription_upload_card.dart';
 import 'rx_choice_card.dart';
 import 'rx_policy_note.dart';
@@ -26,12 +28,13 @@ Future<ImageSource?> showPrescriptionSourceSheet(BuildContext context) =>
       ),
     );
 
-/// Asks camera/gallery, then picks an image. The file is only uploaded to
-/// the server, never kept by the app (C-41). Null when cancelled.
+/// Asks camera/gallery, then picks an image, re-encoded as JPEG (Sprint 35:
+/// no HEIC). The file is only uploaded to the server, never kept by the app
+/// (C-41). Null when cancelled.
 Future<XFile?> pickPrescriptionImage(BuildContext context) async {
   final source = await showPrescriptionSourceSheet(context);
   if (source == null) return null;
-  return ImagePicker().pickImage(source: source, imageQuality: 85);
+  return pickPhotoForUpload(source);
 }
 
 // ── Prescription step (Sprint 32: before review, as the web) ─────────────────

@@ -82,10 +82,10 @@ class DoctorConsultationCard extends StatelessWidget {
               const SizedBox(height: 6),
               const Row(
                 children: [
-                  Icon(Icons.description_outlined, size: 15, color: AppTheme.brandGreen700),
+                  Icon(Icons.description_outlined, size: 15, color: AppTheme.brandTeal700),
                   SizedBox(width: 4),
                   Text('E-prescription issued',
-                      style: TextStyle(fontSize: 12, color: AppTheme.brandGreen700, fontWeight: FontWeight.w600)),
+                      style: TextStyle(fontSize: 12, color: AppTheme.brandTeal700, fontWeight: FontWeight.w600)),
                 ],
               ),
             ] else if (c.status == 'in_progress' || c.status == 'completed') ...[

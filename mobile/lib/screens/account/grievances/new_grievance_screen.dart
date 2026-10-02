@@ -79,7 +79,7 @@ class _NewGrievanceScreenState extends ConsumerState<NewGrievanceScreen> {
             if (widget.orderId != null) ...[
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.receipt_long, color: AppTheme.brandGreen),
+                  leading: const Icon(Icons.receipt_long, color: AppTheme.brandTeal),
                   title: Text('Order ${widget.orderNumber ?? ''}'.trim()),
                   subtitle: const Text('This complaint will be linked to the order'),
                   dense: true,

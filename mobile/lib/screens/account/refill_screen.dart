@@ -135,19 +135,19 @@ class _RefillScreenState extends ConsumerState<RefillScreen> {
 
     Widget body;
     if (!state.loaded && state.isLoading) {
-      body = const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen));
+      body = const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal));
     } else if (state.error != null && state.refills.isEmpty && state.mandates.isEmpty) {
       body = _ErrorView(message: state.error!, onRetry: notifier.load);
     } else {
       body = RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: notifier.load,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             Text(kRefillExplainer, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             const SizedBox(height: 12),
-            if (busy) const LinearProgressIndicator(color: AppTheme.brandGreen),
+            if (busy) const LinearProgressIndicator(color: AppTheme.brandTeal),
             if (state.refills.isEmpty)
               const _EmptyRefills()
             else

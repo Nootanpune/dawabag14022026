@@ -109,7 +109,7 @@ class _NewSideEffectScreenState extends ConsumerState<NewSideEffectScreen> {
             const SizedBox(height: 12),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.medication_outlined, color: AppTheme.brandGreen),
+                leading: const Icon(Icons.medication_outlined, color: AppTheme.brandTeal),
                 title: Text(widget.productName ?? 'Medicine from your order'),
                 dense: true,
               ),

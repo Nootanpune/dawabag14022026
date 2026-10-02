@@ -21,10 +21,10 @@ class SubmittedView extends StatelessWidget {
             width: 72,
             height: 72,
             decoration: const BoxDecoration(
-              color: AppTheme.brandGreen50,
+              color: AppTheme.brandTeal50,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.task_alt, color: AppTheme.brandGreen, size: 40),
+            child: const Icon(Icons.task_alt, color: AppTheme.brandTeal, size: 40),
           ),
         ),
         const SizedBox(height: 20),

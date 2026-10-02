@@ -18,7 +18,7 @@ class ConsultDoctorTile extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        leading: const Icon(Icons.video_call_outlined, color: AppTheme.brandGreen),
+        leading: const Icon(Icons.video_call_outlined, color: AppTheme.brandTeal),
         title: const Text('Consult a doctor',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
         subtitle: const Text('Video or audio consultation with a registered doctor',

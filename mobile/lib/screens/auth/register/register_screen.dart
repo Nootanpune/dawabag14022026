@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../providers/auth_provider.dart';
+import '../../../widgets/brand/brand_backdrop.dart';
 import 'register_constants.dart';
 import 'register_controller.dart';
 import 'register_widgets.dart';
@@ -148,9 +149,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _onAppBarBack)
                 : null,
           ),
+          // Sprint 35: DAWA BAG brand backdrop, as the sign-in pages
           body: BackButtonListener(
             onBackButtonPressed: _handleBack,
-            child: SafeArea(
+            child: BrandBackdrop(child: SafeArea(
               child: Column(
                 children: [
                   if (c.step != RegisterStep.submitted)
@@ -158,7 +160,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   Expanded(child: _stepBody(c)),
                 ],
               ),
-            ),
+            )),
           ),
         );
       },

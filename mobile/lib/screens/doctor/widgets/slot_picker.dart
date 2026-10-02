@@ -56,9 +56,9 @@ class SlotPicker extends ConsumerWidget {
                 child: Container(
                   width: 56,
                   decoration: BoxDecoration(
-                    color: selected ? AppTheme.brandGreen : Colors.white,
+                    color: selected ? AppTheme.brandTeal : Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: selected ? AppTheme.brandGreen : Colors.grey.shade300),
+                    border: Border.all(color: selected ? AppTheme.brandTeal : Colors.grey.shade300),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -82,7 +82,7 @@ class SlotPicker extends ConsumerWidget {
         slots.when(
           loading: () => const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+            child: Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -111,7 +111,7 @@ class SlotPicker extends ConsumerWidget {
                             label: Text(formatSlotTime(s.slotStart, zone: true)),
                             selected: s.id == selectedSlotId,
                             onSelected: (_) => onSlotSelected(s),
-                            selectedColor: AppTheme.brandGreen100,
+                            selectedColor: AppTheme.brandTeal100,
                           ))
                       .toList(),
                 ),

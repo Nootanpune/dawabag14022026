@@ -33,7 +33,7 @@ class JoinConsultationScreen extends ConsumerWidget {
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: retry)],
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: consultErrorMessage(e, fallback: 'Could not open this consultation'),
           onRetry: retry,
@@ -46,7 +46,7 @@ class JoinConsultationScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    Icon(_icon(j.mode), size: 56, color: AppTheme.brandGreen),
+                    Icon(_icon(j.mode), size: 56, color: AppTheme.brandTeal),
                     const SizedBox(height: 12),
                     Text(consultModeLabel(j.mode),
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -66,7 +66,7 @@ class JoinConsultationScreen extends ConsumerWidget {
             if (VideoCallService.canCall(j))
               FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.brandGreen,
+                  backgroundColor: AppTheme.brandTeal,
                   minimumSize: const Size.fromHeight(48),
                 ),
                 onPressed: () => context.push('/consultations/$consultationId/call'),

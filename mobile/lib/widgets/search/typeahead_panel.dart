@@ -81,9 +81,9 @@ class TypeaheadPanel extends ConsumerWidget {
                   Expanded(
                     child: Text('See all results for “$q”',
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.brandGreen700)),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.brandTeal700)),
                   ),
-                  const Icon(Icons.arrow_forward, size: 18, color: AppTheme.brandGreen700),
+                  const Icon(Icons.arrow_forward, size: 18, color: AppTheme.brandTeal700),
                 ]),
               ),
             ),

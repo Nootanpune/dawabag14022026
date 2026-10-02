@@ -24,7 +24,7 @@ class PrescriptionUploadCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.brandGreen100),
+        border: Border.all(color: AppTheme.brandTeal100),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

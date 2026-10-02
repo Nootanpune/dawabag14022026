@@ -20,7 +20,7 @@ class ProductTrustStrip extends StatelessWidget {
         children: [
           for (var i = 0; i < kInfoPages.length; i++)
             ActionChip(
-              avatar: Icon(_icons[i], size: 16, color: AppTheme.brandGreen),
+              avatar: Icon(_icons[i], size: 16, color: AppTheme.brandTeal),
               label: Text(kInfoPages[i].$2, style: const TextStyle(fontSize: 12)),
               onPressed: () => context.push('/trust/${kInfoPages[i].$1}'),
             ),

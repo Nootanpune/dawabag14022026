@@ -22,19 +22,19 @@ class CallLinkNotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: ok ? AppTheme.brandGreen50 : AppTheme.amberBadge,
+        color: ok ? AppTheme.brandTeal50 : AppTheme.amberBadge,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(ok ? Icons.lock_outline : Icons.warning_amber_rounded,
-              size: 18, color: ok ? AppTheme.brandGreen700 : AppTheme.amberText),
+              size: 18, color: ok ? AppTheme.brandTeal700 : AppTheme.amberText),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: 13, color: ok ? AppTheme.brandGreen700 : AppTheme.amberText),
+              style: TextStyle(fontSize: 13, color: ok ? AppTheme.brandTeal700 : AppTheme.amberText),
             ),
           ),
         ],

@@ -41,7 +41,6 @@ extension RegistrationApi on ApiService {
       filePath: filePath,
       filename: filename,
       fields: {'document_type': documentType},
-      mimeType: mimeTypeForFilename(filename),
       accessToken: accessToken,
     );
   }

@@ -43,7 +43,7 @@ class _PolicyScreenState extends ConsumerState<PolicyScreen> {
           ),
           Expanded(
             child: async.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+              loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
               error: (e, _) {
                 final notPublished = e is DioException && e.response?.statusCode == 404;
                 if (notPublished) {
@@ -61,7 +61,7 @@ class _PolicyScreenState extends ConsumerState<PolicyScreen> {
                 );
               },
               data: (doc) => RefreshIndicator(
-                color: AppTheme.brandGreen,
+                color: AppTheme.brandTeal,
                 onRefresh: () => ref.refresh(policyInLanguageProvider(arg).future),
                 child: ListView(
                   padding: const EdgeInsets.all(16),

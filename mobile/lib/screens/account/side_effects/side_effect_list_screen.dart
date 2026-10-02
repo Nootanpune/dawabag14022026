@@ -20,13 +20,13 @@ class SideEffectListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Side-effect reports')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load your reports'),
           onRetry: () => ref.invalidate(adverseEventsProvider),
         ),
         data: (reports) => RefreshIndicator(
-          color: AppTheme.brandGreen,
+          color: AppTheme.brandTeal,
           onRefresh: () => ref.refresh(adverseEventsProvider.future),
           child: ListView(
             padding: const EdgeInsets.all(16),

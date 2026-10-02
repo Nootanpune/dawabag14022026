@@ -20,7 +20,7 @@ class SubstitutesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Substitutes')),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load the substitutes'),
           onRetry: () => ref.invalidate(substitutesProvider((productId, null))),

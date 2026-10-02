@@ -38,7 +38,7 @@ class ReviewStep extends StatelessWidget {
     if (s == null) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 60),
-        child: Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        child: Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
       );
     }
     return Column(
@@ -66,7 +66,7 @@ class ReviewStep extends StatelessWidget {
               value: declared,
               onChanged: orderPlaced ? null : (v) => onDeclared(v ?? false),
               controlAffinity: ListTileControlAffinity.leading,
-              activeColor: AppTheme.brandGreen,
+              activeColor: AppTheme.brandTeal,
               title: const Text(
                 'I confirm these medicines are only for treating or dispensing to my own patients, '
                 'are not for resale, and include no Schedule X or narcotic (NDPS) drugs.',

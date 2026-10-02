@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../utils/password_policy.dart';
+import '../../../widgets/brand/labeled_field.dart';
 import 'register_constants.dart';
 import 'register_controller.dart';
 
-/// Text field used across the details step.
+/// Text field used across the details step; its label is shown above it
+/// (Sprint 35 brand restyle, design review: labels above fields).
 Widget registerTextField(
   TextEditingController ctrl,
   String label, {
@@ -19,39 +22,46 @@ Widget registerTextField(
   String? Function(String?)? validator,
   ValueChanged<String>? onChanged,
 }) =>
-    TextFormField(
-      controller: ctrl,
-      keyboardType: keyboard,
-      obscureText: obscure,
-      maxLength: maxLength,
-      textCapitalization: caps
-          ? TextCapitalization.characters
-          : words
-              ? TextCapitalization.words
-              : TextCapitalization.none,
-      inputFormatters: formatters,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixText: prefix,
-        counterText: maxLength != null ? '' : null,
-      ),
-      validator: validator,
-      onChanged: onChanged,
-    );
+    LabeledField(
+        label: label,
+        child: TextFormField(
+          controller: ctrl,
+          keyboardType: keyboard,
+          obscureText: obscure,
+          maxLength: maxLength,
+          textCapitalization: caps
+              ? TextCapitalization.characters
+              : words
+                  ? TextCapitalization.words
+                  : TextCapitalization.none,
+          inputFormatters: formatters,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixText: prefix,
+            counterText: maxLength != null ? '' : null,
+          ),
+          validator: validator,
+          onChanged: onChanged,
+        ));
 
-Widget registerPasswordField(RegisterController c) => TextFormField(
-      controller: c.passwordCtrl,
-      obscureText: !c.showPassword,
-      decoration: InputDecoration(
-        labelText: 'Password',
-        helperText: 'Minimum 8 characters',
-        suffixIcon: IconButton(
-          icon: Icon(c.showPassword ? Icons.visibility_off : Icons.visibility, size: 20),
-          onPressed: () => c.update(() => c.showPassword = !c.showPassword),
+/// The server's password rules, in its own words (utils/password_policy.dart
+/// mirrors backend utils/passwordPolicy.ts); the server checks again.
+Widget registerPasswordField(RegisterController c) => LabeledField(
+      label: 'Password',
+      child: TextFormField(
+        controller: c.passwordCtrl,
+        obscureText: !c.showPassword,
+        decoration: InputDecoration(
+          helperText: kPasswordRules,
+          helperMaxLines: 2,
+          suffixIcon: IconButton(
+            tooltip: c.showPassword ? 'Hide password' : 'Show password',
+            icon: Icon(c.showPassword ? Icons.visibility_off : Icons.visibility, size: 20),
+            onPressed: () => c.update(() => c.showPassword = !c.showPassword),
+          ),
         ),
+        validator: (v) => passwordProblem(v ?? '', mobile: c.mobileCtrl.text.trim()),
       ),
-      validator: (v) => (v == null || v.length < 8) ? 'Minimum 8 characters' : null,
     );
 
 Widget registerPanField(RegisterController c) => registerTextField(
@@ -72,8 +82,7 @@ Widget registerPanField(RegisterController c) => registerTextField(
       },
     );
 
-Widget registerGstinField(RegisterController c, {required bool isRequired}) =>
-    registerTextField(
+Widget registerGstinField(RegisterController c, {required bool isRequired}) => registerTextField(
       c.gstinCtrl,
       isRequired ? 'GSTIN' : 'GSTIN (optional)',
       hint: '27ABCDE1234F1Z5',
@@ -93,26 +102,25 @@ Widget registerGstinField(RegisterController c, {required bool isRequired}) =>
       },
     );
 
-Widget registerDlTypeField(RegisterController c, Map<String, String> options) =>
-    DropdownButtonFormField<String>(
+Widget registerDlTypeField(RegisterController c, Map<String, String> options) => LabeledField(
+    label: 'Drug licence type',
+    child: DropdownButtonFormField<String>(
       key: ValueKey('dl_type_${c.customerType}'),
       value: options.containsKey(c.dlType) ? c.dlType : null,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Drug licence type'),
-      items: options.entries
-          .map((e) => DropdownMenuItem<String>(value: e.key, child: Text(e.value)))
-          .toList(),
+      decoration: const InputDecoration(),
+      items: options.entries.map((e) => DropdownMenuItem<String>(value: e.key, child: Text(e.value))).toList(),
       onChanged: (v) => c.update(() => c.dlType = v),
       validator: (v) => v == null ? 'Select the drug licence type' : null,
-    );
+    ));
 
-Widget registerSpecialityField(RegisterController c) => DropdownButtonFormField<String>(
+Widget registerSpecialityField(RegisterController c) => LabeledField(
+    label: 'Speciality',
+    child: DropdownButtonFormField<String>(
       value: c.speciality,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Speciality'),
-      items: kSpecialities
-          .map((s) => DropdownMenuItem<String>(value: s, child: Text(s)))
-          .toList(),
+      decoration: const InputDecoration(),
+      items: kSpecialities.map((s) => DropdownMenuItem<String>(value: s, child: Text(s))).toList(),
       onChanged: (v) => c.update(() => c.speciality = v),
       validator: (v) => v == null ? 'Select your speciality' : null,
-    );
+    ));

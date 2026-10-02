@@ -90,12 +90,12 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
 
     Widget body;
     if (consents == null && state.error == null) {
-      body = const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen));
+      body = const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal));
     } else if (consents == null) {
       body = ErrorRetryView(message: state.error!, onRetry: notifier.load);
     } else {
       body = RefreshIndicator(
-        color: AppTheme.brandGreen,
+        color: AppTheme.brandTeal,
         onRefresh: () async {
           ref.invalidate(dataRequestsProvider);
           await notifier.load();
@@ -104,7 +104,7 @@ class _PrivacyScreenState extends ConsumerState<PrivacyScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             if (state.isUpdating || state.isLoading || _requesting)
-              const LinearProgressIndicator(color: AppTheme.brandGreen),
+              const LinearProgressIndicator(color: AppTheme.brandTeal),
             const _Heading('Your choices'),
             ConsentSection(
               consents: consents,

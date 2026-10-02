@@ -37,7 +37,7 @@ class MedicineInfoView extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.verified_outlined, size: 16, color: AppTheme.brandGreen),
+              const Icon(Icons.verified_outlined, size: 16, color: AppTheme.brandTeal),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(

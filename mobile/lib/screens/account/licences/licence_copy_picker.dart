@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../models/licence_draft.dart';
+import '../../../services/photo_picker.dart';
 
 /// A copy of a drug licence chosen on the phone (Sprint 34: photo OR PDF). It
 /// is only uploaded to the server's private store, never kept by the app (C-41).
@@ -73,8 +74,9 @@ Future<LicenceCopy?> pickLicenceCopy(BuildContext context) async {
       return LicenceCopy(path: file.path!, name: file.name, size: file.size);
     case LicenceCopySource.camera:
     case LicenceCopySource.gallery:
-      final photo = await ImagePicker().pickImage(
-          source: source == LicenceCopySource.camera ? ImageSource.camera : ImageSource.gallery, imageQuality: 85);
+      // Re-encoded as JPEG (no HEIC — Sprint 35)
+      final photo = await pickPhotoForUpload(
+          source == LicenceCopySource.camera ? ImageSource.camera : ImageSource.gallery);
       if (photo == null) return null;
       return LicenceCopy(path: photo.path, name: photo.name, size: await photo.length());
   }

@@ -74,13 +74,13 @@ class _AddressListScreenState extends ConsumerState<AddressListScreen> {
       appBar: AppBar(title: const Text('Saved addresses')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _busy ? null : () => context.push('/account/addresses/new'),
-        backgroundColor: AppTheme.brandGreen,
+        backgroundColor: AppTheme.brandTeal,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_location_alt_outlined),
         label: const Text('Add address'),
       ),
       body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load your addresses'),
           onRetry: () => ref.invalidate(addressesProvider),
@@ -88,12 +88,12 @@ class _AddressListScreenState extends ConsumerState<AddressListScreen> {
         data: (raw) {
           final addresses = raw.map(Address.fromJson).toList();
           return RefreshIndicator(
-            color: AppTheme.brandGreen,
+            color: AppTheme.brandTeal,
             onRefresh: () => ref.refresh(addressesProvider.future),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
               children: [
-                if (_busy) const LinearProgressIndicator(color: AppTheme.brandGreen),
+                if (_busy) const LinearProgressIndicator(color: AppTheme.brandTeal),
                 if (addresses.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 48),

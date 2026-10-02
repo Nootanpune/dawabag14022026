@@ -45,7 +45,7 @@ class PaymentStep extends StatelessWidget {
                 SummaryRow('Order', orderNumber),
                 const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
                 SummaryRow('Total payable', formatPrice(totalPaise),
-                    bold: true, valueColor: AppTheme.brandGreen600),
+                    bold: true, valueColor: AppTheme.brandTeal),
                 const SizedBox(height: 6),
                 Text('Includes all taxes (GST) and delivery. No cash on delivery.',
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
@@ -69,7 +69,7 @@ class PaymentStep extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         if (o == null)
-          const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen))
+          const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal))
         else if (o.isDemo && onDemoPay != null) ...[
           DemoCheckout(amountPaise: totalPaise, methods: o.methods, providers: o.providers, onPay: onDemoPay!),
         ] else if (o.isRazorpay)

@@ -37,7 +37,7 @@ class VideoCallScreen extends ConsumerWidget {
     return async.when(
       loading: () => const Scaffold(
         backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        body: Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
       ),
       error: (e, _) => Scaffold(
         appBar: AppBar(title: const Text('Consultation call')),

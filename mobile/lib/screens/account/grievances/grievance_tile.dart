@@ -12,7 +12,7 @@ class GrievanceStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color bg, Color fg) = switch (status) {
-      'resolved' || 'closed' => (AppTheme.brandGreen50, AppTheme.brandGreen700),
+      'resolved' || 'closed' => (AppTheme.brandTeal50, AppTheme.brandTeal700),
       'acknowledged' || 'in_progress' => (Colors.blue.shade50, Colors.blue.shade800),
       _ => (AppTheme.amberBadge, AppTheme.amberText),
     };

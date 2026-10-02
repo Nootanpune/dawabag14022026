@@ -30,12 +30,12 @@ class FreeDeliveryNote extends ConsumerWidget {
       padding: const EdgeInsets.only(top: 8),
       child: Row(
         children: [
-          const Icon(Icons.local_shipping_outlined, size: 16, color: AppTheme.brandGreen700),
+          const Icon(Icons.local_shipping_outlined, size: 16, color: AppTheme.brandTeal700),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               line,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.brandGreen700),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.brandTeal700),
             ),
           ),
         ],

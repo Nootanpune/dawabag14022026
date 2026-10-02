@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../config/theme.dart';
+import '../../../widgets/brand/brand_logo.dart';
 import 'register_constants.dart';
 import 'register_controller.dart';
 import 'register_widgets.dart';
@@ -16,7 +17,9 @@ class StepType extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Text('How will you use Dawabag?',
+        const Center(child: BrandLogo(width: 170)),
+        const SizedBox(height: 24),
+        const Text('How will you use DAWA BAG?',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
         Text('Pricing and verification depend on your account type.',
@@ -43,7 +46,7 @@ class StepType extends StatelessWidget {
                   TextSpan(
                       text: 'Sign in',
                       style: TextStyle(
-                          color: AppTheme.brandGreen, fontWeight: FontWeight.w600)),
+                          color: AppTheme.brandTeal, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -56,17 +59,17 @@ class StepType extends StatelessWidget {
   Widget _typeCard(CustomerTypeOption option) {
     final selected = c.customerType == option.value;
     return Material(
-      color: selected ? AppTheme.brandGreen50 : Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      color: selected ? AppTheme.brandTeal50 : Colors.white,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => c.selectType(option.value),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? AppTheme.brandGreen : Colors.grey.shade300,
+              color: selected ? AppTheme.brandTeal : Colors.grey.shade300,
               width: selected ? 1.5 : 1,
             ),
           ),
@@ -77,11 +80,11 @@ class StepType extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: selected ? AppTheme.brandGreen : AppTheme.brandGreen50,
+                  color: selected ? AppTheme.brandTeal : AppTheme.brandTeal50,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(option.icon,
-                    color: selected ? Colors.white : AppTheme.brandGreen, size: 22),
+                    color: selected ? Colors.white : AppTheme.brandTeal, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -98,7 +101,7 @@ class StepType extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: option.value == 'customer'
-                            ? AppTheme.brandGreen100
+                            ? AppTheme.brandTeal100
                             : AppTheme.amberBadge,
                         borderRadius: BorderRadius.circular(6),
                       ),
@@ -107,7 +110,7 @@ class StepType extends StatelessWidget {
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
                             color: option.value == 'customer'
-                                ? AppTheme.brandGreen700
+                                ? AppTheme.brandTeal700
                                 : AppTheme.amberText,
                           )),
                     ),
@@ -117,7 +120,7 @@ class StepType extends StatelessWidget {
               const SizedBox(width: 8),
               Icon(
                 selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? AppTheme.brandGreen : Colors.grey.shade400,
+                color: selected ? AppTheme.brandTeal : Colors.grey.shade400,
                 size: 22,
               ),
             ],

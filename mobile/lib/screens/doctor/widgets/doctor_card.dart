@@ -24,7 +24,7 @@ class DoctorRegistrationText extends StatelessWidget {
           const SizedBox(height: 2),
           Row(
             children: [
-              const Icon(Icons.verified_outlined, size: 14, color: AppTheme.brandGreen),
+              const Icon(Icons.verified_outlined, size: 14, color: AppTheme.brandTeal),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(registrationLine,
@@ -54,11 +54,11 @@ class DoctorAvatar extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(color: AppTheme.brandGreen50, shape: BoxShape.circle),
+      decoration: const BoxDecoration(color: AppTheme.brandTeal50, shape: BoxShape.circle),
       child: Center(
         child: Text(initials.isEmpty ? 'Dr' : initials,
             style: TextStyle(
-                fontSize: size * 0.36, fontWeight: FontWeight.w700, color: AppTheme.brandGreen600)),
+                fontSize: size * 0.36, fontWeight: FontWeight.w700, color: AppTheme.brandTeal)),
       ),
     );
   }
@@ -93,7 +93,7 @@ class DoctorCard extends StatelessWidget {
                     if (d.speciality != null && d.speciality!.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(d.speciality!,
-                          style: const TextStyle(fontSize: 12, color: AppTheme.brandGreen700)),
+                          style: const TextStyle(fontSize: 12, color: AppTheme.brandTeal700)),
                     ],
                     const SizedBox(height: 4),
                     DoctorRegistrationText(

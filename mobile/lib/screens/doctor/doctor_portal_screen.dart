@@ -18,7 +18,7 @@ class DoctorPortalScreen extends StatelessWidget {
           children: [
             Card(
               child: ListTile(
-                leading: const Icon(Icons.video_call_outlined, color: AppTheme.brandGreen),
+                leading: const Icon(Icons.video_call_outlined, color: AppTheme.brandTeal),
                 title: const Text("Today's consultations", style: TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: const Text('See your patients for the day and join the call'),
                 trailing: const Icon(Icons.chevron_right),

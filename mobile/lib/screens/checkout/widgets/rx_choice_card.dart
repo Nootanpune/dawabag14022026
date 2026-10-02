@@ -29,10 +29,10 @@ class RxChoiceCard extends StatelessWidget {
       label: '${prescriptionTitle(rx)}, ${prescriptionUploaded(rx)}, ${status.label}',
       excludeSemantics: true,
       child: Material(
-        color: selected ? AppTheme.brandGreen50 : Colors.white,
+        color: selected ? AppTheme.brandTeal50 : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: selected ? AppTheme.brandGreen : Colors.grey.shade300, width: 2),
+          side: BorderSide(color: selected ? AppTheme.brandTeal : Colors.grey.shade300, width: 2),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -60,9 +60,9 @@ class RxChoiceCard extends StatelessWidget {
                 ),
                 if (selected)
                   const Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.check_circle, color: AppTheme.brandGreen),
+                    Icon(Icons.check_circle, color: AppTheme.brandTeal),
                     Text('Chosen',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.brandTeal700)),
                   ])
                 else
                   Icon(Icons.radio_button_unchecked, color: Colors.grey.shade400),
@@ -100,7 +100,7 @@ class _RxThumbState extends State<_RxThumb> {
 
   @override
   Widget build(BuildContext context) {
-    const icon = Icon(Icons.description_outlined, color: AppTheme.brandGreen, size: 26);
+    const icon = Icon(Icons.description_outlined, color: AppTheme.brandTeal, size: 26);
     return Container(
       width: 52,
       height: 52,

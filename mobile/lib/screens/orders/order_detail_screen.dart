@@ -38,13 +38,13 @@ class OrderDetailScreen extends ConsumerWidget {
         ],
       ),
       body: orderAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (e, _) => ErrorRetryView(
           message: ApiService.errorMessage(e, fallback: 'Could not load this order'),
           onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
         ),
         data: (order) => RefreshIndicator(
-          color: AppTheme.brandGreen,
+          color: AppTheme.brandTeal,
           onRefresh: () => ref.refresh(orderDetailProvider(orderId).future),
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -132,12 +132,12 @@ class _Header extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppTheme.brandGreen50,
+              color: AppTheme.brandTeal50,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(status.replaceAll('_', ' '),
                 style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.brandGreen700)),
+                    fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.brandTeal700)),
           ),
         ],
       );

@@ -33,7 +33,6 @@ extension LicenceApi on ApiService {
       filePath: filePath,
       filename: filename,
       fileField: 'file',
-      mimeType: mimeTypeForFilename(filename) ?? 'image/jpeg',
     );
   }
 }

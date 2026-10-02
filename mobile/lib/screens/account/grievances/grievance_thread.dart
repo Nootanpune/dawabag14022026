@@ -19,8 +19,8 @@ class GrievanceMessageBubble extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
         decoration: BoxDecoration(
-          color: staff ? Colors.white : AppTheme.brandGreen50,
-          border: Border.all(color: staff ? Colors.grey.shade300 : AppTheme.brandGreen100),
+          color: staff ? Colors.white : AppTheme.brandTeal50,
+          border: Border.all(color: staff ? Colors.grey.shade300 : AppTheme.brandTeal100),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
@@ -94,8 +94,8 @@ class _GrievanceReplyBoxState extends State<GrievanceReplyBox> {
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.brandGreen))
-                    : const Icon(Icons.send, color: AppTheme.brandGreen),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.brandTeal))
+                    : const Icon(Icons.send, color: AppTheme.brandTeal),
               ),
             ],
           ),

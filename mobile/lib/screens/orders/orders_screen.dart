@@ -84,7 +84,7 @@ class OrdersScreen extends ConsumerWidget {
         ],
       ),
       body: orders.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandGreen)),
+        loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
         error: (err, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -108,7 +108,7 @@ class OrdersScreen extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            color: AppTheme.brandGreen,
+            color: AppTheme.brandTeal,
             onRefresh: () async => ref.invalidate(ordersProvider),
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -179,7 +179,7 @@ class _OrderCard extends StatelessWidget {
             if (order['awb_number'] != null) ...[
               const SizedBox(height: 6),
               Text('${order['courier_partner']} · ${order['awb_number']}',
-                style: const TextStyle(fontSize: 12, color: AppTheme.brandGreen)),
+                style: const TextStyle(fontSize: 12, color: AppTheme.brandTeal)),
             ],
           ],
         ),

@@ -44,7 +44,7 @@ class SearchResultTile extends ConsumerWidget {
                     Row(children: [
                       // The buyer's own price from the server (offer / PTR / PTS / institutional)
                       Text(formatPrice(product['display_price_paise'] ?? product['offer_price_paise'] ?? 0),
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.brandTeal700)),
                       // Rx for Schedule H / H1 (C-08), or Non-scheduled (Sprint 31)
                       const SizedBox(width: 8),
                       ScheduleBadge(product['drug_schedule']?.toString()),

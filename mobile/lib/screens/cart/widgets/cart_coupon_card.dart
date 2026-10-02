@@ -50,7 +50,7 @@ class _CartCouponCardState extends State<CartCouponCard> {
     _ctrl.clear();
     messenger.showSnackBar(const SnackBar(
       content: Text('Coupon applied'),
-      backgroundColor: AppTheme.brandGreen,
+      backgroundColor: AppTheme.brandTeal,
     ));
   }
 
@@ -78,9 +78,9 @@ class _CartCouponCardState extends State<CartCouponCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: valid ? AppTheme.brandGreen50 : const Color(0xFFFDECEC),
+        color: valid ? AppTheme.brandTeal50 : const Color(0xFFFDECEC),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: valid ? AppTheme.brandGreen100 : const Color(0xFFF5C2C2)),
+        border: Border.all(color: valid ? AppTheme.brandTeal100 : const Color(0xFFF5C2C2)),
       ),
       child: Row(
         children: [
@@ -90,13 +90,13 @@ class _CartCouponCardState extends State<CartCouponCard> {
               children: [
                 Text(coupon.code,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700, color: AppTheme.brandGreen600)),
+                        fontWeight: FontWeight.w700, color: AppTheme.brandTeal)),
                 Text(
                   valid
                       ? 'You save ${formatPrice(coupon.discountPaise)}'
                       : (coupon.message ?? 'This coupon does not apply to your cart'),
                   style: TextStyle(
-                      fontSize: 12, color: valid ? AppTheme.brandGreen : AppTheme.errorRed),
+                      fontSize: 12, color: valid ? AppTheme.brandTeal : AppTheme.errorRed),
                 ),
               ],
             ),

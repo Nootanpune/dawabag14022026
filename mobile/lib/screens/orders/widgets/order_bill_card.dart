@@ -33,15 +33,15 @@ class OrderBillCard extends StatelessWidget {
             SummaryRow('Shipping', formatPrice(asInt(order['shipping_paise']))),
             if (discount > 0) ...[
               const SizedBox(height: 6),
-              SummaryRow('Discount', '–${formatPrice(discount)}', valueColor: Colors.green),
+              SummaryRow('Discount', '–${formatPrice(discount)}', valueColor: AppTheme.brandLeafDark),
             ],
             if (wallet > 0) ...[
               const SizedBox(height: 6),
-              SummaryRow('Wallet', '–${formatPrice(wallet)}', valueColor: Colors.green),
+              SummaryRow('Wallet', '–${formatPrice(wallet)}', valueColor: AppTheme.brandLeafDark),
             ],
             const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
             SummaryRow('Total', formatPrice(asInt(order['total_paise'])),
-                bold: true, valueColor: AppTheme.brandGreen600),
+                bold: true, valueColor: AppTheme.brandTeal),
             if (method != null && method.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text('Paid via $method', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),

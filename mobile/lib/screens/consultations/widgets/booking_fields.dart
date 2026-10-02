@@ -29,7 +29,7 @@ class ConsultModeChips extends StatelessWidget {
                   avatar: Icon(_icons[e.key], size: 18),
                   label: Text(e.value),
                   selected: value == e.key,
-                  selectedColor: AppTheme.brandGreen100,
+                  selectedColor: AppTheme.brandTeal100,
                   onSelected: enabled ? (_) => onChanged(e.key) : null,
                 ))
             .toList(),
@@ -63,7 +63,7 @@ class TeleconsultConsent extends StatelessWidget {
         onChanged: enabled ? (v) => onChanged(v ?? false) : null,
         controlAffinity: ListTileControlAffinity.leading,
         contentPadding: EdgeInsets.zero,
-        activeColor: AppTheme.brandGreen,
+        activeColor: AppTheme.brandTeal,
         title: const Text(
           kTeleconsultConsentText,
           style: TextStyle(fontSize: 13),

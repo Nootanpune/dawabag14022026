@@ -99,7 +99,7 @@ class CheckboxFormField extends StatelessWidget {
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
               dense: true,
-              activeColor: AppTheme.brandGreen,
+              activeColor: AppTheme.brandTeal,
             ),
             if (field.hasError)
               Padding(
@@ -133,7 +133,7 @@ class RegisterStepIndicator extends StatelessWidget {
                 child: Container(
                   height: 2,
                   margin: const EdgeInsets.only(bottom: 18),
-                  color: i <= currentIndex ? AppTheme.brandGreen : Colors.grey.shade300,
+                  color: i <= currentIndex ? AppTheme.brandTeal : Colors.grey.shade300,
                 ),
               ),
             _dot(i + 1, kStepLabels[steps[i]] ?? '',
@@ -154,8 +154,8 @@ class RegisterStepIndicator extends StatelessWidget {
           height: 26,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: highlighted ? AppTheme.brandGreen : Colors.white,
-            border: Border.all(color: highlighted ? AppTheme.brandGreen : Colors.grey.shade400),
+            color: highlighted ? AppTheme.brandTeal : Colors.white,
+            border: Border.all(color: highlighted ? AppTheme.brandTeal : Colors.grey.shade400),
           ),
           child: Center(
             child: done
@@ -173,7 +173,7 @@ class RegisterStepIndicator extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: highlighted ? AppTheme.brandGreen : Colors.grey.shade600,
+              color: highlighted ? AppTheme.brandTeal : Colors.grey.shade600,
             )),
       ],
     );

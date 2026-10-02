@@ -95,7 +95,7 @@ class _Placeholder extends StatelessWidget {
     final initial = trimmed.isEmpty ? '?' : trimmed.characters.first.toUpperCase();
     final form = inferDosageForm(name);
     return Container(
-      color: AppTheme.brandGreen50,
+      color: AppTheme.brandTeal50,
       alignment: Alignment.center,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -104,7 +104,7 @@ class _Placeholder extends StatelessWidget {
               style: TextStyle(
                 fontSize: compact ? 20 : 34,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.brandGreen700,
+                color: AppTheme.brandTeal700,
               )),
           if (form != null && !compact) ...[
             const SizedBox(height: 4),
@@ -116,7 +116,7 @@ class _Placeholder extends StatelessWidget {
               ),
               child: Text(form.label,
                   style: const TextStyle(
-                      fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.brandGreen700)),
+                      fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.brandTeal700)),
             ),
           ],
         ],

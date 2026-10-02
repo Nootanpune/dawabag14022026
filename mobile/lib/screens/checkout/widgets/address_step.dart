@@ -68,11 +68,11 @@ class AddressStep extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           border: Border.all(
-            color: selected ? AppTheme.brandGreen : Colors.grey.shade200,
+            color: selected ? AppTheme.brandTeal : Colors.grey.shade200,
             width: selected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
-          color: selected ? AppTheme.brandGreen50 : Colors.white,
+          color: selected ? AppTheme.brandTeal50 : Colors.white,
         ),
         child: Row(
           children: [
@@ -82,8 +82,8 @@ class AddressStep extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                    color: selected ? AppTheme.brandGreen : Colors.grey.shade400, width: 2),
-                color: selected ? AppTheme.brandGreen : Colors.transparent,
+                    color: selected ? AppTheme.brandTeal : Colors.grey.shade400, width: 2),
+                color: selected ? AppTheme.brandTeal : Colors.transparent,
               ),
               child: selected ? const Icon(Icons.check, size: 12, color: Colors.white) : null,
             ),

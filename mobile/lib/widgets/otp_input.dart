@@ -81,10 +81,15 @@ class OtpInputState extends State<OtpInput> {
           decoration: InputDecoration(
             counterText: '',
             contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            // The theme's pill fields are for full-width inputs; digit boxes stay square-ish
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade400),
+            ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppTheme.brandGreen, width: 2),
+              borderSide: const BorderSide(color: AppTheme.brandTeal, width: 2),
             ),
           ),
           onChanged: (v) => _onChanged(i, v),

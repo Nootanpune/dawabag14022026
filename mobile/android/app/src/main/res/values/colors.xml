@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DAWA BAG brand colours for the launcher icon and splash (Sprint 35) -->
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="splash_background">#FFFFFF</color>
+    <color name="splash_background_dark">#111827</color>
+</resources>

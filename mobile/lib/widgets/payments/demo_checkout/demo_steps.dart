@@ -134,7 +134,7 @@ class _DemoProviderStepState extends State<DemoProviderStep> {
           ChoiceChip(
             label: Text(p),
             selected: _chosen == p,
-            selectedColor: AppTheme.brandGreen50,
+            selectedColor: AppTheme.brandTeal50,
             onSelected: (_) => setState(() => _chosen = p),
           ),
       ]),

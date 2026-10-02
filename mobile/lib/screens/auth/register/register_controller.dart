@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../services/api_service.dart';
 import '../../../services/registration_api.dart';
+import '../../../services/upload_file.dart';
 import '../../../widgets/otp_input.dart';
 import 'register_constants.dart';
 import 'register_docs.dart';
@@ -217,6 +218,15 @@ class RegisterController extends ChangeNotifier {
       onMessage('Could not read ${file.name}', true);
       return;
     }
+    // The file's bytes must be PDF / JPG / PNG (a HEIC photo named .jpg is refused
+    // by the server — Sprint 35); say so now rather than after OTP
+    try {
+      await prepareUpload(file.path!, file.name);
+    } on UploadRefused catch (e) {
+      onMessage(e.message, true);
+      return;
+    }
+    if (_disposed) return;
 
     update(() {
       files[docType] = file;

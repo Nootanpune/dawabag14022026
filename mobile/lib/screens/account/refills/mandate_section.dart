@@ -62,7 +62,7 @@ class MandateSection extends StatelessWidget {
                         : m.status == 'failed'
                             ? Icons.error_outline
                             : Icons.hourglass_top,
-                    color: m.isActive ? AppTheme.brandGreen : Colors.orange.shade700,
+                    color: m.isActive ? AppTheme.brandTeal : Colors.orange.shade700,
                   ),
                   title: Text('${m.method.toUpperCase()} · up to ${formatPrice(m.maxAmountPaise)}',
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
