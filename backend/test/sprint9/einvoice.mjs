@@ -3,11 +3,13 @@ import { call, check, db, q } from '../sprint5/lib.mjs';
 import { calls } from '../fakes/server.mjs';
 import { expireIrpTokens, irp } from '../fakes/irp.mjs';
 import { order, PREMISES_PIN, SELLER_GSTIN, waitFor } from './fixtures.mjs';
+import { releaseInDb } from '../support/pharmacistCheck.mjs';
 
 const einv = (shipmentId, type = 'INV') => q(`SELECT * FROM einvoices WHERE shipment_id = $1 AND doc_type = $2`, [shipmentId, type]);
 const generated = (shipmentId, type = 'INV') => waitFor(`SELECT * FROM einvoices WHERE shipment_id = $1 AND doc_type = $2`, [shipmentId, type],
   (r) => r[0] && r[0].status !== 'pending');
-const pack = (ctx, id) => call('POST', `/fulfilment/shipments/${id}/pack`, { token: ctx.t.packer });
+// Sprint 35: a pharmacist checks and releases every order before packing (C-08); this suite is about e-invoices
+const pack = async (ctx, id) => { await releaseInDb(q, id); return call('POST', `/fulfilment/shipments/${id}/pack`, { token: ctx.t.packer }); };
 const dispatch = (ctx, id, n) => call('POST', `/fulfilment/shipments/${id}/dispatch`, { token: ctx.t.packer,
   body: { courier_partner: 'Delhivery', awb_number: `S9AWB${n}${Date.now() % 100000}`, seal_number: `SEAL-S9-${n}` } });
 const pdf = (ctx, id) => call('GET', `/invoices/shipments/${id}.pdf`, { token: ctx.t.admin, raw: true });
@@ -52,7 +54,10 @@ export async function runEinvoice(ctx) {
   const sh = (await q(`SELECT total_paise FROM order_shipments WHERE id = $1`, [a.shipmentId]))[0];
   check('e-invoice value equals the tax invoice total', Math.round(p?.ValDtls.TotInvVal * 100) === sh.total_paise, { irp: p?.ValDtls.TotInvVal, invoice: sh.total_paise });
   r = await pdf(ctx, a.shipmentId);
-  check('invoice PDF carries the IRP QR code', r.status === 200 && r.buf.includes('/Subtype /Image'), r.status);
+  // Sprint 35: Dawabag's invoices also carry the DAWA BAG logo, so count images rather than look for one
+  const images = (buf) => buf.toString('latin1').split('/Subtype /Image').length - 1;
+  const withQr = images(r.buf);
+  check('invoice PDF carries the IRP QR code', r.status === 200 && withQr >= 3, { status: r.status, withQr });
   r = await dispatch(ctx, a.shipmentId, 1);
   check('registered B2B parcel dispatches', r.status === 200, r.json);
 
@@ -61,7 +66,7 @@ export async function runEinvoice(ctx) {
   r = await pack(ctx, c.shipmentId);
   check('consumer (no GSTIN) invoice needs no IRN', r.json.data?.einvoice_required === false && !(await einv(c.shipmentId)).length, r.json);
   r = await pdf(ctx, c.shipmentId);
-  check('…and its PDF has no QR', r.status === 200 && !r.buf.includes('/Subtype /Image'), r.status);
+  check('…and its PDF has no QR (only the logo)', r.status === 200 && images(r.buf) > 0 && images(r.buf) < withQr, { status: r.status, images: images(r.buf), withQr });
 
   irp.down = true;
   const d = await order(ctx);

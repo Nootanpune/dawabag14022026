@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { API, call, check, q } from '../sprint5/lib.mjs';
 import { PIN, markPaid } from './fixtures.mjs';
+import { releaseForPacking } from '../support/pharmacistCheck.mjs';
 
 const require = createRequire(import.meta.url);
 const ExcelJS = require('exceljs');
@@ -139,6 +140,7 @@ export async function runOperations({ t, P, addr, ids }) {
   const cold = r.json.data.order;
   await markPaid(cold.id, cold.total_paise);
   const cs = (await q(`SELECT id FROM order_shipments WHERE order_id = $1`, [cold.id]))[0].id;
+  await releaseForPacking(call, t.pharmacist, cs);   // Sprint 35: pharmacist check first (C-08)
   await call('POST', `/fulfilment/shipments/${cs}/pack`, { token: t.packer });
   const disp = (extra) => call('POST', `/fulfilment/shipments/${cs}/dispatch`, { token: t.packer, body: { courier_partner: 'ColdEx', awb_number: 'S6COLD', seal_number: 'SEAL-S6C', ...extra } });
   r = await disp({});

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
@@ -9,16 +9,31 @@ import BottomNav from '@/components/layout/BottomNav';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
+// DAWA BAG brand (owner decision 2026-10-02): icons from public/brand (README there).
+// No speed or "best" claims (C-17).
 export const metadata: Metadata = {
-  title: 'Dawabag — Online Pharmacy',
-  description: 'Order medicines online with prescription verification, fast delivery, and expert pharmacist support.',
+  title: 'DAWA BAG — Online Pharmacy',
+  description: 'Order medicines online from a licensed pharmacy. Every order is checked by a registered pharmacist before it is packed.',
   keywords: 'online pharmacy, medicines, prescription, delivery, Nashik',
+  applicationName: 'DAWA BAG',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/brand/dawabag-mark.svg', type: 'image/svg+xml' },
+      { url: '/brand/dawabag-mark-32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [{ url: '/brand/apple-touch-icon.png', sizes: '180x180' }],
+  },
   openGraph: {
-    title: 'Dawabag — Online Pharmacy',
-    description: 'Trusted online pharmacy with doorstep delivery',
+    title: 'DAWA BAG — Online Pharmacy',
+    description: 'Your Life Saving Companion. A licensed online pharmacy; every order is checked by a pharmacist.',
     type: 'website',
+    images: [{ url: '/brand/dawabag-logo-960.png', width: 960, height: 550, alt: 'DAWA BAG — Your Life Saving Companion' }],
   },
 };
+
+export const viewport: Viewport = { themeColor: '#027B87' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -85,7 +85,7 @@ export default function DetailsStep({
 
       <Field label="Mobile number" error={errors.mobile?.message}>
         <div className="flex">
-          <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+          <span className="inline-flex items-center px-3 rounded-l-full border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
             +91
           </span>
           <input

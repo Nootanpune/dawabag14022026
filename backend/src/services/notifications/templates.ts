@@ -41,6 +41,11 @@ export function buildMessage(payload: NotificationPayload) {
       sms: `Dawabag: Prescription for order ${on} could not be verified. Reason: ${payload.reason || 'Invalid prescription'}. Contact support.`,
       push: { title: 'Prescription rejected', body: `Order ${on} needs a valid prescription.` },
     },
+    // Sprint 35: the pharmacist put the order on hold (C-08); the reason stays with our staff
+    order_on_hold: {
+      sms: `Dawabag: Our pharmacist has put order ${on} on hold before packing and will contact you. Nothing more is charged.`,
+      push: { title: 'Order on hold', body: `Our pharmacist will contact you about order ${on}.` },
+    },
     packed: {
       sms: `Dawabag: Order ${on} packed and ready for dispatch.`,
       push: { title: 'Order packed', body: `Order ${on} is ready to ship.` },

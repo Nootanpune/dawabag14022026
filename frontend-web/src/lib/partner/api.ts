@@ -7,6 +7,7 @@ import type {
   NewListing,
   PartnerListing,
   PartnerMe,
+  PartnerPharmacist,
   PartnerShipment,
   SavedBatch,
   ShipmentStatus,
@@ -18,6 +19,7 @@ export const partnerKeys = {
   catalogue: (q: string) => ['partner', 'catalogue', q] as const,
   listings: ['partner', 'listings'] as const,
   shipments: (status: ShipmentStatus) => ['partner', 'shipments', status] as const,
+  pharmacists: ['partner', 'pharmacists'] as const,
   settlements: ['partner', 'settlements'] as const,
   settlement: (id: string) => ['partner', 'settlements', id] as const,
 };
@@ -50,6 +52,18 @@ export async function saveInventory(listingId: string, batches: BatchInput[]): P
 export async function fetchShipments(status: ShipmentStatus): Promise<PartnerShipment[]> {
   const { data } = await api.get('/partner/shipments', { params: { status } });
   return data.data?.shipments ?? [];
+}
+
+/** Sprint 35: the partner's own registered pharmacists, who check and release its shipments (C-08). */
+export async function fetchPartnerPharmacists(): Promise<PartnerPharmacist[]> {
+  const { data } = await api.get('/partner/pharmacists');
+  return data.data?.pharmacists ?? [];
+}
+
+/** Release for packing, hold, or refuse to supply — recorded against the chosen pharmacist. */
+export async function decidePartnerCheck(id: string, body: { decision: 'release' | 'hold' | 'reject'; vendor_pharmacist_id: string; reason?: string }) {
+  const { data } = await api.post(`/partner/shipments/${id}/check`, body);
+  return data.data as { shipment_id: string; pharmacist_check: string };
 }
 
 /** Seal number is required (C-26). */

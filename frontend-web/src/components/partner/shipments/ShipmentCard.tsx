@@ -10,10 +10,16 @@ interface Props {
   shipment: PartnerShipment;
   onDispatch: (s: PartnerShipment) => void;
   onDelivered: (s: PartnerShipment) => void;
+  /** Sprint 35: open the pharmacist check (release / hold / do not supply) */
+  onCheck: (s: PartnerShipment) => void;
   busy?: boolean;
 }
 
-export default function ShipmentCard({ shipment: s, onDispatch, onDelivered, busy }: Props) {
+// Shipments from before Sprint 35 (not_recorded) and released ones can go; others wait (C-08)
+const mayDispatch = (s: PartnerShipment) => !s.pharmacist_check || s.pharmacist_check === 'released' || s.pharmacist_check === 'not_recorded';
+
+export default function ShipmentCard({ shipment: s, onDispatch, onDelivered, onCheck, busy }: Props) {
+  const waiting = s.status === 'pending' && !mayDispatch(s);
   return (
     <div className="card">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
@@ -43,6 +49,18 @@ export default function ShipmentCard({ shipment: s, onDispatch, onDelivered, bus
 
       <ShipmentLines lines={s.lines} />
 
+      {/* Sprint 35: your registered pharmacist checks and releases every shipment first (C-08) */}
+      {waiting && (
+        <p id={`wait-${s.id}`} className="text-xs text-amber-900 bg-amber-50 rounded-lg p-2 mt-3" data-testid="partner-check-needed">
+          {s.pharmacist_check === 'held'
+            ? `On hold by your pharmacist: ${s.pharmacist_check_note ?? ''}`
+            : 'Your registered pharmacist must check this shipment and release it before it is packed or dispatched.'}
+        </p>
+      )}
+      {s.pharmacist_check === 'released' && s.pharmacist_name && (
+        <p className="text-xs text-gray-700 mt-3">Checked by pharmacist {s.pharmacist_name}, Reg. no. {s.pharmacist_reg_no}</p>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2 mt-3 text-sm">
         <div className="text-xs text-gray-500">
           Subtotal {formatPrice(s.subtotal_paise)} · GST {formatPrice(s.gst_paise)} ·{' '}
@@ -57,8 +75,12 @@ export default function ShipmentCard({ shipment: s, onDispatch, onDelivered, bus
         </div>
         <div className="flex items-center gap-2">
           {s.invoice_number && <InvoiceDownloadButton shipmentId={s.id} invoiceNumber={s.invoice_number} />}
+          {waiting && (
+            <button onClick={() => onCheck(s)} className="btn-outline text-xs py-1.5 px-3">Pharmacist check</button>
+          )}
           {s.status === 'pending' && (
-            <button onClick={() => onDispatch(s)} className="btn-primary text-xs py-1.5 px-3">
+            <button onClick={() => onDispatch(s)} disabled={waiting} aria-describedby={waiting ? `wait-${s.id}` : undefined}
+              className="btn-primary text-xs py-1.5 px-3">
               Dispatch
             </button>
           )}

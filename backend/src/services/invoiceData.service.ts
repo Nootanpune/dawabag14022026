@@ -30,6 +30,10 @@ export interface InvoiceData {
     cgstPaise: number; sgstPaise: number; igstPaise: number; totalPaise: number;
   }[];
   totals: { taxablePaise: number; cgstPaise: number; sgstPaise: number; igstPaise: number; totalPaise: number };
+  /** Dawabag's own invoice carries the DAWA BAG logo; a partner's invoice is the partner's (C-05) */
+  sellerType?: 'dawabag' | 'partner';
+  /** Sprint 35: the registered pharmacist who checked and released this shipment (C-08) */
+  pharmacist?: { name: string; regNo: string } | null;
 }
 
 export interface InvoiceLicence { form: string; label: string; number: string; valid_upto: string | null }
@@ -116,6 +120,8 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
     interState: !sameState(seller.state, s.ship_state),
     einvoice: s.seller_type === 'dawabag' ? await registered('shipment_id = $1 AND doc_type = \'INV\'', shipmentId) : null,
     lines, totals,
+    sellerType: s.seller_type,
+    pharmacist: s.pharmacist_check === 'released' && s.pharmacist_name ? { name: s.pharmacist_name, regNo: s.pharmacist_reg_no } : null,
   };
 }
 

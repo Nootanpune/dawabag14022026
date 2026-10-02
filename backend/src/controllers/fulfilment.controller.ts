@@ -9,6 +9,7 @@ import { toCsv } from '../utils/csv';
 import { fulfilmentQueue, packShipment, dispatchOwnShipment, QueueStage } from '../services/fulfilment.service';
 import { markShipmentDelivered } from '../services/partnerFulfilment.service';
 import { applyPrescriptionToOrder, rejectPrescription, verifyPrescription } from '../services/rxVerification.service';
+import { checkQueue, decideOwnShipment, orderCheckDetail } from '../services/pharmacistCheck/check.service';
 
 const uuid = z.string().uuid();
 
@@ -32,8 +33,9 @@ export const handoverSchema = z.object({
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 // Which roles may see which stage
-const STAGE_ROLES: Record<QueueStage, string[]> = {
+const STAGE_ROLES: Record<QueueStage | 'check', string[]> = {
   rx: ['pharmacist_rx'],
+  check: ['pharmacist_rx'],      // Sprint 35: every order's pharmacist check (C-08)
   pack: ['pharmacist_pack', 'admin', 'super_admin'],
   dispatch: ['pharmacist_pack', 'admin', 'super_admin'],
   deliver: ['delivery', 'pharmacist_pack', 'admin', 'super_admin'],   // packers see it to reassign riders
@@ -41,8 +43,9 @@ const STAGE_ROLES: Record<QueueStage, string[]> = {
 
 export async function getQueue(req: Request, res: Response, next: NextFunction) {
   try {
-    const stage = z.enum(['rx', 'pack', 'dispatch', 'deliver']).parse(req.query.stage);
+    const stage = z.enum(['rx', 'check', 'pack', 'dispatch', 'deliver']).parse(req.query.stage);
     if (!STAGE_ROLES[stage].includes(req.user!.role)) throw new AppError('Access denied', 403);
+    if (stage === 'check') return res.json({ success: true, data: { stage, items: await checkQueue() } });
     // Riders get their own run sheet, never the whole delivery queue
     if (req.user!.role === 'delivery') return res.json({ success: true, data: { stage, items: await myRun(req.user!.id) } });
     res.json({ success: true, data: { stage, items: await fulfilmentQueue(stage) } });
@@ -76,6 +79,23 @@ export async function postApply(req: Request, res: Response, next: NextFunction)
   try {
     const { order_id } = z.object({ order_id: uuid }).parse(req.body);
     res.json({ success: true, data: await applyPrescriptionToOrder(req.user!.id, uuid.parse(req.params.id), order_id) });
+  } catch (err) { next(err); }
+}
+
+// Sprint 35 — the pharmacist check on every order (C-08): release, hold or refuse
+export const checkDecisionSchema = z.object({
+  decision: z.enum(['release', 'hold', 'reject']),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export async function getOrderCheck(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await orderCheckDetail(uuid.parse(req.params.orderId)) }); } catch (err) { next(err); }
+}
+
+export async function postCheck(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { decision, reason } = checkDecisionSchema.parse(req.body);
+    res.json({ success: true, data: await decideOwnShipment(req.user!.id, uuid.parse(req.params.id), decision, reason) });
   } catch (err) { next(err); }
 }
 

@@ -16,13 +16,13 @@ import BookCourierButton from './BookCourierButton';
 import ReassignRiderDialog from './ReassignRiderDialog';
 import { OWN_RIDER_COURIER } from '@/lib/fulfilment/riders';
 
-type ShipmentStage = Exclude<QueueStage, 'rx'>;
+type ShipmentStage = Exclude<QueueStage, 'rx' | 'check'>;
 
 // Packers see the Deliver tab only to reassign riders; delivery is confirmed by riders and managers (C-26)
 const DELIVER_ROLES = ['delivery', 'admin', 'super_admin'];
 
 const COPY: Record<ShipmentStage, { action: string; empty: string }> = {
-  pack: { action: 'Mark packed', empty: 'Nothing waiting to be packed' },
+  pack: { action: 'Mark packed', empty: 'Nothing waiting to be packed' },   // shipments still with the pharmacist show, blocked
   dispatch: { action: 'Dispatch', empty: 'Nothing packed and waiting for dispatch' },
   deliver: { action: 'Mark delivered', empty: 'No shipments out for delivery' },
 };
@@ -77,6 +77,14 @@ export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
     pack.mutate(s);
   };
 
+  // Sprint 35: packing waits for the pharmacist's release (the server refuses it too, C-08)
+  const blockedFor = (s: QueueShipment) => {
+    if (stage !== 'pack' || !s.pharmacist_check || s.pharmacist_check === 'released' || s.pharmacist_check === 'not_recorded') return undefined;
+    return s.pharmacist_check === 'held'
+      ? `On hold by the pharmacist: ${s.pharmacist_check_note ?? 'no reason given'}`
+      : 'Waiting for the pharmacist check — cannot be packed until a pharmacist releases it.';
+  };
+
   const extraFor = (s: QueueShipment) => {
     if (stage === 'dispatch' && s.status === 'packed' && !s.awb_number) return <BookCourierButton shipment={s} />;
     if (stage === 'deliver' && s.courier_partner === OWN_RIDER_COURIER) {
@@ -101,6 +109,7 @@ export default function ShipmentQueue({ stage }: { stage: ShipmentStage }) {
             onAction={() => onAction(s)}
             busy={pack.isPending && pack.variables?.shipment_id === s.shipment_id}
             extra={extraFor(s)}
+            blockedReason={blockedFor(s)}
           />
         ))}
       </div>

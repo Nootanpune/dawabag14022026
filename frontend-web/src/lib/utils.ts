@@ -12,10 +12,17 @@ export const ORDER_STATUS_LABELS: Record<string, { label: string; color: string 
   rx_pending:       { label: 'Rx verification pending', color: 'text-orange-600 bg-orange-50' },
   rx_verified:      { label: 'Prescription verified',   color: 'text-blue-600 bg-blue-50' },
   rx_rejected:      { label: 'Rx rejected',             color: 'text-red-600 bg-red-50' },
-  packing:          { label: 'Being packed',            color: 'text-indigo-600 bg-indigo-50' },
+  // Sprint 35: a paid order is checked by the pharmacist, then packed
+  packing:          { label: 'Being prepared',          color: 'text-indigo-600 bg-indigo-50' },
   packed:           { label: 'Packed',                  color: 'text-indigo-600 bg-indigo-50' },
   dispatched:       { label: 'Dispatched',              color: 'text-brand-600 bg-brand-50' },
   delivered:        { label: 'Delivered',               color: 'text-green-700 bg-green-50' },
   cancelled:        { label: 'Cancelled',               color: 'text-gray-600 bg-gray-100' },
   returned:         { label: 'Returned',                color: 'text-gray-600 bg-gray-100' },
+};
+
+/** Sprint 35: while the pharmacist check is open the order page says so, whatever the order status. */
+export const PHARMACIST_CHECK_LABELS: Record<'pending' | 'held', { label: string; color: string }> = {
+  pending: { label: 'Pharmacist check',              color: 'text-brand-700 bg-brand-50' },
+  held:    { label: 'On hold — pharmacist will call', color: 'text-amber-800 bg-amber-50' },
 };

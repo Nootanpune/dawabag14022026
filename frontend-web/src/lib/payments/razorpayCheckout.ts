@@ -51,7 +51,7 @@ export async function openCheckout(o: { key: string; amount: number; orderId: st
       handler: (response: CheckoutSuccess) => done({ kind: 'paid', response }),
       // Closing after a failed attempt reports the failure, not just "closed"
       modal: { ondismiss: () => done(failure ? { kind: 'failed', reason: failure } : { kind: 'dismissed' }), confirm_close: true },
-      theme: { color: '#167A4C' },
+      theme: { color: '#027B87' }   // DAWA BAG teal (AA shade),
     });
     // Razorpay lets the buyer retry inside its window; remember the reason for when they close it
     rzp.on?.('payment.failed', (r: any) => {

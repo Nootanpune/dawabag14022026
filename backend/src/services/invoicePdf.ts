@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import { InvoiceData } from './invoiceData.service';
 import { formatDateIST } from '../utils/ist';
+import { BRAND, brandLogo } from '../utils/brand';
 
 const rs = (p: number) => `Rs. ${(p / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -17,7 +18,12 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
     doc.on('error', reject);
 
     const isCredit = d.title === 'CREDIT NOTE';
-    doc.font('Helvetica-Bold').fontSize(16).text(d.title ?? 'TAX INVOICE', { align: 'center' });
+    // DAWA BAG logo on Dawabag's own documents; a partner's invoice is the partner's (C-05)
+    const logo = d.sellerType === 'partner' ? null : brandLogo('logo');
+    if (logo) {
+      doc.image(logo, 36, 30, { width: 96 });
+    }
+    doc.font('Helvetica-Bold').fontSize(16).fillColor('#000').text(d.title ?? 'TAX INVOICE', 36, logo ? 44 : 36, { align: 'center', width: 523 });
     doc.moveDown(0.3).font('Helvetica').fontSize(9)
       .text(`${isCredit ? 'Credit note' : 'Invoice'} No: ${d.invoiceNumber}    Date: ${formatDateIST(d.invoiceDate)}    Order: ${d.orderNumber}`, { align: 'center' });
     if (d.againstInvoice) doc.text(`Against tax invoice: ${d.againstInvoice}`, { align: 'center' });
@@ -28,6 +34,7 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
       if (qr) doc.image(qr, 36 + 523 - 80, 36, { width: 80 });
     }
     doc.moveDown();
+    if (logo) doc.y = Math.max(doc.y, 92);   // below the logo
 
     const top = doc.y;
     // Every drug licence of the seller and of a licensed buyer, one per line (C-13, Sprint 30)
@@ -67,9 +74,15 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
       .text(`Taxable value: ${rs(t.taxablePaise)}`, { align: 'right' })
       .text(d.interState ? `IGST: ${rs(t.igstPaise)}` : `CGST: ${rs(t.cgstPaise)}   SGST: ${rs(t.sgstPaise)}`, { align: 'right' })
       .fontSize(11).text(`${isCredit ? 'Credit note' : 'Invoice'} total: ${rs(t.totalPaise)}`, { align: 'right' });
+    // Sprint 35: every order is checked and released by a registered pharmacist (C-08)
+    if (!isCredit && d.pharmacist) {
+      doc.moveDown(0.6).font('Helvetica').fontSize(8.5).fillColor('#000')
+        .text(`Checked by pharmacist ${d.pharmacist.name}, Reg. no. ${d.pharmacist.regNo}`, 36, doc.y, { width: 523 });
+    }
     doc.moveDown(2).font('Helvetica').fontSize(8).fillColor('#444')
       .text('Delivery charges, discounts and wallet use appear on the order summary. Goods once dispensed cannot be returned except as per the refund policy.')
       .text('This is a computer-generated invoice.');
+    if (d.sellerType === 'partner') doc.fillColor(BRAND.grey).text('Ordered through the DAWA BAG platform. The seller named above issues this invoice.');
     doc.end();
   });
 }

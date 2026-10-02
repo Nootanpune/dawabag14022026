@@ -14,6 +14,7 @@ import { effectiveCustomerType, requiresPrescription } from '../utils/customerTy
 const CANCELLABLE = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing'];
 import { createOrderSchema, placeOrder } from '../services/orderPlacement.service';
 import { approvedImageKeySql, withImageUrls } from '../services/productImage.service';
+import { orderCheckState } from '../services/pharmacistCheck/rules';
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -85,9 +86,16 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     const shipments = await query<any>(
       `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.invoice_number, s.status,
               s.total_paise, s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at,
-              s.seal_number, s.handover_code_required, s.received_by_name, s.received_by_relation, s.tracking_status, s.rto_at
+              s.seal_number, s.handover_code_required, s.received_by_name, s.received_by_relation, s.tracking_status, s.rto_at,
+              -- Sprint 35: who checked and released it (C-08); the hold note is for staff only
+              s.pharmacist_check, s.pharmacist_name, s.pharmacist_reg_no, s.pharmacist_checked_at,
+              ${canSeeAll ? 's.pharmacist_check_note' : 'NULL::text AS pharmacist_check_note'}
        FROM order_shipments s LEFT JOIN vendors v ON v.id = s.partner_id
        WHERE s.order_id = $1 ORDER BY s.seller_type, v.name`, [id]);
+    // A rejected check names the pharmacist; a hold shows only that the pharmacist will be in touch
+    for (const s of shipments) {
+      if (s.pharmacist_check === 'held' && !canSeeAll) { s.pharmacist_name = null; s.pharmacist_reg_no = null; }
+    }
 
     // Only the buyer sees the delivery code, and only while the pack is on its way (C-26)
     for (const s of shipments) {
@@ -111,6 +119,7 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     res.json({ success: true, data: {
       ...orderResult, items, shipments,
       requires_prescription: needsRx, can_cancel: canCancel,
+      pharmacist_check: orderCheckState(shipments),
       credit_notes: creditNotes, refunds, returns,
     } });
   } catch (err) { next(err); }

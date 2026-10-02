@@ -27,6 +27,8 @@ RUN --mount=type=secret,id=ca,required=false \
 COPY --from=build /app/dist ./dist
 COPY database ./database
 COPY templates ./templates
+# DAWA BAG logo for invoice / e-prescription PDFs (read-only, src/utils/brand.ts)
+COPY backend/assets ./assets
 ENV TEMPLATES_DIR=/app/templates
 ENV MIGRATIONS_DIR=/app/database
 # The app writes nothing to disk (logs go to stdout); run as an unprivileged user

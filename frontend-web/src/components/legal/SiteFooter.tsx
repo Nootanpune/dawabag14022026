@@ -11,6 +11,8 @@ import TrustLinks from '@/components/trust/TrustLinks';
 import { POLICY_KEYS } from '@/lib/legal/policies';
 import { currentYearIST } from '@/lib/dates';
 import { isPortalPath } from '@/lib/layout/portalPaths';
+import BrandLogo from '@/components/brand/BrandLogo';
+import BrandTagline from '@/components/brand/BrandTagline';
 
 /**
  * Site-wide footer with licence, pharmacist and grievance-officer details from the
@@ -28,6 +30,11 @@ export default function SiteFooter() {
   return (
     <footer className="bg-white border-t border-gray-200 mt-10">
       <div className="max-w-6xl mx-auto px-4 py-6 md:py-8">
+        {/* DAWA BAG logo and tagline (owner's brand, 2026-10-02) */}
+        <div className="flex items-center gap-3 mb-4">
+          <BrandLogo height={32} />
+          <BrandTagline className="text-xs" />
+        </div>
         {data &&
           (isDesktop ? (
             <LegalBlocks info={data} />

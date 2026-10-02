@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import BrandLogo from '@/components/brand/BrandLogo';
 import PartnerNav from './PartnerNav';
 
 export default function PartnerShell({ children }: { children: ReactNode }) {
@@ -22,10 +23,7 @@ export default function PartnerShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 md:px-6 h-14 flex items-center justify-between">
         <Link href="/partner" className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">D</span>
-          </div>
-          <span className="text-xl font-bold text-brand-600">dawabag</span>
+          <BrandLogo height={32} priority />
           <span className="text-sm text-gray-400 hidden md:block">/ Partner</span>
         </Link>
         <div className="flex items-center gap-3 text-sm text-gray-600">

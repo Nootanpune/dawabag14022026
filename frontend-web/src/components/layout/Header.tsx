@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { staffHome } from '@/lib/fulfilment/roles';
 import HeaderSearch from '@/components/search/HeaderSearch';
 import BackButton from './BackButton';
+import BrandLogo from '@/components/brand/BrandLogo';
 
 interface Props {
   /** the query of the search results page, shown in the header's search box */
@@ -43,16 +44,12 @@ export default function Header({ searchQuery }: Props = {}) {
         {/* Back on every page but home (Sprint 26), then the logo */}
         <div className="flex items-center">
         <BackButton />
+        {/* DAWA BAG logo (owner's brand, 2026-10-02); the link is named by the logo's alt text */}
         <Link href="/" className="flex items-center gap-2 h-16">
-          <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold">D</span>
-          </div>
-          <span className="leading-tight">
-            <span className="block text-xl font-bold text-brand-700 tracking-tight">dawabag</span>
-            {/* Licence details are in the footer and on /legal (C-04) */}
-            <span className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-gray-600">
-              <ShieldCheck className="w-3 h-3 text-brand-600" aria-hidden="true" /> Licensed online pharmacy
-            </span>
+          <BrandLogo height={40} priority />
+          {/* Licence details are in the footer and on /legal (C-04) */}
+          <span className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-gray-600 leading-tight max-w-[7rem]">
+            <ShieldCheck className="w-3 h-3 shrink-0 text-brand-600" aria-hidden="true" /> Licensed online pharmacy
           </span>
         </Link>
         </div>

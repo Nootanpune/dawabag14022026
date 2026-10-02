@@ -3,12 +3,15 @@
 import api from '../api';
 import { downloadFromApi } from '../download';
 import type { DispatchInput, HandoverInput } from './handover';
-import type { H1Entry, QueueShipment, QueueStage, RxQueueItem, StaffOrder, VerifyRxInput } from './types';
+import type {
+  CheckDecision, CheckQueueItem, H1Entry, OrderCheckDetail, QueueShipment, QueueStage, RxQueueItem, StaffOrder, VerifyRxInput,
+} from './types';
 
 export const fulfilmentKeys = {
   all: ['fulfilment'] as const,
   queue: (stage: QueueStage) => ['fulfilment', 'queue', stage] as const,
   order: (id: string) => ['fulfilment', 'order', id] as const,
+  orderCheck: (id: string) => ['fulfilment', 'order-check', id] as const,
   rxUrl: (id: string) => ['fulfilment', 'rx-url', id] as const,
   h1: (from: string, to: string) => ['fulfilment', 'h1', from, to] as const,
 };
@@ -18,7 +21,24 @@ export async function fetchRxQueue(): Promise<RxQueueItem[]> {
   return data.data?.items ?? [];
 }
 
-export async function fetchShipmentQueue(stage: Exclude<QueueStage, 'rx'>): Promise<QueueShipment[]> {
+// ─── Sprint 35: the pharmacist check on every order (C-08) ───────────────────
+export async function fetchCheckQueue(): Promise<CheckQueueItem[]> {
+  const { data } = await api.get('/fulfilment/queue', { params: { stage: 'check' } });
+  return data.data?.items ?? [];
+}
+
+export async function fetchOrderCheck(orderId: string): Promise<OrderCheckDetail> {
+  const { data } = await api.get(`/fulfilment/checks/${orderId}`);
+  return data.data;
+}
+
+/** Release for packing, hold, or refuse to supply (refusal cancels and refunds the order, C-37). */
+export async function decideCheck(shipmentId: string, decision: CheckDecision, reason?: string) {
+  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/check`, { decision, reason });
+  return data.data as { shipment_id: string; pharmacist_check: string; refund_paise?: number };
+}
+
+export async function fetchShipmentQueue(stage: Exclude<QueueStage, 'rx' | 'check'>): Promise<QueueShipment[]> {
   const { data } = await api.get('/fulfilment/queue', { params: { stage } });
   return data.data?.items ?? [];
 }
@@ -47,7 +67,7 @@ export async function fetchPrescriptionUrl(prescriptionId: string): Promise<Pres
 
 export async function verifyPrescription(prescriptionId: string, body: VerifyRxInput) {
   const { data } = await api.post(`/fulfilment/prescriptions/${prescriptionId}/verify`, body);
-  return data.data as { prescription_id: string; order_id: string; lines_covered: number; valid_until: string };
+  return data.data as { prescription_id: string; order_id: string; lines_covered: number; valid_until: string; shipments_released?: number };
 }
 
 export async function rejectPrescription(prescriptionId: string, reason: string) {

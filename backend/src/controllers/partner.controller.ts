@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { query, queryOne } from '../config/database';
 import { listPartnerProducts, submitListing, upsertInventory } from '../services/partnerListing.service';
 import { dispatchShipment, listPartnerShipments, markShipmentDelivered } from '../services/partnerFulfilment.service';
+import { decidePartnerShipment, partnerPharmacists } from '../services/pharmacistCheck/partner.service';
 import { getSettlement, listSettlements } from '../services/settlement.service';
 import { rejectionLabel } from '../utils/rejectionCodes';
 import { licenceLine } from '../services/licences/forms';
@@ -113,6 +114,22 @@ export async function postDispatch(req: Request, res: Response, next: NextFuncti
   try {
     const { courier_partner, awb_number, ...record } = dispatchSchema.parse(req.body);
     res.json({ success: true, data: await dispatchShipment(req.partner!.vendorId, uuid.parse(req.params.id), courier_partner, awb_number, req.user!.id, record) });
+  } catch (err) { next(err); }
+}
+
+// Sprint 35: the partner's own registered pharmacist checks and releases each shipment (C-08)
+export async function getPharmacists(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: { pharmacists: await partnerPharmacists(req.partner!.vendorId) } }); } catch (err) { next(err); }
+}
+
+export async function postCheck(req: Request, res: Response, next: NextFunction) {
+  try {
+    const input = z.object({
+      decision: z.enum(['release', 'hold', 'reject']),
+      vendor_pharmacist_id: uuid,
+      reason: z.string().trim().max(500).optional(),
+    }).parse(req.body);
+    res.json({ success: true, data: await decidePartnerShipment(req.partner!.vendorId, req.user!.id, uuid.parse(req.params.id), input) });
   } catch (err) { next(err); }
 }
 

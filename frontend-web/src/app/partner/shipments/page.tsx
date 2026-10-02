@@ -11,6 +11,7 @@ import QueryState from '@/components/admin/QueryState';
 import StatusTabs from '@/components/admin/StatusTabs';
 import ShipmentCard from '@/components/partner/shipments/ShipmentCard';
 import DispatchDialog from '@/components/partner/shipments/DispatchDialog';
+import PartnerCheckDialog from '@/components/partner/shipments/PartnerCheckDialog';
 import HandoverDialog from '@/components/delivery/HandoverDialog';
 
 const TABS = [
@@ -24,6 +25,7 @@ export default function PartnerShipmentsPage() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<ShipmentStatus>('pending');
   const [dispatching, setDispatching] = useState<PartnerShipment | null>(null);
+  const [checking, setChecking] = useState<PartnerShipment | null>(null);
   const [delivering, setDelivering] = useState<PartnerShipment | null>(null);
   const [deliverError, setDeliverError] = useState('');
   const { data, isLoading, error, refetch, isFetching } = useQuery({
@@ -53,6 +55,7 @@ export default function PartnerShipmentsPage() {
             key={s.id}
             shipment={s}
             onDispatch={setDispatching}
+            onCheck={setChecking}
             onDelivered={(x) => {
               setDeliverError('');
               setDelivering(x);
@@ -61,6 +64,7 @@ export default function PartnerShipmentsPage() {
           />
         ))}
       </div>
+      {checking && <PartnerCheckDialog shipment={checking} onClose={() => setChecking(null)} />}
       {dispatching && <DispatchDialog shipment={dispatching} onClose={() => setDispatching(null)} />}
       {delivering && (
         <HandoverDialog

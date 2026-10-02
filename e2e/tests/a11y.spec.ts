@@ -3,7 +3,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-const pages = ['/', '/auth/login', '/auth/register', '/policies', '/cart', '/search?q=E2E%20Paracetamol', '/search?q=qzxwvkj'];
+const pages = ['/', '/auth/login', '/auth/register', '/auth/forgot-password', '/trust/pharmacist-checked', '/policies', '/cart', '/search?q=E2E%20Paracetamol', '/search?q=qzxwvkj'];
 
 for (const path of pages) {
   test(`no serious accessibility problems on ${path}`, async ({ page }) => {

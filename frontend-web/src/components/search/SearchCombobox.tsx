@@ -111,7 +111,7 @@ export default function SearchCombobox({ id, label, placeholder = SEARCH_PLACEHO
           autoComplete="off"
           enterKeyHint="search"
           className={cn(
-            'w-full scroll-mt-20 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-400',
+            'w-full scroll-mt-20 rounded-full border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500',
             size === 'lg' ? 'pl-12 pr-11 py-3.5 text-base shadow-sm' : 'pl-9 pr-9 py-2 text-sm',
           )}
         />

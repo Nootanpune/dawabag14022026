@@ -117,7 +117,16 @@ export interface PartnerShipment {
   state: string | null;
   pincode: string | null;
   lines: ShipmentLine[];
+  /** Sprint 35: your registered pharmacist checks and releases it before packing (C-08) */
+  pharmacist_check?: 'pending' | 'held' | 'released' | 'rejected' | 'not_recorded';
+  pharmacist_check_note?: string | null;
+  pharmacist_name?: string | null;
+  pharmacist_reg_no?: string | null;
+  pharmacist_checked_at?: string | null;
 }
+
+/** One of the partner's registered pharmacists (Sprint 28, recorded by Dawabag's admin) */
+export interface PartnerPharmacist { id: string; full_name: string; registration_no: string }
 
 /** Drug schedule helpers — the server enforces the same rules. */
 // DB values are 'Schedule H1' etc.; the old check compared against 'H1' and never matched.

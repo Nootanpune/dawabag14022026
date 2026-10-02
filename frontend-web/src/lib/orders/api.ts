@@ -36,7 +36,15 @@ export interface OrderShipmentDetail {
   rto_at?: string | null;
   /** courier scans, oldest first */
   tracking?: TrackingEvent[];
+  /** Sprint 35: the registered pharmacist who checked and released this shipment (C-08) */
+  pharmacist_check?: PharmacistCheckState;
+  pharmacist_name?: string | null;
+  pharmacist_reg_no?: string | null;
+  pharmacist_checked_at?: string | null;
 }
+
+/** Sprint 35: every order is checked by a pharmacist before packing (C-08) */
+export type PharmacistCheckState = 'pending' | 'held' | 'released' | 'rejected' | 'not_recorded';
 
 export type TrackingStatus = 'booked' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'rto';
 
@@ -102,6 +110,8 @@ export interface OrderDetail {
   shipments: OrderShipmentDetail[];
   requires_prescription: boolean;
   can_cancel: boolean;
+  /** Sprint 35: released once every shipment is (not_recorded: orders from before the check existed) */
+  pharmacist_check?: PharmacistCheckState;
   credit_notes: OrderCreditNote[];
   refunds: OrderRefund[];
   returns: OrderReturn[];

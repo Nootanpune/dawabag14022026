@@ -15,7 +15,7 @@ export async function pharmacist(browser: Browser, story: Story) {
   const shot = (title: string, caption: string, o = {}) => capture(page, { journey: 'Pharmacist', role: 'Pharmacist', device, title, caption }, o);
   await signIn(page, 'pharmacist');
   await page.goto('/staff/fulfilment');
-  await shot('Prescription queue', 'The pharmacist lands on the Rx verify queue: orders waiting for a prescription check, oldest first.');
+  await shot('Pharmacist check', 'The pharmacist lands on "Pharmacist check": prescription orders first, then every other order waiting to be checked before packing (Sprint 35, C-08).');
   await page.getByRole('button', { name: 'Review', exact: true }).first().click();
   await page.waitForTimeout(1200);
   await shot('Prescription and form', 'The uploaded prescription beside the form: doctor, registration number, date, patient and prescribed quantity (C-08, C-09).', { fullPage: true });
@@ -36,6 +36,21 @@ export async function pharmacist(browser: Browser, story: Story) {
     if (r.status >= 300) throw new Error(JSON.stringify(r.json));
   }, page);
   await page.reload();
-  await capture(page, { journey: 'Pharmacist', role: 'Pharmacist', device, title: 'Verified', caption: 'Verified. The order leaves the queue and moves to packing; the check is recorded against the pharmacist\'s registration.', note });
+  await capture(page, { journey: 'Pharmacist', role: 'Pharmacist', device, title: 'Verified', caption: 'Verified. Verifying the prescription is also the order\'s pharmacist check: it is released for packing, recorded against the pharmacist\'s registration.', note });
+
+  // Sprint 35: the OTC order is checked and released too — every order is (C-08)
+  const otcNote = await onScreenOr(async () => {
+    const card = page.getByTestId('check-card').filter({ hasText: story.orders.otc! });
+    await card.getByRole('button', { name: 'Check order' }).click();
+    await page.getByRole('dialog').waitFor();
+    await shot('Order check', 'An order without prescription medicines: the pharmacist checks the medicines, quantities and any health note, then releases it for packing.', { fullPage: true });
+    await page.getByRole('button', { name: 'Release for packing' }).click();
+    await page.getByRole('dialog').waitFor({ state: 'detached', timeout: 8000 });
+  }, async () => {
+    const sid = (await dbRow(`SELECT s.id FROM order_shipments s JOIN orders o ON o.id = s.order_id WHERE o.order_number = $1 AND s.seller_type = 'dawabag'`, [story.orders.otc]))!.id;
+    const r = await call('POST', `/fulfilment/shipments/${sid}/check`, { decision: 'release' }, await token('pharmacist'));
+    if (r.status >= 300) throw new Error(JSON.stringify(r.json));
+  }, page);
+  await capture(page, { journey: 'Pharmacist', role: 'Pharmacist', device, title: 'Released for packing', caption: 'Released: the packer can now pack it. The order page shows "Checked by pharmacist" with the name and registration number.', note: otcNote });
   await ctx.close();
 }

@@ -30,7 +30,9 @@ export default function RxVerifyForm({ order, prescriptionId, onDone }: Props) {
   const verify = useMutation({
     mutationFn: (body: Parameters<typeof verifyPrescription>[1]) => verifyPrescription(prescriptionId, body),
     onSuccess: (r) => {
-      toast.success(`${order.order_number}: prescription verified (valid until ${r.valid_until})`);
+      // Sprint 35: the same review releases Dawabag's part of the order for packing
+      toast.success(`${order.order_number}: prescription verified (valid until ${r.valid_until})`,
+        { description: r.shipments_released ? 'Checked and released for packing.' : undefined });
       onDone();
     },
     onError: (err) => {

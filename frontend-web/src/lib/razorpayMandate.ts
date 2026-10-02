@@ -16,7 +16,7 @@ export function openMandateCheckout(c: MandateCheckout, onFinished: () => void):
     description: 'Automatic payment for refills',
     handler: onFinished,
     modal: { ondismiss: onFinished },
-    theme: { color: '#167A4C' },
+    theme: { color: '#027B87' }   // DAWA BAG teal (AA shade),
   });
   rzp.open();
   return true;

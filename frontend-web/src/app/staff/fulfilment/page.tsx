@@ -10,7 +10,7 @@ export default function FulfilmentPage() {
     <div>
       <PageHeader
         title="Fulfilment"
-        subtitle="Dawabag-own orders: prescription check, packing, dispatch and delivery"
+        subtitle="Dawabag-own orders: pharmacist check of every order, packing, dispatch and delivery"
         onRefresh={() => queryClient.invalidateQueries({ queryKey: fulfilmentKeys.all })}
       />
       <FulfilmentTabs />

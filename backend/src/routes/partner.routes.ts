@@ -11,7 +11,7 @@ import { requirePartner } from '../middleware/partner.middleware';
 import { getMyReturn, getMyReturns } from '../controllers/partner.controller';
 import stockImportRoutes from './partnerStockImport.routes';
 import {
-  createListing, getInventory, getListings, getMe, getMySettlement, getMySettlements, getShipments,
+  createListing, getInventory, getListings, getMe, getPharmacists, postCheck, getMySettlement, getMySettlements, getShipments,
   postDelivered, postDispatch, putInventory, searchCatalogue,
 } from '../controllers/partner.controller';
 
@@ -31,6 +31,8 @@ router.post('/products', createListing);
 router.get('/products/:id/inventory', getInventory);
 router.put('/products/:id/inventory', putInventory);
 router.get('/shipments', getShipments);
+router.get('/pharmacists', getPharmacists);
+router.post('/shipments/:id/check', postCheck);          // Sprint 35: release / hold / refuse (C-08)
 router.post('/shipments/:id/dispatch', postDispatch);
 router.post('/shipments/:id/delivered', postDelivered);
 router.get('/returns', getMyReturns);

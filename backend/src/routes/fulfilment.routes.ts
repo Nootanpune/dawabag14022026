@@ -2,7 +2,7 @@ import { postBookCourier } from '../controllers/courier.controller';
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
-  getH1Register, getMyRun, getQueue, getRiders, postApply, postDelivered, postDispatch, postPack, postReassignRider, postReject, postVerify,
+  getH1Register, getMyRun, getOrderCheck, getQueue, postCheck, getRiders, postApply, postDelivered, postDispatch, postPack, postReassignRider, postReject, postVerify,
 } from '../controllers/fulfilment.controller';
 
 // Staff fulfilment — /api/v1/fulfilment/*
@@ -16,6 +16,9 @@ router.get('/queue', getQueue);                                      // role che
 router.post('/prescriptions/:id/verify', pharmacist, postVerify);
 router.post('/prescriptions/:id/reject', pharmacist, postReject);
 router.post('/prescriptions/:id/apply', pharmacist, postApply);
+// Sprint 35: a registered pharmacist checks and releases every order before packing (C-08)
+router.get('/checks/:orderId', authorize('pharmacist_rx', 'admin', 'super_admin'), getOrderCheck);
+router.post('/shipments/:id/check', pharmacist, postCheck);
 router.post('/shipments/:id/pack', packer, postPack);
 router.post('/shipments/:id/book-courier', packer, postBookCourier);
 router.post('/shipments/:id/dispatch', packer, postDispatch);

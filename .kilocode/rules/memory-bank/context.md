@@ -2,13 +2,117 @@
 
 ## Current state (2026-10-02)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–34 are done (Sprint 14 video calls wired on web and mobile; Sprint 34 uncommitted) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–35 are done (Sprint 14 video calls wired on web and mobile; Sprints 34–35 uncommitted) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Sprint 35 — app rebrand + JPEG uploads (mobile only, 2026-10-02, uncommitted)
+- **DAWA BAG brand** (DECISIONS "Adopt the DAWA BAG brand"): `mobile/assets/brand/` — logo.png and wordmark.png
+  (1x/2x/3x) rendered from the owner's vector PDF; `source/logo.svg` + `source/make_brand_assets.py` (pymupdf + pillow)
+  remake everything; provenance in `assets/brand/README.md`. Launcher icon = the logo's bag shape only (Android
+  legacy mipmaps, adaptive + monochrome `mipmap-anydpi-v26`, iOS AppIcon set); splash: Android 12+ `values-v31` /
+  `values-night-v31` (splash_mark), older `launch_background` with the logo, iOS LaunchImage 200 pt. App name
+  "DAWA BAG" (Android label, iOS display name, MaterialApp title). The mock-ups' illustration is NOT used (licence unknown).
+- **Theme** (`config/theme.dart`): tokens `brandTealLogo #0397A6` (logo / large only, 3.5:1), `brandTeal #027A86`
+  (primary, buttons, small text — 5.1:1 with white), `brandTeal700 #015F68`, `brandTeal50/100`, `brandLeaf #87A959`
+  (decorative only), `brandLeafDark #4E6B2C` (readable green, discounts), `brandGrey #565655`; dark theme primary
+  `#5CC8D2` on-primary `#00363C`. Pill buttons (StadiumBorder) and pill fields (radius 28), labels always visible;
+  `lightTheme(googleFonts: false)` for offline widget tests. All `brandGreen*` uses renamed to the teal tokens.
+- **Screens**: `/welcome` (new initial route; signed-in sessions are redirected to `/`; headline "Medicines delivered to
+  your door, checked by a pharmacist" — no "fastest" claim, C-17), sign-in (password or OTP via /auth/send-otp →
+  OTP screen; labels above fields; "Forgot password?"), `/auth/forgot-password` (mobile → OTP → new password twice →
+  `POST /auth/reset-password {mobile, otp, new_password}`), sign-up restyled (logo, brand backdrop, labels above,
+  password field now checks the server's password rules). Shared widgets in `widgets/brand/` (BrandLogo,
+  BrandBackdrop, LabeledField, AuthPage).
+- **OPEN (backend):** `POST /auth/reset-password` does not exist yet. Until it does, the app shows "Sign in with the
+  OTP instead" (the OTP already sent still works with /auth/verify-otp). The server should check the OTP, the
+  password policy, reset lockout and end other sessions (password_changed_at, C-44).
+- **JPEG uploads:** `services/upload_file.dart` types every upload by its first bytes (JPEG / PNG / PDF; HEIC/HEIF
+  refused with a plain message) and fixes the file name; `ApiService.uploadMultipart` uses it for prescriptions
+  (previously sent as application/octet-stream — would have been refused by the Sprint 34 server check), licence
+  copies and KYC documents; KYC files are checked when picked. `services/photo_picker.dart`: image_picker with
+  imageQuality 85, max 2400 px (re-encodes iPhone HEIC as JPEG).
+- Tests: +41 (sprint35_brand_contrast, sprint35_auth_screens, sprint35_jpeg_uploads) — flutter test 195 passed;
+  flutter analyze 13 infos (all existing, no errors/warnings). Not verified on a device: launcher icon / splash
+  rendering, image_picker's HEIC → JPEG re-encode on a real iPhone / Android gallery.
+
+## Sprint 35 — pharmacist check on every order; DAWA BAG rebrand (web) (backend + web, 2026-10-02, uncommitted)
+- Owner decisions (DECISIONS rows 2026-10-02): every order / shipment is checked and released by a registered
+  pharmacist before packing or dispatch (C-08); DAWA | BAG logo applied. Developer's recommendation recorded:
+  partner shipments are released by the PARTNER's own registered pharmacist (vendor_pharmacists), Dawabag's
+  pharmacist releases Dawabag's own — owner may override. Forgot password by OTP added (coordinator scope).
+- DB `30_sprint35_pharmacist_check.sql`: `order_shipments.pharmacist_check` pending | held | released | rejected |
+  not_recorded (+ checked_by, checked_at, pharmacist_name, pharmacist_reg_no, vendor_pharmacist_id, note; CHECK:
+  released ⇒ name + reg no + time; held / rejected ⇒ reason ≥ 5). Backfill: shipments still 'pending' → pending,
+  everything else → not_recorded (may still be dispatched). Trust page 'pharmacist-checked' v2 "Every order is
+  checked by a pharmacist" inserted ONLY if v1 is still the untouched seed (md5 of summary + body) and no v2+.
+- Backend `services/pharmacistCheck/`: rules.ts (pure: mayPack = released; mayDispatch = released | not_recorded;
+  canDecide; reasons; orderCheckState; abuseSignals = qty at max_qty_per_order, habit forming from approved
+  medicine info, Schedule H1 / X / NDPS, same product ≥1 unit in the buyer's other orders in 30 days),
+  check.service.ts (checkQueue: Dawabag shipments pending/held of orders confirmed | packing | rx_verified, held
+  last; orderCheckDetail; decide() release / hold / reject — reject = cancelOrder(staff) → refund (C-37), then
+  marks the shipment rejected; hold queues notification `order_on_hold`; audit pharmacist_check_released / _held /
+  _rejected with name + reg no + via; releaseOwnAfterPrescription called inside verifyPrescription and
+  applyPrescriptionToOrder → the Rx review IS the check, response `shipments_released`), partner.service.ts
+  (partner chooses an active vendor_pharmacist of ITS vendor; order rx_pending → 409 "Waiting for Dawabag's
+  pharmacist"). Gates: fulfilment.service pack (mayPack) + dispatch (mayDispatch), partnerFulfilment dispatch
+  (plain partner message). Pack queue now includes unreleased shipments (pharmacist fields; released first).
+  API: GET /fulfilment/queue?stage=check (pharmacist_rx), GET /fulfilment/checks/:orderId (rx/admin),
+  POST /fulfilment/shipments/:id/check {decision, reason} (pharmacist_rx with reg no), GET /partner/pharmacists,
+  POST /partner/shipments/:id/check {decision, vendor_pharmacist_id, reason}. Order detail: shipments[].
+  pharmacist_check / name / reg_no / checked_at (+ note for staff only; held hides the name from buyers) and
+  order-level `pharmacist_check`. Invoice PDF: "Checked by pharmacist <name>, Reg. no. <x>" (tax invoices only).
+  Admin stats `waiting_pharmacist_check`.
+- Password reset: POST /auth/reset-password {mobile, otp, new_password} (controllers/passwordReset.controller.ts;
+  passwordPolicy first, then OTP; 5 wrong codes delete the OTP (`otp_wrong:<mobile>` 15 min); same answer for an
+  unknown mobile; sets password_changed_at (ends every session), clears lock + must_change_password, marks mobile
+  verified, audit password_reset_by_otp, issues a session). /auth/send-otp now answers 200 with the same message
+  for unregistered mobiles (SMS sent after the response, crypto.randomInt). OTPs are not purpose-scoped (one
+  otp:<mobile> key for sign-in, verify and reset).
+- Brand: `frontend-web/public/brand/` (dawabag-logo.svg = PDF conversion with tagline as paths, dawabag-wordmark.svg
+  without tagline, dawabag-mark.svg DERIVED bag icon (logo handle + plain two-colour body), PNG sizes, apple-touch,
+  icon-192/512 + maskable, README with provenance), `public/favicon.ico`, `public/manifest.webmanifest`; web
+  Dockerfile now copies public/. `backend/assets/brand/` PNGs for pdfkit (utils/brand.ts; backend Dockerfile copies
+  assets). Logo on Dawabag invoices / credit notes and e-prescriptions; partner invoices get only "Ordered through
+  the DAWA BAG platform" (C-05). Emails: white header with the logo linked from PUBLIC_WEB_URL/brand/
+  dawabag-logo-email.png + tagline. Razorpay theme #027B87.
+- Theme: Tailwind `brand` = teal (500 #0397A6 logo/large only, 3.5:1 with white; 600 #027B87 5.0:1 buttons/links;
+  700 #026D78 6.1:1; 800 #025B64), `accent` = green (500 #87A959 decoration only 2.7:1; 700 #586F39 5.6:1 text),
+  `ink` #565655; CSS variables --brand-teal(-strong/-deep) --brand-green(-strong) --brand-grey. Pill .btn-primary /
+  .btn-outline / .input (textarea.input rounded-2xl), focus rings brand-500. BrandLogo (wordmark | full | mark,
+  next/image unoptimized) in Header, footer (+ tagline), Admin / Doctor / Partner shells; home hero tagline;
+  TrustStrip "Every order, before packing" → /trust/pharmacist-checked; metadata title "DAWA BAG — Online Pharmacy",
+  no "fast delivery" claim (C-17).
+- Auth (owner's mock): AuthShell (full logo + tagline centred, heading, rounded card), IconField (label above, pill
+  with icon, +91 prefix); login = Password | One-time code (send-otp → verify-otp), "Forgot password?" →
+  /auth/forgot-password (ForgotPasswordForm: mobile → code + new password twice → signed in); register uses
+  AuthShell; placeholders 9876543210 / •••••••• kept for tests.
+- Staff web: one "Pharmacist check" tab (PharmacistCheckTab = RxQueue "Prescription orders" + CheckQueue "Orders to
+  check before packing"; CheckDialog: health note, lines, signals, reason, Release for packing / Put on hold / Do not
+  supply (confirm twice)); RxReviewDialog shows OrderCheckSignals + "verifying also releases"; pack card disabled
+  with the reason (data-testid pack-blocked) and "Checked by pharmacist …". Partner portal: "Pharmacist check"
+  button + PartnerCheckDialog (choose pharmacist, confirm box, reason), Dispatch disabled until released.
+  Buyer: lib/orders/timeline.ts — "Pharmacist check" step on every order (Rx: "Prescription submitted" then the
+  check), "Checked by pharmacist <name>, Reg. no. <x>" per released shipment, status chip "Pharmacist check" /
+  "On hold — pharmacist will call"; 'packing' label now "Being prepared".
+- Tests: jest 59 suites / 476 (+ pharmacistCheck/rules.test, passwordReset.test); `test/sprint35.smoke.mjs`
+  (67 checks: non-Rx blocked then hold/release/pack, credit order queued at placement, Rx single check, reject →
+  cancel + refund, partner pharmacist hold/release/dispatch, partner waits for Rx, trust page, password reset) in
+  test:smoke. Older suites release first via `test/support/pharmacistCheck.mjs` (releaseForPacking through the API
+  where a pharmacist login exists — S4/S5/S6; releaseInDb for S3/S5 partner, S8, S9, S13); S9 counts PDF images
+  (logo + QR); S33 trust text updated; S4 checks the Rx review releases the shipment. Playwright:
+  pharmacistCheck.spec (queue, hold, blocked pack button, release, buyer timeline), forgotPassword.spec (logo,
+  OTP sign-in, reset), a11y adds /auth/forgot-password and /trust/pharmacist-checked; journeys pharmacist (OTC order
+  check) and partner (partner pharmacist release) updated (not re-recorded). Full runs: smoke all green;
+  Playwright 120 passed, 6 skipped (S3-upload / desktop-only skips); web tsc + lint + build pass.
+  Before/after screenshots (home, product, login, checkout, admin × phone / desktop) were taken outside the repo.
+- App needs (mobile agent): see the Sprint 35 report — order fields above, "Pharmacist check" step, notification
+  type order_on_hold, /auth/send-otp no longer 404s for unknown mobiles, brand assets in public/brand.
+- DLT: new SMS type `order_on_hold` needs a registered template (sms.dlt_templates) before SMS goes out.
 
 ## Sprint 34 — security review 25–33, Schedule C/C1, retention, list enforcement (backend + web, 2026-10-02, uncommitted)
 - A. Security review of Sprints 25–33: `docs/security/review-sprint25-33.md` (1 High, 6 Medium, 10 Low; all High/Medium

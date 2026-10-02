@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { SEARCH_EXAMPLES } from '@/lib/search/api';
 import SearchCombobox from '@/components/search/SearchCombobox';
 import { HOME_SEARCH_ID } from '@/components/search/HeaderSearch';
+import BrandTagline from '@/components/brand/BrandTagline';
 
 export { HOME_SEARCH_ID };
 
@@ -10,7 +11,9 @@ export { HOME_SEARCH_ID };
  *  suggestions with Add as you type, Enter opens all results. */
 export default function HomeHero({ note }: { note?: ReactNode }) {
   return (
-    <section className="rounded-2xl bg-gradient-to-br from-brand-50 to-white border border-brand-100 px-4 py-4 sm:px-8 sm:py-8 mb-5">
+    <section className="rounded-3xl bg-gradient-to-br from-brand-50 via-white to-accent-50 border border-brand-100 px-4 py-4 sm:px-8 sm:py-8 mb-5">
+      {/* DAWA BAG tagline, as on the owner's design */}
+      <BrandTagline className="text-sm sm:text-base mb-1" />
       <h1 className="text-xl sm:text-3xl font-semibold text-gray-900 tracking-tight">
         Genuine medicines, checked by a pharmacist
       </h1>

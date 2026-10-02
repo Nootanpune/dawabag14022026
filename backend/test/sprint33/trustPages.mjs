@@ -20,8 +20,9 @@ export async function runTrustPages() {
     && r.json.data.body.includes(`within ${hours} hours`) && r.json.data.body.includes(`at least ${shelf} days`)
     && r.json.data.body.includes('expires within 30 days'), r.json.data?.body);
   r = await call('GET', '/info-pages/pharmacist-checked');
-  check('the pharmacist page says what the system does (prescriptions checked before packing)', r.status === 200
-    && /checks it against the medicines and quantities in your order before anything is packed/.test(r.json.data.body), r.json.data?.title);
+  // Sprint 35: every order is checked by a pharmacist now, so migration 30 replaced the seed text
+  check('the pharmacist page says what the system does (every order checked before packing)', r.status === 200
+    && /Every order is checked by a registered pharmacist before it is packed/.test(r.json.data.body), r.json.data?.title);
   r = await call('GET', '/info-pages/terms');
   check('an unknown page is 404', r.status === 404, r.status);
 

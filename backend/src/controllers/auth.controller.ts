@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { privacyNoticeRef } from '../services/policy.service';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
@@ -471,17 +472,20 @@ export async function sendLoginOTP(req: Request, res: Response, next: NextFuncti
       mobile: z.string().regex(/^[6-9]\d{9}$/),
     }).parse(req.body);
 
+    // Same answer, at the same speed, whether or not the mobile is registered (Sprint 35:
+    // sign-in by OTP and "Forgot password" use this; it must not tell anyone which
+    // mobiles have accounts). The SMS goes out after the answer.
     const user = await queryOne<{ id: string }>(
       'SELECT id FROM users WHERE mobile = $1 AND deleted_at IS NULL',
       [mobile]
     );
-    if (!user) throw new AppError('Mobile not registered', 404);
+    if (user) {
+      const otp = crypto.randomInt(100000, 1000000).toString();
+      await storeOTP(mobile, otp);
+      setImmediate(() => { sendOTP(mobile, otp).catch((e) => logger.warn(`OTP SMS failed: ${(e as Error).message}`)); });
+    }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    await storeOTP(mobile, otp);
-    await sendOTP(mobile, otp);
-
-    res.json({ success: true, message: 'OTP sent', data: { otp_sent: true } });
+    res.json({ success: true, message: 'If this mobile number has an account, a code has been sent to it', data: { otp_sent: true } });
   } catch (error) {
     next(error);
   }

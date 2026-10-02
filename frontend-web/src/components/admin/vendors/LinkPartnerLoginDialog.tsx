@@ -34,7 +34,7 @@ export default function LinkPartnerLoginDialog({ vendor, onClose }: { vendor: Ap
       </p>
       <label className="block text-sm font-medium text-gray-700 mb-1">Mobile number</label>
       <div className="flex">
-        <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+        <span className="inline-flex items-center px-3 rounded-l-full border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
           +91
         </span>
         <input

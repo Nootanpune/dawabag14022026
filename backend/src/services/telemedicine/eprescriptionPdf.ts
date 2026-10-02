@@ -5,6 +5,7 @@
 // database; never stored.
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
+import { brandLogo } from '../../utils/brand';
 
 export function verifyUrl(code: string): string {
   const site = (process.env.PUBLIC_WEB_URL || (process.env.CORS_ORIGINS || 'https://dawabag.in').split(',')[0]).replace(/\/$/, '');
@@ -23,10 +24,13 @@ export async function renderEprescriptionPdf(rx: any): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.font('Helvetica-Bold').fontSize(15).text(`Dr. ${rx.doctor_name}`);
-    doc.font('Helvetica').fontSize(9.5).text(rx.doctor_qualification || '')
-      .text(`Registration No. ${rx.doctor_reg_no} — ${rx.doctor_council}`);
+    doc.font('Helvetica-Bold').fontSize(15).text(`Dr. ${rx.doctor_name}`, { width: 330 });
+    doc.font('Helvetica').fontSize(9.5).text(rx.doctor_qualification || '', { width: 330 })
+      .text(`Registration No. ${rx.doctor_reg_no} — ${rx.doctor_council}`, { width: 330 });
     doc.image(qr, 595 - 40 - 80, 40, { width: 80 });
+    // DAWA BAG, through whose teleconsultation it was issued (owner's brand, 2026-10-02)
+    const logo = brandLogo('wordmark');
+    if (logo) doc.image(logo, 595 - 40 - 80 - 12 - 84, 44, { width: 84 });
     doc.moveDown(0.8).moveTo(40, doc.y).lineTo(555, doc.y).stroke('#999').moveDown(0.6);
 
     const issued = new Date(rx.issued_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });

@@ -3,29 +3,43 @@
 @tailwind utilities;
 
 @layer base {
+  /* DAWA BAG brand tokens (owner decision 2026-10-02). The logo colours are for the logo,
+     large text and shapes; the "-strong" shades meet WCAG AA 4.5:1 for small text and for
+     white text on buttons (see tailwind.config.js). */
   :root {
-    --brand: #167A4C;
-    --brand-light: #EDFAF4;
+    --brand-teal: #0397A6;          /* logo teal — large elements only (3.5:1 with white) */
+    --brand-teal-strong: #027B87;   /* buttons, links, small text (5.0:1 with white) */
+    --brand-teal-deep: #026D78;     /* hover / pressed (6.1:1) */
+    --brand-green: #87A959;         /* logo green — decoration only (2.7:1 on white) */
+    --brand-green-strong: #586F39;  /* green text (5.6:1 on white) */
+    --brand-grey: #565655;          /* tagline grey (7.4:1 on white) */
+    --brand: var(--brand-teal-strong);
+    --brand-light: #EEF8FA;
   }
   * { box-sizing: border-box; }
   body { @apply text-gray-800; }
 }
 
 @layer components {
+  /* Rounded pill buttons and fields, as in the owner's DAWA BAG design */
   .btn-primary {
-    @apply bg-brand-600 text-white px-4 py-2 rounded-lg font-medium
+    @apply bg-brand-600 text-white px-4 py-2 rounded-full font-medium
            hover:bg-brand-700 active:scale-95 transition-all disabled:opacity-50
-           disabled:cursor-not-allowed;
+           disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2
+           focus-visible:ring-offset-2 focus-visible:ring-brand-500;
   }
   .btn-outline {
-    @apply border border-brand-600 text-brand-600 px-4 py-2 rounded-lg font-medium
-           hover:bg-brand-50 active:scale-95 transition-all;
+    @apply border border-brand-600 text-brand-600 px-4 py-2 rounded-full font-medium
+           hover:bg-brand-50 active:scale-95 transition-all focus-visible:outline-none
+           focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500;
   }
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-           focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
+    @apply w-full px-4 py-2 border border-gray-300 rounded-full text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
            placeholder-gray-400 bg-white;
   }
+  /* Multi-line fields keep rounded corners, not a pill */
+  textarea.input { @apply rounded-2xl; }
   .card {
     @apply bg-white border border-gray-200 rounded-xl p-4;
   }

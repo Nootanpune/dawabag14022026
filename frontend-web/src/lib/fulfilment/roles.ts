@@ -15,6 +15,7 @@ export function staffHome(role: string | undefined): string {
 
 export const STAGE_ROLES: Record<QueueStage | 'h1', readonly string[]> = {
   rx: ['pharmacist_rx'],
+  check: ['pharmacist_rx'],   // Sprint 35: every order's pharmacist check (prescriptions included)
   pack: ['pharmacist_pack', 'admin', 'super_admin'],
   dispatch: ['pharmacist_pack', 'admin', 'super_admin'],
   deliver: ['delivery', 'pharmacist_pack', 'admin', 'super_admin'],   // packers: to reassign riders

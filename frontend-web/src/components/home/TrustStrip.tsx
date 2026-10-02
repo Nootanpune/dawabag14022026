@@ -16,12 +16,15 @@ export default function TrustStrip() {
           </span>
         </Link>
       </li>
-      <li className={ITEM}>
-        <UserCheck className="w-5 h-5 text-brand-600 shrink-0" aria-hidden="true" />
-        <span>
-          <span className="font-medium text-gray-900">Pharmacist-checked</span>
-          <span className="block text-xs text-gray-500">Every prescription order</span>
-        </span>
+      {/* Sprint 35: every order is checked and released by a registered pharmacist (C-08) */}
+      <li>
+        <Link href="/trust/pharmacist-checked" className={`${ITEM} hover:border-brand-400`}>
+          <UserCheck className="w-5 h-5 text-brand-600 shrink-0" aria-hidden="true" />
+          <span>
+            <span className="font-medium text-gray-900">Pharmacist-checked</span>
+            <span className="block text-xs text-gray-500">Every order, before packing</span>
+          </span>
+        </Link>
       </li>
       <li className={ITEM}>
         <PackageCheck className="w-5 h-5 text-brand-600 shrink-0" aria-hidden="true" />

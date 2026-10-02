@@ -1,6 +1,53 @@
 // Staff fulfilment types — shapes returned by /api/v1/fulfilment/* (Sprint 4).
 
-export type QueueStage = 'rx' | 'pack' | 'dispatch' | 'deliver';
+export type QueueStage = 'rx' | 'check' | 'pack' | 'dispatch' | 'deliver';
+
+/** Sprint 35: a registered pharmacist checks and releases every shipment before packing (C-08) */
+export type PharmacistCheck = 'pending' | 'held' | 'released' | 'rejected' | 'not_recorded';
+
+export interface CheckSignal { product_name: string; signal: string }
+
+export interface CheckLine {
+  order_item_id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  drug_schedule: string | null;
+  prescription_verified: boolean;
+}
+
+/** GET /fulfilment/queue?stage=check — Dawabag shipments waiting for the pharmacist */
+export interface CheckQueueItem {
+  shipment_id: string;
+  invoice_number: string | null;
+  total_paise: number;
+  cold_chain: boolean;
+  created_at: string;
+  pharmacist_check: PharmacistCheck;
+  pharmacist_check_note: string | null;
+  pharmacist_checked_at: string | null;
+  order_id: string;
+  order_number: string;
+  order_status: string;
+  payment_terms: string | null;
+  buyer_name: string | null;
+  customer_type: string;
+  lines: CheckLine[];
+  signals: CheckSignal[];
+}
+
+/** GET /fulfilment/checks/:orderId */
+export interface OrderCheckDetail {
+  order: { id: string; order_number: string; status: string; payment_terms: string | null; buyer_name: string | null; customer_type: string };
+  lines: (CheckLine & { shipment_id: string })[];
+  signals: CheckSignal[];
+  shipments: {
+    id: string; seller_type: string; seller_name: string; status: string; pharmacist_check: PharmacistCheck;
+    pharmacist_check_note: string | null; pharmacist_name: string | null; pharmacist_reg_no: string | null; pharmacist_checked_at: string | null;
+  }[];
+}
+
+export type CheckDecision = 'release' | 'hold' | 'reject';
 
 export interface QueuePrescription {
   prescription_id: string;
@@ -48,6 +95,11 @@ export interface QueueShipment {
   city: string | null;
   pincode: string | null;
   lines: QueueShipmentLine[];
+  /** Sprint 35: packing waits for the pharmacist's release (C-08) */
+  pharmacist_check?: PharmacistCheck;
+  pharmacist_check_note?: string | null;
+  pharmacist_name?: string | null;
+  pharmacist_reg_no?: string | null;
 }
 
 /** An order line from GET /orders/:id (staff view) */

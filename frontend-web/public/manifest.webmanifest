@@ -1,0 +1,14 @@
+{
+  "name": "DAWA BAG — online pharmacy",
+  "short_name": "DAWA BAG",
+  "description": "Licensed online pharmacy. Every order is checked by a registered pharmacist.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#037B87",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

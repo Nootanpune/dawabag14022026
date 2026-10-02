@@ -1,6 +1,7 @@
 // Cancellation, refunds, credit notes, returns and partner settlement deductions (C-37)
 import { call, check, q } from './lib.mjs';
 import { PIN } from './fixtures.mjs';
+import { releaseForPacking, releaseInDb } from '../support/pharmacistCheck.mjs';
 
 let payCounter = 0;
 // A payment id containing FAIL is one the (fake) gateway refuses to refund
@@ -58,6 +59,7 @@ export async function runAftercare({ t, P, addr, ids }) {
   const o3 = r.json.data.order;
   await markPaid(o3.id, o3.total_paise);
   const s3 = await shipment(o3.id);
+  await releaseForPacking(call, t.pharmacist, s3.id);   // Sprint 35: pharmacist check first (C-08)
   await call('POST', `/fulfilment/shipments/${s3.id}/pack`, { token: t.packer });
   r = await call('POST', `/orders/${o3.id}/cancel`, { token: t.buyer, body: { reason: 'Too late?' } });
   check('buyer cannot cancel once packing has started', r.status === 409, r.json);
@@ -114,6 +116,7 @@ export async function runAftercare({ t, P, addr, ids }) {
   await markPaid(o4.id, o4.total_paise);
   const s4 = await shipment(o4.id);
   check('partner line shipped under the partner invoice series', /^S5P\//.test(s4.invoice_number), s4);
+  await releaseInDb(q, s4.id);   // Sprint 35: the partner's pharmacist releases it (C-08)
   r = await call('POST', `/partner/shipments/${s4.id}/dispatch`, { token: t.partner, body: { courier_partner: 'Shadowfax', awb_number: 'S5P-AWB', seal_number: 'SEAL-P-1' } });
   check('partner sealed dispatch', r.status === 200, r.json);
   r = await call('POST', `/partner/shipments/${s4.id}/delivered`, { token: t.partner });

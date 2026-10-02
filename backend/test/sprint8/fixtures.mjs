@@ -1,5 +1,6 @@
 // Sprint 8 test data: mobiles 90000008xx, SKU prefix S8-, pincode 499981
 import { call, check, login, q, signUp } from '../sprint5/lib.mjs';
+import { releaseInDb } from '../support/pharmacistCheck.mjs';
 
 const consent = { accept_privacy_notice: true, age_confirmed: true };
 const person = (mobile, name) => ({ customer_type: 'customer', full_name: name, mobile, password: 'Passw0rd!', ...consent });
@@ -66,6 +67,7 @@ export async function paidOrder({ t, P, addr }) {
            VALUES ($1, $2, $3, 'captured', $4, NOW())`, [o.id, `order_S8_${pay}_${Date.now()}`, `pay_S8_${pay}_${Date.now()}`, o.total_paise]);
   await q(`UPDATE orders SET status = 'packing' WHERE id = $1`, [o.id]);
   const s = (await q(`SELECT id FROM order_shipments WHERE order_id = $1`, [o.id]))[0];
+  await releaseInDb(q, s.id);   // Sprint 35: a pharmacist has checked it (C-08); this suite is about delivery
   return { order: o, shipmentId: s.id };
 }
 

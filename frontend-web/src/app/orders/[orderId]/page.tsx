@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { fetchOrder, orderKeys } from '@/lib/orders/api';
-import { ORDER_STATUS_LABELS } from '@/lib/utils';
+import { ORDER_STATUS_LABELS, PHARMACIST_CHECK_LABELS } from '@/lib/utils';
 import Header from '@/components/layout/Header';
 import QueryState from '@/components/admin/QueryState';
 import OrderTimeline from '@/components/orders/OrderTimeline';
@@ -26,8 +26,10 @@ export default function OrderDetailPage() {
     refetchInterval: 30000, // status, delivery code and refunds come from the server
   });
 
+  const checking = order && ['confirmed', 'packing', 'rx_verified'].includes(order.status)
+    && (order.pharmacist_check === 'pending' || order.pharmacist_check === 'held') ? order.pharmacist_check : null;
   const statusInfo = order
-    ? ORDER_STATUS_LABELS[order.status] || { label: order.status, color: 'text-gray-600 bg-gray-100' }
+    ? (checking ? PHARMACIST_CHECK_LABELS[checking] : null) ?? ORDER_STATUS_LABELS[order.status] ?? { label: order.status, color: 'text-gray-600 bg-gray-100' }
     : null;
 
   return (

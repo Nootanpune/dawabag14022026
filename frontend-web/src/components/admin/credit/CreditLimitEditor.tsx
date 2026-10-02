@@ -47,7 +47,7 @@ export default function CreditLimitEditor({ userId, creditLimitPaise, creditUsed
       </p>
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="flex flex-1">
-          <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+          <span className="inline-flex items-center px-3 rounded-l-full border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
             ₹
           </span>
           <input

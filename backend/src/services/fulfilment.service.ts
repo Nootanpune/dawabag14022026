@@ -1,7 +1,8 @@
 // src/services/fulfilment.service.ts
 // Dawabag's own shipments: pack → dispatch → deliver (Sprint 4). Dispatch
 // takes the units out of the reserved batches and writes the H1 register.
-// Nothing moves while a prescription line is unverified (rxGate).
+// Nothing moves while a prescription line is unverified (rxGate) or before a
+// registered pharmacist has checked and released the shipment (Sprint 35, C-08).
 import { PoolClient } from 'pg';
 import { query, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
@@ -11,6 +12,7 @@ import { assertNoRecalledLines } from './recall.service';
 import { DispatchRecord, handoverCode, prepareHandover } from './handover.service';
 import { queueNotification } from './notification.service';
 import { assignAtDispatch } from './delivery/rider.service';
+import { mayDispatch, mayPack, notReleasedMessage } from './pharmacistCheck/rules';
 import { assertEinvoiceReady, ensureInvoiceEinvoice, prepareDispatchEinvoice } from './einvoice/einvoice.service';
 
 // Orders ready for fulfilment: paid (packing), prescription-verified, or on credit (confirmed)
@@ -38,6 +40,8 @@ export async function fulfilmentQueue(stage: QueueStage) {
   return query(
     `SELECT s.id AS shipment_id, s.invoice_number, s.status, s.total_paise, s.cold_chain, s.created_at,
             s.courier_partner, s.awb_number, s.seal_number, s.handover_code_required, o.id AS order_id, o.order_number, o.status AS order_status,
+            -- Sprint 35: packers see what is still waiting for the pharmacist, with Pack refused (C-08)
+            s.pharmacist_check, s.pharmacist_check_note, s.pharmacist_name, s.pharmacist_reg_no, s.pharmacist_checked_at,
             a.full_name AS ship_to_name, a.city, a.pincode,
             json_agg(json_build_object('product_name', oi.product_name, 'quantity', oi.quantity,
               'batch_number', ib.batch_number, 'expiry_date', ib.expiry_date, 'rx_cleared',
@@ -53,13 +57,14 @@ export async function fulfilmentQueue(stage: QueueStage) {
      JOIN products p ON p.id = oi.product_id
      LEFT JOIN inventory_batches ib ON ib.id = oi.batch_id
      WHERE s.seller_type = 'dawabag' AND s.status = $1 AND o.status = ANY($2::text[])
-     GROUP BY s.id, o.id, a.id, u.customer_type, u.kyc_status ORDER BY s.created_at LIMIT 200`,
+     GROUP BY s.id, o.id, a.id, u.customer_type, u.kyc_status ORDER BY (s.pharmacist_check NOT IN ('released', 'not_recorded')), s.created_at LIMIT 200`,
     [shipmentStatus, READY]);
 }
 
 async function lockOwnShipment(client: PoolClient, shipmentId: string) {
   const s = (await client.query(
-    `SELECT s.id, s.status, s.order_id, s.courier_partner, s.awb_number, s.courier_provider, o.status AS order_status, o.order_number, o.user_id
+    `SELECT s.id, s.status, s.order_id, s.courier_partner, s.awb_number, s.courier_provider, s.pharmacist_check, s.pharmacist_check_note,
+            o.status AS order_status, o.order_number, o.user_id
      FROM order_shipments s JOIN orders o ON o.id = s.order_id
      WHERE s.id = $1 AND s.seller_type = 'dawabag' FOR UPDATE OF s`, [shipmentId])).rows[0];
   if (!s) throw new AppError('Shipment not found', 404);
@@ -71,6 +76,8 @@ export async function packShipment(shipmentId: string, userId: string) {
   return withTransaction(async (client) => {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'pending') throw new AppError(`Shipment is already ${s.status}`, 409);
+    // Every order is checked and released by a registered pharmacist first (Sprint 35, C-08)
+    if (!mayPack(s.pharmacist_check)) throw new AppError(notReleasedMessage(s.pharmacist_check, s.pharmacist_check_note, 'dawabag'), 409);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
     await client.query(`UPDATE order_shipments SET status = 'packed' WHERE id = $1`, [shipmentId]);
@@ -95,6 +102,7 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
     const own = riderId ? await assignAtDispatch(client, shipmentId, riderId, userId) : null;
     const courier = own?.courier ?? courierIn ?? s.courier_partner, awb = own?.awb ?? awbIn ?? s.awb_number;
     if (!courier || !awb) throw new AppError('Enter the courier and AWB number, or book the courier first', 400);
+    if (!mayDispatch(s.pharmacist_check)) throw new AppError(notReleasedMessage(s.pharmacist_check, s.pharmacist_check_note, 'dawabag'), 409);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
     await assertEinvoiceReady(client, shipmentId);

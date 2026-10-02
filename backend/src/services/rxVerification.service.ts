@@ -10,6 +10,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { queueNotification } from './notification.service';
 import { rxRequiredLines } from './rxGate.service';
+import { releaseOwnAfterPrescription } from './pharmacistCheck/check.service';
 
 export interface VerifyInput {
   prescriber_name: string;
@@ -95,8 +96,11 @@ export async function verifyPrescription(pharmacistId: string, prescriptionId: s
     await writeAuditTx(client, { userId: rx.user_id, action: 'prescription_verified', performedBy: pharmacistId,
       newValue: { prescription_id: prescriptionId, order_id: rx.order_id, lines_covered: covered, valid_until: validUntil },
       notes: input.notes });
+    // The prescription review is the pharmacist check of Dawabag's own part of the
+    // order: one step, not two (Sprint 35, C-08). Partner parts wait for their pharmacist.
+    const released = await releaseOwnAfterPrescription(client, rx.order_id, pharmacistId);
     await notifyBuyer(client, rx.order_id, 'rx_verified');
-    return { prescription_id: prescriptionId, order_id: rx.order_id, lines_covered: covered, valid_until: validUntil };
+    return { prescription_id: prescriptionId, order_id: rx.order_id, lines_covered: covered, valid_until: validUntil, shipments_released: released };
   });
 }
 
@@ -134,8 +138,9 @@ export async function applyPrescriptionToOrder(pharmacistId: string, prescriptio
     const covered = await dispenseAgainst(client, prescriptionId, orderId);
     await writeAuditTx(client, { userId: rx.user_id, action: 'prescription_reused', performedBy: pharmacistId,
       newValue: { prescription_id: prescriptionId, order_id: orderId, lines_covered: covered } });
+    const released = await releaseOwnAfterPrescription(client, orderId, pharmacistId);   // same single check (Sprint 35)
     await notifyBuyer(client, orderId, 'rx_verified');
-    return { prescription_id: prescriptionId, order_id: orderId, lines_covered: covered };
+    return { prescription_id: prescriptionId, order_id: orderId, lines_covered: covered, shipments_released: released };
   });
 }
 

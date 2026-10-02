@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Loader2, Package, IndianRupee, ClipboardCheck, AlertTriangle, Users } from 'lucide-react';
+import { Loader2, Package, IndianRupee, ClipboardCheck, AlertTriangle, Users, UserCheck } from 'lucide-react';
 import PageHeader from '@/components/admin/PageHeader';
 import SellingRightsWarnings from '@/components/admin/SellingRightsWarnings';
 import { useAuthStore } from '@/store/authStore';
@@ -39,6 +39,8 @@ export default function AdminDashboard() {
     { label: "Today's orders", value: stats?.today_orders ?? 0, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: "Today's revenue", value: formatPrice(stats?.today_revenue_paise ?? 0), icon: IndianRupee, color: 'text-brand-600', bg: 'bg-brand-50' },
     { label: 'Pending Rx', value: stats?.pending_rx ?? 0, icon: ClipboardCheck, color: 'text-amber-600', bg: 'bg-amber-50' },
+    // Sprint 35: every order waits for a pharmacist's release before packing (C-08)
+    { label: 'Waiting for pharmacist check', value: stats?.waiting_pharmacist_check ?? 0, icon: UserCheck, color: 'text-brand-700', bg: 'bg-brand-50' },
     { label: 'Low stock items', value: stats?.low_stock_items ?? 0, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
     { label: 'New users today', value: stats?.new_users_today ?? 0, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
@@ -67,7 +69,7 @@ export default function AdminDashboard() {
             <SellingRightsWarnings />
 
             {/* Metric cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
               {metricCards.map((card) => (
                 <div key={card.label} className="card">
                   <div className={`w-9 h-9 rounded-lg ${card.bg} flex items-center justify-center mb-3`}>

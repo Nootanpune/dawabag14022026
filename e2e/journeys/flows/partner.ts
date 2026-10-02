@@ -50,7 +50,20 @@ export async function partnerOrder(browser: Browser, story: Story) {
   await card.first().waitFor();
   await partShot('Shipment to send', 'Paid orders for the partner: where to send them, what to pack, the batch and expiry, and the invoice in the partner\'s own series to print.', { fullPage: true });
   const [sid] = await shipmentsOf(story.orders.partner);
+  // Sprint 35: the partner's own registered pharmacist checks and releases it first (C-08)
+  const vendor = (await dbRow(`SELECT id FROM vendors WHERE name = $1`, [PARTNER.name]))!.id;
+  const vp = (await dbRow(`SELECT id FROM vendor_pharmacists WHERE vendor_id = $1 AND is_active LIMIT 1`, [vendor]))?.id
+    ?? (await dbRow(`INSERT INTO vendor_pharmacists (vendor_id, full_name, registration_no) VALUES ($1, 'E2E Meera Joshi', 'E2E-MSPC-0042') RETURNING id`, [vendor]))!.id;
   let note = await onScreenOr(async () => {
+    await card.getByRole('button', { name: 'Pharmacist check' }).click();
+    const d = dialog(part.page);
+    await d.getByLabel('Registered pharmacist who checked it').selectOption({ index: 1 });
+    await d.getByRole('checkbox').check();
+    await partShot('Pharmacist check', 'Before packing, the partner\'s own registered pharmacist checks the medicines and quantities and releases the shipment; their name and registration number are recorded (C-08).');
+    await d.getByRole('button', { name: 'Release for packing' }).click();
+    await d.waitFor({ state: 'detached' });
+  }, () => apiAs('partner', 'POST', `/partner/shipments/${sid}/check`, { decision: 'release', vendor_pharmacist_id: vp }), part.page);
+  note = await onScreenOr(async () => {
     await card.getByRole('button', { name: 'Dispatch' }).click();
     const d = dialog(part.page);
     await d.getByLabel('Courier').fill('Shree Maruti Courier');
@@ -59,7 +72,7 @@ export async function partnerOrder(browser: Browser, story: Story) {
     await partShot('Seal and dispatch', 'The pack is closed with a tamper-evident seal; the courier, tracking number and seal number are recorded (C-26).');
     await d.getByRole('button', { name: 'Mark dispatched' }).click();
     await d.waitFor({ state: 'detached' });
-  }, () => apiAs('partner', 'POST', `/partner/shipments/${sid}/dispatch`, { courier_partner: 'Shree Maruti Courier', awb_number: 'SMC4412078', seal_number: 'SEAL-LRP-0001' }), part.page);
+  }, () => apiAs('partner', 'POST', `/partner/shipments/${sid}/dispatch`, { courier_partner: 'Shree Maruti Courier', awb_number: 'SMC4412078', seal_number: 'SEAL-LRP-0001' }), part.page) ?? note;
   await part.page.getByRole('button', { name: 'Dispatched', exact: true }).click();
   await partShot('Dispatched', 'On its way; the buyer is told and can track it with the courier.', { note });
   note = await onScreenOr(async () => {

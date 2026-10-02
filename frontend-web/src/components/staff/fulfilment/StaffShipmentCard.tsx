@@ -13,10 +13,12 @@ interface Props {
   busy?: boolean;
   /** extra buttons beside the main action (e.g. courier booking) */
   extra?: ReactNode;
+  /** Sprint 35: why the action cannot be taken yet (the server refuses it too) */
+  blockedReason?: string;
 }
 
 /** One Dawabag-own shipment in the pack / dispatch / deliver queue. */
-export default function StaffShipmentCard({ shipment: s, actionLabel, onAction, busy, extra }: Props) {
+export default function StaffShipmentCard({ shipment: s, actionLabel, onAction, busy, extra, blockedReason }: Props) {
   const rxPending = s.lines.some((l) => !l.rx_cleared);
   return (
     <div className="card">
@@ -67,13 +69,23 @@ export default function StaffShipmentCard({ shipment: s, actionLabel, onAction, 
           <AlertTriangle className="w-3.5 h-3.5" /> Some lines are prescription-only and not yet verified — shown as-is from the queue.
         </p>
       )}
+      {/* Sprint 35: every order is checked and released by a registered pharmacist (C-08) */}
+      {s.pharmacist_check === 'released' && s.pharmacist_name && (
+        <p className="text-xs text-gray-700 mt-2">Checked by pharmacist {s.pharmacist_name}, Reg. no. {s.pharmacist_reg_no}</p>
+      )}
+      {blockedReason && (
+        <p id={`blocked-${s.shipment_id}`} className="text-xs text-amber-900 bg-amber-50 rounded-lg p-2 mt-2 flex items-center gap-1" data-testid="pack-blocked">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {blockedReason}
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
         <span className="text-sm font-semibold">{formatPrice(s.total_paise)}</span>
         <div className="flex items-center gap-2">
           {s.invoice_number && <InvoiceDownloadButton shipmentId={s.shipment_id} invoiceNumber={s.invoice_number} />}
           {extra}
           {actionLabel && (
-            <button onClick={onAction} disabled={busy} className="btn-primary text-xs py-1.5 px-3">
+            <button onClick={onAction} disabled={busy || !!blockedReason} aria-describedby={blockedReason ? `blocked-${s.shipment_id}` : undefined}
+              className="btn-primary text-xs py-1.5 px-3">
               {actionLabel}
             </button>
           )}

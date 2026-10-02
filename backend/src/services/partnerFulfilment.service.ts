@@ -9,11 +9,14 @@ import { assertNoRecalledLines } from './recall.service';
 import { DispatchRecord, HandoverInput, checkHandover, handoverCode, prepareHandover, recordHandover } from './handover.service';
 import { queueNotification } from './notification.service';
 import { syncOrderStatus } from './fulfilment.service';
+import { mayDispatch, notReleasedMessage } from './pharmacistCheck/rules';
 
 export async function listPartnerShipments(vendorId: string, status?: string) {
   return query(
     `SELECT s.id, s.invoice_number, s.status, s.subtotal_paise, s.gst_paise, s.total_paise, s.cold_chain,
             s.seal_number, s.handover_code_required,
+            -- Sprint 35: the partner's registered pharmacist checks and releases first (C-08)
+            s.pharmacist_check, s.pharmacist_check_note, s.pharmacist_name, s.pharmacist_reg_no, s.pharmacist_checked_at,
             s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at, s.created_at,
             o.order_number, o.status AS order_status,
             a.full_name AS ship_to_name, a.mobile AS ship_to_mobile, a.address_line1, a.city, a.state, a.pincode,
@@ -39,7 +42,7 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
   if (!courier || !awb) throw new AppError('Enter the courier and AWB number', 400);
   return withTransaction(async (client) => {
     const s = (await client.query(
-      `SELECT s.id, s.status, s.created_at, o.status AS order_status, o.id AS order_id
+      `SELECT s.id, s.status, s.created_at, s.pharmacist_check, s.pharmacist_check_note, o.status AS order_status, o.id AS order_id
        FROM order_shipments s JOIN orders o ON o.id = s.order_id
        WHERE s.id = $1 AND s.partner_id = $2 FOR UPDATE OF s`, [shipmentId, vendorId])).rows[0];
     if (!s) throw new AppError('Shipment not found', 404);
@@ -47,6 +50,8 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
     if (['pending_payment', 'payment_failed', 'rx_pending', 'rx_rejected', 'cancelled'].includes(s.order_status)) {
       throw new AppError(`Order is ${s.order_status.replace('_', ' ')}; it cannot be dispatched yet`, 409);
     }
+    // Packing and dispatch wait for the partner's own registered pharmacist (Sprint 35, C-08)
+    if (!mayDispatch(s.pharmacist_check)) throw new AppError(notReleasedMessage(s.pharmacist_check, s.pharmacist_check_note, 'partner'), 409);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
     // Reserved → shipped: take the units out of the partner's batch

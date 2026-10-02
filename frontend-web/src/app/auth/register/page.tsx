@@ -23,6 +23,7 @@ import DocumentsStep, { type HeldFiles } from '@/components/auth/register/Docume
 import OtpStep from '@/components/auth/register/OtpStep';
 import KycUploadStep from '@/components/auth/register/KycUploadStep';
 import SubmittedScreen from '@/components/auth/register/SubmittedScreen';
+import AuthShell from '@/components/auth/AuthShell';
 
 type Step = 'type' | 'details' | 'documents' | 'otp' | 'upload' | 'submitted';
 
@@ -146,17 +147,7 @@ export default function RegisterPage() {
   const optionalDocs = customerType ? getOptionalDocuments(customerType) : [];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <span className="text-white font-bold text-2xl">D</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Create account</h1>
-          <p className="text-sm text-gray-500 mt-1">Join Dawabag today</p>
-        </div>
-
-        <div className="card shadow-sm">
+    <AuthShell title="Create account" subtitle="Join Dawabag today" wide>
           {step !== 'submitted' && <StepIndicator steps={stepLabels} current={stepIndex} />}
 
           {formError && (step === 'details' || step === 'documents') && (
@@ -236,8 +227,6 @@ export default function RegisterPage() {
               </Link>
             </p>
           )}
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

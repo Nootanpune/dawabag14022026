@@ -47,6 +47,10 @@ export default function OrderShipmentsCard({ order }: { order: OrderDetail }) {
                 <span className="text-gray-700">{formatPrice(s.total_paise)}</span>
               </div>
             </div>
+            {/* Sprint 35: who checked it before packing (C-08) */}
+            {s.pharmacist_check === 'released' && s.pharmacist_name && (
+              <p className="text-xs text-gray-700 mt-1">Checked by pharmacist {s.pharmacist_name}, Reg. no. {s.pharmacist_reg_no}</p>
+            )}
             {s.handover_code && <DeliveryCodeBanner code={s.handover_code} />}
             <ShipmentTrackingTimeline shipment={s} />
             {s.status === 'dispatched' && s.seal_number && (

@@ -10,6 +10,7 @@
 import { createRequire } from 'module';
 import { startFakes } from './fakes/server.mjs';
 import { licencePartner } from './support/partnerLicences.mjs';
+import { releaseInDb } from './support/pharmacistCheck.mjs';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const Redis = require('ioredis');
@@ -255,6 +256,7 @@ async function main() {
   r = await call('GET', '/partner/shipments?status=pending', { token: pa });
   const queuedShip = r.json.data?.shipments?.find((s) => s.id === shipA);
   check('paid order appears with ship-to address and batch', queuedShip?.pincode === BUYER_PIN && queuedShip?.lines?.[0]?.batch_number === 'A1-1', queuedShip);
+  await releaseInDb(q, shipA);   // Sprint 35: the partner's pharmacist releases it first (C-08)
   r = await call('POST', `/partner/shipments/${shipA}/dispatch`, { token: pb, body: { courier_partner: 'Delhivery', awb_number: 'AWB123456', seal_number: 'SEAL-S3-1' } });
   check('another partner cannot dispatch it', r.status === 404, r.json);
   const stockBefore = (await q(`SELECT qty_available, qty_reserved FROM partner_inventory WHERE partner_product_id = $1`, [A1]))[0];

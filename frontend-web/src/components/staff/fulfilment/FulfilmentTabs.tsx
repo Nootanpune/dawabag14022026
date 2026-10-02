@@ -4,15 +4,16 @@ import { useAuthStore } from '@/store/authStore';
 import { hasRole } from '@/lib/admin/roles';
 import { STAGE_ROLES } from '@/lib/fulfilment/roles';
 import StatusTabs from '@/components/admin/StatusTabs';
-import RxQueue from './RxQueue';
+import PharmacistCheckTab from './PharmacistCheckTab';
 import ShipmentQueue from './ShipmentQueue';
 import H1Register from './H1Register';
 import RunSheet from '@/components/staff/delivery/RunSheet';
 
-type Tab = 'rx' | 'pack' | 'dispatch' | 'deliver' | 'h1';
+type Tab = 'check' | 'pack' | 'dispatch' | 'deliver' | 'h1';
 
+// Sprint 35: one "Pharmacist check" tab for every order, prescription orders included (C-08)
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'rx', label: 'Rx verify' },
+  { value: 'check', label: 'Pharmacist check' },
   { value: 'pack', label: 'Pack' },
   { value: 'dispatch', label: 'Dispatch' },
   { value: 'deliver', label: 'Deliver' },
@@ -32,7 +33,7 @@ export default function FulfilmentTabs() {
   return (
     <div>
       <StatusTabs tabs={tabs} value={tab} onChange={setPicked} />
-      {tab === 'rx' && <RxQueue />}
+      {tab === 'check' && <PharmacistCheckTab />}
       {(tab === 'pack' || tab === 'dispatch' || tab === 'deliver') && <ShipmentQueue key={tab} stage={tab} />}
       {tab === 'h1' && <H1Register />}
     </div>

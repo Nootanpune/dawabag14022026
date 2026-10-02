@@ -10,6 +10,7 @@
 // before and after. NEVER point it at a production database.
 import { createRequire } from 'module';
 import { cleanup, people, PIN } from './sprint4.fixtures.mjs';
+import { releaseForPacking } from './support/pharmacistCheck.mjs';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const Redis = require('ioredis');
@@ -122,6 +123,10 @@ async function main() {
   r = await call('POST', `/fulfilment/prescriptions/${rx1}/verify`, { token: t.pharmacist, body: verifyBody(6) });
   const o1s = (await q(`SELECT status FROM orders WHERE id = $1`, [o1.id]))[0].status;
   check('valid prescription verified; order moves to rx_verified', r.status === 200 && o1s === 'rx_verified', { r: r.json, o1s });
+  // Sprint 35: the prescription review is also the pharmacist check of Dawabag's shipment (one step)
+  const chk = (await q(`SELECT pharmacist_check, pharmacist_reg_no FROM order_shipments WHERE id = $1`, [s1]))[0];
+  check('…and releases Dawabag\'s shipment for packing in the same step', r.json.data?.shipments_released === 1
+    && chk.pharmacist_check === 'released' && chk.pharmacist_reg_no === 'MSPC-S4-001', { r: r.json.data, chk });
   const disp = (await q(`SELECT dispensed_qty FROM prescription_items WHERE prescription_id = $1`, [rx1]))[0];
   check('dispensed quantity recorded against prescription', disp?.dispensed_qty === 2, disp);
 
@@ -214,6 +219,7 @@ async function main() {
   const recallId = r.json.data?.id;
   r = await call('POST', '/recalls', { token: t.admin, body: { product_id: RC, batch_number: 'RC-1', reason: 'again please' } });
   check('same batch cannot be recalled twice', r.status === 409, r.json);
+  await releaseForPacking(call, t.pharmacist, await shipmentOf(o5.id));   // Sprint 35: checked first (C-08)
   r = await call('POST', `/fulfilment/shipments/${await shipmentOf(o5.id)}/pack`, { token: t.packer });
   check('recalled stock cannot be packed', r.status === 409 && /Recalled/.test(r.json.message), r.json);
   r = await call('GET', `/products/${RC}`, { token: t.buyer });
