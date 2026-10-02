@@ -10,6 +10,89 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 33 — medicine information, substitutes, trust, reminders, health profile (2026-10-02)
+Owner-approved; structure inspired by Tata 1mg / Apollo / PharmEasy / Truemeds product pages — NO text
+copied (copyright, C-19): medicine words are entered by our pharmacist from the package insert.
+Built in a separate worktree while Sprint 32 (migration 27) was finished on the main checkout.
+- DB `28_sprint33_medicine_info.sql`: `product_info_versions` (product, version, status draft |
+  pending_review | approved | rejected | superseded, content JSONB, claim flags, submitted/reviewed
+  by+at, review_notes, reviewer_name + reviewer_reg_no snapshot; one open (draft/pending) and one
+  approved per product by partial unique index; CHECK approved ⇒ signed with reg no);
+  `info_pages` (3 trust pages, versioned, seeded v1, {{tokens}}); `medicine_reminders` (times TEXT[]
+  1–6 HH:MM IST, start/end, source order|manual, is_active) + `reminder_dose_logs` (one answer per
+  dose, UNIQUE reminder+scheduled_for); `health_profiles` (allergies / conditions / current_medicines
+  JSONB, consent_version); `patients` + age_years, age_recorded_on, allergies, conditions (family
+  members = the existing patients list, one authority); consent purpose 'health_profile'.
+- Medicine information (`services/medicineInfo/`): content.ts (zod: overview, uses, how to use, how it
+  works, side effects common/serious/contact doctor if, safety alcohol/pregnancy/breast-feeding/driving/
+  kidney/liver × safe|caution|unsafe|consult_doctor|not_known + note, missed dose, interactions
+  medicines/food/conditions, quick tips, fact box incl. habit forming, FAQs, references; publicSections
+  drops empty sections; claims via utils/claimsCheck), versions.service (save draft — a new version
+  when nothing is open, editing a submitted one sends it back to draft; submit needs text + a source;
+  review = pharmacist_rx with reg no, flagged text needs a ≥20-char reason (same rules as C-19 copy),
+  approve supersedes the old live version; audit product_info_draft_saved / _submitted / _approved /
+  _rejected, C-46). Buyers: only the approved version of an active, sellable product + "Reviewed by
+  <name>, Reg. no. <x>, on <date>" + "For information only. Follow your doctor's advice."
+- API `/api/v1/medicines`: GET `:id/info` (public), `:id/substitutes?limit=`, `:id/delivery?pincode=`
+  (optionalAuth); staff (pharmacist_rx/admin/super_admin) GET `:id/info/editor`, PUT `:id/info/draft`,
+  POST `:id/info/submit`, GET `info-review/queue`; POST `:id/info/review` pharmacist_rx only.
+  `/api/v1/info-pages` (GET list / :key public; admins GET :key/history, POST :key = new version,
+  unknown {{token}} refused, audit info_page_published). `/api/v1/reminders` (GET, GET upcoming?hours,
+  GET suggestions = delivered orders' medicines without a reminder, POST, PATCH/:id, DELETE/:id,
+  POST/:id/doses {scheduled_for, status} — must be a real dose time, ≤ 12 h ahead, ≤ 7 days back).
+  `/api/v1/health-profile` (GET, PUT {consent?, lists}, DELETE = withdraw + delete, members
+  POST/PUT/DELETE; GET orders/:orderId for pharmacist_rx / pharmacist_pack → the order's person
+  (family member when the order names one), only with consent, each look audited
+  health_profile_viewed). Error log redacts allergies/conditions/medicine names.
+- Substitutes (`services/shopping/substitutes.ts` + `.service.ts`): reuses sameMedicine.medicineKey
+  (generic + every strength + form + release + schedule; Sprint 33 adds ROUTE — eye/ear/nasal/inhaled/
+  vaginal/rectal/injection/skin/oral — which also makes the cart's cheaper option stricter); packs
+  comparable by unit kind (packSize: tablets/caps/ml/g, "2 x 10"); sorted by price per unit, then in
+  stock, then name; save_pct per unit (floor, ≥1 %); SELLABLE_SQL listing rules (C-10), buyer's own
+  price. Never swaps anything.
+- Delivery date (`services/productPage/deliveryEstimate.ts` pure + `delivery.service.ts`): no product-
+  page ETA existed; reuses the checkout's promises (pincode_serviceability.estimated_days for any
+  seller, dawabag_delivery_hours for own stock), takes the SLOWER of the sellers that could supply,
+  +1 day for an Rx line (pharmacist check), +1 after 14:00 IST, never a Sunday, always "Estimated".
+  Cold-chain product to a PIN without cold_chain_available and no partner stock → no date, says why.
+  PIN from the query or the signed-in buyer's default address. Product detail adds
+  `expires_on_or_after` ("Mar 2027", earliest sellable batch > 30 days, = allocation's FEFO rule) and
+  `cold_chain_note` (C-25).
+- Trust pages (server-held, chosen over Markdown in the repo: admins can edit; {{tokens}} filled from
+  live settings: sell/receive shelf life, returns 48 h / 30 d / 90 d): "Genuine medicines", "Expired,
+  damaged and recalled medicines", and **"How a pharmacist checks your order"** — the owner's title
+  "Every order checked by a pharmacist" was NOT used because the system does not do that: only
+  prescription orders get a pharmacist's check; packing is open to pharmacist_pack AND admins; partner
+  shipments are packed by the partner. Owner to confirm the wording or change the process.
+- Web: product page (`components/shop/`): DeliveryInfo (PIN box → "Get it by …" (estimated), expiry,
+  cold chain), ProductTrustStrip, substitutes/SubstitutesPreview (top 3 + "See all n"), medicineInfo/
+  MedicineInfo (desktop sticky section tabs, phone accordion), `/medicine/[id]/substitutes`,
+  `/trust/[key]` (+ footer TrustLinks), staff `/staff/medicine-info/[productId]` editor (links from New
+  products cards and admin product page; Save draft / Send for pharmacist review; versions), Product
+  copy page shows "Medicine information" queue (InfoReviewCard previews exactly what buyers see),
+  admin `/admin/info-pages` (menu Compliance → Trust pages), `/account/medicines`, `/account/health`
+  (consent box never pre-ticked), RxReviewDialog shows BuyerHealthNote. No browser storage.
+- App: product screen DeliveryInfoCard, ProductTrustStrip, SubstitutesSection (+ /medicine/:id/
+  substitutes), MedicineInfoView (ExpansionTiles); /trust/:key; Account → My medicines (reminders,
+  Taken/Skipped) and Health profile. Dose alerts: `services/dose_alarms.dart` plans from GET
+  /reminders/upcoming (72 h, ≤ 60 alerts, ids 700000+, same-minute doses merged, generic text without
+  the medicine name — lock-screen privacy) and `providers/reminder_provider.dart` DoseAlarmSync re-sets
+  them on start, sign-in/out and after each change; flutter_local_notifications zonedSchedule (+
+  `timezone` 0.9.4 now a direct dependency, manifest ScheduledNotificationReceiver/
+  ActionBroadcastReceiver, no boot receiver). Tapping an alert opens My medicines
+  (NotificationTapRouter.openLocalPayload). Note: the plugin itself records its scheduled alerts with
+  the OS (time + generic text + reminder id) — the schedule's authority stays the server.
+- Privacy: export includes health_profile, family_members, medicine_reminders (+ answers); erasure
+  deletes health profile + reminders and wipes members' health fields; consent label in web privacy.
+- Tests: jest +42 (content, visibility, substitutes, deliveryEstimate, schedule, health rules, trust
+  tokens) → 404; `test/sprint33.smoke.mjs` 116 checks (in test:smoke; full smoke green); Playwright
+  `medicinePage.spec.ts` 8 desktop + 6 phone (full run 98 passed, 5 skipped); Flutter +14 (4 files) →
+  134; flutter analyze: only the 13 older infos.
+- Not built: reminder_dose_logs retention purge; boot-time re-scheduling; notification action buttons
+  (Taken/Skipped from the alert itself — the tap opens My medicines); medicine info editor in the app
+  (staff work on the website); app screens for trust pages are read-only (no admin editing in app);
+  pharmacist health note on the packing queue (only the prescription check dialog).
+
 ## Sprint 31 — queue quick-create (Alt+C) and optional buyer copy (2026-10-02, uncommitted)
 Owner, for "New products to complete": "Category — create new by ALT+C", "HSN code — create new
 by ALT+C", "Description for buyers — enter it while editing after save, not mandatory while save",

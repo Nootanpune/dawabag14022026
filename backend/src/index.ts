@@ -53,6 +53,11 @@ import purchasingRoutes from './routes/purchasing.routes';
 import stockControlRoutes from './routes/stockControl.routes';
 import courierRoutes from './routes/courier.routes';
 import einvoiceRoutes from './routes/einvoice.routes';
+// Sprint 33: medicine information, substitutes, delivery date, trust pages, reminders, health profile
+import medicineRoutes from './routes/medicines.routes';
+import infoPageRoutes from './routes/infoPages.routes';
+import reminderRoutes from './routes/reminders.routes';
+import healthProfileRoutes from './routes/healthProfile.routes';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
@@ -180,6 +185,10 @@ app.use(`${api}/purchasing`, purchasingRoutes);
 app.use(`${api}/stock`, stockControlRoutes);
 app.use(`${api}/courier`, courierRoutes);
 app.use(`${api}/einvoices`, einvoiceRoutes);
+app.use(`${api}/medicines`, medicineRoutes);             // Sprint 33: product page information
+app.use(`${api}/info-pages`, infoPageRoutes);           // Sprint 33: trust pages
+app.use(`${api}/reminders`, reminderRoutes);            // Sprint 33: "My medicines" dose reminders
+app.use(`${api}/health-profile`, healthProfileRoutes);  // Sprint 33: health profile (consent, C-41)
 
 // ─── Error Handling ─────────────────────────────────────────────────────────
 app.use(notFound);

@@ -7,6 +7,7 @@ import Modal from '@/components/admin/Modal';
 import QueryState from '@/components/admin/QueryState';
 import PrescriptionViewer from './PrescriptionViewer';
 import RxVerifyForm from './RxVerifyForm';
+import BuyerHealthNote from './BuyerHealthNote';
 
 interface Props {
   item: RxQueueItem;
@@ -26,6 +27,8 @@ export default function RxReviewDialog({ item, prescription, onClose }: Props) {
       <div className="grid gap-4 lg:grid-cols-2">
         <PrescriptionViewer prescriptionId={prescription.prescription_id} fileType={prescription.file_type} />
         <div>
+          {/* Sprint 33: allergies / conditions from the buyer's health profile (with consent, C-41) */}
+          <BuyerHealthNote orderId={item.order_id} />
           <QueryState isLoading={order.isLoading} error={order.error} isEmpty={false} emptyText="" />
           {order.data && <RxVerifyForm order={order.data} prescriptionId={prescription.prescription_id} onDone={onClose} />}
         </div>

@@ -7,6 +7,7 @@ import { useIsDesktop } from './useIsDesktop';
 import LegalBlocks from './LegalBlocks';
 import FooterLicenceSummary from './FooterLicenceSummary';
 import PolicyLinks from './PolicyLinks';
+import TrustLinks from '@/components/trust/TrustLinks';
 import { POLICY_KEYS } from '@/lib/legal/policies';
 import { currentYearIST } from '@/lib/dates';
 import { isPortalPath } from '@/lib/layout/portalPaths';
@@ -58,6 +59,8 @@ export default function SiteFooter() {
           </Link>
           {/* Published policies (C-39) */}
           <PolicyLinks keys={POLICY_KEYS} className="contents" />
+          {/* Sprint 33: how we keep medicines genuine, in date and pharmacist-checked */}
+          <TrustLinks className="contents" />
         </div>
       </div>
     </footer>

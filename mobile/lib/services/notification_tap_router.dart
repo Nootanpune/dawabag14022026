@@ -26,6 +26,18 @@ class NotificationTapRouter {
   static GoRouter? _router;
   static bool _signedIn = false;
   static String? _pendingOrderId;
+  static String? _pendingPath;
+
+  /// A tapped local notification: a dose alert (Sprint 33, payload 'dose:…')
+  /// opens My medicines; anything else is an order id.
+  static void openLocalPayload(String? payload) {
+    if (payload != null && payload.startsWith('dose:')) {
+      _pendingPath = '/account/medicines';
+      _flush();
+      return;
+    }
+    openOrder(payload);
+  }
 
   /// The order id to open for a push data payload, or null.
   static String? orderIdFor(Map<String, dynamic> data) {
@@ -61,6 +73,11 @@ class NotificationTapRouter {
 
   static void _flush() {
     final router = _router;
+    final path = _pendingPath;
+    if (router != null && _signedIn && path != null) {
+      _pendingPath = null;
+      scheduleMicrotask(() => router.push(path));
+    }
     final orderId = _pendingOrderId;
     if (router == null || !_signedIn || orderId == null) return;
     _pendingOrderId = null;

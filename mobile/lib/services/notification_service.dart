@@ -18,9 +18,9 @@ class NotificationService {
     const iosInit = DarwinInitializationSettings();
     await _localNotifications.initialize(
       const InitializationSettings(android: androidInit, iOS: iosInit),
-      // Tap on a foreground notification we showed: payload is the order id.
+      // Tap on a notification we showed: the order id, or a dose alert (Sprint 33).
       onDidReceiveNotificationResponse: (NotificationResponse response) =>
-          NotificationTapRouter.openOrder(response.payload),
+          NotificationTapRouter.openLocalPayload(response.payload),
     );
 
     // Create notification channel (Android)
@@ -69,7 +69,7 @@ class NotificationService {
     }
     final launch = await _localNotifications.getNotificationAppLaunchDetails();
     if (launch != null && launch.didNotificationLaunchApp) {
-      NotificationTapRouter.openOrder(launch.notificationResponse?.payload);
+      NotificationTapRouter.openLocalPayload(launch.notificationResponse?.payload);
     }
 
     // Re-register with the server whenever FCM rotates the token.

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { ClipboardList, FileUp, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText, Stethoscope, BadgeCheck } from 'lucide-react';
+import { ClipboardList, FileUp, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText, Stethoscope, BadgeCheck, AlarmClock, Activity } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 
@@ -13,6 +13,9 @@ const LINKS = [
   { href: '/account/addresses', label: 'Saved addresses', icon: MapPin },
   { href: '/account/returns', label: 'Returns & refunds', icon: Undo2 },
   { href: '/account/refills', label: 'Refills & automatic payment', icon: Repeat },
+  // Sprint 33: dose reminders and the health profile (consent, C-41)
+  { href: '/account/medicines', label: 'My medicines (dose reminders)', icon: AlarmClock },
+  { href: '/account/health', label: 'Health profile', icon: Activity },
   { href: '/account/consultations', label: 'Doctor consultations', icon: Stethoscope },
   { href: '/account/side-effects', label: 'Side-effect reports', icon: HeartPulse },
   { href: '/account/complaints', label: 'Complaints', icon: MessageSquareWarning },

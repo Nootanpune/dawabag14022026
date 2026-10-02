@@ -67,6 +67,15 @@ export async function exportUserData(userId: string) {
     complaints: await many(`SELECT ticket_no, category, subject, status, created_at, resolved_at FROM grievances
                             WHERE user_id = $1 ORDER BY created_at`),
     refills: await many(`SELECT id, frequency_days, next_refill_date, is_active FROM refill_subscriptions WHERE user_id = $1`),
+    // Sprint 33: health profile (held only with consent, C-41) and dose reminders
+    health_profile: await one(`SELECT allergies, conditions, current_medicines, consent_version, consented_at, updated_at
+                               FROM health_profiles WHERE user_id = $1`),
+    family_members: await many(`SELECT full_name, relationship, age_years, age_recorded_on, allergies, conditions FROM patients
+                                WHERE owner_user_id = $1 AND deleted_at IS NULL`),
+    medicine_reminders: await many(`SELECT medicine_name, dose, times, start_date, end_date, is_active, created_at,
+                                      (SELECT json_agg(json_build_object('scheduled_for', l.scheduled_for, 'status', l.status) ORDER BY l.scheduled_for)
+                                       FROM reminder_dose_logs l WHERE l.reminder_id = r.id) AS answers
+                                    FROM medicine_reminders r WHERE r.user_id = $1 ORDER BY created_at`),
     data_requests: await many(`SELECT request_type, status, created_at, handled_at, outcome FROM data_requests
                                WHERE user_id = $1 ORDER BY created_at`),
   };
@@ -141,11 +150,16 @@ async function anonymiseUser(client: PoolClient, userId: string) {
     [userId]);
   await client.query(`UPDATE addresses SET deleted_at = COALESCE(deleted_at, NOW()) WHERE user_id = $1`, [userId]);
   await client.query(`UPDATE patients SET deleted_at = COALESCE(deleted_at, NOW()) WHERE owner_user_id = $1`, [userId]);
+  // Sprint 33: health profile and dose reminders are deleted outright (nothing statutory, C-44)
+  await client.query(`UPDATE patients SET age_years = NULL, age_recorded_on = NULL, allergies = '[]', conditions = '[]' WHERE owner_user_id = $1`, [userId]);
+  await client.query(`DELETE FROM health_profiles WHERE user_id = $1`, [userId]);
+  await client.query(`DELETE FROM medicine_reminders WHERE user_id = $1`, [userId]);
   await client.query(`UPDATE refill_subscriptions SET is_active = FALSE WHERE user_id = $1`, [userId]);
   await client.query(`DELETE FROM cart_items WHERE user_id = $1`, [userId]);
   await client.query(`DELETE FROM user_devices WHERE user_id = $1`, [userId]);
   await client.query(`DELETE FROM carts WHERE user_id = $1`, [userId]);
   await client.query(
-    `INSERT INTO consent_records (user_id, purpose, granted, policy_version) VALUES ($1, 'marketing', FALSE, $2), ($1, 'whatsapp', FALSE, $2)`,
+    `INSERT INTO consent_records (user_id, purpose, granted, policy_version) VALUES ($1, 'marketing', FALSE, $2), ($1, 'whatsapp', FALSE, $2),
+       ($1, 'health_profile', FALSE, $2)`,
     [userId, (await privacyNoticeRef('en')).version]);
 }

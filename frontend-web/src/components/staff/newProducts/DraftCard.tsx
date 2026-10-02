@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { Check, Loader2 } from 'lucide-react';
 import { formatDateTimeIST } from '@/lib/dates';
 import { hasClaimWarning, NEVER_ONLINE, type Draft, type DraftOptions } from '@/lib/admin/catalogueDrafts';
@@ -43,6 +44,10 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
           <span className="text-[11px] text-green-700 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Saved</span>
         ) : null}
         {!open && <span className="text-xs font-medium">{DONE_LABEL[draft.status]}</span>}
+        {/* Sprint 33: full medicine information, written here and reviewed by the pharmacist (C-19) */}
+        {!neverOnline && draft.status !== 'rejected' && draft.status !== 'not_listed' && (
+          <Link href={`/staff/medicine-info/${draft.id}`} className="text-xs font-medium text-brand-700 underline">Medicine information</Link>
+        )}
       </div>
       {open && !neverOnline && !draft.description && (
         <button type="button" className="text-xs underline text-brand-700 mb-2"
