@@ -10,7 +10,8 @@ import { settleGatewayLeg } from '../refund.service';
 import { applyCapture } from './capture.service';
 import { consultationRefundEvent } from '../telemedicine/consultationFee.service';
 
-async function paymentFailed(p: any): Promise<string> {
+// Also the demo payment's "Simulate failure" (demoPayment.service)
+export async function paymentFailed(p: any): Promise<string> {
   if (!p?.order_id) return 'no order id';
   // A late or replayed failure never overrides a payment that went through
   const r = await query(`UPDATE payments SET status = 'failed' WHERE gateway_order_id = $1 AND status NOT IN ('captured', 'partially_refunded', 'refunded') RETURNING order_id`, [p.order_id]);

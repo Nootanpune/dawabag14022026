@@ -10,6 +10,62 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 26 — customer journey fixes (2026-10-02, uncommitted)
+Owner walked the live trial after Sprint 25 (tests green, experience poor): search "not
+working", no quantity choice, no back button, prescription unclear at payment, "Pay
+securely" showed an error. Walked it like a customer with `e2e/walkthrough/` (phone 390×844
++ laptop, numbered screenshots + notes.json; trial-like stack: APP_ENV=trial, demo seed, no
+Razorpay keys, fake object store). Causes and fixes:
+- **Search:** the home box only filtered a product list far below the hero (phone: nothing
+  visible); the header search was hidden on home. Home now uses the same `SearchCombobox`
+  (suggestions with Add, Enter → /search, scrolls to the top on phones); the header search
+  appears on home once the hero box scrolls away (`hooks/useInView`). Suggestions stack
+  name/generic/price so − qty + fits; dropdown ≥ 30rem on laptops. Toasts moved to the
+  bottom (they covered the header and the suggestions).
+- **Quantity:** `hooks/useCartQuantity` + `components/cart/{QuantityStepper,CartQuantityControl}`
+  (`lib/shop/quantity.ts` limits from the cart line or search/product data): Add → − qty +
+  on cards, suggestions, cart lines (limit message in words); product page `ProductBuyBox`
+  (choose quantity, "Add 3 to cart · ₹84", then stepper + Go to cart). API: product detail
+  returns `min_order_qty` / `max_order_qty` for the buyer type (`qtyLimits` exported).
+- **Back:** `components/layout/BackButton` in the header on every page but home
+  (`lib/layout/navHistory` in-memory page stack → router.back, else `backTarget.parentPath`);
+  checkout steps have Back; breadcrumbs (laptop) on product and search pages.
+- **Prescription clarity:** checkout order is now address → prescription → review → place →
+  payment. `PrescriptionStep` lists the Rx lines, the buyer's prescriptions as radio cards
+  (thumbnail via signed link, uploaded date+time, status, "Chosen"), "Or upload a new one"
+  (upload without order, auto-chosen); the choice is offered to the order right after placing
+  (`use-for-order`; failure → 'rx-fix' step). Review, payment and confirmation show
+  "Prescription (photo) uploaded … ✓ — our pharmacist checks it before dispatch" and
+  `RxPolicyNote` (existing policy: told why, send a new one, or cancel for a full refund,
+  C-08/C-37). OrderTimeline's rx_rejected text was wrong ("cancelled and refund initiated")
+  — fixed to the real behaviour.
+- **Payment:** cause = no Razorpay keys on the trial → 503 "Online payments are not
+  configured" shown raw. New `GET /payments/options` (`services/payments/paymentMode.ts`:
+  razorpay | demo | unavailable). Demo = APP_ENV=trial and no keys (DEMO_PAYMENTS=false
+  turns it off; config/env.ts refuses DEMO_PAYMENTS outside trial; routes 404 elsewhere):
+  `POST /payments/demo` and `/consultations/:id/pay/demo` (`demoPayment.service.ts`) insert a
+  payments row gateway='demo' (demo_order_/demo_pay_ ids) and call the same `applyCapture`
+  as Razorpay; failure uses the webhook's `paymentFailed`; audit demo_payment_* {demo:true};
+  demo refunds settle at once (`refund.service.settleDemoRefunds`, consultation fee too);
+  sweep skips demo rows. Web `PaymentStep`: Razorpay → `lib/payments/razorpayCheckout`
+  (shared with consultations; success/failed/dismissed in plain words), demo →
+  `DemoPaymentPanel` (tiles UPI/Card/Netbanking/Wallet — no COD exists, Pay (demo),
+  Simulate failure), else `PaymentUnavailable`. getApiErrorMessage: 500/502/504 and network
+  errors are plain sentences (app `apiErrorMessage` too).
+- **App:** `QuantityStepper` / `CartQuantityControl` on grid cards and search results;
+  `ProductBuyBar` (quantity before Add); checkout payment step reads /payments/options (demo
+  tiles + Simulate failure, "not available" text), shows the prescription label and policy;
+  prescription step lists Rx items, date+time, "Chosen"; consultation fee demo via
+  `showDemoPaymentSheet`; Razorpay failure/cancel messages plain. Not done on the app: home
+  search dropdown (home still opens the Search tab), app checkout keeps prescription after
+  review (order placed first), no breadcrumbs (AppBar back already on pushed screens).
+- Tests: jest `paymentMode.test.ts` + env DEMO_PAYMENTS (135 jest); `test/sprint26.smoke.mjs`
+  (spawns trial APIs on 4126/4128 and refused configs on 4127; in test:smoke); e2e
+  `journey.spec.ts` (9: home dropdown + stepper, card/cart stepper, product quantity, Back,
+  breadcrumbs, demo success/failure, unavailable, Razorpay opened with the order + dismiss,
+  prescription named on review/payment) → 63 e2e; checkout/public/shop specs updated; Flutter
+  `sprint26_journey_test.dart` (79). Journeys recorder flow updated (not re-recorded).
+
 ## Sprint 25 — shop like Amazon (2026-10-02, uncommitted)
 Owner's trial feedback: search not working, prescription upload not reachable, no way
 to add items from the cart.

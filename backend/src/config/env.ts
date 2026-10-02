@@ -5,7 +5,8 @@
 // APP_ENV names the deployment: unset (staging rules, as before), 'staging',
 // 'trial' (the owner's throwaway demo server, deploy/trial/TRIAL.md) or
 // 'production'. Trial-only behaviour (demo seed, a self-hosted object store) is
-// refused unless APP_ENV=trial, and APP_ENV=production refuses it outright.
+// refused unless APP_ENV=trial, and APP_ENV=production refuses it outright. The demo
+// payment (DEMO_PAYMENTS, payments/paymentMode.ts) likewise exists only with APP_ENV=trial.
 import { z } from 'zod';
 
 export const APP_ENVS = ['development', 'test', 'staging', 'trial', 'production'] as const;
@@ -54,10 +55,14 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
     // never take real money — Razorpay test keys only (rzp_test_…)
     if (env.ALLOW_MISSING_INTEGRATIONS !== 'true') errors.push('APP_ENV=trial needs ALLOW_MISSING_INTEGRATIONS=true (a closed trial, not production)');
     if (/^rzp_live_/.test(String(env.RAZORPAY_KEY_ID ?? ''))) errors.push('APP_ENV=trial must use Razorpay test keys (rzp_test_…), never live keys');
+    // Demo payment (Sprint 26): on by default in a trial without Razorpay keys; DEMO_PAYMENTS=false turns it off
+    if (env.DEMO_PAYMENTS != null && !['true', 'false'].includes(env.DEMO_PAYMENTS)) errors.push('DEMO_PAYMENTS must be true or false');
   } else {
     // The demo seed and its shared password exist only on a trial server
     if (env.DEMO_SEED === 'true') errors.push('DEMO_SEED is allowed only with APP_ENV=trial');
     if (production && env.TRIAL_DEMO_PASSWORD) errors.push('TRIAL_DEMO_PASSWORD is allowed only with APP_ENV=trial');
+    // A demo payment marks orders paid with no money: never anywhere but a trial (Sprint 26)
+    if (env.DEMO_PAYMENTS != null && env.DEMO_PAYMENTS !== '') errors.push('DEMO_PAYMENTS is allowed only with APP_ENV=trial');
   }
 
   if (production) {

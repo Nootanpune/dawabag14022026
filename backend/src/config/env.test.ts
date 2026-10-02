@@ -73,6 +73,16 @@ describe('checkEnv', () => {
       expect(checkEnv({ ...prod, TRIAL_DEMO_PASSWORD: 'x'.repeat(12) } as any).errors.join(' ')).toMatch(/TRIAL_DEMO_PASSWORD/);
       expect(checkEnv({ ...prod, S3_ENDPOINT: 'http://127.0.0.1:4890' } as any).errors.join(' ')).toMatch(/S3_ENDPOINT/);
     });
+    // Sprint 26 — demo payment only on a trial
+    it('DEMO_PAYMENTS is refused outside a trial and must be true/false in one', () => {
+      const real = { ...prod, APP_ENV: 'production' };
+      for (const v of ['true', 'false']) {
+        expect(checkEnv({ ...real, DEMO_PAYMENTS: v } as any).errors.join(' ')).toMatch(/DEMO_PAYMENTS is allowed only with APP_ENV=trial/);
+        expect(checkEnv({ ...prod, DEMO_PAYMENTS: v } as any).errors.join(' ')).toMatch(/DEMO_PAYMENTS/);
+        expect(checkEnv({ ...trial, DEMO_PAYMENTS: v } as any).errors).toEqual([]);
+      }
+      expect(checkEnv({ ...trial, DEMO_PAYMENTS: 'yes' } as any).errors.join(' ')).toMatch(/true or false/);
+    });
     it('refuses an unknown APP_ENV', () => {
       expect(checkEnv({ ...prod, APP_ENV: 'demo' } as any).errors.join(' ')).toMatch(/APP_ENV must be one of/);
     });

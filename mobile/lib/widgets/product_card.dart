@@ -7,8 +7,10 @@ class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   final void Function(Map<String, dynamic>) onAddToCart;
   final VoidCallback onTap;
+  /// Replaces the plain Add button, e.g. a CartQuantityControl (Add → − qty +)
+  final Widget? cartControl;
 
-  const ProductCard({super.key, required this.product, required this.onAddToCart, required this.onTap});
+  const ProductCard({super.key, required this.product, required this.onAddToCart, required this.onTap, this.cartControl});
 
   @override
   Widget build(BuildContext context) {
@@ -78,8 +80,8 @@ class ProductCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  // Add button
-                  SizedBox(
+                  // Add button (or − qty + once in the cart)
+                  if (cartControl != null) cartControl! else SizedBox(
                     width: double.infinity,
                     height: 32,
                     child: ElevatedButton(

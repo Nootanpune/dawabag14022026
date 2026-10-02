@@ -3,7 +3,8 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { fetchProduct, productKeys } from '@/lib/products/api';
 import Header from '@/components/layout/Header';
-import BackLink from '@/components/admin/BackLink';
+import Breadcrumbs from '@/components/layout/Breadcrumbs';
+import { searchHref } from '@/lib/search/searchUrl';
 import QueryState from '@/components/admin/QueryState';
 import ProductSummary from '@/components/shop/ProductSummary';
 import ProductDeclarations from '@/components/shop/ProductDeclarations';
@@ -16,7 +17,11 @@ export default function ProductPage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
-        <BackLink href="/" label="All medicines" />
+        <Breadcrumbs items={[
+          { label: 'Home', href: '/' },
+          ...(data?.category ? [{ label: data.category, href: searchHref({ category: data.category }) }] : [{ label: 'Medicines', href: '/search' }]),
+          { label: data?.name ?? 'Medicine' },
+        ]} />
         <QueryState isLoading={isLoading} error={error} isEmpty={false} emptyText="" />
         {data && (
           <>

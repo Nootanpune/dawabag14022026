@@ -9,12 +9,19 @@ import PolicyLinks from '@/components/legal/PolicyLinks';
 import PreviewShipmentBlock from './PreviewShipmentBlock';
 import ChargeBreakup from './ChargeBreakup';
 import PractitionerDeclaration from './PractitionerDeclaration';
+import RxAttachedLine, { type ChosenRx } from './rx/RxAttachedLine';
+import RxPolicyNote from './rx/RxPolicyNote';
 
 interface Props {
   body: OrderBody;
   /** doctors / hospitals must tick the own-patients declaration (C-15) */
   needsDeclaration: boolean;
   placing: boolean;
+  /** the prescription chosen for the prescription medicines (C-08), with a way to change it */
+  rx?: ChosenRx | null;
+  onChangeRx?: () => void;
+  /** e.g. "Prescription" or "Address": the step Back returns to */
+  backLabel?: string;
   onBack: () => void;
   onPlace: (declaration: boolean) => void;
 }
@@ -22,7 +29,7 @@ interface Props {
 const RETURN_POLICIES: PolicyKey[] = ['refund', 'cancellation', 'shipping'];
 
 /** Everything the buyer must see before paying (C-35): sellers, licences, lines, charges, returns and policies. */
-export default function ReviewStep({ body, needsDeclaration, placing, onBack, onPlace }: Props) {
+export default function ReviewStep({ body, needsDeclaration, placing, rx, onChangeRx, backLabel = 'Back', onBack, onPlace }: Props) {
   const [declared, setDeclared] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: checkoutKeys.preview(body),
@@ -47,6 +54,7 @@ export default function ReviewStep({ body, needsDeclaration, placing, onBack, on
               <PreviewShipmentBlock key={`${s.seller_type}-${s.seller_name}-${i}`} s={s} />
             ))}
           </div>
+          {rx && (<><RxAttachedLine rx={rx} onChange={onChangeRx} /><RxPolicyNote /></>)}
           <ChargeBreakup charges={data.charges} paymentTerms={data.payment_terms} />
           <div className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 space-y-2">
             <p className="whitespace-pre-line">{data.returns_note}</p>
@@ -57,7 +65,7 @@ export default function ReviewStep({ body, needsDeclaration, placing, onBack, on
       )}
       <div className="flex gap-3">
         <button onClick={onBack} disabled={placing} className="btn-outline flex items-center gap-1">
-          <ChevronLeft className="w-4 h-4" /> Address
+          <ChevronLeft className="w-4 h-4" /> {backLabel}
         </button>
         <button
           onClick={() => onPlace(declared)}
@@ -65,7 +73,7 @@ export default function ReviewStep({ body, needsDeclaration, placing, onBack, on
           className="btn-primary flex-1 py-3 flex items-center justify-center gap-2"
         >
           {placing && <Loader2 className="w-4 h-4 animate-spin" />}
-          Place order <ChevronRight className="w-4 h-4" />
+          Place order and pay <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>

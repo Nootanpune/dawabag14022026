@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cancelConsultation, teleKeys } from '@/lib/telemedicine/api';
-import { payConsultation } from '@/lib/telemedicine/razorpay';
 import type { MyConsultation } from '@/lib/telemedicine/types';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { formatPaise } from '@/lib/admin/format';
@@ -13,6 +12,7 @@ import ReasonDialog from '@/components/admin/ReasonDialog';
 import ConsultationCard from './ConsultationCard';
 import JoinDialog from '../common/JoinDialog';
 import { useJoin } from '../common/useConsultActions';
+import { useConsultationPayment } from './useConsultationPayment';
 
 const paidOrFree = (c: MyConsultation) => c.payment_status === 'paid' || c.payment_status === 'waived';
 
@@ -21,12 +21,8 @@ export default function MyConsultationsList({ rows }: { rows: MyConsultation[] }
   const [cancelling, setCancelling] = useState<MyConsultation | null>(null);
   const { join, room, closeRoom } = useJoin(teleKeys.mine);
 
-  const pay = useMutation({
-    mutationFn: (c: MyConsultation) => payConsultation(c.id, `Consultation with Dr ${c.doctor_name}`),
-    onSuccess: (paid) => paid && toast.success('Fee paid'),
-    onError: (err) => toast.error(getApiErrorMessage(err, 'Payment could not be completed')),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: teleKeys.mine }),
-  });
+  // Razorpay, or the trial's demo payment, or "not available" (Sprint 26)
+  const { pay, busyId, dialog } = useConsultationPayment();
   const cancel = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => cancelConsultation(id, reason),
     onSuccess: (r) => {
@@ -47,11 +43,11 @@ export default function MyConsultationsList({ rows }: { rows: MyConsultation[] }
             <>
               {c.status === 'booked' && c.payment_status === 'unpaid' && (
                 <button
-                  onClick={() => pay.mutate(c)}
-                  disabled={pay.isPending}
+                  onClick={() => pay({ id: c.id, fee_paise: c.fee_paise, label: `Consultation with Dr ${c.doctor_name}` })}
+                  disabled={!!busyId}
                   className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1"
                 >
-                  {pay.isPending && pay.variables?.id === c.id && <Loader2 className="w-3 h-3 animate-spin" />} Pay {formatPaise(c.fee_paise)}
+                  {busyId === c.id && <Loader2 className="w-3 h-3 animate-spin" />} Pay {formatPaise(c.fee_paise)}
                 </button>
               )}
               {['booked', 'in_progress'].includes(c.status) && paidOrFree(c) && (
@@ -72,6 +68,7 @@ export default function MyConsultationsList({ rows }: { rows: MyConsultation[] }
           }
         />
       ))}
+      {dialog}
       {room && <JoinDialog consultationId={room.id} info={room.info} onClose={closeRoom} />}
       {cancelling && (
         <ReasonDialog

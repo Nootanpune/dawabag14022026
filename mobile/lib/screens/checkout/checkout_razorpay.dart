@@ -35,7 +35,7 @@ class CheckoutRazorpay {
         'theme': {'color': '#167A4C'},
       });
     } catch (e) {
-      onError(ApiService.errorMessage(e, fallback: 'Payment error'));
+      onError(ApiService.errorMessage(e, fallback: 'We could not start the payment. Please try again in a minute.'));
     } finally {
       onBusy(false);
     }
@@ -51,12 +51,13 @@ class CheckoutRazorpay {
       );
       onPaid();
     } catch (_) {
-      onError('Payment verification failed. Contact support.');
+      onError('We received your payment but could not confirm it yet. Please do not pay again — check My orders in a few minutes.');
     }
   }
 
-  void _onFailure(PaymentFailureResponse response) =>
-      onError('Payment failed: ${response.message}');
+  void _onFailure(PaymentFailureResponse response) => onError(response.code == Razorpay.PAYMENT_CANCELLED
+      ? 'Payment window closed. Nothing was charged. Tap Pay when you are ready.'
+      : 'Your payment did not go through. No money was taken; please try again.');
 
   void dispose() => _razorpay.clear();
 }

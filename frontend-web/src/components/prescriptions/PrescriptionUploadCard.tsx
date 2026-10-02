@@ -11,7 +11,16 @@ import { prescriptionFileProblem, prescriptionKeys, uploadPrescription } from '@
  * API and the server object store — nothing is kept in the browser. It is checked
  * by our pharmacist with the order before anything is dispensed (C-08).
  */
-export default function PrescriptionUploadCard({ onUploaded }: { onUploaded: () => void }) {
+interface Props {
+  /** told the new prescription's id once it is stored */
+  onUploaded: (prescriptionId: string) => void;
+  /** e.g. "Upload a new prescription" at checkout */
+  title?: string;
+  /** checkout: a lighter card inside the step */
+  compact?: boolean;
+}
+
+export default function PrescriptionUploadCard({ onUploaded, title = 'Upload a prescription', compact }: Props) {
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -19,10 +28,10 @@ export default function PrescriptionUploadCard({ onUploaded }: { onUploaded: () 
 
   const upload = useMutation({
     mutationFn: (file: File) => uploadPrescription(file),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: prescriptionKeys.mine });
+    onSuccess: async (rx: { id: string }) => {
+      await queryClient.invalidateQueries({ queryKey: prescriptionKeys.mine });
       toast.success('Prescription uploaded');
-      onUploaded();
+      onUploaded(rx.id);
     },
     onError: (err) => setError(getApiErrorMessage(err, 'Upload failed. Please try again.')),
   });
@@ -37,8 +46,8 @@ export default function PrescriptionUploadCard({ onUploaded }: { onUploaded: () 
   };
 
   return (
-    <section aria-labelledby="upload-heading" className="card">
-      <h2 id="upload-heading" className="text-base font-semibold text-gray-900">Upload a prescription</h2>
+    <section aria-labelledby="upload-heading" className={compact ? 'rounded-xl border-2 border-dashed border-gray-300 p-4' : 'card'}>
+      <h2 id="upload-heading" className="text-base font-semibold text-gray-900">{title}</h2>
       <p className="text-sm text-gray-600 mt-1">
         A clear photo or PDF of the whole prescription: doctor’s name and registration number, date, your name, and the medicines.
       </p>

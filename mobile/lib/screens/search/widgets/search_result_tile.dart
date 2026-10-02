@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../config/theme.dart';
-import '../../../providers/cart_actions.dart';
 import '../../../utils/formatters.dart';
+import '../../../widgets/cart_quantity_control.dart';
 import '../../../widgets/product_image.dart';
 
 /// One search result: thumbnail, name, generic name, price and Add.
@@ -14,7 +14,6 @@ class SearchResultTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final inStock = product['in_stock'] as bool? ?? false;
     final generic = product['generic_name']?.toString();
     final schedule = product['drug_schedule']?.toString();
     final rx = schedule == 'Schedule H' || schedule == 'Schedule H1';
@@ -57,13 +56,8 @@ class SearchResultTile extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              inStock
-                  ? FilledButton.tonal(
-                      onPressed: () => addProductToCart(context, ref, product),
-                      style: FilledButton.styleFrom(minimumSize: const Size(64, 36)),
-                      child: const Text('Add'),
-                    )
-                  : Text('Out of stock', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              // Add, then − qty + against the server cart (Sprint 26)
+              CartQuantityControl(product: product, compact: true),
             ],
           ),
         ),

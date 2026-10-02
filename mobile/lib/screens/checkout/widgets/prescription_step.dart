@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../config/theme.dart';
 import '../../../utils/ist.dart';
+import 'rx_policy_note.dart';
 
 /// Bottom sheet: take a photo or pick from the gallery.
 Future<ImageSource?> showPrescriptionSourceSheet(BuildContext context) =>
@@ -45,11 +46,14 @@ class PrescriptionStep extends StatelessWidget {
   final String? selectedSavedId;
   final VoidCallback onPickFile;
   final void Function(String) onSelectSaved;
+  /// "Amoxicillin 500 mg Capsule × 1": the lines that need a prescription (C-08)
+  final List<String> rxItems;
 
   const PrescriptionStep({
     super.key,
     required this.prescriptionFile, required this.savedPrescriptions,
     required this.selectedSavedId, required this.onPickFile, required this.onSelectSaved,
+    this.rxItems = const [],
   });
 
   @override
@@ -57,12 +61,20 @@ class PrescriptionStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Upload prescription',
+        const Text('Prescription needed',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
-        Text('Required for Schedule H medicines in your cart.',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-        const SizedBox(height: 20),
+        Text(rxItems.isEmpty ? 'Some medicines in this order need a doctor’s prescription.' : 'These medicines need a doctor’s prescription:',
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+        for (final item in rxItems)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 8),
+            child: Text('• $item', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+        const SizedBox(height: 16),
+        const Text('Upload a new one, or choose one you uploaded earlier below.',
+          style: TextStyle(fontSize: 12)),
+        const SizedBox(height: 8),
 
         // Upload zone
         GestureDetector(
@@ -134,16 +146,25 @@ class PrescriptionStep extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(rx['doctor_name'] != null ? 'Dr. ${rx['doctor_name']}' : 'Uploaded prescription',
+                        Text(rx['doctor_name'] != null ? 'Prescription from Dr ${rx['doctor_name']}' : rx['file_type'] == 'pdf' ? 'Prescription (PDF)' : 'Prescription photo',
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13,
                             color: AppTheme.brandGreen700)),
+                        Text('Uploaded ${formatDateTimeIst(rx['created_at'])}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                         Text(rx['status'] == 'pending'
-                            ? 'Uploaded ${formatDateIst(rx['created_at'])} · not checked yet'
+                            ? 'Not checked yet — our pharmacist checks it with this order'
                             : 'Checked · valid until ${_validUntil(rx['valid_until'])}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                       ],
                     ),
                   ),
+                  if (selectedSavedId == rx['id']?.toString())
+                    const Column(children: [
+                      Icon(Icons.check_circle, color: AppTheme.brandGreen),
+                      Text('Chosen', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.brandGreen700)),
+                    ])
+                  else
+                    Icon(Icons.radio_button_unchecked, color: Colors.grey.shade400),
                 ],
               ),
             ),
@@ -151,25 +172,7 @@ class PrescriptionStep extends StatelessWidget {
         ],
 
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFAEEDA),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              const Text('📞', style: TextStyle(fontSize: 16)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Our pharmacist will call you to verify the prescription before dispatching your order.',
-                  style: TextStyle(fontSize: 12, color: Colors.brown.shade700),
-                ),
-              ),
-            ],
-          ),
-        ),
+        const RxPolicyNote(),
       ],
     );
   }

@@ -32,8 +32,8 @@ export interface CartLine {
   requires_prescription: boolean;
 }
 
-// Quantity limits per buyer type — same columns order.controller enforces
-function qtyLimits(type: BuyerType, p: any): { min: number; max: number } {
+// Quantity limits per buyer type — same columns order.controller enforces (also the product page)
+export function qtyLimits(type: BuyerType, p: any): { min: number; max: number } {
   if (type === 'b2b_retailer') return { min: p.min_order_qty_retailer ?? 1, max: p.max_qty_per_order_retailer ?? 9999 };
   if (type === 'b2b_wholesaler') return { min: p.min_order_qty_wholesaler ?? 10, max: p.max_qty_per_order_wholesaler ?? 9999 };
   return { min: 1, max: p.max_qty_per_order };

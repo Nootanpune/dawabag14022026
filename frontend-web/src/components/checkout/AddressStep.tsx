@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Loader2, MapPin, ChevronRight } from 'lucide-react';
+import { Loader2, MapPin, ChevronRight, ChevronLeft } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import type { Address } from '@/lib/addresses';
 import type { CartView } from '@/lib/cart';
@@ -14,9 +14,12 @@ interface Props {
   onSelect: (id: string) => void;
   cart: CartView;
   onContinue: () => void;
+  /** "Review order", or "Continue to prescription" when one is needed */
+  continueLabel?: string;
+  onBack: () => void;
 }
 
-export default function AddressStep({ addresses, loading, selectedId, onSelect, cart, onContinue }: Props) {
+export default function AddressStep({ addresses, loading, selectedId, onSelect, cart, onContinue, continueLabel = 'Review order', onBack }: Props) {
   const [adding, setAdding] = useState(false);
   const selected = addresses?.find((a) => a.id === selectedId);
   return (
@@ -73,13 +76,18 @@ export default function AddressStep({ addresses, loading, selectedId, onSelect, 
         <p className="text-xs text-gray-400">GST and delivery for this address are shown on the next step, before you pay.</p>
       </div>
 
-      <button
-        onClick={onContinue}
-        disabled={!selected || selected.is_serviceable === false}
-        className="btn-primary w-full mt-5 py-3 flex items-center justify-center gap-2"
-      >
-        Review order <ChevronRight className="w-4 h-4" />
-      </button>
+      <div className="flex gap-3 mt-5">
+        <button type="button" onClick={onBack} className="btn-outline flex items-center gap-1">
+          <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Cart
+        </button>
+        <button
+          onClick={onContinue}
+          disabled={!selected || selected.is_serviceable === false}
+          className="btn-primary flex-1 py-3 flex items-center justify-center gap-2"
+        >
+          {continueLabel} <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
       {adding && <AddressFormDialog onClose={() => setAdding(false)} onSaved={(a) => onSelect(a.id)} />}
     </div>
   );

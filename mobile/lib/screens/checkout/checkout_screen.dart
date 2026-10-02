@@ -8,6 +8,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/checkout_api.dart';
+import '../../services/payment_api.dart';
+import '../../utils/formatters.dart';
 import 'checkout_flow.dart';
 import 'checkout_prescription.dart';
 import 'checkout_razorpay.dart';
@@ -35,6 +37,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _rx = CheckoutPrescription();
   bool _isLoading = false;
   late final CheckoutRazorpay _razorpay;
+  PaymentOptions? _payOptions; // GET /payments/options (Sprint 26)
+  String _demoMethod = 'upi';
+  String? _payNotice;
+  bool _paidDemo = false;
+  List<String> _rxItems = const []; // the order's prescription lines, kept when the cart empties
 
   @override
   void initState() {
@@ -48,6 +55,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
     _rx.loadSaved().then((_) {
       if (mounted) setState(() {});
+    });
+    apiService.getPaymentOptions().then((o) {
+      if (mounted) setState(() => _payOptions = o);
     });
   }
 
@@ -125,6 +135,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
     final body = _orderBody(declaration: practitioner ? true : null);
     if (body == null) return;
+    _rxItems = ref.read(cartProvider).view.orderableItems
+        .where((l) => l.requiresPrescription)
+        .map((l) => '${l.name} × ${l.quantity}')
+        .toList();
     await _busy(() async {
       final data = await apiService.placeOrder(body);
       if (!mounted) return;
@@ -165,6 +179,41 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (!mounted) return;
     ref.read(cartProvider.notifier).load();
     setState(() => _step = CheckoutStep.confirmed);
+  }
+
+  /// Trial server without Razorpay keys: a labelled demo payment, no money moves.
+  Future<void> _payDemo({bool fail = false}) async {
+    final orderId = _order?.id;
+    if (orderId == null) return;
+    setState(() => _payNotice = null);
+    var paid = false;
+    await _busy(() async {
+      paid = await apiService.payOrderDemo(orderId, method: _demoMethod, fail: fail);
+    }, 'We could not record the demo payment. Please try again.');
+    if (!mounted) return;
+    if (paid) {
+      _paidDemo = true;
+      _onPaid();
+    } else {
+      setState(() => _payNotice = 'Demo payment failed (simulated). No money was taken. Your order is saved — tap “Pay (demo)” to try again.');
+    }
+  }
+
+  String _payLabel() {
+    final total = formatPrice(_order?.totalPaise ?? 0);
+    final o = _payOptions;
+    if (o == null) return 'Getting payment options…';
+    if (o.isDemo) return 'Pay $total (demo)';
+    if (o.isRazorpay) return 'Pay $total securely';
+    return 'Online payment not available';
+  }
+
+  VoidCallback? _payAction() {
+    final o = _payOptions;
+    if (o == null) return null;
+    if (o.isDemo) return () => _payDemo();
+    if (o.isRazorpay) return () => _razorpay.pay(_order?.id ?? '', orderNumber: _order?.orderNumber);
+    return null;
   }
 
   void _showError(String msg) {
@@ -228,20 +277,27 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 onPickFile: _pickPrescription,
                 onSelectSaved: (id) => setState(() => _rx.selectSaved(id)),
                 order: _order,
+                rxItems: _rxItems,
+                paymentOptions: _payOptions,
+                demoMethod: _demoMethod,
+                onDemoMethod: (m) => setState(() => _demoMethod = m),
+                onSimulateFailure: _isLoading ? null : () => _payDemo(fail: true),
+                prescriptionLabel: _requiresPrescription ? _rx.label : null,
+                paymentNotice: _payNotice,
+                paidDemo: _paidDemo,
               ),
             ),
           ),
           if (!confirmed)
             CheckoutBottomButton(
-              label: _step.buttonLabel(
-                totalPaise: _order?.totalPaise ?? 0,
-                orderPlaced: _order != null,
-              ),
+              label: _step == CheckoutStep.payment
+                  ? _payLabel()
+                  : _step.buttonLabel(totalPaise: _order?.totalPaise ?? 0, orderPlaced: _order != null),
               onPressed: switch (_step) {
                 CheckoutStep.address => _review,
                 CheckoutStep.review => _placeOrder,
                 CheckoutStep.prescription => _uploadPrescription,
-                CheckoutStep.payment => () => _razorpay.pay(_order?.id ?? '', orderNumber: _order?.orderNumber),
+                CheckoutStep.payment => _payAction(),
                 CheckoutStep.confirmed => null,
               },
               isLoading: _isLoading,

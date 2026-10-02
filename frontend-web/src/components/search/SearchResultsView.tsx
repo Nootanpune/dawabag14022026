@@ -6,8 +6,8 @@ import { Loader2, Search } from 'lucide-react';
 import api from '@/lib/api';
 import { searchKeys, searchProducts, SEARCH_EXAMPLES, type SearchSort } from '@/lib/search/api';
 import { parseSearchState, searchHref, type SearchState } from '@/lib/search/searchUrl';
-import { useAddProduct } from '@/hooks/useAddProduct';
 import Header from '@/components/layout/Header';
+import Breadcrumbs from '@/components/layout/Breadcrumbs';
 import ProductCard from '@/components/shop/ProductCard';
 import EmptyState from '@/components/ui/EmptyState';
 import type { Category } from '@/components/home/CategoryTiles';
@@ -23,7 +23,6 @@ export default function SearchResultsView() {
   const router = useRouter();
   const state = parseSearchState(useSearchParams());
   const { q, category, sort } = state;
-  const { add, pendingProductId } = useAddProduct();
   const go = (next: Partial<SearchState>) => router.push(searchHref({ ...state, ...next }), { scroll: false });
 
   const { data: categories = [] } = useQuery<Category[]>({
@@ -52,6 +51,7 @@ export default function SearchResultsView() {
     <div className="min-h-screen bg-gray-50">
       <Header searchQuery={q} />
       <main className="max-w-6xl mx-auto px-4 py-5 sm:py-6">
+        <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Search', href: q || category ? '/search' : undefined }, ...(q || category ? [{ label: q ? `“${q}”` : category }] : [])]} />
         <h1 className="text-xl font-semibold text-gray-900">{heading}</h1>
         {searching && (
           <div className="mt-3 space-y-3">
@@ -83,7 +83,7 @@ export default function SearchResultsView() {
               <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-label="Search results">
                 {products.map((p) => (
                   <li key={p.id} className="flex">
-                    <div className="w-full"><ProductCard product={p} onAddToCart={add} isAdding={pendingProductId === p.id} /></div>
+                    <div className="w-full"><ProductCard product={p} /></div>
                   </li>
                 ))}
               </ul>

@@ -1,12 +1,8 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { searchHref } from '@/lib/search/searchUrl';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { useAddToCart } from '@/hooks/useCart';
 import { usePincode } from '@/hooks/usePincode';
-import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import PinCodeBanner from '@/components/shop/PinCodeBanner';
 import TrustStrip from '@/components/home/TrustStrip';
@@ -16,34 +12,15 @@ import PrescriptionCta from '@/components/home/PrescriptionCta';
 import CategoryTiles, { type Category } from '@/components/home/CategoryTiles';
 import ProductResults from '@/components/home/ProductResults';
 
+// Home: the search (suggestions as you type, Enter → /search), then categories and popular medicines
 export default function HomePage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const searchRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
   const { pincode, setPincode } = usePincode();
-  const { addToCart, isPending: isAdding, pendingProductId } = useAddToCart();
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 400);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // The bottom nav's "Search" opens /?focus=search
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('focus') === 'search') {
-      searchRef.current?.focus();
-      searchRef.current?.scrollIntoView({ block: 'center' });
-    }
-  }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['products', debouncedQuery, selectedCategory, pincode],
+    queryKey: ['products', '', selectedCategory, pincode],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (debouncedQuery) params.set('q', debouncedQuery);
       if (selectedCategory) params.set('category', selectedCategory);
       if (pincode) params.set('pincode', pincode);
       params.set('limit', '20');
@@ -60,36 +37,11 @@ export default function HomePage() {
     },
   });
 
-  // Schedule X / NDPS are never sold online (C-10); the server enforces it too
-  const handleAddToCart = (product: any) => {
-    if (['NDPS', 'Schedule X'].includes(product.drug_schedule)) {
-      toast.error('This medicine cannot be ordered online.');
-      return;
-    }
-    if (!product.in_stock) {
-      toast.error('Out of stock');
-      return;
-    }
-    addToCart(product.id, product.name);
-  };
-
-  const resetFilters = () => {
-    setSearchQuery('');
-    setDebouncedQuery('');
-    setSelectedCategory('');
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="max-w-6xl mx-auto px-4 py-5 sm:py-6">
-        <HomeHero
-          query={searchQuery}
-          onQueryChange={setSearchQuery}
-          inputRef={searchRef}
-          note={<FreeDeliveryNote />}
-          onSubmit={() => searchQuery.trim() && router.push(searchHref({ q: searchQuery, category: selectedCategory }))}
-        />
+      <main className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
+        <HomeHero note={<FreeDeliveryNote />} />
         <TrustStrip />
         <PinCodeBanner pincode={pincode} onPincodeChange={setPincode} pincodeInfo={data?.pincode_info} />
         <PrescriptionCta />
@@ -97,11 +49,9 @@ export default function HomePage() {
         <ProductResults
           products={data?.products}
           isLoading={isLoading}
-          query={debouncedQuery}
+          query=""
           category={selectedCategory}
-          onAddToCart={handleAddToCart}
-          pendingProductId={isAdding ? pendingProductId : undefined}
-          onReset={resetFilters}
+          onReset={() => setSelectedCategory('')}
         />
       </main>
     </div>

@@ -29,9 +29,15 @@ what is wrong. Generate secrets with `openssl rand -hex 48`.
 
 `APP_ENV` names the deployment: set **`APP_ENV=production`** on the real production
 servers — the API then also refuses `ALLOW_MISSING_INTEGRATIONS`, `S3_ENDPOINT`,
-`DEMO_SEED` and `TRIAL_DEMO_PASSWORD` outright. Unset (or `staging`) keeps the staging
+`DEMO_SEED`, `TRIAL_DEMO_PASSWORD` and `DEMO_PAYMENTS` outright. Unset (or `staging`) keeps the staging
 rules; `trial` is only for the owner's demo server (section 7e) and needs
-`ALLOW_MISSING_INTEGRATIONS=true` and Razorpay test keys. `S3_PUBLIC_ENDPOINT` (with
+`ALLOW_MISSING_INTEGRATIONS=true`; Razorpay test keys are optional there. Without them a
+trial offers a labelled **demo payment** (`GET /payments/options` → `mode: demo`,
+`POST /payments/demo`, `POST /consultations/:id/pay/demo`): no money moves, the order is
+marked paid through the same capture code as Razorpay (payments.gateway = `demo`, ids
+`demo_order_…`/`demo_pay_…`, audit `demo_payment_*` with `demo: true`), and refunds of demo
+payments are settled at once without a gateway. `DEMO_PAYMENTS=false` turns it off; the
+API refuses `DEMO_PAYMENTS` anywhere but `APP_ENV=trial`, and the routes answer 404 there. `S3_PUBLIC_ENDPOINT` (with
 `S3_ENDPOINT` only) is the https address of a self-hosted store that browsers use;
 signed links are made for it while the API itself talks to `S3_ENDPOINT`.
 

@@ -1,6 +1,8 @@
 import type { OrderShipment } from '@/components/orders/SoldBySection';
 
-export type CheckoutStep = 'address' | 'review' | 'prescription' | 'payment' | 'confirmed';
+// Address → prescription (only when needed) → review (C-35) → payment (Sprint 26 order).
+// 'rx-fix': the order is placed but the chosen prescription could not go with it.
+export type CheckoutStep = 'address' | 'prescription' | 'review' | 'rx-fix' | 'payment' | 'confirmed';
 
 /** Subset of the order returned by POST /orders (data.order) — amounts are the server's. */
 export interface PlacedOrder {

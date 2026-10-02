@@ -35,6 +35,9 @@ export interface ProductDetail {
   s3_image_key?: string | null;
   content_status?: 'pending_review' | 'approved' | 'rejected';
   max_qty_per_order: number;
+  /** this buyer's own order limits (buyer type), as the cart applies them */
+  min_order_qty?: number;
+  max_order_qty?: number;
   in_stock: boolean;
   requires_prescription: boolean;
   cannot_order_online: boolean;

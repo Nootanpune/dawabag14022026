@@ -36,10 +36,13 @@ test('a prescription medicine cannot reach payment without a prescription (C-08)
   await page.goto(`/shop/${process.env.E2E_RX_PRODUCT_ID}`);
   await addToCart(page);
   await page.goto('/checkout');
-  await page.getByRole('button', { name: /Review order/ }).click();
-  await page.getByRole('button', { name: /Place order/ }).click();
-  await expect(page.getByText(/pharmacist will verify your prescription/i)).toBeVisible();
-  await expect(page.getByRole('button', { name: /Continue to payment/ })).toBeDisabled();
+  // Sprint 26: the prescription is chosen before review, so nothing is placed without one
+  await page.getByRole('button', { name: /Continue to prescription/ }).click();
+  await expect(page.getByRole('heading', { name: 'Prescription needed' })).toBeVisible();
+  await expect(page.getByText('E2E Amoxicillin 500 × 1')).toBeVisible();
+  await expect(page.getByText(/pharmacist checks your prescription before anything is dispatched/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: /Choose or upload a prescription/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /Place order/ })).toHaveCount(0);
 });
 
 test('every page carries the licence and grievance details (C-04, C-36)', async ({ page }) => {

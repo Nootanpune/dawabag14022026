@@ -10,7 +10,7 @@ export function razorpayConfigured(): boolean {
 }
 
 export function getRazorpay(): Razorpay {
-  if (!razorpayConfigured()) throw new AppError('Online payments are not configured', 503);
+  if (!razorpayConfigured()) throw new AppError('Online payment is not available right now. Please try again later.', 503);
   if (!client) {
     client = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID!, key_secret: process.env.RAZORPAY_KEY_SECRET! });
     // Tests only (production refuses it, config/env.ts): point the SDK at a fake gateway

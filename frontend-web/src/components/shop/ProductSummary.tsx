@@ -1,17 +1,16 @@
 'use client';
-import { ShoppingCart, Snowflake, Loader2 } from 'lucide-react';
+import { Snowflake } from 'lucide-react';
 import type { ProductDetail } from '@/lib/products/api';
 import { formatPrice } from '@/lib/utils';
 import { scheduleBadge } from '@/lib/drugSchedule';
-import { useAddToCart } from '@/hooks/useCart';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole } from '@/lib/admin/roles';
 import { STAFF_ROLES } from '@/lib/layout/portalPaths';
 import ProductImage from './ProductImage';
+import ProductBuyBox from './ProductBuyBox';
 
 /** Name, the buyer's own price and add-to-cart. Copy appears only once a pharmacist approved it (C-19). */
 export default function ProductSummary({ p }: { p: ProductDetail }) {
-  const { addToCart, isPending } = useAddToCart();
   const badge = scheduleBadge(p.drug_schedule);
   // Unapproved copy is never shown (C-19); only staff see that it is pending review
   const role = useAuthStore((s) => s.user?.role);
@@ -42,19 +41,9 @@ export default function ProductSummary({ p }: { p: ProductDetail }) {
             )}
           </div>
           {/* Schedule H / H1 needs a prescription the pharmacist checks before dispatch (C-08) */}
-          {p.requires_prescription && <p className="text-xs text-amber-800 mt-1">Prescription required</p>}
-          {p.cannot_order_online ? (
-            <p className="text-sm text-red-700 mt-3">This medicine cannot be ordered online.</p>
-          ) : (
-            <button
-              onClick={() => addToCart(p.id, p.name)}
-              disabled={!p.in_stock || isPending}
-              className="btn-primary mt-3 inline-flex items-center gap-2 disabled:opacity-50"
-            >
-              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
-              {p.in_stock ? 'Add to cart' : 'Out of stock'}
-            </button>
-          )}
+          {p.requires_prescription && <p className="text-xs text-amber-800 mt-1">Needs a doctor’s prescription. Our pharmacist checks it before dispatch.</p>}
+          {/* Quantity first, then Add; afterwards − qty + (Sprint 26) */}
+          <ProductBuyBox p={p} />
         </div>
       </div>
       {p.description ? (

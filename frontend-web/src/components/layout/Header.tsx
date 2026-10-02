@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { staffHome } from '@/lib/fulfilment/roles';
 import HeaderSearch from '@/components/search/HeaderSearch';
+import BackButton from './BackButton';
 
 interface Props {
   /** the query of the search results page, shown in the header's search box */
@@ -39,7 +40,9 @@ export default function Header({ searchQuery }: Props = {}) {
     <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-50 shadow-sm">
       <div className="max-w-6xl mx-auto px-4 min-h-16 flex flex-wrap items-center justify-between gap-x-3">
 
-        {/* Logo */}
+        {/* Back on every page but home (Sprint 26), then the logo */}
+        <div className="flex items-center">
+        <BackButton />
         <Link href="/" className="flex items-center gap-2 h-16">
           <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center">
             <span className="text-white font-bold">D</span>
@@ -52,6 +55,7 @@ export default function Header({ searchQuery }: Props = {}) {
             </span>
           </span>
         </Link>
+        </div>
 
         {/* Medicine search on every shopping page (Sprint 25) */}
         <HeaderSearch query={searchQuery} />

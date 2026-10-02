@@ -11,11 +11,14 @@ const List<String> _notOrderableOnline = ['NDPS', 'Schedule X'];
 /// Shared "Add to cart" action for product lists and detail pages.
 /// Guests are sent to sign in (there is no guest cart). Returns true when
 /// the server accepted the change.
+/// [quantity] (product page): how many to put in; otherwise the buyer's
+/// minimum (from the search/product data), or one more than in the cart.
 Future<bool> addProductToCart(
   BuildContext context,
   WidgetRef ref,
-  Map<String, dynamic> product,
-) async {
+  Map<String, dynamic> product, {
+  int? quantity,
+}) async {
   final messenger = ScaffoldMessenger.of(context);
   final schedule = product['drug_schedule'] as String? ?? 'OTC';
   if (_notOrderableOnline.contains(schedule)) {
@@ -37,15 +40,30 @@ Future<bool> addProductToCart(
 
   final productId = product['id']?.toString();
   if (productId == null) return false;
-  final error = await ref.read(cartProvider.notifier).addOne(productId);
+  final notifier = ref.read(cartProvider.notifier);
+  final inCart = ref.read(cartProvider).view.lineFor(productId)?.quantity ?? 0;
+  final minQty = (product['min_order_qty'] as num?)?.toInt() ?? 1;
+  final error = quantity != null || inCart == 0
+      ? await notifier.setQuantity(productId, inCart + (quantity ?? (minQty < 1 ? 1 : minQty)))
+      : await notifier.addOne(productId);
   if (error != null) {
     messenger.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
     return false;
   }
   messenger.showSnackBar(SnackBar(
-    content: Text('${product['name'] ?? 'Item'} added to cart'),
+    content: Text('${product['name'] ?? 'Item'} added to your cart'),
     backgroundColor: AppTheme.brandGreen,
     duration: const Duration(seconds: 2),
   ));
   return true;
+}
+
+/// − / + on a cart line or a product already in the cart (Sprint 26). Below the
+/// buyer's minimum the line is removed; the server checks the limits again.
+Future<void> changeCartQuantity(BuildContext context, WidgetRef ref, String productId, int quantity) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final error = await ref.read(cartProvider.notifier).setQuantity(productId, quantity);
+  if (error != null) {
+    messenger.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
+  }
 }

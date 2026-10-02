@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { ShoppingCart, Snowflake, Loader2 } from 'lucide-react';
+import { Snowflake } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import { scheduleBadge } from '@/lib/drugSchedule';
 import ProductImage from './ProductImage';
+import CartQuantityControl from '@/components/cart/CartQuantityControl';
 
 export interface Product {
   id: string; name: string; generic_name?: string | null; sku: string;
@@ -12,15 +13,14 @@ export interface Product {
   /** buyer-specific price from the server (offer / PTR / PTS / institutional) */
   display_price_paise: number;
   cold_chain: boolean; s3_image_key?: string | null; max_qty_per_order: number;
+  /** the buyer's own order limits (search results) */
+  min_order_qty?: number | null; max_order_qty?: number | null;
   /** signed link to the pharmacist-approved pack photo (C-19), or null */
   image_url?: string | null;
 }
 
 interface Props {
   product: Product;
-  onAddToCart: (product: Product) => void;
-  /** true while this product's add-to-cart request is in flight */
-  isAdding?: boolean;
 }
 
 const scheduleColors: Record<string, string> = {
@@ -29,8 +29,7 @@ const scheduleColors: Record<string, string> = {
   'Schedule G': 'text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium',
 };
 
-export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
-  const cannotOrder = ['NDPS', 'Schedule X'].includes(product.drug_schedule);
+export default function ProductCard({ product }: Props) {
 
   return (
     <div className="card hover:shadow-md transition-shadow flex flex-col">
@@ -86,16 +85,8 @@ export default function ProductCard({ product, onAddToCart, isAdding }: Props) {
         </div>
       </div>
 
-      {/* CTA */}
-      <button
-        onClick={() => onAddToCart(product)}
-        disabled={!product.in_stock || cannotOrder || isAdding}
-        className="w-full btn-primary flex items-center justify-center gap-2 text-sm py-2
-                   disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
-      >
-        {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
-        {cannotOrder ? 'Not available online' : !product.in_stock ? 'Out of stock' : 'Add to cart'}
-      </button>
+      {/* Add, then − qty + against the server cart (Sprint 26) */}
+      <CartQuantityControl product={product} />
     </div>
   );
 }

@@ -11,8 +11,6 @@ interface Props {
   isLoading: boolean;
   query: string;
   category: string;
-  onAddToCart: (product: any) => void;
-  pendingProductId?: string;
   onReset: () => void;
 }
 
@@ -28,7 +26,7 @@ function CardSkeleton() {
 }
 
 /** "Popular medicines" or search results, with loading skeletons and an empty state. */
-export default function ProductResults({ products, isLoading, query, category, onAddToCart, pendingProductId, onReset }: Props) {
+export default function ProductResults({ products, isLoading, query, category, onReset }: Props) {
   const filtered = !!query || !!category;
   const heading = query ? `Results for “${query}”` : category ? category : 'Popular medicines';
 
@@ -66,12 +64,7 @@ export default function ProductResults({ products, isLoading, query, category, o
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onAddToCart={onAddToCart}
-              isAdding={pendingProductId === product.id}
-            />
+            <ProductCard key={product.id} product={product} />
           ))}
         </div>
       )}

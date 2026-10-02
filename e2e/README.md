@@ -20,3 +20,12 @@ when it has no object store; nothing is ever stored locally).
 
 Test people (mobiles 90000019xx) and products (SKU E2E-) are created before the run
 and removed after it. CI runs this on every push (job "browser").
+
+## Customer walkthrough (Sprint 26)
+
+`walkthrough/` walks the demo customer of the trial seed (9000090001) through search,
+quantity, back, cart, prescription, checkout and payment on a phone (390×844) and a
+laptop, and saves numbered screenshots plus `notes.json` for review. Not a test suite;
+it runs against a trial-like stack (`APP_ENV=trial`, demo seed, no Razorpay keys):
+
+    WALKTHROUGH_OUT=/some/folder TRIAL_DEMO_PASSWORD=… npx playwright test -c walkthrough/walkthrough.config.ts

@@ -47,6 +47,11 @@ String apiErrorMessage(
   String fallback = 'Something went wrong. Please try again.',
 }) {
   if (error is DioException) {
+    // A server fault's own text is technical: a plain sentence with what to do (Sprint 26)
+    final status = error.response?.statusCode;
+    if (status == 500 || status == 502 || status == 504) {
+      return 'Something went wrong on our side. Please try again in a minute.';
+    }
     final data = error.response?.data;
     if (data is Map) {
       final errors = data['errors'];

@@ -62,7 +62,10 @@ export default function OrderTimeline({ order }: { order: OrderDetail }) {
       })}
       {order.status === 'rx_rejected' && (
         <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          Prescription rejected. Your order has been cancelled and refund initiated.
+          {/* The order stays open (rxVerification.service): a new prescription puts it back in the
+              pharmacist's queue (C-08); cancelling refunds what was paid (cancellation.service, C-37) */}
+          Our pharmacist could not accept the prescription for this order. Please upload a new prescription
+          from your Prescriptions page, or cancel the order for a full refund to the way you paid.
         </div>
       )}
     </div>

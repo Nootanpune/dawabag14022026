@@ -31,12 +31,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Licences + grievance officer on every public page, from the server (C-04, C-36) */}
           <SiteFooter />
           <BottomNav />
-          {/* Below the 64px sticky header so toasts never cover the header or the user's name */}
+          {/* At the bottom (above the phone's tab bar), so a toast never covers the header,
+              the Back arrow, the cart or a search's suggestions (Sprint 26) */}
           <Toaster
-            position="top-center"
+            position="bottom-center"
             richColors
-            offset={{ top: 76 }}
-            mobileOffset={{ top: 72, left: 16, right: 16 }}
+            duration={3000}
+            offset={{ bottom: 24 }}
+            mobileOffset={{ bottom: 84, left: 16, right: 16 }}
           />
         </Providers>
       </body>

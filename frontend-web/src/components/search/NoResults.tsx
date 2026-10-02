@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { SearchX, FileUp } from 'lucide-react';
 import { fetchSuggestions, searchKeys, searchProducts, SEARCH_EXAMPLES } from '@/lib/search/api';
 import { searchHref } from '@/lib/search/searchUrl';
-import { useAddProduct } from '@/hooks/useAddProduct';
 import ProductCard from '@/components/shop/ProductCard';
 
 interface Props {
@@ -31,7 +30,6 @@ export default function NoResults({ query, category, onClearCategory, headingLev
     queryFn: () => searchProducts({ limit: 6 }),
     staleTime: 60_000,
   });
-  const { add, pendingProductId } = useAddProduct();
 
   return (
     <section aria-labelledby="no-results-heading" className="py-6">
@@ -79,7 +77,7 @@ export default function NoResults({ query, category, onClearCategory, headingLev
           <H className="text-base font-semibold text-gray-900 mb-3">Popular medicines</H>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {popular.products.map((p) => (
-              <ProductCard key={p.id} product={p} onAddToCart={add} isAdding={pendingProductId === p.id} />
+              <ProductCard key={p.id} product={p} />
             ))}
           </div>
         </div>

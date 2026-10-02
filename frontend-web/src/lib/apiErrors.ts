@@ -6,6 +6,10 @@
  */
 export function getApiErrorMessage(err: any, fallback = 'Something went wrong'): string {
   const body = err?.response?.data;
+  // A server fault's own text is technical; customers get a plain sentence with what to do
+  if (err?.response?.status === 500 || err?.response?.status === 502 || err?.response?.status === 504) {
+    return 'Something went wrong on our side. Please try again in a minute.';
+  }
   if (body) {
     if (typeof body.message === 'string' && body.message) return body.message;
     if (typeof body.error === 'string' && body.error) return body.error;
@@ -13,8 +17,8 @@ export function getApiErrorMessage(err: any, fallback = 'Something went wrong'):
       return body.errors.map((e: any) => e?.message).filter(Boolean).join('. ') || fallback;
     }
   }
-  if (err?.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
-  if (err?.request && !err?.response) return 'Network error. Check your connection and try again.';
+  if (err?.code === 'ECONNABORTED') return 'This is taking too long. Please check your internet connection and try again.';
+  if (err?.request && !err?.response) return 'We could not reach Dawabag. Please check your internet connection and try again.';
   return fallback;
 }
 

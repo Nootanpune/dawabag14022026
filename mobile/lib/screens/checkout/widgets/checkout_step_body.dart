@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../models/checkout_summary.dart';
+import '../../../services/payment_api.dart';
 import '../checkout_flow.dart';
 import 'address_step.dart';
 import 'confirmed_step.dart';
@@ -26,6 +27,14 @@ class CheckoutStepBody extends StatelessWidget {
   final VoidCallback onPickFile;
   final void Function(String) onSelectSaved;
   final PlacedOrder? order;
+  final List<String> rxItems;
+  final PaymentOptions? paymentOptions;
+  final String demoMethod;
+  final ValueChanged<String> onDemoMethod;
+  final VoidCallback? onSimulateFailure;
+  final String? prescriptionLabel;
+  final String? paymentNotice;
+  final bool paidDemo;
 
   const CheckoutStepBody({
     super.key,
@@ -43,6 +52,14 @@ class CheckoutStepBody extends StatelessWidget {
     required this.onPickFile,
     required this.onSelectSaved,
     required this.order,
+    this.rxItems = const [],
+    this.paymentOptions,
+    this.demoMethod = 'upi',
+    required this.onDemoMethod,
+    this.onSimulateFailure,
+    this.prescriptionLabel,
+    this.paymentNotice,
+    this.paidDemo = false,
   });
 
   @override
@@ -65,14 +82,22 @@ class CheckoutStepBody extends StatelessWidget {
             selectedSavedId: savedPrescriptionId,
             onPickFile: onPickFile,
             onSelectSaved: onSelectSaved,
+            rxItems: rxItems,
           ),
         CheckoutStep.payment => PaymentStep(
             orderNumber: order?.orderNumber ?? '',
             totalPaise: order?.totalPaise ?? 0,
+            options: paymentOptions,
+            demoMethod: demoMethod,
+            onDemoMethod: onDemoMethod,
+            onSimulateFailure: onSimulateFailure,
+            prescriptionLabel: prescriptionLabel,
+            notice: paymentNotice,
           ),
         CheckoutStep.confirmed => ConfirmedStep(
             orderNumber: order?.orderNumber ?? '',
             shipments: order?.shipments ?? const [],
+            demo: paidDemo,
           ),
       };
 }

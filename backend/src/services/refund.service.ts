@@ -13,6 +13,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { logger } from '../config/logger';
 import { getRazorpay, razorpayConfigured } from './razorpay.client';
+import { DEMO_PAYMENT_PREFIX } from './payments/paymentMode';
 
 export type RefundSource = 'cancellation' | 'return' | 'admin';
 
@@ -105,8 +106,28 @@ export async function recordRefund(
   return { legs: out, gatewayRefundIds };
 }
 
+// A trial's demo payment (Sprint 26, payments/demoPayment.service) took no money, so its
+// refund leg is settled at once (flagged demo in the audit log) instead of going to Razorpay.
+// Returns the ids that are real gateway legs.
+async function settleDemoRefunds(ids: string[]): Promise<string[]> {
+  const demo = await query<{ id: string; order_id: string; amount_paise: number }>(
+    `SELECT id, order_id, amount_paise FROM refunds WHERE id = ANY($1) AND status = 'pending' AND gateway_payment_id LIKE $2`,
+    [ids, `${DEMO_PAYMENT_PREFIX}%`]);
+  for (const r of demo) {
+    await withTransaction(async (client) => {
+      await client.query(`UPDATE refunds SET gateway_refund_id = $2, failure_reason = NULL WHERE id = $1`, [r.id, `demo_refund_${r.id.slice(0, 8)}`]);
+      await settleGatewayLeg(client, r.id);
+      await writeAuditTx(client, { userId: null, action: 'demo_refund_settled', newValue: { demo: true, refund_id: r.id, order_id: r.order_id, amount_paise: r.amount_paise } });
+    });
+  }
+  const done = new Set(demo.map((r) => r.id));
+  return ids.filter((id) => !done.has(id));
+}
+
 // After commit: send pending gateway legs to Razorpay
 export async function sendGatewayRefunds(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  ids = await settleDemoRefunds(ids);
   if (!ids.length) return;
   if (!razorpayConfigured()) {
     await query(`UPDATE refunds SET failure_reason = 'Payment gateway not configured; process manually' WHERE id = ANY($1)`, [ids]);

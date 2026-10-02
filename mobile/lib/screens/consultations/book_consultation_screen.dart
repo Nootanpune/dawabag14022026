@@ -10,6 +10,7 @@ import '../../utils/consult_format.dart';
 import '../../utils/formatters.dart';
 import '../doctor/widgets/doctor_card.dart';
 import 'consult_payment.dart';
+import '../../widgets/payments/demo_payment_sheet.dart';
 import 'widgets/booking_fields.dart';
 
 /// /consultations/book?doctorId&slotId&date&start — mode, chief complaint
@@ -57,6 +58,7 @@ class _BookConsultationScreenState extends ConsumerState<BookConsultationScreen>
       onBusy: (busy) {
         if (mounted) setState(() => _busy = busy);
       },
+      chooseDemo: () => showDemoPaymentSheet(context, amountLabel: 'the fee'),
     );
   }
 

@@ -4,14 +4,14 @@ import { API } from '../support/data';
 
 test('home page searches the catalogue', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('searchbox', { name: 'Search medicines' }).fill('E2E Paracetamol');
+  await page.getByRole('combobox', { name: 'Search medicines' }).fill('E2E Paracetamol');
   await expect(page.getByText('E2E Paracetamol 500').first()).toBeVisible();
   await expectNoBrowserStorage(page);
 });
 
 test('home search forgives a misspelt generic name', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('searchbox', { name: 'Search medicines' }).fill('E2E Paracetmol');
+  await page.getByRole('combobox', { name: 'Search medicines' }).fill('E2E Paracetmol');
   await expect(page.getByText('E2E Paracetamol 500').first()).toBeVisible();
 });
 
@@ -33,8 +33,8 @@ test('a search with no results says so and offers the prescription upload', asyn
 
 test('pressing Enter in the home search opens the full results page', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('searchbox', { name: 'Search medicines' }).fill('E2E Paracetamol');
-  await page.getByRole('searchbox', { name: 'Search medicines' }).press('Enter');
+  await page.getByRole('combobox', { name: 'Search medicines' }).fill('E2E Paracetamol');
+  await page.getByRole('combobox', { name: 'Search medicines' }).press('Enter');
   await expect(page).toHaveURL(/\/search\?q=E2E\+Paracetamol/);
   await expect(page.getByText('E2E Paracetamol 500').first()).toBeVisible();
 });
@@ -42,7 +42,7 @@ test('pressing Enter in the home search opens the full results page', async ({ p
 test('home page shows the free-delivery amount the server sets, and nothing when it is off', async ({ page, request }) => {
   const offer = (await (await request.get(`${API}/delivery/offer`)).json()).data.free_delivery_above_paise;
   await page.goto('/');
-  await expect(page.getByRole('searchbox', { name: 'Search medicines' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Search medicines' })).toBeVisible();
   const note = page.getByTestId('free-delivery-note');
   if (typeof offer === 'number') {
     const rupees = (offer / 100).toLocaleString('en-IN', { minimumFractionDigits: offer % 100 ? 2 : 0, maximumFractionDigits: 2 });

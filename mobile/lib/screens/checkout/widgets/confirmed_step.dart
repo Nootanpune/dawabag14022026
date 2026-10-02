@@ -10,7 +10,10 @@ class ConfirmedStep extends StatelessWidget {
   /// shipment); empty when the API sent none.
   final List<Map<String, dynamic>> shipments;
 
-  const ConfirmedStep({super.key, required this.orderNumber, this.shipments = const []});
+  /// Paid with the trial's demo payment (no money moved)
+  final bool demo;
+
+  const ConfirmedStep({super.key, required this.orderNumber, this.shipments = const [], this.demo = false});
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +30,13 @@ class ConfirmedStep extends StatelessWidget {
         const Text('Order confirmed!',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
+        if (demo)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: const Color(0xFFFFF8E6), borderRadius: BorderRadius.circular(20)),
+            child: const Text('Demo payment — no money moved', style: TextStyle(fontSize: 12, color: Color(0xFF7A4B00))),
+          ),
         Text('Order ID: $orderNumber',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
         const SizedBox(height: 8),

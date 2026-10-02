@@ -1,0 +1,52 @@
+import 'api_service.dart';
+import 'api_utils.dart';
+
+/// How the server takes payment (Sprint 26): 'razorpay' (keys set), 'demo' (the
+/// owner's trial server without keys — no money moves) or 'unavailable'.
+class PaymentOptions {
+  final String mode;
+  final List<String> methods;
+  const PaymentOptions({this.mode = 'unavailable', this.methods = const []});
+
+  bool get isRazorpay => mode == 'razorpay';
+  bool get isDemo => mode == 'demo';
+
+  factory PaymentOptions.fromJson(Map<String, dynamic> j) => PaymentOptions(
+        mode: j['mode']?.toString() ?? 'unavailable',
+        methods: (j['methods'] is List) ? (j['methods'] as List).map((e) => e.toString()).toList() : const [],
+      );
+}
+
+/// Plain names for the ways to pay.
+const paymentMethodLabels = {
+  'upi': ('UPI', 'Google Pay, PhonePe, Paytm, BHIM'),
+  'card': ('Card', 'Debit or credit card'),
+  'netbanking': ('Netbanking', 'All major banks'),
+  'wallet': ('Wallet', 'Paytm, Mobikwik and others'),
+};
+
+extension PaymentApi on ApiService {
+  /// GET /payments/options. Failures read as "not available".
+  Future<PaymentOptions> getPaymentOptions() async {
+    try {
+      final res = await dio.get('/payments/options');
+      return PaymentOptions.fromJson(apiData(res));
+    } catch (_) {
+      return const PaymentOptions();
+    }
+  }
+
+  /// POST /payments/demo — trial only; the server records it through the same
+  /// path as a captured Razorpay payment. Returns whether it was paid.
+  Future<bool> payOrderDemo(String orderId, {required String method, bool fail = false}) async {
+    final res = await dio.post('/payments/demo', data: {'order_id': orderId, 'method': method, 'outcome': fail ? 'failure' : 'success'});
+    return apiData(res)['paid'] == true;
+  }
+
+  /// POST /consultations/:id/pay/demo — trial only.
+  Future<bool> payConsultationDemo(String consultationId, {required String method, bool fail = false}) async {
+    final res = await dio.post('/consultations/${Uri.encodeComponent(consultationId)}/pay/demo',
+        data: {'method': method, 'outcome': fail ? 'failure' : 'success'});
+    return apiData(res)['paid'] == true;
+  }
+}

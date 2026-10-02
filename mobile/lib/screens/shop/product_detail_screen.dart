@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../config/theme.dart';
-import '../../providers/cart_actions.dart';
 import '../../services/api_service.dart';
 import '../../widgets/error_retry_view.dart';
 import '../../widgets/product_image.dart';
 import 'widgets/product_badges.dart';
+import 'widgets/product_buy_bar.dart';
 import 'widgets/product_declarations.dart';
 import 'widgets/product_price.dart';
 
@@ -18,7 +17,6 @@ final productDetailProvider = FutureProvider.family<Map<String, dynamic>, String
 });
 
 const _rxSchedules = ['Schedule H', 'Schedule H1'];
-const _notOnline = ['NDPS', 'Schedule X'];
 
 class ProductDetailScreen extends ConsumerWidget {
   final String productId;
@@ -39,7 +37,7 @@ class ProductDetailScreen extends ConsumerWidget {
         data: (product) => _Body(product: product),
       ),
       bottomNavigationBar: productAsync.maybeWhen(
-        data: (product) => _AddToCartBar(product: product),
+        data: (product) => ProductBuyBar(product: product),
         orElse: () => const SizedBox.shrink(),
       ),
     );
@@ -119,38 +117,12 @@ class _RxNotice extends StatelessWidget {
           SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Prescription required. Upload a photo of a valid prescription at checkout; '
+              'Needs a doctor’s prescription. Choose or upload it at checkout; '
               'our pharmacist checks it before dispatch.',
               style: TextStyle(fontSize: 12, color: AppTheme.amberText),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _AddToCartBar extends ConsumerWidget {
-  final Map<String, dynamic> product;
-  const _AddToCartBar({required this.product});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cannotOrder = product['cannot_order_online'] == true || _notOnline.contains(product['drug_schedule']);
-    final inStock = product['in_stock'] == true;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: ElevatedButton.icon(
-          onPressed: cannotOrder || !inStock
-              ? null
-              : () async {
-                  final added = await addProductToCart(context, ref, product);
-                  if (added && context.mounted) context.push('/cart');
-                },
-          icon: const Icon(Icons.shopping_cart),
-          label: Text(cannotOrder ? 'Not available online' : !inStock ? 'Out of stock' : 'Add to cart'),
-        ),
       ),
     );
   }

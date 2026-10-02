@@ -1,23 +1,28 @@
 'use client';
 import type { ReactNode } from 'react';
-import { Trash2, Plus, Minus, AlertTriangle, Snowflake } from 'lucide-react';
+import { Trash2, AlertTriangle, Snowflake } from 'lucide-react';
 import { formatPrice, cn } from '@/lib/utils';
 import type { CartLine } from '@/lib/cart';
 import { scheduleBadge } from '@/lib/drugSchedule';
 import ProductImage from '@/components/shop/ProductImage';
+import { quantityLimits } from '@/lib/shop/quantity';
+import QuantityStepper from './QuantityStepper';
 
 interface Props {
   line: CartLine;
   disabled?: boolean;
+  /** this line is being changed */
+  busy?: boolean;
   onQuantityChange: (quantity: number) => void;
   /** e.g. a cheaper option with the same medicine (Sprint 25) */
   suggestion?: ReactNode;
 }
 
 /** One cart line exactly as the server priced it. */
-export default function CartLineItem({ line, disabled, onQuantityChange, suggestion }: Props) {
+export default function CartLineItem({ line, disabled, busy, onQuantityChange, suggestion }: Props) {
   const isRx = ['Schedule H', 'Schedule H1'].includes(line.drug_schedule);
-  const minQty = Math.max(1, line.min_qty || 1);
+  // The buyer's own limits from the server cart line (buyer type, stock)
+  const limits = quantityLimits({}, line);
 
   return (
     <div className={cn('card flex gap-4', !line.available && 'border-red-200 bg-red-50/40')}>
@@ -49,27 +54,21 @@ export default function CartLineItem({ line, disabled, onQuantityChange, suggest
         )}
 
         <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center gap-2 border border-gray-200 rounded-lg overflow-hidden">
-            <button
-              onClick={() => onQuantityChange(line.quantity <= minQty ? 0 : line.quantity - 1)}
-              disabled={disabled}
-              className="p-1.5 hover:bg-gray-100 text-gray-600 disabled:opacity-30"
-              aria-label={`Decrease quantity of ${line.name}`}
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-            <span className="text-sm font-medium w-6 text-center" aria-label={`Quantity ${line.quantity}`} aria-live="polite">{line.quantity}</span>
-            <button
-              onClick={() => onQuantityChange(line.quantity + 1)}
-              disabled={disabled || line.quantity >= line.max_qty}
-              className="p-1.5 hover:bg-gray-100 text-gray-600 disabled:opacity-30"
-              aria-label={`Increase quantity of ${line.name}`}
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <QuantityStepper
+            name={line.name}
+            quantity={line.quantity}
+            min={limits.min}
+            max={limits.max}
+            busy={busy}
+            disabled={disabled}
+            size="sm"
+            onDecrease={() => onQuantityChange(line.quantity <= limits.min ? 0 : line.quantity - 1)}
+            onIncrease={() => onQuantityChange(line.quantity + 1)}
+          />
           <span className="font-semibold text-brand-600">{formatPrice(line.line_subtotal_paise)}</span>
         </div>
+        {line.available && line.quantity >= limits.max && <p className="text-xs text-gray-600 mt-1">{limits.maxMessage}</p>}
+        {limits.minMessage && <p className="text-xs text-gray-600 mt-1">{limits.minMessage}</p>}
         {suggestion}
       </div>
       <button

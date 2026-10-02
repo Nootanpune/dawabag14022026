@@ -10,6 +10,7 @@ import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
 import { getRazorpay, validCheckoutSignature } from '../razorpay.client';
 import { applyCapture } from '../payments/capture.service';
+import { isDemoPaymentId } from '../payments/paymentMode';
 
 export async function startPayment(userId: string, id: string) {
   return withTransaction(async (client) => {
@@ -48,6 +49,11 @@ export async function confirmPayment(userId: string, id: string, p: { razorpay_o
 export async function refundConsultationFee(id: string): Promise<{ id: string; amount_paise: number } | null> {
   const c = await queryOne<any>(`SELECT id, fee_paise, gateway_payment_id, payment_status FROM consultations WHERE id = $1`, [id]);
   if (!c || c.payment_status !== 'refund_pending' || !c.gateway_payment_id) return null;
+  // A trial's demo payment took no money: nothing to send to Razorpay (Sprint 26)
+  if (isDemoPaymentId(c.gateway_payment_id)) {
+    await markConsultationRefunded(id, `demo_refund_${String(id).slice(0, 8)}`, c.fee_paise);
+    return { id: `demo_refund_${String(id).slice(0, 8)}`, amount_paise: c.fee_paise };
+  }
   try {
     const rzp: any = getRazorpay();
     const earlier = await rzp.payments.fetchMultipleRefund(c.gateway_payment_id).catch(() => ({ items: [] }));

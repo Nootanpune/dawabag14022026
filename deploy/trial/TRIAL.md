@@ -87,6 +87,14 @@ next deploy (the database keeps the password it was created with).
 
 ### Razorpay test keys (so checkout and consultation fees can be paid with test money)
 
+*Optional.* Until these keys are added, the trial shows a **demo payment** instead:
+"Demo payment — no money moves", with UPI / Card / Netbanking / Wallet tiles and the
+buttons **Pay (demo)** and **Simulate failure**. Pay (demo) marks the order paid exactly as
+a real payment would (pharmacist check, packing, invoice), and it is recorded as a demo
+payment. To hide it, add `DEMO_PAYMENTS=false` to `TRIAL_ENV`. A real (production) server
+refuses this setting and never offers the demo. Once the keys below are added, "Pay
+securely" opens Razorpay's own payment window instead.
+
 1. Log in at **dashboard.razorpay.com**. Switch the toggle at the top to **Test Mode**.
 2. **Account & Settings** → **API Keys** → **Generate Test Key**. Copy the
    **Key Id** (starts with `rzp_test_`) and the **Key Secret** (shown once).
@@ -176,7 +184,7 @@ The artifact is kept for 14 days; run the workflow again for a fresh one.
 
 | Works | Does not work (on purpose) |
 | --- | --- |
-| Website and Android app over HTTPS, every role's screens | **Real money**: only Razorpay test payments. Without the three Razorpay lines, checkout and consultation booking stop at the payment step with "Online payments are not configured" |
+| Website and Android app over HTTPS, every role's screens | **Real money**: only Razorpay test payments. Without the three Razorpay lines, checkout and consultation fees use the labelled **demo payment** (no money moves) |
 | Catalogue, search, cart, delivery charge, prescriptions (upload, pharmacist check), packing, dispatch to the demo rider, partner orders, doctor slots and e-prescriptions | **SMS / OTP**: no SMS provider (MSG91) is connected, so **new sign-ups and OTP logins do not work** — use the demo logins (password sign-in) |
 | Files (product photos, prescriptions, KYC documents) stored in the server's own encrypted file store, opened by short-lived signed links | **E-mail, push notifications, courier booking, GST e-invoicing, video calls**: not connected; the screens show them as unavailable |
 | Nightly encrypted database backup into the same file store | **Legal details are placeholders** ("DEMO — not a real licence"); prices, GST rates and schedules are demo values |

@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Search, X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTypeahead } from '@/hooks/useTypeahead';
-import { useAddToCart } from '@/hooks/useCart';
 import { SEARCH_PLACEHOLDER, TYPEAHEAD_MIN_CHARS } from '@/lib/search/api';
 import { searchHref } from '@/lib/search/searchUrl';
 import TypeaheadOption from './TypeaheadOption';
@@ -21,6 +20,8 @@ interface Props {
   className?: string;
   /** Enter with nothing highlighted, or "See all results"; defaults to the results page */
   onSubmitQuery?: (q: string) => void;
+  /** On a phone, scroll the box to the top when focused so the suggestions fit on screen */
+  scrollOnFocus?: boolean;
 }
 
 /**
@@ -28,7 +29,7 @@ interface Props {
  * + listbox): ↑/↓ move, Enter opens the highlighted medicine or all results, Esc
  * closes. In-stock items have a quick "Add" that updates the server cart.
  */
-export default function SearchCombobox({ id, label, placeholder = SEARCH_PLACEHOLDER, initialQuery = '', size = 'md', className, onSubmitQuery }: Props) {
+export default function SearchCombobox({ id, label, placeholder = SEARCH_PLACEHOLDER, initialQuery = '', size = 'md', className, onSubmitQuery, scrollOnFocus }: Props) {
   const router = useRouter();
   const listId = `${id}-list`;
   const statusId = useId();
@@ -37,7 +38,6 @@ export default function SearchCombobox({ id, label, placeholder = SEARCH_PLACEHO
   const [active, setActive] = useState(-1);
   const boxRef = useRef<HTMLDivElement>(null);
   const { products, total, isFetching, settled, enabled } = useTypeahead(query);
-  const { addToCart, isPending, pendingProductId } = useAddToCart();
 
   useEffect(() => setQuery(initialQuery), [initialQuery]);
   const resultKey = products.map((p) => p.id).join(',');
@@ -102,13 +102,16 @@ export default function SearchCombobox({ id, label, placeholder = SEARCH_PLACEHO
           aria-describedby={statusId}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onFocus={(e) => {
+            setOpen(true);
+            if (scrollOnFocus && window.matchMedia('(max-width: 767px)').matches) e.currentTarget.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          }}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           autoComplete="off"
           enterKeyHint="search"
           className={cn(
-            'w-full rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-400',
+            'w-full scroll-mt-20 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-brand-400',
             size === 'lg' ? 'pl-12 pr-11 py-3.5 text-base shadow-sm' : 'pl-9 pr-9 py-2 text-sm',
           )}
         />
@@ -131,7 +134,7 @@ export default function SearchCombobox({ id, label, placeholder = SEARCH_PLACEHO
         role="listbox"
         aria-label={`Suggestions for ${trimmed || 'your search'}`}
         hidden={!showList}
-        className="absolute z-50 left-0 right-0 mt-1 max-h-[70vh] overflow-auto rounded-xl border border-gray-200 bg-white shadow-lg py-1"
+        className="absolute z-50 left-0 right-0 lg:min-w-[30rem] mt-1 max-h-[70vh] overflow-auto rounded-xl border border-gray-200 bg-white shadow-lg py-1"
       >
         {showList && products.map((p, i) => (
           <TypeaheadOption
@@ -139,10 +142,8 @@ export default function SearchCombobox({ id, label, placeholder = SEARCH_PLACEHO
             id={optionId(i)}
             product={p}
             active={active === i}
-            adding={isPending && pendingProductId === p.id}
             onHover={() => setActive(i)}
             onOpen={() => openProduct(p.id)}
-            onAdd={() => addToCart(p.id, p.name)}
           />
         ))}
         {showList && settled && !products.length && (

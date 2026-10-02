@@ -60,6 +60,7 @@ export default function CartPage() {
                 key={line.product_id}
                 line={line}
                 disabled={busy}
+                busy={setQuantity.isPending && setQuantity.variables?.productId === line.product_id}
                 onQuantityChange={(quantity) => setQuantity.mutate({ productId: line.product_id, quantity })}
                 suggestion={option && (
                   <CheaperOptionNote

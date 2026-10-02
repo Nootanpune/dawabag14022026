@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { bookConsultation, teleKeys } from '@/lib/telemedicine/api';
 import { payConsultation } from '@/lib/telemedicine/razorpay';
+import { usePaymentOptions } from '@/hooks/usePaymentOptions';
 import { MODE_LABELS, MODES, TPG_CONSENT_TEXT } from '@/lib/telemedicine/labels';
 import type { ConsultMode, Doctor } from '@/lib/telemedicine/types';
 import { getApiErrorLines, getApiErrorMessage } from '@/lib/apiErrors';
@@ -30,6 +31,7 @@ export default function BookingForm({ doctor }: { doctor: Doctor }) {
   const [complaint, setComplaint] = useState('');
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const { data: payOptions } = usePaymentOptions();
 
   const book = useMutation({
     mutationFn: () =>
@@ -37,13 +39,16 @@ export default function BookingForm({ doctor }: { doctor: Doctor }) {
     onSuccess: async (b) => {
       queryClient.invalidateQueries({ queryKey: teleKeys.all });
       toast.success('Consultation booked');
-      if (b.payment_status === 'unpaid') {
+      // Razorpay opens here; a trial's demo payment (or none) is on My consultations (Sprint 26)
+      if (b.payment_status === 'unpaid' && payOptions?.mode !== 'razorpay') {
+        toast.message('Now pay the fee from My consultations.');
+      } else if (b.payment_status === 'unpaid') {
         try {
           const paid = await payConsultation(b.id, `Consultation with Dr ${doctor.full_name}`);
           if (paid) toast.success('Fee paid');
           else toast.message('You can pay from My consultations before the slot.');
         } catch (err) {
-          toast.error(getApiErrorMessage(err, 'Payment could not be completed. You can pay from My consultations.'));
+          toast.error(err instanceof Error && !(err as any).response ? `${err.message} You can pay from My consultations.` : getApiErrorMessage(err, 'Payment could not be completed. You can pay from My consultations.'));
         }
       }
       router.push('/account/consultations');

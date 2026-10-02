@@ -6,6 +6,7 @@ import '../../../providers/cart_actions.dart';
 import '../../../services/api_service.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/error_retry_view.dart';
+import '../../../widgets/cart_quantity_control.dart';
 import '../../../widgets/product_card.dart';
 
 // Fixed tile height (not an aspect ratio) so two-line names, the maker and
@@ -50,6 +51,7 @@ class ProductGrid extends ConsumerWidget {
               (context, i) => ProductCard(
                 product: list[i],
                 onAddToCart: (product) => addProductToCart(context, ref, product),
+                cartControl: CartQuantityControl(product: list[i]),
                 onTap: () => context.push('/shop/${list[i]['id']}'),
               ),
               childCount: list.length,

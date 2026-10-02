@@ -2,6 +2,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../services/api_service.dart';
 import '../../services/checkout_api.dart';
+import '../../utils/ist.dart';
 
 /// The prescription chosen for an Rx order: a new photo, uploaded straight
 /// to the server's object store and never kept by the app (C-41), or one of
@@ -13,6 +14,20 @@ class CheckoutPrescription {
   List<Map<String, dynamic>> saved = const [];
 
   bool get hasChoice => file != null || savedId != null;
+
+  /// For the payment step: "photo uploaded 02 Oct 2026, 9:56 am" (Sprint 26).
+  String? get label {
+    if (file != null) return 'new photo, sent with this order';
+    final id = savedId;
+    if (id == null) return null;
+    for (final rx in saved) {
+      if (rx['id']?.toString() == id) {
+        final kind = rx['doctor_name'] != null ? 'from Dr ${rx['doctor_name']}' : rx['file_type'] == 'pdf' ? 'PDF' : 'photo';
+        return '$kind uploaded ${formatDateTimeIst(rx['created_at'])}';
+      }
+    }
+    return 'chosen';
+  }
 
   /// GET /prescriptions/my (verified and still valid only). Failures leave
   /// the list empty; the buyer can still upload a photo.

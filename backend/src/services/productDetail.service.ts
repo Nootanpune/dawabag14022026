@@ -9,6 +9,7 @@ import { AppError } from '../utils/AppError';
 import { BuyerType, priceField } from '../utils/customerType';
 import { partnerNearestExpirySql, partnerStockSql } from './stock/partnerStock';
 import { imageUrlFor } from './productImage.service';
+import { qtyLimits } from './cart.service';
 
 const PUBLIC_FIELDS = ['id', 'name', 'generic_name', 'sku', 'category', 'drug_schedule', 'hsn_code', 'gst_rate',
   'marketed_by', 'composition', 'storage_instructions', 'cold_chain', 'mrp_paise', 's3_image_key',
@@ -49,6 +50,9 @@ export async function productDetail(productId: string, pricingType: BuyerType) {
     nearest_expiry: row.nearest_expiry,
     discount_pct: row.mrp_paise ? Math.round(((row.mrp_paise - price) / row.mrp_paise) * 100) : 0,
     requires_prescription: ['Schedule H', 'Schedule H1'].includes(row.drug_schedule),
+    // This buyer's own order limits, as the cart applies them (Sprint 26: quantity before Add)
+    min_order_qty: qtyLimits(pricingType, row).min,
+    max_order_qty: qtyLimits(pricingType, row).max,
     cannot_order_online: ['NDPS', 'Schedule X'].includes(row.drug_schedule),
   };
 }

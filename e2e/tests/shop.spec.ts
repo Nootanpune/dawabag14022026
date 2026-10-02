@@ -75,8 +75,11 @@ test('signed out, the prescriptions page asks to sign in and comes back after', 
 test('a prescription is uploaded on its own, listed, and then offered in the cart', async ({ page }) => {
   test.skip(!process.env.S3_ENDPOINT, 'no object store for this run (set S3_ENDPOINT and AWS_S3_BUCKET as in e2e/README.md)');
   await signIn(page, 'buyer');
+  // Counted from the server: another test may have uploaded one already (the list loads after the page)
+  const token = (await call('POST', '/auth/login', { mobile: people.buyer.mobile, password: people.buyer.password })).json.data?.access_token;
+  const before = ((await call('GET', '/prescriptions/my', undefined, token)).json.data ?? []).length;
   await page.goto('/prescriptions');
-  const before = await page.getByTestId('prescription-row').count();
+  await expect(page.getByTestId('prescription-row')).toHaveCount(before);
   await Promise.all([
     page.waitForResponse((r) => r.url().endsWith('/prescriptions/upload') && r.status() === 201),
     page.getByLabel('Prescription file').setInputFiles({ name: 'prescription.png', mimeType: 'image/png',

@@ -9,6 +9,7 @@ import '../../utils/consult_format.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/error_retry_view.dart';
 import 'consult_payment.dart';
+import '../../widgets/payments/demo_payment_sheet.dart';
 import 'widgets/cancel_consultation_dialog.dart';
 import 'widgets/consultation_card.dart';
 
@@ -41,6 +42,7 @@ class _MyConsultationsScreenState extends ConsumerState<MyConsultationsScreen> {
       onBusy: (busy) {
         if (mounted) setState(() => _busy = busy);
       },
+      chooseDemo: () => showDemoPaymentSheet(context, amountLabel: 'the fee'),
     );
     Future.microtask(_reload);
   }

@@ -2,8 +2,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import SessionBootstrap from '@/components/auth/SessionBootstrap';
+import { useTrackPages } from '@/lib/layout/navHistory';
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  useTrackPages();   // for the header's Back arrow (memory only)
   const [queryClient] = useState(
     () =>
       new QueryClient({

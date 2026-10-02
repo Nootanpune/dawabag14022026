@@ -14,9 +14,9 @@ import { retryPendingConsultationRefunds } from '../telemedicine/consultationFee
 export async function runPaymentSweep(): Promise<Record<string, unknown>> {
   if (!razorpayConfigured()) return { skipped: 'Razorpay not configured' };
   const open = await query<{ gateway_order_id: string }>(
-    `SELECT gateway_order_id FROM payments WHERE status IN ('created', 'failed') AND gateway_order_id IS NOT NULL
+    `SELECT gateway_order_id FROM payments WHERE status IN ('created', 'failed') AND gateway_order_id IS NOT NULL AND gateway <> 'demo'
        AND created_at BETWEEN NOW() - INTERVAL '3 days' AND NOW() - INTERVAL '10 minutes'
-     UNION SELECT gateway_order_id FROM consultations WHERE payment_status = 'unpaid' AND gateway_order_id IS NOT NULL
+     UNION SELECT gateway_order_id FROM consultations WHERE payment_status = 'unpaid' AND gateway_order_id IS NOT NULL AND gateway_order_id NOT LIKE 'demo\_%'
        AND status = 'booked' AND created_at BETWEEN NOW() - INTERVAL '3 days' AND NOW() - INTERVAL '10 minutes'
      LIMIT 200`);
   let recorded = 0;
