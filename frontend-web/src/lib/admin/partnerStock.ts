@@ -17,9 +17,11 @@ export interface ProductRequest {
   gst_rate: string | number | null;
   mrp_paise: number | null;
   ptr_paise: number | null;
-  status: 'open' | 'linked' | 'rejected';
+  status: 'open' | 'drafted' | 'linked' | 'rejected';
   product_id: string | null;
   product_name: string | null;
+  /** Sprint 29: 'draft' while the pharmacist completes the product created for it */
+  product_state: 'live' | 'draft' | 'not_listed' | 'rejected' | null;
   requested_at: string;
   resolution_note: string | null;
 }

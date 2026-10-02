@@ -10,6 +10,54 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 29 — draft products from partner requests (2026-10-02, uncommitted)
+The first real partner file (MediVision) has ~329 items not in the catalogue; creating each by
+hand was too slow. Now: requests → admin "Create drafts" → pharmacist completes → partner
+re-check / re-upload → Apply.
+- DB `24_sprint29_catalogue_drafts.sql`: `products.catalogue_state` live | draft | not_listed |
+  rejected; CHECK `products_active_only_live` (NOT is_active OR live) — a draft or a Schedule
+  X/NDPS approval can never be active (C-10); drug_schedule / category / gst_rate now NULLable
+  but only while draft/rejected (CHECK `products_decided_unless_draft`); new `strength`,
+  `dosage_form`. `catalogue_drafts` (product_id PK, from_file JSONB incl. every grouped request,
+  cold_chain_decided, status open/approved/not_listed/rejected, decided_by/at/note).
+  partner_product_requests status + 'drafted'; unique open index now covers open+drafted.
+- `services/catalogueDrafts/`: rules (pure: approvalProblems, prescriptionFor via
+  requiresPrescription, suggestedDescription "generic strength form. Pack: …", draftWarnings
+  HSN-30 vs 18/28 % and claims, HSN 4/6/8 digits, GST 0/5/12/18/28), dedupe (pure:
+  requestKey = Sprint 27 rowTokens tokenKey + pack + company; groups a batch; links to ONE
+  active product or earlier draft with same words+strength, same pack (both known or both
+  blank) and companies agreeing; >1 fit, X/NDPS fit or no MRP → skipped for a person),
+  create.service (one txn, FOR UPDATE of open requests, draft = name/pack/company code
+  (marketed_by)/GST if a slab/MRP (offer = MRP), SKU NEW-xxxxxxxxxx, partner_item_links →
+  draft (source admin), request 'drafted'; active match → 'linked'; audit
+  catalogue_drafts_created), queue.service (list with filters company / needs_schedule /
+  cold_chain / q, progress done-of-total, companies; save-as-you-go with per-save audit
+  catalogue_draft_saved; bulk-set ONLY category/HSN/manufacturer name+address/country),
+  decide.service (approve: live + active + `reviewContentTx` = the same C-19 code path as
+  the Product copy queue (now split out of reviewContent; refuses drafts); flagged copy needs
+  the pharmacist's own ≥20-char note; requests → linked; X/NDPS → not_listed, requests
+  rejected "never sold online (C-10)", links deleted; reject → soft delete, requests rejected
+  with reason, links deleted; all audited).
+- API `/catalogue-drafts` (GET list, GET options, GET/PATCH :id, POST bulk, POST :id/reject —
+  pharmacist_rx/admin/super_admin; POST :id/approve — pharmacist_rx only, as C-19 copy review);
+  POST `/admin/partner-product-requests/drafts` {request_ids}|{all_open} (admins).
+  Guards: PATCH /products is_active on non-live → 409; contentQueue skips drafts; e-prescription
+  refuses drafts; partner import shows "Dawabag is adding this product" for draft-linked items;
+  resolveProductRequest to a draft → 'drafted'. Every customer path already reads is_active
+  (verified by `visibility.test.ts`, which scans buyer/partner product queries).
+- Web: admin Partner stock files → requests with checkboxes, "Create drafts (n)" / "Create drafts
+  for all open requests", result dialog (`DraftsCreatedDialog`), tab "Drafts being completed";
+  staff `/staff/new-products` "New products to complete" (menu under Catalogue & stock,
+  PHARMACIST_ROLES): progress bar "x of y done", To complete / Done tabs, filters, one card-row
+  per product (from-file panel read-only + fields saved on blur/Enter/change), "Still needed"
+  list, Approve (pharmacist only) / Approve as never sold online / Not a medicine we list,
+  "Set for all chosen" bar. `components/staff/newProducts/*`, `lib/admin/catalogueDrafts.ts`.
+- Tests: jest catalogueDrafts rules/dedupe/visibility (56); `test/sprint29.smoke.mjs` (62
+  checks, in test:smoke); e2e `partnerDrafts.spec.ts` (desktop + phone, serial).
+- Not built: drafts for requests without MRP; editing prices (offer = MRP until an admin
+  changes it in Products); pharmacist reg-no requirement for approval (C-19 path has none);
+  mobile app screens; telemedicine list for approved drafts is set only for OTC (trigger).
+
 ## Sprint 28 — admin onboards partners (2026-10-02, uncommitted)
 Owner wants Nootan Pharmaceuticals, Pune as the first real partner on trial.dawabag.com, but
 partner self-registration needs an SMS OTP (no SMS on the trial). So the admin adds partners.

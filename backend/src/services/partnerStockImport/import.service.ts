@@ -238,7 +238,7 @@ export async function requestNewProducts(id: string, partnerId: string, userId: 
         `INSERT INTO partner_product_requests (partner_id, import_id, item_key, item_name, pack, manufacturer, item_code, hsn_code,
            gst_rate, mrp_paise, ptr_paise, requested_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         ON CONFLICT (partner_id, item_key) WHERE status = 'open' DO NOTHING RETURNING id`,
+         ON CONFLICT (partner_id, item_key) WHERE status IN ('open', 'drafted') DO NOTHING RETURNING id`,
         [partnerId, id, key, String(p.item_name ?? '').slice(0, 500), p.pack?.slice(0, 100) ?? null, p.manufacturer?.slice(0, 255) ?? null,
          p.item_code?.slice(0, 100) ?? null, p.hsn?.slice(0, 20) ?? null, p.gst_rate ?? null, p.mrp_paise ?? null, p.ptr_paise ?? null, userId]);
       created += ins.rowCount ?? 0;
@@ -261,9 +261,12 @@ export async function cancelImport(id: string, partnerId: string, userId: string
 }
 
 // ── Admin: new-product requests ─────────────────────────────────────────────
-export async function listProductRequests(status: 'open' | 'linked' | 'rejected' = 'open') {
+export const REQUEST_STATUSES = ['open', 'drafted', 'linked', 'rejected'] as const;
+export type RequestStatus = typeof REQUEST_STATUSES[number];
+
+export async function listProductRequests(status: RequestStatus = 'open') {
   return query(
-    `SELECT r.*, v.name AS partner_name, p.name AS product_name FROM partner_product_requests r
+    `SELECT r.*, v.name AS partner_name, p.name AS product_name, p.catalogue_state AS product_state FROM partner_product_requests r
      JOIN vendors v ON v.id = r.partner_id LEFT JOIN products p ON p.id = r.product_id
      WHERE r.status = $1 ORDER BY r.requested_at ASC LIMIT 500`, [status]);
 }
@@ -275,16 +278,17 @@ export async function resolveProductRequest(id: string, adminId: string, input: 
     if (!r) throw new AppError('Request not found', 404);
     if (r.status !== 'open') throw new AppError('This request is already closed', 409);
     if (input.product_id) {
-      const p = (await c.query<any>('SELECT id, name, drug_schedule FROM products WHERE id = $1 AND deleted_at IS NULL', [input.product_id])).rows[0];
+      const p = (await c.query<any>('SELECT id, name, drug_schedule, catalogue_state FROM products WHERE id = $1 AND deleted_at IS NULL', [input.product_id])).rows[0];
       if (!p) throw new AppError('Product not found', 404);
-      if (NEVER_ONLINE.includes(p.drug_schedule)) throw new AppError(`${p.name} can never be sold online (C-10)`, 403);
+      if (NEVER_ONLINE.includes(p.drug_schedule) || p.catalogue_state === 'not_listed') throw new AppError(`${p.name} can never be sold online (C-10)`, 403);
       await c.query(
         `INSERT INTO partner_item_links (partner_id, item_key, product_id, item_label, source, created_by)
          VALUES ($1, $2, $3, $4, 'admin', $5)
          ON CONFLICT (partner_id, item_key) DO UPDATE SET product_id = EXCLUDED.product_id, source = 'admin', updated_at = NOW()`,
         [r.partner_id, r.item_key, p.id, r.item_name, adminId]);
-      await c.query(`UPDATE partner_product_requests SET status = 'linked', product_id = $2, resolved_by = $3, resolved_at = NOW() WHERE id = $1`,
-        [id, p.id, adminId]);
+      // Linked to a draft (Sprint 29): 'drafted' until the pharmacist approves it
+      await c.query(`UPDATE partner_product_requests SET status = $4, product_id = $2, resolved_by = $3, resolved_at = NOW() WHERE id = $1`,
+        [id, p.id, adminId, p.catalogue_state === 'draft' ? 'drafted' : 'linked']);
     } else {
       if (!input.reject_reason?.trim()) throw new AppError('Give a reason, or choose the product to link', 400);
       await c.query(`UPDATE partner_product_requests SET status = 'rejected', resolution_note = $2, resolved_by = $3, resolved_at = NOW() WHERE id = $1`,
@@ -292,6 +296,7 @@ export async function resolveProductRequest(id: string, adminId: string, input: 
     }
     await writeAuditTx(c, { userId: null, action: input.product_id ? 'partner_product_request_linked' : 'partner_product_request_rejected',
       performedBy: adminId, newValue: { request_id: id, vendor_id: r.partner_id, product_id: input.product_id ?? null }, notes: input.reject_reason ?? null });
-    return { status: input.product_id ? 'linked' : 'rejected' };
+    const done = (await c.query<{ status: string }>('SELECT status FROM partner_product_requests WHERE id = $1', [id])).rows[0];
+    return { status: done.status };
   });
 }

@@ -62,6 +62,8 @@ export async function cleanup(c: Client) {
     [vendors.flatMap((v) => [`P:${v.id}`, ...(v.invoice_prefix ? [`CN:${v.invoice_prefix}-CN`] : [])])]);
   await removeRows(c, 'vendors', vendors.map((v) => v.id));
   await removeRows(c, 'users', ids);
+  // Sprint 29: draft products made from the journeys' partner requests (named 'E2E …')
+  products.push(...(await c.query(`SELECT product_id::text AS id FROM catalogue_drafts WHERE from_file->>'item_name' LIKE 'E2E %'`)).rows.map((r) => r.id));
   await c.query(`DELETE FROM audit_logs WHERE new_value->>'product_id' = ANY($1::text[])`, [products]);
   await removeRows(c, 'products', products);
   await c.query('DELETE FROM pincode_serviceability WHERE pincode = $1', [PIN]);

@@ -196,6 +196,12 @@ export async function updateProduct(req: Request, res: Response, next: NextFunct
 
     const before = await queryOne<Record<string, any>>('SELECT * FROM products WHERE id = $1', [productId]);
     if (!before) throw new AppError('Product not found', 404);
+    // Drafts go live only through pharmacist approval; Schedule X / NDPS drafts never (Sprint 29, C-10, C-19)
+    if (updates.is_active === true && before.catalogue_state !== 'live') {
+      throw new AppError(before.catalogue_state === 'draft'
+        ? 'A new product goes on sale only when a pharmacist approves it in "New products to complete" (C-19)'
+        : 'This product can never be listed online (C-10)', 409);
+    }
     assertPrices({ ...before, ...updates });
     await assertBelowShelfMrp(productId, { ...before, ...updates });
 

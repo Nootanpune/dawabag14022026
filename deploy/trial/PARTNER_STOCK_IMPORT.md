@@ -1,4 +1,4 @@
-# Partner stock upload — owner guide (Sprint 27)
+# Partner stock upload — owner guide (Sprints 27–29)
 
 A partner pharmacy keeps its stock on Dawabag up to date by uploading the stock report
 from its own billing software. The first partner is **Nootan Pharmaceuticals, Pune**,
@@ -100,17 +100,45 @@ Look-alike drug names are a patient-safety risk, so matching is strict:
 Most of Nootan's items are brand names and hospital injectables that are not in the
 catalogue yet, so at first most lines will be **requests for new products**.
 
-## What Dawabag's admin does with new-product requests
+## What Dawabag does with new-product requests (Sprint 29)
 
 Admin → **Partner stock files** → **New product requests** lists each item with the
-partner's name, unit, company code, GST % and MRP.
+partner's name, unit, company code, GST % and MRP. For hundreds of items, use drafts:
 
-1. Create the product in **Products → New**: name, generic name, schedule (Schedule
-   X and NDPS can never be sold online), HSN, GST, cold chain, prices and the copy; the
-   pharmacist reviews the copy as usual.
-2. Back on **Partner stock files**, press **Link product** on the request and pick it.
-3. The partner's next upload matches that item automatically; on apply it becomes a
-   new listing for Dawabag to approve and post live.
+1. **Create drafts (admin).** Tick the requests (or **Choose all**) and press **Create
+   drafts**, or press **Create drafts for all open requests**. Each item becomes a
+   **draft product**, filled in only from the file: name, pack, company code, GST %
+   (when it is 0 / 5 / 12 / 18 / 28) and MRP. Nothing clinical is guessed. The same
+   item asked for twice (two partners, or two spellings with the same name, strength,
+   pack and company) becomes **one** draft. An item that is clearly a product already on
+   sale is linked to it at once. Items without an MRP, or that look like more than one
+   product, are listed as "left for you to handle". A draft is **not on sale**: buyers
+   cannot find it, open it or add it to a cart, and partners cannot list it.
+2. **Pharmacist completes each draft.** Menu → **New products to complete** (pharmacists
+   and admins; only a pharmacist can approve, as for any product copy). One product per
+   row: on the left what the file said; on the right the details a person must decide —
+   **drug schedule** (the page shows whether a prescription is needed), generic name,
+   strength, dosage form, **cold chain** (2–8 °C), HSN, GST, category, the product-page
+   declarations (manufacturer name and address, country) and a short **description**
+   (the page offers "generic name + strength + form + pack"; no claims). Every field is
+   saved on the server as you leave it. "Still needed" says what is missing; the counter
+   shows e.g. "37 of 329 done". Filters: company, needs schedule, cold chain.
+   - **Set for all chosen** fills category, HSN, manufacturer name/address or country on
+     many rows at once. The schedule is never set in bulk.
+   - **Approve** puts the product in the catalogue (copy approved, audited).
+   - Schedule **X** or **NDPS**: **Approve as never sold online** keeps it on record but
+     it can never be listed (the partner's request is closed).
+   - **Not a medicine we list** closes it with a reason the partner sees.
+3. **Partner re-checks or uploads again.** On an open upload the partner presses
+   re-check (or uploads a fresh export): approved items now match by themselves.
+   Items still being completed say "Dawabag is adding this product".
+4. **Apply.** The partner applies as usual: new listings accept Dawabag's catalogue
+   price (≤ MRP), refrigerated items need the 2–8 °C declaration, Schedule H1 needs the
+   pharmacist's details. Dawabag approves and posts the new listings live; then the
+   stock is on sale.
+
+One product at a time still works: create it in **Products → New** and press **Link
+product** on the request.
 
 ## Trying it on the trial server
 

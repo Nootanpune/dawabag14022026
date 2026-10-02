@@ -39,7 +39,9 @@ export async function issuePrescription(doctorUserId: string, consultationId: st
     }
     const kind: ConsultKind = input.new_condition ? 'first' : c.consult_kind;
     const products = new Map((await client.query(
-      `SELECT id, name, generic_name, composition, drug_schedule, telemedicine_list FROM products WHERE id = ANY($1::uuid[])`,
+      // Drafts (Sprint 29) are not prescribable: their clinical details are not confirmed yet
+      `SELECT id, name, generic_name, composition, drug_schedule, telemedicine_list FROM products
+       WHERE id = ANY($1::uuid[]) AND catalogue_state IN ('live', 'not_listed')`,
       [input.items.map((i) => i.product_id)])).rows.map((p: any) => [p.id, p]));
     const problems = input.items.map((i, n) => {
       const p: any = products.get(i.product_id);

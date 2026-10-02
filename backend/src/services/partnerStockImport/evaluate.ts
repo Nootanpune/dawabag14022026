@@ -42,6 +42,16 @@ export async function loadMatchContext(db: Db, partnerId: string): Promise<Match
   return buildMatchContext(products.rows, links.rows, listings.rows);
 }
 
+export const DRAFT_WAITING = 'Dawabag is adding this product: a pharmacist is completing its details. Check again once it is approved.';
+
+/** The partner's items linked to a draft product that is not approved yet (Sprint 29). */
+async function draftLinkedKeys(db: Db, partnerId: string): Promise<Set<string>> {
+  const { rows } = await db.query<{ item_key: string }>(
+    `SELECT l.item_key FROM partner_item_links l JOIN products p ON p.id = l.product_id
+     WHERE l.partner_id = $1 AND p.catalogue_state = 'draft' AND p.deleted_at IS NULL`, [partnerId]);
+  return new Set(rows.map((r) => r.item_key));
+}
+
 /** Recall / uncleared regulator alert per (product, batch) — same rule as receiptGate (C-28). */
 async function recallMessages(db: Db, pairs: { product_id: string; batch_number: string }[]) {
   const out = new Map<string, string>();
@@ -91,6 +101,7 @@ export async function evaluateImport(db: Db, importId: string, partnerId: string
   const mapping = imp?.mapping ?? {};
   const prepared = missingRequired(mapping).length ? null : prepareRows(stored.map((r) => ({ rowNumber: r.row_number, cells: r.raw })), mapping);
   const ctx = await loadMatchContext(db, partnerId);
+  const waiting = await draftLinkedKeys(db, partnerId);
   const today = todayIST();
 
   const results: EvaluatedRow[] = stored.map((s, i) => {
@@ -106,7 +117,9 @@ export async function evaluateImport(db: Db, importId: string, partnerId: string
     const line = checkLine(p.parsed, { today, minShelfDays: PARTNER_MIN_SHELF_DAYS });
     const problems = [...p.problems, ...line.problems];
     const warnings = [...p.warnings, ...line.warnings];
-    if (!m.productId && m.reason) warnings.unshift(m.reason);
+    // Linked to a draft Dawabag is completing (Sprint 29): matched once a pharmacist approves it
+    if (!m.productId && p.itemKey && waiting.has(p.itemKey)) warnings.unshift(DRAFT_WAITING);
+    else if (!m.productId && m.reason) warnings.unshift(m.reason);
     return { id: s.id, status: 'needs_review', parsed: p.parsed, item_key: p.itemKey, product_id: m.productId,
       match_method: m.method, problems, warnings, candidates: m.candidates };
   });

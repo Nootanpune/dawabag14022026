@@ -14,6 +14,7 @@ import {
   adminGetStockImport, adminGetStockImportRows, adminListProductRequests, adminListStockImports, adminResolveProductRequest,
 } from '../controllers/partnerStockImport.controller';
 import { getPartnerDetail, getPartners, postPartner, postPartnerLogin, putPartner } from '../controllers/partnerAdmin.controller';
+import { postCreateDrafts } from '../controllers/catalogueDraft.controller';
 
 const router = Router();
 
@@ -110,6 +111,8 @@ router.get('/partner-stock-imports', authenticate, managers, adminListStockImpor
 router.get('/partner-stock-imports/:id', authenticate, managers, adminGetStockImport);
 router.get('/partner-stock-imports/:id/rows', authenticate, managers, adminGetStockImportRows);
 router.get('/partner-product-requests', authenticate, managers, adminListProductRequests);
+// Sprint 29: many requests → draft products for the pharmacist to complete
+router.post('/partner-product-requests/drafts', authenticate, managers, postCreateDrafts);
 router.post('/partner-product-requests/:id/resolve', authenticate, managers, adminResolveProductRequest);
 router.post('/shipments/:id/delivered', authenticate, managers, postShipmentDelivered);
 router.get('/settlements', authenticate, managers, getSettlements);

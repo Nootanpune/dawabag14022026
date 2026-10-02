@@ -9,7 +9,7 @@ import { FIELD_KEYS } from '../services/partnerStockImport/fields';
 import { MAX_FILE_BYTES } from '../services/partnerStockImport/readFile';
 import {
   cancelImport, createImport, getImport, linkRow, listImports, listProductRequests, listRows, recheckImport,
-  requestNewProducts, resolveProductRequest, ROW_TABS, setMapping, unlinkRow,
+  REQUEST_STATUSES, requestNewProducts, resolveProductRequest, ROW_TABS, setMapping, unlinkRow,
 } from '../services/partnerStockImport/import.service';
 import { applyImport } from '../services/partnerStockImport/apply.service';
 
@@ -133,7 +133,7 @@ export async function adminGetStockImportRows(req: Request, res: Response, next:
 
 export async function adminListProductRequests(req: Request, res: Response, next: NextFunction) {
   try {
-    const status = z.enum(['open', 'linked', 'rejected']).default('open').parse(req.query.status);
+    const status = z.enum(REQUEST_STATUSES).default('open').parse(req.query.status);
     res.json({ success: true, data: { requests: await listProductRequests(status) } });
   } catch (err) { next(err); }
 }

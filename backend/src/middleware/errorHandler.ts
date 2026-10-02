@@ -67,6 +67,9 @@ export function errorHandler(
     const known: Record<string, string> = {
       products_price_le_mrp: 'Selling prices cannot exceed the MRP',
       products_mrp_le_ceiling: 'MRP cannot exceed the NPPA ceiling price',
+      // Sprint 29: drafts and Schedule X / NDPS approvals are never active (C-10, C-19)
+      products_active_only_live: 'Only an approved product can be put on sale',
+      products_decided_unless_draft: 'Schedule, category and GST rate must be set before a product leaves draft',
     };
     return fail(400, (constraint && known[constraint]) || 'This change breaks a business rule');
   }
