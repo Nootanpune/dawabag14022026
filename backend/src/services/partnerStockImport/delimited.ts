@@ -33,8 +33,12 @@ function splitLine(line: string, d: string): string[] {
   return parseDelimited(line, d)[0] ?? [];
 }
 
-/** RFC 4180-style parsing: quoted cells may hold the separator, quotes ("") and line breaks. */
-export function parseDelimited(text: string, d = detectDelimiter(text)): string[][] {
+/**
+ * RFC 4180-style parsing: quoted cells may hold the separator, quotes ("") and line breaks.
+ * Stops once maxRows + 1 rows are read, so a file of millions of empty lines never
+ * becomes millions of arrays (the caller refuses a file over the limit; Sprint 34 review).
+ */
+export function parseDelimited(text: string, d = detectDelimiter(text), maxRows = Infinity): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
@@ -52,6 +56,7 @@ export function parseDelimited(text: string, d = detectDelimiter(text)): string[
     if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && text[i + 1] === '\n') i++;
       row.push(cell); rows.push(row); row = []; cell = '';
+      if (rows.length > maxRows) return rows.map((r) => r.map((c) => c.trim()));
       continue;
     }
     cell += ch;
@@ -75,19 +80,50 @@ function decodeEntities(s: string): string {
 /** Whether the text is an HTML table export (often named .xls). */
 export const looksLikeHtml = (text: string) => /<table[\s>]/i.test(text.slice(0, 20000));
 
+// Opening / closing table, row and cell tags. [^<>]* never runs past the next "<", so
+// the scan is linear even for a file full of unclosed tags (the earlier lazy
+// [\s\S]*? patterns re-scanned to the end of the file for each one: a few MB of "<tr"
+// kept the API busy for minutes — security review Sprint 34).
+const TAG = /<(\/?)(table|tr|td|th)\b([^<>]*)>/gi;
+const cellText = (html: string) => decodeEntities(html.replace(/<br\s*\/?>/gi, ' ').replace(/<[^<>]*>/g, '')).replace(/\s+/g, ' ').trim();
+
 /** Rows of the first table: one array per <tr>, one cell per <td>/<th>; colspan repeats blanks. */
-export function parseHtmlTable(html: string): string[][] {
-  const table = html.match(/<table[\s\S]*?<\/table>/i)?.[0] ?? html;
+export function parseHtmlTable(html: string, maxRows = Infinity): string[][] {
   const rows: string[][] = [];
-  for (const tr of table.match(/<tr[\s\S]*?<\/tr>/gi) ?? []) {
-    const cells: string[] = [];
-    for (const m of tr.matchAll(/<t([dh])([^>]*)>([\s\S]*?)<\/t\1>/gi)) {
-      const text = decodeEntities(m[3].replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
-      cells.push(text);
-      const span = Number(m[2].match(/colspan\s*=\s*["']?(\d+)/i)?.[1] ?? 1);
-      for (let i = 1; i < Math.min(span, 50); i++) cells.push('');
+  let inTable = false;
+  let row: string[] | null = null;
+  let cell: { from: number; span: number } | null = null;
+  const closeCell = (at: number) => {
+    if (!cell || !row) { cell = null; return; }
+    row.push(cellText(html.slice(cell.from, at)));
+    for (let i = 1; i < Math.min(cell.span, 50); i++) row.push('');
+    cell = null;
+  };
+  const closeRow = (at: number) => { closeCell(at); if (row) rows.push(row); row = null; };
+  TAG.lastIndex = 0;
+  for (let m = TAG.exec(html); m; m = TAG.exec(html)) {
+    const [, slash, nameRaw, attrs] = m;
+    const name = nameRaw.toLowerCase();
+    if (name === 'table') {
+      if (!slash && !inTable) { inTable = true; continue; }
+      if (slash && inTable) { closeRow(m.index); break; }   // the first table only
+      continue;
     }
-    rows.push(cells);
+    if (!inTable) continue;
+    if (name === 'tr') {
+      closeRow(m.index);
+      if (!slash) row = [];
+      if (rows.length > maxRows) break;
+      continue;
+    }
+    // td / th
+    if (slash) { closeCell(m.index); continue; }
+    closeCell(m.index);
+    if (!row) row = [];
+    cell = { from: m.index + m[0].length, span: Number(attrs.match(/colspan\s*=\s*["']?(\d+)/i)?.[1] ?? 1) };
   }
+  if (inTable) closeRow(html.length);
+  // No <table> at all: read the rows anyway (the earlier parser did the same)
+  if (!inTable && !rows.length && /<tr\b/i.test(html)) return parseHtmlTable(`<table>${html}</table>`, maxRows);
   return rows;
 }

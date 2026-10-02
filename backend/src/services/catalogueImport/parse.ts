@@ -3,6 +3,7 @@
 // heading text, so extra columns (e.g. Manufacturer Address) can be added.
 import ExcelJS from 'exceljs';
 import { AppError } from '../../utils/AppError';
+import { assertSafeZip } from '../../utils/zipGuard';
 
 export type Row = Record<string, unknown> & { _row: number };
 
@@ -20,6 +21,8 @@ const MASTER_COLUMNS: [string, string][] = [
   // Columns the owner adds for C-17 / C-16 (not in the v3.1 template)
   ['net quantity', 'net_quantity'], ['manufacturer name', 'manufacturer_name'], ['manufacturer address', 'manufacturer_address'],
   ['country of origin', 'country_of_origin'], ['nppa ceiling', 'nppa_ceiling_price'],
+  // Sprint 34: Drugs Rules Schedule C / C1 (yes / no), set by the pharmacist (C-07, C-33)
+  ['schedule c', 'schedule_c_c1'],
 ];
 
 const STOCK_COLUMNS: [string, string][] = [
@@ -73,6 +76,7 @@ function readSheet(ws: ExcelJS.Worksheet, columns: [string, string][], keyHeadin
 
 export async function parseCatalogueWorkbook(buffer: Buffer) {
   const wb = new ExcelJS.Workbook();
+  assertSafeZip(buffer);   // zip-bomb guard before unpacking (security review Sprint 34)
   try { await wb.xlsx.load(buffer as unknown as ArrayBuffer); } catch { throw new AppError('The file is not a readable .xlsx workbook', 422); }
   const master = wb.worksheets.find((w) => /medicine.?master/i.test(w.name));
   const stock = wb.worksheets.find((w) => /opening.?inventory/i.test(w.name));

@@ -6,6 +6,7 @@
 // retail buyers from Form 20/21 holders, trade buyers from Form 20B/21B holders —
 // for partners (party_licences, C-33) and for Dawabag's own stock (its licence
 // register, C-07). Same SQL as the stock shown to the buyer (stock/sellingRights.ts).
+// Sprint 34: and of the form the medicine needs — 21 / 21B for Schedule C / C1, else 20 / 20B.
 import { PoolClient } from 'pg';
 import { AppError } from '../utils/AppError';
 import { distanceKm, LatLng, toLatLng } from '../utils/geo';
@@ -52,8 +53,6 @@ export async function allocateAndReserve(
   const premises = await getSetting<{ latitude: number; longitude: number }>('dawabag.premises', null as any, client);
   const dawabagAt = premises ? toLatLng(premises.latitude, premises.longitude) : null;
 
-  // Dawabag's own stock only when its register holds an in-date licence for this kind of sale (C-07)
-  const ownMaySell = (await client.query(`SELECT ${dawabagMaySupplySql(params.saleKind)} AS ok`)).rows[0]?.ok === true;
 
   const ownFirst = ownStockFirst({
     orderValuePaise: params.orderValuePaise,
@@ -73,6 +72,10 @@ export async function allocateAndReserve(
   const allocations: Allocation[] = new Array(params.lines.length);
   for (const i of order) {
     const line = params.lines[i];
+    // Dawabag's own stock only when its register holds an in-date licence for this kind of
+    // sale of THIS medicine — Form 21 / 21B for Schedule C / C1, else 20 / 20B (C-07, Sprint 34)
+    const ownMaySell = (await client.query(`SELECT ${dawabagMaySupplySql(params.saleKind, '$1::uuid')} AS ok`, [line.product_id]))
+      .rows[0]?.ok === true;
     const candidates = [
       ...(ownMaySell ? await ownCandidate(client, line, dawabagAt, buyerAt, !!pin?.cold_chain_available) : []),
       ...(await partnerCandidates(client, line, buyerAt, params.saleKind)),
@@ -144,7 +147,7 @@ async function partnerCandidates(client: PoolClient, line: AllocationLine, buyer
      WHERE v.approval_status = 'approved' AND v.is_active = TRUE
        AND v.vendor_type IN ('marketplace_partner', 'both')
        AND (v.drug_license_expiry IS NULL OR v.drug_license_expiry >= CURRENT_DATE)
-       AND ${partnerMaySupplySql('v', kind)}
+       AND ${partnerMaySupplySql('v', kind, '$1::uuid')}
      ORDER BY v.id, pi.expiry_date ASC`,
     [line.product_id, line.quantity, line.cold_chain])).rows;
 

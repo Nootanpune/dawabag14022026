@@ -3,6 +3,7 @@ import { COLD_CHAIN_STORAGE, NEVER_ONLINE, type Draft, type DraftOptions, type D
 import CategoryPicker from '@/components/catalogueLists/CategoryPicker';
 import HsnPicker from '@/components/catalogueLists/HsnPicker';
 import { DraftSelect, DraftText } from './DraftInputs';
+import ScheduleCField from '@/components/catalogue/ScheduleCField';
 
 const RX_TEXT: Record<string, string> = {
   needed: 'Prescription needed for patients (C-08)',
@@ -48,6 +49,8 @@ export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
               options={[{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes, 2–8 °C' }]} onSave={setCold} />
             <DraftText id={id('storage')} label="Storage instructions" value={draft.storage_instructions} {...common}
               onSave={(v) => onSave({ storage_instructions: v })} />
+            <ScheduleCField id={id('schedc')} checked={!!draft.schedule_c_c1} disabled={disabled} className="sm:col-span-2"
+              onChange={(c) => onSave({ schedule_c_c1: c })} />
           </>
         )}
       </fieldset>

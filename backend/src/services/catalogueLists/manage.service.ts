@@ -31,9 +31,13 @@ export async function updateCategory(id: string, edit: { name?: string; is_activ
       name = tidyName(edit.name);
       await c.query('UPDATE product_categories SET name = $2 WHERE id = $1', [id, name]);
       // Every product under the old name (any spelling of it), drafts and removed ones included
+      // Same entry, new spelling: the products trigger lets this through even when the
+      // entry is switched off (it refuses only a NEW choice of a switched-off entry, Sprint 34)
+      await c.query(`SELECT set_config('dawabag.catalogue_list_rename', 'on', true)`);
       productIds = (await c.query<{ id: string }>(
         `UPDATE products p SET category = $2, updated_at = NOW() WHERE ${CATEGORY_KEY_SQL} = $1 RETURNING p.id`,
         [cur.name_key, name])).rows.map((r) => r.id);
+      await c.query(`SELECT set_config('dawabag.catalogue_list_rename', 'off', true)`);
       await writeAuditTx(c, { userId: null, action: 'product_category_renamed', performedBy: userId,
         oldValue: { category_id: id, name: cur.name },
         newValue: { category_id: id, name, products_updated: productIds.length } });

@@ -6,6 +6,7 @@
 // plain "save it as .xlsx or CSV" — no maintained, safe reader for it is installed.
 import ExcelJS from 'exceljs';
 import { AppError } from '../../utils/AppError';
+import { assertSafeZip } from '../../utils/zipGuard';
 import { decodeText, looksLikeHtml, parseDelimited, parseHtmlTable } from './delimited';
 import { headingFieldCount } from './fields';
 
@@ -13,6 +14,8 @@ export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_DATA_ROWS = 10_000;
 export const MAX_COLUMNS = 60;
 const HEADER_SCAN_ROWS = 40;
+/** Rows read from a sheet at most: title block + data + footer (Sprint 34 review: bounded memory) */
+const MAX_SHEET_ROWS = MAX_DATA_ROWS + HEADER_SCAN_ROWS + 50;
 
 export type FileKind = 'xlsx' | 'csv' | 'html';
 
@@ -43,14 +46,19 @@ export function cellText(v: ExcelJS.CellValue): string {
 
 async function readXlsx(buffer: Buffer): Promise<SheetText> {
   const wb = new ExcelJS.Workbook();
+  assertSafeZip(buffer);   // zip-bomb guard before unpacking (security review Sprint 34)
   try { await wb.xlsx.load(buffer as unknown as ArrayBuffer); } catch {
     throw new AppError('This Excel file could not be read. Open it in Excel, save it again as .xlsx (or CSV) and upload that', 422);
   }
   const ws = wb.worksheets.find((w) => w.rowCount > 0) ?? wb.worksheets[0];
   if (!ws) throw new AppError('The workbook has no sheets', 422);
   const rows: string[][] = [];
-  ws.eachRow({ includeEmpty: true }, (row, n) => {
-    if (n > MAX_DATA_ROWS + HEADER_SCAN_ROWS + 50) return;
+  // More filled rows than a file may have: refused before they are walked
+  if (ws.actualRowCount > MAX_SHEET_ROWS) {
+    throw new AppError(`The file has more than ${MAX_DATA_ROWS} rows; split it into smaller files`, 422);
+  }
+  ws.eachRow({ includeEmpty: false }, (row, n) => {
+    if (n > MAX_SHEET_ROWS) return;
     const cells: string[] = [];
     row.eachCell({ includeEmpty: true }, (cell, col) => {
       if (col > MAX_COLUMNS) return;
@@ -72,8 +80,11 @@ export async function readStockFile(buffer: Buffer): Promise<SheetText> {
   }
   const text = decodeText(buffer);
   if (/\u0000/.test(text.slice(0, 2000))) throw new AppError('This file is not a spreadsheet or CSV export', 422);
-  if (looksLikeHtml(text)) return { kind: 'html', sheetName: null, rows: parseHtmlTable(text) };
-  return { kind: 'csv', sheetName: null, rows: parseDelimited(text) };
+  // Read at most the rows a file may have (heading block + data + footer); more is refused
+  const cap = MAX_SHEET_ROWS;
+  const rows = looksLikeHtml(text) ? parseHtmlTable(text, cap) : parseDelimited(text, undefined, cap);
+  if (rows.length > cap) throw new AppError(`The file has more than ${MAX_DATA_ROWS} rows; split it into smaller files`, 422);
+  return { kind: looksLikeHtml(text) ? 'html' : 'csv', sheetName: null, rows };
 }
 
 export interface LocatedTable {
@@ -98,7 +109,8 @@ export function locateTable(sheetRows: string[][]): LocatedTable {
   if (best < 0 || bestCount < 3) {
     throw new AppError('Could not find the column headings. The file should have a heading row such as "Item Name, Batch No, Expiry, MRP, Qty"', 422);
   }
-  const width = Math.min(MAX_COLUMNS, Math.max(...sheetRows.map((r) => r?.length ?? 0)));
+  // reduce, not Math.max(...rows): spreading many rows overflows the call stack
+  const width = Math.min(MAX_COLUMNS, sheetRows.reduce((w, r) => Math.max(w, r?.length ?? 0), 0));
   const headers = Array.from({ length: width }, (_, i) => String(sheetRows[best][i] ?? '').trim() || `Column ${i + 1}`);
   // Trailing "Column N" headings with no data are dropped
   let lastUsed = headers.length - 1;

@@ -4,7 +4,8 @@
 import api from '../api';
 
 export interface SellingRightsWarning {
-  code: 'dawabag_no_retail_licence' | 'dawabag_no_trade_licence' | 'partner_no_rights';
+  code: 'dawabag_no_retail_licence' | 'dawabag_no_trade_licence' | 'partner_no_rights'
+    | 'dawabag_no_form_20' | 'dawabag_no_form_21' | 'dawabag_no_form_20b' | 'dawabag_no_form_21b';   // Sprint 34
   message: string;
   link: string;
 }

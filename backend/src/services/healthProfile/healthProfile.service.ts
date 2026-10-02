@@ -165,9 +165,19 @@ export async function deleteHealthProfile(userId: string, ctx: Ctx = {}) {
  * the order is for (a family member when the order names one) — only when the
  * buyer has consented. Each look is audited (C-46).
  */
+/**
+ * Orders our pharmacists are still working on (prescription check, packing). Health
+ * details are shown only then — not for any past or cancelled order (C-41: only what
+ * the check needs; security review Sprint 34).
+ */
+export const HEALTH_NOTE_ORDER_STATUSES = ['pending_payment', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing', 'packed'];
+
 export async function healthNoteForOrder(staffId: string, orderId: string) {
-  const o = await queryOne<any>(`SELECT id, user_id, patient_id, order_number FROM orders WHERE id = $1`, [orderId]);
+  const o = await queryOne<any>(`SELECT id, user_id, patient_id, order_number, status FROM orders WHERE id = $1 AND deleted_at IS NULL`, [orderId]);
   if (!o) throw new AppError('Order not found', 404);
+  if (!HEALTH_NOTE_ORDER_STATUSES.includes(o.status)) {
+    throw new AppError('Health details are shown only while an order is being checked or packed', 409);
+  }
   const consent = await currentConsent(null, o.user_id);
   if (!consent.granted) return { order_id: orderId, shared: false };
   const today = todayIST();

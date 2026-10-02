@@ -14,6 +14,7 @@ import {
   type ProductFormValues,
 } from '@/lib/admin/productForm';
 import ProductFieldGrid from './ProductFieldGrid';
+import ScheduleCField from '@/components/catalogue/ScheduleCField';
 
 interface Props {
   initial: ProductFormValues;
@@ -72,6 +73,7 @@ export default function ProductForm({ initial, editing, pending, error, fieldErr
           <input type="checkbox" checked={v.cold_chain} onChange={(e) => setV({ ...v, cold_chain: e.target.checked })} />
           Cold chain (2–8 °C)
         </label>
+        <ScheduleCField checked={v.schedule_c_c1} onChange={(c) => setV({ ...v, schedule_c_c1: c })} />
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={v.is_active} onChange={(e) => setV({ ...v, is_active: e.target.checked })} />
           Active (listed for sale)

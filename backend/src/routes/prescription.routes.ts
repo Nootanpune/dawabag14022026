@@ -5,7 +5,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
 });
 
 const router = Router();

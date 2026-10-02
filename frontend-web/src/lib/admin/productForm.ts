@@ -66,6 +66,8 @@ export interface ProductFormValues {
   sku: string;
   drug_schedule: string;
   cold_chain: boolean;
+  /** Drugs Rules Schedule C / C1 — sold only under Form 21 / 21B (Sprint 34, C-07, C-33) */
+  schedule_c_c1: boolean;
   is_active: boolean;
   text: Record<string, string>;
 }
@@ -81,7 +83,7 @@ const NEW_DEFAULTS: Record<string, string> = {
 
 export function blankForm(): ProductFormValues {
   const text = Object.fromEntries(ALL_FIELDS.map((f) => [f.key, NEW_DEFAULTS[f.key] ?? '']));
-  return { sku: '', drug_schedule: 'OTC', cold_chain: false, is_active: true, text };
+  return { sku: '', drug_schedule: 'OTC', cold_chain: false, schedule_c_c1: false, is_active: true, text };
 }
 
 const rupees = (paise: number | null | undefined) => (paise == null ? '' : (Number(paise) / 100).toFixed(2));
@@ -97,7 +99,7 @@ export function formFromDetail(p: ProductDetail): ProductFormValues {
     else if (f.kind === 'rupees') text[f.key] = rupees(src[f.key] as number | null);
     else text[f.key] = src[f.key] == null ? '' : String(src[f.key]);
   }
-  return { sku: p.sku, drug_schedule: p.drug_schedule ?? 'OTC', cold_chain: !!p.cold_chain,
+  return { sku: p.sku, drug_schedule: p.drug_schedule ?? 'OTC', cold_chain: !!p.cold_chain, schedule_c_c1: src.schedule_c_c1 === true,
     is_active: full ? src.is_active !== false : true, text };
 }
 
@@ -134,7 +136,8 @@ export type BuildResult = { body: ProductBody; error?: undefined } | { body?: un
 /** Full body for POST /products; optional blanks are left out. */
 export function buildCreateBody(v: ProductFormValues): BuildResult {
   if (v.sku.trim().length < 3) return { error: 'SKU needs at least 3 characters' };
-  const body: ProductBody = { sku: v.sku.trim(), drug_schedule: v.drug_schedule, cold_chain: v.cold_chain, is_active: v.is_active };
+  const body: ProductBody = { sku: v.sku.trim(), drug_schedule: v.drug_schedule, cold_chain: v.cold_chain,
+    schedule_c_c1: v.schedule_c_c1, is_active: v.is_active };
   for (const f of ALL_FIELDS) {
     const r = convert(f, v.text[f.key] ?? '');
     if (r.error) return { error: r.error };
@@ -149,6 +152,7 @@ export function buildPatchBody(v: ProductFormValues, initial: ProductFormValues)
   const body: ProductBody = {};
   if (v.drug_schedule !== initial.drug_schedule) body.drug_schedule = v.drug_schedule;
   if (v.cold_chain !== initial.cold_chain) body.cold_chain = v.cold_chain;
+  if (v.schedule_c_c1 !== initial.schedule_c_c1) body.schedule_c_c1 = v.schedule_c_c1;
   if (v.is_active !== initial.is_active) body.is_active = v.is_active;
   const known: Record<string, number | null> = {};
   for (const f of ALL_FIELDS) {

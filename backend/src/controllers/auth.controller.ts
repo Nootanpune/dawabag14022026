@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { query, queryOne, withTransaction } from '../config/database';
 import { storeOTP, verifyOTP, blacklistToken } from '../config/redis';
-import { generateTokens, verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
+import { generateTokens, issuedBeforePasswordChange, verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
 import { sendOTP } from '../services/sms.service';
 import { sendWelcomeEmail } from '../services/email.service';
 import { AppError } from '../utils/AppError';
@@ -317,6 +317,9 @@ export async function verifyMobileOTP(req: Request, res: Response, next: NextFun
 }
 
 // ─── Login ──────────────────────────────────────────────────────────────────
+let dummy: Promise<string> | null = null;
+const dummyHash = () => (dummy ??= bcrypt.hash('not-a-real-password-0', parseInt(process.env.BCRYPT_ROUNDS || '12')));
+
 export async function login(req: Request, res: Response, next: NextFunction) {
   try {
     const { mobile, password } = loginSchema.parse(req.body);
@@ -333,7 +336,9 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       [mobile]
     );
 
-    if (!user) throw new AppError('Invalid credentials', 401);
+    // An unknown mobile costs the same bcrypt work as a wrong password, so the answer's
+    // timing does not tell which mobiles have an account (Sprint 34 review, C-44)
+    if (!user) { await bcrypt.compare(password, await dummyHash()); throw new AppError('Invalid credentials', 401); }
     if (!user.is_active) throw new AppError('Account deactivated. Contact support.', 403);
 
     // Check lockout
@@ -420,13 +425,17 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
     const payload = await verifyRefreshToken(refresh_token);
 
     const user = await queryOne<{ id: string; role: string; is_active: boolean; customer_type: string; kyc_status: string; mobile: string;
-      must_change_password: boolean }>(
-      `SELECT id, role, is_active, customer_type, kyc_status, mobile, must_change_password
+      must_change_password: boolean; password_changed_at: Date | null }>(
+      `SELECT id, role, is_active, customer_type, kyc_status, mobile, must_change_password, password_changed_at
        FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [payload.sub]
     );
 
     if (!user || !user.is_active) throw new AppError('Invalid token', 401);
+    // A refresh token from before the last password change cannot be renewed (Sprint 34 review, C-44)
+    if (issuedBeforePasswordChange(payload.iat, user.password_changed_at)) {
+      throw new AppError('Your password was changed. Please sign in again', 401);
+    }
 
     // Rotate: the old refresh token can never be used again
     await blacklistToken(payload.jti, 7 * 24 * 3600);

@@ -1,6 +1,7 @@
 // Sprint 32 — selling rights by licence and buyer type (C-33 partners, C-07 Dawabag's register)
 import {
-  dawabagMaySupply, dawabagMaySupplySql, partnerMaySupply, partnerMaySupplySql, saleKindFor, SELLER_FORMS,
+  dawabagMaySupply, dawabagMaySupplySql, partnerMaySupply, partnerMaySupplySql, requiredForm, requiredRegisterType, saleKindFor,
+  SELLER_FORMS, sqlRef,
 } from './sellingRights';
 import { partnerStockSql, sellableStockSql } from './partnerStock';
 
@@ -65,23 +66,66 @@ describe("Dawabag's own stock (its licence register)", () => {
 });
 
 describe('the SQL applies the same forms (availability = allocation)', () => {
-  it('names exactly the forms of each kind', () => {
-    expect(partnerMaySupplySql('v', 'retail')).toMatch(/form IN \('dl20', 'dl21'\)/);
-    expect(partnerMaySupplySql('v', 'trade')).toMatch(/form IN \('dl20b', 'dl21b'\)/);
-    expect(partnerMaySupplySql('v', 'retail')).toMatch(/status = 'verified'/);
-    expect(partnerMaySupplySql('v', 'retail')).toMatch(/valid_upto >= CURRENT_DATE/);
-    expect(dawabagMaySupplySql('retail')).toMatch(/'retail_20', 'retail_21'/);
-    expect(dawabagMaySupplySql('trade')).toMatch(/'wholesale_20b', 'wholesale_21b'/);
+  it('names the form each medicine needs, by kind of sale', () => {
+    const r = partnerMaySupplySql('v', 'retail', 'p.id');
+    expect(r).toMatch(/form = CASE WHEN COALESCE\(\(SELECT sc_p\.schedule_c_c1 FROM products sc_p WHERE sc_p\.id = p\.id\), FALSE\) THEN 'dl21' ELSE 'dl20' END/);
+    expect(partnerMaySupplySql('v', 'trade', 'p.id')).toMatch(/THEN 'dl21b' ELSE 'dl20b' END/);
+    expect(r).toMatch(/status = 'verified'/);
+    expect(r).toMatch(/valid_upto >= CURRENT_DATE/);
+    expect(dawabagMaySupplySql('retail', '$1::uuid')).toMatch(/THEN 'retail_21' ELSE 'retail_20' END/);
+    expect(dawabagMaySupplySql('trade', 'p.id')).toMatch(/THEN 'wholesale_21b' ELSE 'wholesale_20b' END/);
     expect(SELLER_FORMS.retail).toEqual(['dl20', 'dl21']);
   });
   it('partner stock and own stock both carry the rule for the kind asked', () => {
-    expect(partnerStockSql('p.id', 'trade')).toContain(partnerMaySupplySql('v', 'trade'));
+    expect(partnerStockSql('p.id', 'trade')).toContain(partnerMaySupplySql('v', 'trade', 'p.id'));
     const both = sellableStockSql('p.id', 'retail');
-    expect(both).toContain(dawabagMaySupplySql('retail'));
-    expect(both).toContain(partnerMaySupplySql('v', 'retail'));
+    expect(both).toContain(dawabagMaySupplySql('retail', 'p.id'));
+    expect(both).toContain(partnerMaySupplySql('v', 'retail', 'p.id'));
     expect(both).not.toContain('dl20b');
   });
   it('only the two kinds can reach the SQL', () => {
-    expect(partnerMaySupplySql('v', "x'; DROP TABLE vendors; --" as any)).toMatch(/form IN \('dl20', 'dl21'\)/);
+    expect(partnerMaySupplySql('v', "x'; DROP TABLE vendors; --" as any, 'p.id')).toMatch(/THEN 'dl21' ELSE 'dl20' END/);
+  });
+  it('only fixed column / alias / parameter expressions are accepted (Sprint 34 review)', () => {
+    for (const ok of ['p.id', '$1::uuid', '$2', 'v', 'pp.product_id']) expect(sqlRef(ok)).toBe(ok);
+    for (const bad of ["p.id OR 1=1", "'x'", 'p.id; DROP TABLE products', '$1::text', '(SELECT 1)', '']) {
+      expect(() => sqlRef(bad)).toThrow();
+      expect(() => partnerStockSql(bad, 'retail')).toThrow();
+      expect(() => sellableStockSql(bad, 'trade')).toThrow();
+    }
+    expect(() => partnerMaySupplySql('v.id--', 'retail', 'p.id')).toThrow();
+  });
+});
+
+describe('Schedule C / C1 needs Form 21 / 21B; other medicines Form 20 / 20B (Drugs Rules, Sprint 34)', () => {
+  it('the one form required', () => {
+    expect(requiredForm('retail', false)).toBe('dl20');
+    expect(requiredForm('retail', true)).toBe('dl21');
+    expect(requiredForm('trade', false)).toBe('dl20b');
+    expect(requiredForm('trade', true)).toBe('dl21b');
+    expect(requiredRegisterType('retail', true)).toBe('retail_21');
+    expect(requiredRegisterType('trade', false)).toBe('wholesale_20b');
+  });
+  it('a partner with only Form 20 cannot supply a Schedule C / C1 medicine, and only Form 21 cannot supply the others', () => {
+    const only20 = [lic('dl20', '2027-01-01')];
+    const only21 = [lic('dl21', '2027-01-01')];
+    expect(partnerMaySupply(only20, 'retail', today, false)).toBe(true);
+    expect(partnerMaySupply(only20, 'retail', today, true)).toBe(false);
+    expect(partnerMaySupply(only21, 'retail', today, true)).toBe(true);
+    expect(partnerMaySupply(only21, 'retail', today, false)).toBe(false);
+    const only21b = [lic('dl21b', '2027-01-01')];
+    expect(partnerMaySupply(only21b, 'trade', today, true)).toBe(true);
+    expect(partnerMaySupply(only21b, 'trade', today, false)).toBe(false);
+    expect(partnerMaySupply(only21b, 'retail', today, true)).toBe(false);   // wholesale form never covers retail
+  });
+  it("Dawabag's register likewise, type by type", () => {
+    const row = (licence_type: string) => ({ licence_type, valid_upto: '2027-01-01', is_active: true });
+    expect(dawabagMaySupply([row('retail_20')], 'retail', today, true)).toBe(false);
+    expect(dawabagMaySupply([row('retail_21')], 'retail', today, true)).toBe(true);
+    expect(dawabagMaySupply([row('retail_21')], 'retail', today, false)).toBe(false);
+    expect(dawabagMaySupply([row('wholesale_20b')], 'trade', today, false)).toBe(true);
+    expect(dawabagMaySupply([row('wholesale_20b')], 'trade', today, true)).toBe(false);
+    // no medicine named: may it sell anything of that kind (dashboard)
+    expect(dawabagMaySupply([row('retail_21')], 'retail', today)).toBe(true);
   });
 });

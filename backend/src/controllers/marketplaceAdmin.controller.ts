@@ -153,6 +153,11 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
     notification_deliveries: z.number().int().min(30).max(3650), notifications: z.number().int().min(30).max(3650),
     payment_webhook_events: z.number().int().min(180).max(3650), job_runs: z.number().int().min(30).max(3650),
     abandoned_carts: z.number().int().min(30).max(3650), stale_devices: z.number().int().min(30).max(3650),
+    // Sprint 34: dose reminder answers and ended reminders; health profiles of inactive accounts
+    // (absent / null = kept until the buyer withdraws consent or asks for erasure)
+    reminder_dose_logs: z.number().int().min(30).max(3650).optional(),
+    ended_reminders: z.number().int().min(30).max(3650).optional(),
+    inactive_health_profiles: z.number().int().min(365).max(3650).nullable().optional(),
   }).strict(),
   // Sprint 9 — e-invoicing once turnover crosses the threshold (C-31)
   'einvoice.enabled': z.boolean(),

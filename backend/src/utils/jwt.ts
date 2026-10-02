@@ -80,3 +80,17 @@ export async function verifyRefreshToken(token: string): Promise<TokenPayload> {
     throw new AppError('Invalid or expired refresh token', 401);
   }
 }
+
+/**
+ * A token issued before the account's last password change no longer opens it: changing
+ * the password ends every other session (other phones, a browser left signed in, or a
+ * session opened with an admin's temporary password). Security review Sprint 34 (C-44).
+ * JWT iat is in whole seconds, so a token from the same second as the change still
+ * counts; password_changed_at is written from the API's clock (password.controller).
+ */
+export function issuedBeforePasswordChange(iat: number | undefined, passwordChangedAt: Date | string | null | undefined): boolean {
+  if (!passwordChangedAt || typeof iat !== 'number') return false;
+  const changed = new Date(passwordChangedAt).getTime();
+  if (!Number.isFinite(changed)) return false;
+  return iat < Math.floor(changed / 1000);
+}

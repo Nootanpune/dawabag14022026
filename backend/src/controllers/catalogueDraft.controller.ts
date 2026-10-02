@@ -61,6 +61,7 @@ const saveSchema = z.object({
   dosage_form: z.enum(DOSAGE_FORMS).nullable(),
   drug_schedule: z.enum(SCHEDULES).nullable(),
   cold_chain: z.boolean(),
+  schedule_c_c1: z.boolean(),   // Sprint 34: Drugs Rules Schedule C / C1, set by the pharmacist
   hsn_code: hsn,
   gst_rate: gst,
   category: text(100),

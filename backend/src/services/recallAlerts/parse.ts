@@ -3,6 +3,7 @@
 // by heading text: drug name, batch, manufacturer, reason (C-28).
 import ExcelJS from 'exceljs';
 import { AppError } from '../../utils/AppError';
+import { assertSafeZip } from '../../utils/zipGuard';
 
 export interface AlertLineInput { drug_name: string; batch_number: string; manufacturer?: string; reason?: string }
 
@@ -76,6 +77,7 @@ export function linesFromTable(table: string[][]): AlertLineInput[] {
 export async function parseAlertFile(buffer: Buffer, filename: string): Promise<AlertLineInput[]> {
   if (/\.csv$/i.test(filename)) return linesFromTable(parseCsv(buffer.toString('utf8')));
   const wb = new ExcelJS.Workbook();
+  assertSafeZip(buffer);   // zip-bomb guard before unpacking (security review Sprint 34)
   try { await wb.xlsx.load(buffer as unknown as ArrayBuffer); } catch { throw new AppError('The file is not a readable .xlsx or .csv list', 422); }
   const ws = wb.worksheets[0];
   if (!ws) throw new AppError('The workbook has no sheet', 422);

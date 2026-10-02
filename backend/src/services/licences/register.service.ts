@@ -12,6 +12,7 @@ import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAudit, writeAuditTx } from '../../utils/audit';
 import { todayIST } from '../../utils/ist';
+import { validateDocument } from '../../utils/documentCheck';
 import { getPrivateObjectUrl, isObjectStoreConfigured, putPrivateObject } from '../storage.service';
 import {
   DAWABAG_DRUG_TYPES, eligibility, FORM_ORDER, formLabel, LicenceForm, LicenceIn, numberKey, Party, validity,
@@ -277,25 +278,33 @@ export const decideLicence = (licenceId: string, adminId: string, d: Decision) =
   withTransaction((c) => decideLicenceTx(c, licenceId, adminId, d));
 
 // ── Licence scans (private object store, like KYC documents; C-41) ───────────
+/**
+ * Whether the holder owns this licence row: a partner its vendor's licences, a buyer
+ * account its own. Security review Sprint 34 (High): the earlier check compared both
+ * columns with "!==" and "&&", so a buyer matched any other buyer's licence (both
+ * vendor_id NULL) and a partner any other partner's — scans could be read and replaced.
+ */
+export function ownsLicence(row: { vendor_id: string | null; user_id: string | null }, owner: PartyRef): boolean {
+  if (owner.vendorId) return !!row.vendor_id && row.vendor_id === owner.vendorId;
+  if (owner.userId) return !!row.user_id && row.user_id === owner.userId;
+  return false;
+}
+
 export const LICENCE_FILE_MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIME: Record<string, string> = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' };
 
 export async function attachDocument(licenceId: string, owner: PartyRef | null, file: Express.Multer.File | undefined, actorId: string) {
   if (!file) throw new AppError('No file uploaded', 400);
-  const ext = ALLOWED_MIME[file.mimetype];
-  if (!ext) throw new AppError('Only PDF, JPG and PNG files are allowed', 400);
-  if (file.size > LICENCE_FILE_MAX_BYTES) throw new AppError('File must be 5 MB or smaller', 413);
+  // Type from the file's own bytes, matching what was declared (security review Sprint 34)
+  const { ext, contentType } = validateDocument(file, { maxBytes: LICENCE_FILE_MAX_BYTES, what: 'File' });
   const row = await queryOne<any>(`SELECT id, vendor_id, user_id, status FROM party_licences WHERE id = $1`, [licenceId]);
-  if (!row || (owner && row.vendor_id !== (owner.vendorId ?? null) && row.user_id !== (owner.userId ?? null))) {
-    throw new AppError('Licence not found', 404);
-  }
+  if (!row || (owner && !ownsLicence(row, owner))) throw new AppError('Licence not found', 404);
   if (owner && row.status !== 'pending') throw new AppError('A checked licence cannot be changed; send the renewed licence instead', 409);
   if (!isObjectStoreConfigured()) throw new AppError('Document storage is not configured on this server', 503);
   const key = `licences/${row.vendor_id ? `vendor/${row.vendor_id}` : `user/${row.user_id}`}/${licenceId}/${uuidv4()}.${ext}`;
-  await putPrivateObject(key, file.buffer, file.mimetype, { licence_id: licenceId, uploaded_at: new Date().toISOString() });
+  await putPrivateObject(key, file.buffer, contentType, { licence_id: licenceId, uploaded_at: new Date().toISOString() });
   await query(
     `UPDATE party_licences SET document_key = $2, document_name = $3, document_mime = $4, document_size = $5, updated_at = NOW() WHERE id = $1`,
-    [licenceId, key, file.originalname?.slice(0, 255) || null, file.mimetype, file.size]);
+    [licenceId, key, file.originalname?.slice(0, 255) || null, contentType, file.size]);
   await writeAudit({ userId: row.user_id ?? null, action: 'licence_document_uploaded', performedBy: actorId,
     newValue: { licence_id: licenceId, vendor_id: row.vendor_id } });
   return { licence_id: licenceId, has_document: true };
@@ -304,7 +313,7 @@ export async function attachDocument(licenceId: string, owner: PartyRef | null, 
 /** 5-minute link to a licence scan; every view is logged (C-41). */
 export async function documentLink(licenceId: string, owner: PartyRef | null, viewerId: string) {
   const row = await queryOne<any>(`SELECT vendor_id, user_id, document_key FROM party_licences WHERE id = $1`, [licenceId]);
-  if (!row || (owner && row.vendor_id !== (owner.vendorId ?? null) && row.user_id !== (owner.userId ?? null))) throw new AppError('Licence not found', 404);
+  if (!row || (owner && !ownsLicence(row, owner))) throw new AppError('Licence not found', 404);
   if (!row.document_key) throw new AppError('No document was uploaded for this licence', 404);
   if (!isObjectStoreConfigured()) throw new AppError('Document storage is not configured on this server', 503);
   const url = await getPrivateObjectUrl(row.document_key, 300);

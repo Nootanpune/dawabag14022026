@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../utils/jwt';
+import { issuedBeforePasswordChange, verifyAccessToken } from '../utils/jwt';
 import { AppError } from '../utils/AppError';
 import { queryOne } from '../config/database';
 import { BuyerType } from '../utils/customerType';
@@ -64,13 +64,17 @@ export async function authenticate(
     const token = authHeader.split(' ')[1];
     const payload = await verifyAccessToken(token);
 
-    const user = await queryOne<AuthUserRow & { is_active: boolean; must_change_password: boolean }>(
-      `SELECT ${AUTH_USER_COLUMNS}, is_active, must_change_password FROM users WHERE id = $1 AND deleted_at IS NULL`,
+    const user = await queryOne<AuthUserRow & { is_active: boolean; must_change_password: boolean; password_changed_at: Date | null }>(
+      `SELECT ${AUTH_USER_COLUMNS}, is_active, must_change_password, password_changed_at FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [payload.sub]
     );
 
     if (!user) throw new AppError('User not found', 401);
     if (!user.is_active) throw new AppError('Account deactivated', 403);
+    // A session from before the last password change has ended (Sprint 34 review, C-44)
+    if (issuedBeforePasswordChange(payload.iat, user.password_changed_at)) {
+      throw new AppError('Your password was changed. Please sign in again', 401);
+    }
     // A temporary password set by Dawabag's admin (Sprint 28) opens nothing but the
     // change-password step; enforced here so no client can skip it (C-44)
     if (user.must_change_password && !PASSWORD_CHANGE_PATHS.has(req.originalUrl.split('?')[0])) {
@@ -105,12 +109,12 @@ export function optionalAuth(
   const token = authHeader.split(' ')[1];
   verifyAccessToken(token)
     .then(async (payload) => {
-      const user = await queryOne<AuthUserRow>(
-        `SELECT ${AUTH_USER_COLUMNS} FROM users WHERE id = $1 AND deleted_at IS NULL AND is_active = TRUE
+      const user = await queryOne<AuthUserRow & { password_changed_at: Date | null }>(
+        `SELECT ${AUTH_USER_COLUMNS}, password_changed_at FROM users WHERE id = $1 AND deleted_at IS NULL AND is_active = TRUE
            AND must_change_password = FALSE`,
         [payload.sub]
       );
-      if (user) req.user = await toRequestUser(user);
+      if (user && !issuedBeforePasswordChange(payload.iat, user.password_changed_at)) req.user = await toRequestUser(user);
       next();
     })
     .catch(() => next());

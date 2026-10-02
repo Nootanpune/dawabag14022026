@@ -37,10 +37,13 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
       throw new AppError('Choose a new password that is different from the current one', 400);
     }
     const hash = await bcrypt.hash(d.new_password, parseInt(process.env.BCRYPT_ROUNDS || '12'));
+    // From the API's clock, as token iat is: every token issued before this second stops
+    // working (auth.middleware, refresh) — all other sessions end (Sprint 34 review, C-44)
+    const changedAt = new Date();
     await withTransaction(async (c) => {
       await c.query(
-        `UPDATE users SET password_hash = $2, must_change_password = FALSE, password_changed_at = NOW(),
-                failed_login_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = $1`, [user.id, hash]);
+        `UPDATE users SET password_hash = $2, must_change_password = FALSE, password_changed_at = $3,
+                failed_login_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = $1`, [user.id, hash, changedAt]);
       await writeAuditTx(c, { userId: user.id, action: 'password_changed', performedBy: user.id, ip: req.ip ?? null,
         newValue: { temporary_password_replaced: user.must_change_password } });
     });

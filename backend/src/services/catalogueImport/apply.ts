@@ -13,6 +13,7 @@ import { assertBelowShelfMrp } from '../shelfMrp';
 import { parseCatalogueWorkbook } from './parse';
 import { BatchRecord, Checked, ProductRecord, checkBatch, checkProduct } from './validate';
 import { assertBatchReceivable } from '../recallAlerts/receiptGate';
+import { categoryKey } from '../catalogueLists/rules';
 
 const COPY = ['name', 'description', 'composition', 'storage_instructions'] as const;
 
@@ -34,6 +35,16 @@ async function plan(client: PoolClient, buffer: Buffer): Promise<Plan> {
   const skus = [...new Set([...checkedP.map((p) => p.sku), ...batches.map((b) => String(b.sku ?? '').trim().toUpperCase())])].filter(Boolean);
   const existing = new Map((await client.query(
     `SELECT * FROM products WHERE upper(sku) = ANY($1::text[]) AND deleted_at IS NULL`, [skus])).rows.map((r: any) => [r.sku.toUpperCase(), r]));
+
+  // Sprint 34: a category / HSN code an admin switched off is refused for a new product or
+  // a product moving to it (one that already had it keeps it) — same rule as the forms and
+  // the database trigger, with a plain reason on the row (C-46 lists are managed by admins)
+  const off = await switchedOffEntries(client);
+  for (const p of checkedP) {
+    if (!p.record) continue;
+    const cur: any = existing.get(p.sku);
+    p.errors.push(...switchedOffProblems(p.record, cur ?? null, off));
+  }
 
   const outP: Plan['products'] = checkedP.map((p) => {
     if (p.errors.length || !p.record) return { ...p, record: null, action: 'error' as const };
@@ -62,6 +73,29 @@ async function plan(client: PoolClient, buffer: Buffer): Promise<Plan> {
     return { ...b, record: b.errors.length ? null : b.record, action: b.errors.length ? 'error' as const : 'create' as const };
   });
   return { products: outP, batches: outB };
+}
+
+export interface SwitchedOff { categories: Map<string, string>; hsn: Set<string> }
+
+async function switchedOffEntries(client: PoolClient): Promise<SwitchedOff> {
+  const cats = (await client.query(`SELECT name_key, name FROM product_categories WHERE NOT is_active`)).rows;
+  const hsn = (await client.query(`SELECT code FROM hsn_codes WHERE NOT is_active`)).rows;
+  return { categories: new Map(cats.map((r: any) => [r.name_key, r.name])), hsn: new Set(hsn.map((r: any) => r.code)) };
+}
+
+/** Plain reasons a row cannot use a switched-off category / HSN code (pure; unit-tested). */
+export function switchedOffProblems(rec: Pick<ProductRecord, 'category' | 'hsn_code'>,
+  cur: { category?: string | null; hsn_code?: string | null } | null, off: SwitchedOff): string[] {
+  const out: string[] = [];
+  const key = categoryKey(rec.category);
+  if (off.categories.has(key) && (!cur?.category || categoryKey(cur.category) !== key)) {
+    out.push(`Category "${off.categories.get(key)}" is switched off in Admin → Catalogue lists; choose another category or ask an admin to switch it back on`);
+  }
+  const hsn = rec.hsn_code?.trim();
+  if (hsn && off.hsn.has(hsn) && (cur?.hsn_code ?? '').trim() !== hsn) {
+    out.push(`HSN code ${hsn} is switched off in Admin → Catalogue lists; choose another code or ask an admin to switch it back on`);
+  }
+  return out;
 }
 
 function summary(p: Plan) {

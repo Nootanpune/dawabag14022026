@@ -115,7 +115,25 @@ const authLimiter = rateLimit({
   message: limitMessage('Too many auth attempts. Please try again later.'),
 });
 
+// Uploads (prescriptions, licence scans, stock and catalogue files) are stored or parsed in
+// memory: a tighter per-address limit than the global one (security review Sprint 34)
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.UPLOAD_RATE_LIMIT_MAX || '40'),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method !== 'POST' && req.method !== 'PUT',
+  message: limitMessage('Too many uploads. Please try again in a few minutes.'),
+});
+const UPLOAD_PATHS = [
+  '/api/v1/prescriptions/upload', '/api/v1/catalogue/import', '/api/v1/kyc/documents',
+  /^\/api\/v1\/partner\/stock-imports\/?$/,   // the file itself, not the steps after it
+  /^\/api\/v1\/(users\/me|partner)\/licences\/[^/]+\/document$/,
+  /^\/api\/v1\/admin\/party-licences\/[^/]+\/document$/,
+];
+
 app.use(globalLimiter);
+app.use(UPLOAD_PATHS, uploadLimiter);
 app.use(compression());
 app.use(cookieParser());
 // Keep the raw bytes for webhook signature checks (payment.controller handleWebhook)

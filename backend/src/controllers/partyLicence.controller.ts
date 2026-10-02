@@ -111,9 +111,10 @@ export async function getPartyLicences(req: Request, res: Response, next: NextFu
       party: z.enum(['vendor', 'customer']).optional(),
     }).parse(req.query);
     const where = [`p.status ${f.filter === 'waiting' ? `= 'pending'` : f.filter === 'all' ? `IN ('pending', 'verified', 'rejected')` : `= 'verified'`}`];
+    const params: unknown[] = [];
     if (f.filter === 'expiring') where.push(`p.valid_upto BETWEEN CURRENT_DATE AND CURRENT_DATE + 30`);
     if (f.filter === 'expired') where.push(`p.valid_upto < CURRENT_DATE`);
-    if (f.party) where.push(`p.party_type = '${f.party}'`);
+    if (f.party) { params.push(f.party); where.push(`p.party_type = $${params.length}`); }   // a value: always a parameter
     if (!MANAGERS.includes(req.user!.role)) where.push(`p.party_type = 'customer'`);   // pharmacists check buyer KYC only
     const rows = await query<any>(
       `SELECT p.id, p.party_type, p.vendor_id, p.user_id, p.form, p.form_name, p.licence_number, p.issued_by,
@@ -125,7 +126,7 @@ export async function getPartyLicences(req: Request, res: Response, next: NextFu
        LEFT JOIN users u ON u.id = p.user_id
        LEFT JOIN user_profiles up ON up.user_id = p.user_id
        WHERE ${where.join(' AND ')}
-       ORDER BY p.valid_upto NULLS FIRST, p.created_at LIMIT 300`);
+       ORDER BY p.valid_upto NULLS FIRST, p.created_at LIMIT 300`, params);
     const today = todayIST();
     res.json({ success: true, data: { licences: rows.map((r) => ({ ...r, label: formLabel(r.form, r.form_name), validity: validity(r.valid_upto, today) })) } });
   } catch (e) { next(e); }

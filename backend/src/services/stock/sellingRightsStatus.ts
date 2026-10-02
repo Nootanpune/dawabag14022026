@@ -2,20 +2,28 @@
 // licence register (C-07) has no in-date licence for a kind of sale, Dawabag's own
 // stock is NOT offered to those buyers (blocked, never sold unlicensed); this tells the
 // admins why, instead of the stock silently disappearing. Partners that can sell to
-// nobody (no checked, in-date Form 20/21 or 20B/21B) are listed too (C-33).
+// nobody (no checked, in-date Form 20/21 or 20B/21B) are listed too (C-33). Sprint 34:
+// each kind of sale is split by form — Form 20 / 20B for most medicines, 21 / 21B for
+// Schedule C / C1 — and a register missing one of them is warned about too.
 import { query } from '../../config/database';
 import { todayIST } from '../../utils/ist';
 import { DAWABAG_REGISTER_TYPES, SALE_KIND_WORDS, SaleKind, dawabagMaySupply, partnerMaySupply } from './sellingRights';
 
 export interface SellingRightsWarning {
-  code: 'dawabag_no_retail_licence' | 'dawabag_no_trade_licence' | 'partner_no_rights';
+  code: 'dawabag_no_retail_licence' | 'dawabag_no_trade_licence' | 'partner_no_rights'
+    // Sprint 34: the register covers the kind of sale but not one of its two forms
+    | 'dawabag_no_form_20' | 'dawabag_no_form_21' | 'dawabag_no_form_20b' | 'dawabag_no_form_21b';
   message: string;
   link: string;
 }
 
+/** Per kind of sale: other medicines (Form 20 / 20B) and Schedule C / C1 medicines (Form 21 / 21B). */
+export type FormRights = Record<SaleKind, { other: boolean; schedule_c: boolean }>;
+
 export interface SellingRightsStatus {
   dawabag: Record<SaleKind, boolean>;
-  partners: { id: string; name: string; retail: boolean; trade: boolean }[];
+  dawabag_forms: FormRights;
+  partners: { id: string; name: string; retail: boolean; trade: boolean; forms: FormRights }[];
   warnings: SellingRightsWarning[];
 }
 
@@ -26,6 +34,11 @@ export async function sellingRightsStatus(): Promise<SellingRightsStatus> {
      FROM business_licences WHERE licence_type = ANY($1)`,
     [[...DAWABAG_REGISTER_TYPES.retail, ...DAWABAG_REGISTER_TYPES.trade]]);
   const dawabag = { retail: dawabagMaySupply(register, 'retail', today), trade: dawabagMaySupply(register, 'trade', today) };
+  const formsOf = (may: (kind: SaleKind, scheduleC: boolean) => boolean): FormRights => ({
+    retail: { other: may('retail', false), schedule_c: may('retail', true) },
+    trade: { other: may('trade', false), schedule_c: may('trade', true) },
+  });
+  const dawabagForms = formsOf((k, c) => dawabagMaySupply(register, k, today, c));
 
   // Approved, active partners with a live listing: what each may sell
   const rows = await query<{ id: string; name: string; form: string | null; valid_upto: string | null; status: string | null }>(
@@ -45,6 +58,7 @@ export async function sellingRightsStatus(): Promise<SellingRightsStatus> {
     id, name: p.name,
     retail: partnerMaySupply(p.licences, 'retail', today),
     trade: partnerMaySupply(p.licences, 'trade', today),
+    forms: formsOf((k, c) => partnerMaySupply(p.licences, k, today, c)),
   }));
 
   const warnings: SellingRightsWarning[] = [];
@@ -56,6 +70,23 @@ export async function sellingRightsStatus(): Promise<SellingRightsStatus> {
       link: '/admin/licences',
     });
   }
+  // The kind of sale is covered but one of its forms is not (Drugs Rules, Sprint 34)
+  const FORM_WORDS = {
+    retail: { other: ['dawabag_no_form_20', 'Form 20', 'medicines other than Schedule C / C1'], schedule_c: ['dawabag_no_form_21', 'Form 21', 'Schedule C / C1 medicines (biologicals such as vaccines, sera and insulin)'] },
+    trade: { other: ['dawabag_no_form_20b', 'Form 20B', 'medicines other than Schedule C / C1'], schedule_c: ['dawabag_no_form_21b', 'Form 21B', 'Schedule C / C1 medicines (biologicals such as vaccines, sera and insulin)'] },
+  } as const;
+  for (const kind of ['retail', 'trade'] as SaleKind[]) {
+    if (!dawabag[kind]) continue;
+    for (const which of ['other', 'schedule_c'] as const) {
+      if (dawabagForms[kind][which]) continue;
+      const [code, form, what] = FORM_WORDS[kind][which];
+      warnings.push({
+        code,
+        message: `Dawabag's own stock of ${what} is not offered to ${SALE_KIND_WORDS[kind].buyers}: the licence register has no in-date ${form}. Add or renew it in the licence register.`,
+        link: '/admin/licences',
+      });
+    }
+  }
   for (const p of partners.filter((x) => !x.retail && !x.trade)) {
     warnings.push({
       code: 'partner_no_rights',
@@ -63,5 +94,5 @@ export async function sellingRightsStatus(): Promise<SellingRightsStatus> {
       link: `/admin/partners/${p.id}`,
     });
   }
-  return { dawabag, partners, warnings };
+  return { dawabag, dawabag_forms: dawabagForms, partners, warnings };
 }

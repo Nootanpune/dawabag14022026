@@ -17,12 +17,19 @@ import { SCHEDULES } from '../services/catalogueDrafts/rules';
 // ─── Search Products ─────────────────────────────────────────────────────────
 export async function searchProducts(req: Request, res: Response, next: NextFunction) {
   try {
-    const q = (req.query.q as string || '').trim();
-    const category = req.query.category as string;
-    const schedule = req.query.schedule as string;
-    const pincode = req.query.pincode as string;
-    const page = Math.max(1, parseInt(req.query.page as string || '1'));
-    const limit = Math.min(50, parseInt(req.query.limit as string || '20'));
+    // One text value each (a repeated ?q= arrives as an array); page/limit always whole
+    // numbers in range — a bad value no longer reaches SQL as NaN (security review Sprint 34)
+    const one = (v: unknown) => (typeof v === 'string' ? v : undefined);
+    const whole = (v: unknown, dflt: number, max: number) => {
+      const n = parseInt(one(v) ?? '', 10);
+      return Number.isFinite(n) ? Math.min(max, Math.max(1, n)) : dflt;
+    };
+    const q = (one(req.query.q) ?? '').trim().slice(0, 200);
+    const category = one(req.query.category)?.slice(0, 100) as string;
+    const schedule = one(req.query.schedule)?.slice(0, 40) as string;
+    const pincode = one(req.query.pincode)?.slice(0, 10) as string;
+    const page = whole(req.query.page, 1, 10_000);
+    const limit = whole(req.query.limit, 20, 50);
     const offset = (page - 1) * limit;
 
     // Check pincode serviceability
@@ -69,7 +76,7 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
 // up to 3 names close to what was typed, from sellable products only (C-10)
 export async function getSearchSuggestions(req: Request, res: Response, next: NextFunction) {
   try {
-    const q = String(req.query.q ?? '').slice(0, 100);
+    const q = typeof req.query.q === 'string' ? req.query.q.slice(0, 100) : '';
     res.json({ success: true, data: { suggestions: await didYouMean(q) } });
   } catch (error) {
     next(error);
@@ -122,6 +129,8 @@ const productFields = {
   composition: z.string().nullable().optional(),
   storage_instructions: z.string().nullable().optional(),
   cold_chain: z.boolean(),
+  // Sprint 34: Drugs Rules Schedule C / C1 — sold only under Form 21 / 21B (stock/sellingRights.ts, C-07, C-33)
+  schedule_c_c1: z.boolean(),
   mrp_paise: priceField,
   offer_price_paise: priceField,
   ptr_price_paise: priceField.nullable().optional(),
@@ -144,6 +153,7 @@ const createSchema = z.object({
   ...productFields,
   sku: z.string().min(3).max(100),
   cold_chain: productFields.cold_chain.default(false),
+  schedule_c_c1: productFields.schedule_c_c1.default(false),
   max_qty_per_order: productFields.max_qty_per_order.default(3),
   min_order_qty_retailer: productFields.min_order_qty_retailer.default(1),
   min_order_qty_wholesaler: productFields.min_order_qty_wholesaler.default(10),

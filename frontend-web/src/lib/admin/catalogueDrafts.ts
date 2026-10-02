@@ -27,6 +27,8 @@ export interface Draft {
   drug_schedule: string | null;
   cold_chain: boolean;
   cold_chain_decided: boolean;
+  /** Drugs Rules Schedule C / C1 (Sprint 34): sold only under Form 21 / 21B */
+  schedule_c_c1: boolean;
   hsn_code: string | null;
   gst_rate: number | null;
   category: string | null;
@@ -78,7 +80,7 @@ export interface DraftOptions {
 }
 
 export type DraftPatch = Partial<Pick<Draft, 'name' | 'generic_name' | 'composition' | 'strength' | 'dosage_form' | 'drug_schedule'
-  | 'cold_chain' | 'hsn_code' | 'gst_rate' | 'category' | 'description' | 'storage_instructions' | 'net_quantity' | 'marketed_by'
+  | 'cold_chain' | 'schedule_c_c1' | 'hsn_code' | 'gst_rate' | 'category' | 'description' | 'storage_instructions' | 'net_quantity' | 'marketed_by'
   | 'manufacturer_name' | 'manufacturer_address' | 'country_of_origin'>>;
 
 /** Fields "set for all selected" may change — never the schedule or anything clinical (server enforces the same). */

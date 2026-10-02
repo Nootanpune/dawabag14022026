@@ -157,6 +157,9 @@ export async function setMapping(id: string, partnerId: string, userId: string, 
        ON CONFLICT (partner_id) DO UPDATE SET headers = EXCLUDED.headers, mapping = EXCLUDED.mapping,
          updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
       [partnerId, JSON.stringify(imp.headers), JSON.stringify(mappingToNames(imp.headers, clean)), userId]);
+    // C-46: which columns the partner confirmed (Sprint 34 review — was not in the audit trail)
+    await writeAuditTx(c, { userId, action: 'partner_stock_mapping_saved', performedBy: userId,
+      newValue: { vendor_id: partnerId, import_id: id, mapping: mappingToNames(imp.headers, clean) } });
     return evaluateImport(c, id, partnerId);
   });
 }
@@ -255,8 +258,12 @@ export async function requestNewProducts(id: string, partnerId: string, userId: 
 export async function cancelImport(id: string, partnerId: string, userId: string) {
   const imp = await loadImport(id, partnerId);
   assertDraft(imp);
-  await query(`UPDATE partner_stock_imports SET status = 'cancelled', cancelled_by = $2, cancelled_at = NOW(), updated_at = NOW()
-               WHERE id = $1 AND status = 'draft'`, [id, userId]);
+  await withTransaction(async (c) => {
+    await c.query(`UPDATE partner_stock_imports SET status = 'cancelled', cancelled_by = $2, cancelled_at = NOW(), updated_at = NOW()
+                   WHERE id = $1 AND status = 'draft'`, [id, userId]);
+    await writeAuditTx(c, { userId, action: 'partner_stock_import_cancelled', performedBy: userId,
+      newValue: { vendor_id: partnerId, import_id: id } });   // C-46 (Sprint 34 review)
+  });
   return { status: 'cancelled' };
 }
 

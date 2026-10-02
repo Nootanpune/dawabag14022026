@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { settingsKeys, updateSetting, type AppSetting } from '@/lib/admin/settings';
 import {
+  blankMeaning,
   fromRetentionDraft,
   RETENTION_FIELDS,
   RETENTION_KEY,
@@ -43,7 +44,7 @@ function RetentionEditor({ value, onClose }: { value: unknown; onClose: () => vo
             <span>
               <span className="block font-medium text-gray-700">{f.label}</span>
               <span className="block text-xs text-gray-400">
-                {f.min}–{RETENTION_MAX_DAYS} days
+                {f.min}–{RETENTION_MAX_DAYS} days{f.optional ? ' · leave blank to keep until withdrawn' : ''}
               </span>
             </span>
             <input
@@ -91,7 +92,9 @@ export default function RetentionSection({ setting, canEdit }: { setting: AppSet
           RETENTION_FIELDS.map((f) => (
             <div key={f.key} className="px-4 py-2.5 flex justify-between gap-3 text-sm">
               <span>{f.label}</span>
-              <span className="font-semibold">{draft[f.key] ? `${draft[f.key]} days` : <span className="text-gray-400">kept</span>}</span>
+              <span className="font-semibold text-right">
+                {draft[f.key] ? `${draft[f.key]} days` : <span className="text-gray-400 font-normal">{blankMeaning(f.key)}</span>}
+              </span>
             </div>
           ))
         )}

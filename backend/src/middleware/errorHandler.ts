@@ -10,13 +10,21 @@ const REDACTED_FIELDS = new Set([
   'diagnosis', 'advice', 'chief_complaint', 'notes', 'items', 'reason', 'instructions', 'patient_name', 'address_line1', 'address_line2',
   // Sprint 33: health profile and dose reminders are health data
   'allergies', 'conditions', 'current_medicines', 'medicine_name', 'dose', 'full_name',
+  // Sprint 34 review: licence numbers in the newer licence rows, relationship and age of family members
+  'licence_number', 'relationship', 'age_years',
 ]);
 
-function redact(body: unknown): unknown {
+/**
+ * Request body for the error log with the fields above blanked at ANY depth — family
+ * members, licence rows and order lines are nested (security review Sprint 34, C-41).
+ */
+export function redact(body: unknown, depth = 0): unknown {
   if (!body || typeof body !== 'object') return body;
+  if (depth > 6) return '[nested]';
+  if (Array.isArray(body)) return body.slice(0, 20).map((v) => redact(v, depth + 1));
   return Object.fromEntries(
     Object.entries(body as Record<string, unknown>).map(([k, v]) =>
-      [k, REDACTED_FIELDS.has(k) ? '[redacted]' : v])
+      [k, REDACTED_FIELDS.has(k) ? '[redacted]' : redact(v, depth + 1)])
   );
 }
 
@@ -72,6 +80,9 @@ export function errorHandler(
       // Sprint 29: drafts and Schedule X / NDPS approvals are never active (C-10, C-19)
       products_active_only_live: 'Only an approved product can be put on sale',
       products_decided_unless_draft: 'Schedule, category and GST rate must be set before a product leaves draft',
+      // Sprint 34: the database refuses a NEW choice of a switched-off list entry (any path)
+      products_category_switched_off: 'This category is switched off in Admin → Catalogue lists. Choose another category, or ask an admin to switch it back on',
+      products_hsn_switched_off: 'This HSN code is switched off in Admin → Catalogue lists. Choose another code, or ask an admin to switch it back on',
     };
     return fail(400, (constraint && known[constraint]) || 'This change breaks a business rule');
   }

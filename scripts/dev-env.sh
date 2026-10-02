@@ -23,6 +23,7 @@ if [ -z "${JWT_ACCESS_SECRET:-}" ]; then
 fi
 # Generous limits: the smoke suites sign in and verify many times
 export AUTH_RATE_LIMIT_MAX="${AUTH_RATE_LIMIT_MAX:-5000}" RATE_LIMIT_MAX="${RATE_LIMIT_MAX:-50000}" VERIFY_RATE_LIMIT_MAX="${VERIFY_RATE_LIMIT_MAX:-1000}"
+export UPLOAD_RATE_LIMIT_MAX="${UPLOAD_RATE_LIMIT_MAX:-5000}"
 export DISABLE_SCHEDULER="${DISABLE_SCHEDULER:-true}"
 _dawabag_root="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 if [ -z "${FAKE_PROVIDERS_PORT:-}" ]; then

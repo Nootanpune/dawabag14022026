@@ -13,6 +13,9 @@ export interface ProductRecord {
   max_qty_per_order: number; min_order_qty_retailer: number; min_order_qty_wholesaler: number; reorder_level_qty: number;
   net_quantity: string | null; manufacturer_name: string | null; manufacturer_address: string | null;
   country_of_origin: string; is_active: boolean;
+  /** Drugs Rules Schedule C / C1 (Sprint 34). Absent = the column was blank or missing: a new
+   *  product is not marked, an existing one keeps what the pharmacist set. */
+  schedule_c_c1?: boolean;
 }
 
 export interface BatchRecord {
@@ -51,6 +54,15 @@ export function toDate(v: unknown, endOfMonth: boolean): string | null {
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
   m = s.match(/^\d{4}-\d{2}-\d{2}$/);
   return m ? s : null;
+}
+
+/** "Schedule C/C1" cell: yes / no (y, n, true, false, 1, 0, C, C1); blank = not given. */
+export function scheduleCValue(v: unknown): boolean | undefined | 'invalid' {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s || s === '—') return undefined;
+  if (/^(y|yes|true|1|c|c1|schedule c|schedule c1|c\/c1)$/.test(s)) return true;
+  if (/^(n|no|false|0)$/.test(s)) return false;
+  return 'invalid';
 }
 
 export function checkProduct(r: Row): Checked<ProductRecord> {
@@ -95,6 +107,10 @@ export function checkProduct(r: Row): Checked<ProductRecord> {
   if (!net) errors.push('Net quantity (or Strength / Pack Size) is required');
   if (!makerAddress && active) { active = false; warnings.push('No manufacturer address column/value: imported as inactive until it is added (C-17)'); }
 
+  // Schedule C / C1: yes or no from the pharmacist, never guessed from the name (C-07, C-33)
+  const schedC = scheduleCValue(r.schedule_c_c1);
+  if (schedC === 'invalid') errors.push('Schedule C/C1 must be yes or no (or left blank)');
+
   const storage = [text(r.storage_instructions), text(r.storage_condition)].filter(Boolean).join(' — ') || null;
   const cold = yes(r.cold_chain) || /refrigerat|2\s*[–-]\s*8|frozen/i.test(String(r.storage_condition ?? ''));
   if (errors.length) return { row: r._row, sku, record: null, errors, warnings };
@@ -109,6 +125,7 @@ export function checkProduct(r: Row): Checked<ProductRecord> {
       max_qty_per_order: qty.max, min_order_qty_retailer: qty.minR, min_order_qty_wholesaler: qty.minW,
       reorder_level_qty: qty.reorder, net_quantity: net, manufacturer_name: maker, manufacturer_address: makerAddress,
       country_of_origin: text(r.country_of_origin) ?? 'India', is_active: active,
+      ...(typeof schedC === 'boolean' ? { schedule_c_c1: schedC } : {}),
     },
   };
 }

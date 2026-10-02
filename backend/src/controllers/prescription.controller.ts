@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
+import { validateDocument } from '../utils/documentCheck';
 import { writeAudit } from '../utils/audit';
 import { getPrivateObjectUrl, putPrivateObject } from '../services/storage.service';
 import { queueNotification } from '../services/notification.service';
@@ -17,15 +18,8 @@ export async function uploadPrescription(req: Request, res: Response, next: Next
     const file = req.file as Express.Multer.File;
 
     if (!file) throw new AppError('No file uploaded', 400);
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new AppError('Only JPEG, PNG, and PDF files are allowed', 400);
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      throw new AppError('File size must be under 10MB', 400);
-    }
+    // JPEG, PNG or PDF by the file's own bytes, matching the declared type (security review Sprint 34, C-41)
+    const { ext, contentType } = validateDocument(file, { maxBytes: 10 * 1024 * 1024, what: 'The prescription file' });
 
     const uuidOk = (v: unknown) => v == null || v === '' || /^[0-9a-f-]{36}$/i.test(String(v));
     if (!uuidOk(order_id) || !uuidOk(patient_id)) throw new AppError('Invalid order or patient', 422);
@@ -44,11 +38,9 @@ export async function uploadPrescription(req: Request, res: Response, next: Next
     }
 
     // Upload to S3 with AES-256 encryption
-    const ext = file.mimetype === 'application/pdf' ? 'pdf'
-      : file.mimetype === 'image/png' ? 'png' : 'jpg';
     const s3Key = `prescriptions/${userId}/${uuidv4()}.${ext}`;
 
-    await putPrivateObject(s3Key, file.buffer, file.mimetype, {
+    await putPrivateObject(s3Key, file.buffer, contentType, {
       user_id: userId,
       order_id: order_id || '',
       uploaded_at: new Date().toISOString(),

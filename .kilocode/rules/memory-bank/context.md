@@ -2,13 +2,93 @@
 
 ## Current state (2026-10-02)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–32 are done (Sprint 14 video calls wired on web and mobile; Sprint 32 uncommitted) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–34 are done (Sprint 14 video calls wired on web and mobile; Sprint 34 uncommitted) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Sprint 34 — security review 25–33, Schedule C/C1, retention, list enforcement (backend + web, 2026-10-02, uncommitted)
+- A. Security review of Sprints 25–33: `docs/security/review-sprint25-33.md` (1 High, 6 Medium, 10 Low; all High/Medium
+  and 7 Lows fixed, 3 Lows left with reasons). High: licence scans IDOR — `register.service` ownership check matched
+  any buyer to any buyer's (and partner to partner's) licence (`!==`/`&&` on NULLs); now `ownsLicence()`. Medium:
+  password change now ends every other session (`users.password_changed_at` from the API clock; `utils/jwt
+  issuedBeforePasswordChange` in authenticate / optionalAuth / refresh); xlsx zip bombs (`utils/zipGuard.ts`
+  before every exceljs load: ≤ 2,000 parts, ≤ 60 MB unpacked, each part inflated with maxOutputLength); HTML
+  ".xls" parser rewritten linear (old lazy regexes were quadratic); CSV / sheet rows capped while parsing;
+  uploads typed by magic bytes (`utils/documentCheck.ts`: prescriptions, licence scans, KYC documents);
+  pharmacist health note only for orders still being checked / packed (409 otherwise). Lows fixed: recursive
+  error-log redaction, login timing for unknown mobiles (dummy bcrypt), upload rate limit (`UPLOAD_RATE_LIMIT_MAX`,
+  default 40 / 15 min; dev-env 5,000), search page/limit/q sanitised, `sqlRef()` guard on the stock SQL
+  builders (constants only — verified no user input), licence work-list filter bound, stock-import mapping /
+  cancel audited. Left: change-password wrong-current not counted for lockout; same pharmacist may write and
+  approve medicine info; no search-specific limiter (global covers).
+- B. Schedule C / C1 (DECISIONS row): `products.schedule_c_c1` (migration `29_sprint34_schedule_c_retention_lists.sql`,
+  NOT NULL default FALSE = not marked; set by the pharmacist, never guessed). `stock/sellingRights.ts`
+  `requiredForm` / `requiredRegisterType`: C/C1 → Form 21 (retail) / 21B (trade), others → 20 / 20B; SQL builders
+  now take the product (`partnerMaySupplySql(v, kind, productExpr)`, `dawabagMaySupplySql(kind, productExpr)`);
+  allocation checks own stock per line. Selling-rights status adds `dawabag_forms`, per-partner `forms` and
+  warnings `dawabag_no_form_20/21/20b/21b`. Editable: admin product form + "New products to complete"
+  (`components/catalogue/ScheduleCField`), catalogue import column "Schedule C/C1" (yes/no; blank keeps; other =
+  row error). `devLicenceRegister` now adds each missing register TYPE. Template xlsx not edited (column read by heading).
+- C. Retention (C-44): `retention.days` keys `reminder_dose_logs` (730), `ended_reminders` (730), optional
+  `inactive_health_profiles` (unset = until withdrawn / erasure; ≥ 365; deletes profile + wipes members' health
+  fields for accounts not signed in / updated that long); migration merges defaults without changing set values;
+  admin Settings → Data retention shows them. Export / erasure already covered them (Sprint 33) — smoke-checked.
+- D. Switched-off category / HSN: trigger `dawabag_catalogue_lists` (migration 29) raises check_violation
+  (`products_category_switched_off` / `products_hsn_switched_off`, plain messages in errorHandler) for a new
+  product or a move to a switched-off entry; a product that already had it keeps it; category rename sets
+  `dawabag.catalogue_list_rename` so products move with it. Catalogue import rows fail with a plain reason
+  (`switchedOffProblems`).
+- Tests: jest 57 suites / 463 (new: zipGuard, documentCheck, sessionRevocation, errorHandler, ownership,
+  parsingLimits, catalogueImport sprint34, retention.sprint34; sellingRights updated); `test/sprint34.smoke.mjs`
+  (92 checks incl. a second API on port 4134 for the upload limit) in test:smoke — full smoke green; Playwright 114 passed, 3 skipped.
+- mobile/ untouched by this work (the app section below is the other agent's).
+
+## Sprint 34 — app follow-ups (mobile only, 2026-10-02, uncommitted)
+Closes the app's open items from Sprints 26, 30, 32 and 33. No backend change needed.
+- **Dose alerts survive a restart:** manifest RECEIVE_BOOT_COMPLETED + flutter_local_notifications
+  `ScheduledNotificationBootReceiver` (BOOT_COMPLETED, MY_PACKAGE_REPLACED, QUICKBOOT) — the plugin re-sets
+  its own stored alerts (its OS records: time, generic text, reminder ids; no medicine names, C-41); the app
+  still re-syncs from GET /reminders/upcoming on start / sign-in / each change.
+- **"Taken" / "Skip" on the alert:** `services/dose_actions.dart` (payload `dose:<ids,…>@<UTC ISO>` — every
+  reminder due at that minute; parse, action ids, `answerDoseAlert`, `myMedicinesLocation` /
+  `doseFromQuery`), `services/local_notifications.dart` (ONE plugin set-up shared with order pushes —
+  a second `initialize` used to replace the tap handlers; iOS category `dawabag_dose` with both actions
+  `authenticationRequired`; permission asked only when there are alerts to set, iOS via
+  requestPermissions, not at start-up; foreground action → apiService.logDose; cold-start tap routed from
+  main() even without Firebase), `services/dose_action_background.dart` (`@pragma('vm:entry-point')`
+  background isolate: keychain refresh token → POST /auth/refresh → stores the rotated token → POST
+  /reminders/:id/doses, the same call as My medicines; never deletes the token on failure; failure →
+  generic "Your answer was not saved" alert whose tap opens My medicines on that dose). Android actions run
+  without opening the app (showsUserInterface false, cancel the alert); iOS AppDelegate sets
+  `FlutterLocalNotificationsPlugin.setPluginRegistrantCallback` + UNUserNotificationCenter delegate.
+  `/account/medicines?dose=&at=` → MyMedicinesBody highlights the dose (amber card + row, scrolled to,
+  "Mark the dose from your reminder below"). Risk: the background refresh and an open app refreshing in
+  the same instant can sign the app out (refresh tokens rotate) — narrow window, accepted.
+- **Trade prices paused banner** (Sprint 32 web parity, C-14): `models/trade_prices.dart`,
+  `services/trade_price_api.dart` (GET /users/me/trade-prices), `providers/trade_price_provider.dart`
+  (retailers/wholesalers only, autoDispose), `widgets/trade_price_banner.dart` (web words + "Send the
+  renewed licence" → /account/licences) on Search, product page, cart and checkout.
+- **Order confirmed** repeats "Prescription (photo uploaded …) ✓ — our pharmacist checks it before dispatch"
+  + "Next: our pharmacist checks…" and the web's title "Order placed and paid" (C-08).
+- **Licence copies as PDF too:** `screens/account/licences/licence_copy_picker.dart` (Take photo / Choose
+  from gallery / Choose a PDF via file_picker; `licenceCopyProblem` = server rule PDF/JPG/PNG ≤ 5 MB) used by
+  the renewal form and Upload / Replace copy.
+- **Search tab debounce** now `kTypeaheadDebounce` (250 ms, same as home).
+- **Small phones / large text:** product page checked at 360 dp × textScaler 1.3 with long content.
+  Fixed: DeliveryInfoCard "To <PIN> (city) · Change PIN" row (now Wrap), SafetyRow (topic + level wrap,
+  note below), and a real crash — AppTheme's outlined buttons are full width (min width ∞), so the PIN
+  "Check" button and My medicines' Taken / Skipped / Set reminder buttons in rows threw "BoxConstraints
+  forces an infinite width" in the real theme; they now size to their text. Dose rows wrap.
+- Tests: sprint34_dose_actions_test (10), sprint34_app_followups_test (8), sprint34_product_layout_test (2,
+  golden-free, app-like button theme, opens all 8 closed accordions and scrolls to the end);
+  sprint32_licences_test moved to the copy API. Flutter 154 pass; analyze: only the 13 older infos.
+- Not done / not verifiable here: no Android/iOS build in this container (no Android SDK, no Xcode) — the
+  manifest receivers and the Swift AppDelegate change are unbuilt; background actions need a device test
+  (Android: action from a killed app; iOS: unlock prompt, keychain in the background engine).
 
 ## Sprint 32 — app parity (mobile only, 2026-10-02, uncommitted)
 Brings the Flutter app up to the web (gaps listed in Sprints 25, 26, 28, 30). No backend change.

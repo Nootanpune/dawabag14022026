@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
+import { validateDocument } from '../utils/documentCheck';
 import { logger } from '../config/logger';
 import { putPrivateObject } from '../services/storage.service';
 import {
@@ -68,9 +69,9 @@ export async function uploadKycDocument(req: Request, res: Response, next: NextF
 
     const file = req.file;
     if (!file) throw new AppError('No file uploaded', 400);
-    const ext = ALLOWED_MIME[file.mimetype];
-    if (!ext) throw new AppError('Only PDF, JPG and PNG files are allowed', 400);
-    if (file.size > KYC_MAX_FILE_BYTES) throw new AppError('File must be 5 MB or smaller', 413);
+    if (!ALLOWED_MIME[file.mimetype]) throw new AppError('Only PDF, JPG and PNG files are allowed', 400);
+    // Type from the file's own bytes, matching what was declared (security review Sprint 34, C-41)
+    const { ext, contentType } = validateDocument(file, { maxBytes: KYC_MAX_FILE_BYTES, what: 'File' });
 
     const before = await documentState(userId);
     if (before.type === 'customer') {
@@ -85,7 +86,7 @@ export async function uploadKycDocument(req: Request, res: Response, next: NextF
     }
 
     const key = `kyc/${userId}/${document_type}/${uuidv4()}.${ext}`;
-    await putPrivateObject(key, file.buffer, file.mimetype, {
+    await putPrivateObject(key, file.buffer, contentType, {
       user_id: userId,
       document_type,
       uploaded_at: new Date().toISOString(),
@@ -98,7 +99,7 @@ export async function uploadKycDocument(req: Request, res: Response, next: NextF
          SET storage_key = EXCLUDED.storage_key, original_name = EXCLUDED.original_name,
              mime_type = EXCLUDED.mime_type, size_bytes = EXCLUDED.size_bytes,
              uploaded_at = NOW()`,
-      [userId, document_type, key, file.originalname?.slice(0, 255) || null, file.mimetype, file.size]
+      [userId, document_type, key, file.originalname?.slice(0, 255) || null, contentType, file.size]
     );
 
     const after = await documentState(userId);

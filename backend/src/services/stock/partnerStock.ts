@@ -7,7 +7,8 @@
 // stock only where cold storage is confirmed (C-05, C-25, C-27, C-28). Sprint 32: and
 // only partners whose licence allows THIS buyer's kind of sale — retail (Form 20/21)
 // or trade (Form 20B/21B) — so the stock shown equals what allocation can supply (C-33).
-import { SaleKind, dawabagMaySupplySql, partnerMaySupplySql } from './sellingRights';
+// Sprint 34: and of the form this medicine needs — 21 / 21B for Schedule C / C1, else 20 / 20B.
+import { SaleKind, dawabagMaySupplySql, partnerMaySupplySql, sqlRef } from './sellingRights';
 
 export const PARTNER_MIN_SHELF_DAYS = 30;
 /** Dawabag's own batches need the same shelf life before they count (C-27). */
@@ -18,14 +19,14 @@ const eligible = (productExpr: string, kind: SaleKind) => `
   JOIN vendors v ON v.id = pp.partner_id
   JOIN partner_inventory pi ON pi.partner_product_id = pp.id
   JOIN products px ON px.id = pp.product_id
-  WHERE pp.product_id = ${productExpr} AND pp.approval_status = 'approved' AND pp.listing_status = 'live'
+  WHERE pp.product_id = ${sqlRef(productExpr)} AND pp.approval_status = 'approved' AND pp.listing_status = 'live'
     AND pi.is_recalled = FALSE AND pi.qty_available > pi.qty_reserved
     AND pi.expiry_date > CURRENT_DATE + ${PARTNER_MIN_SHELF_DAYS}
     AND (COALESCE(px.cold_chain, FALSE) = FALSE OR pi.cold_chain_confirmed = TRUE)
     AND v.approval_status = 'approved' AND v.is_active = TRUE
     AND v.vendor_type IN ('marketplace_partner', 'both')
     AND (v.drug_license_expiry IS NULL OR v.drug_license_expiry >= CURRENT_DATE)
-    AND ${partnerMaySupplySql('v', kind)}`;
+    AND ${partnerMaySupplySql('v', kind, productExpr)}`;
 
 /** The most one partner can supply of the product to this kind of buyer (an order line goes to one seller). */
 export const partnerStockSql = (productExpr: string, kind: SaleKind) =>
@@ -41,14 +42,14 @@ export const partnerNearestExpirySql = (productExpr: string, kind: SaleKind) =>
  * dashboard says so — services/stock/sellingRightsStatus.ts).
  */
 export const ownStockSql = (productExpr: string, kind: SaleKind) =>
-  `(CASE WHEN ${dawabagMaySupplySql(kind)} THEN (SELECT COALESCE(SUM(ob.quantity_available - ob.quantity_reserved), 0)
-     FROM inventory_batches ob WHERE ob.product_id = ${productExpr} AND ob.expiry_date > CURRENT_DATE + ${OWN_MIN_SHELF_DAYS}
+  `(CASE WHEN ${dawabagMaySupplySql(kind, productExpr)} THEN (SELECT COALESCE(SUM(ob.quantity_available - ob.quantity_reserved), 0)
+     FROM inventory_batches ob WHERE ob.product_id = ${sqlRef(productExpr)} AND ob.expiry_date > CURRENT_DATE + ${OWN_MIN_SHELF_DAYS}
        AND ob.is_recalled = FALSE AND ob.quantity_available > ob.quantity_reserved) ELSE 0 END)`;
 
 /** Earliest expiry of Dawabag's own sellable batches for this kind of buyer (NULL when it may not sell). */
 export const ownNearestExpirySql = (productExpr: string, kind: SaleKind) =>
-  `(CASE WHEN ${dawabagMaySupplySql(kind)} THEN (SELECT MIN(ob.expiry_date)
-     FROM inventory_batches ob WHERE ob.product_id = ${productExpr} AND ob.expiry_date > CURRENT_DATE + ${OWN_MIN_SHELF_DAYS}
+  `(CASE WHEN ${dawabagMaySupplySql(kind, productExpr)} THEN (SELECT MIN(ob.expiry_date)
+     FROM inventory_batches ob WHERE ob.product_id = ${sqlRef(productExpr)} AND ob.expiry_date > CURRENT_DATE + ${OWN_MIN_SHELF_DAYS}
        AND ob.is_recalled = FALSE AND ob.quantity_available > ob.quantity_reserved) END)`;
 
 /** The most ONE seller can supply to this kind of buyer: Dawabag's batches or one partner's ledger. */

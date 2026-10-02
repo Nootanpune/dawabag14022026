@@ -13,7 +13,7 @@ import { approvalProblems, draftWarnings, prescriptionFor, suggestedDescription,
 
 /** Fields a person may save on a draft (all optional; null clears). */
 export const DRAFT_FIELDS = [
-  'name', 'generic_name', 'composition', 'strength', 'dosage_form', 'drug_schedule', 'cold_chain', 'hsn_code', 'gst_rate',
+  'name', 'generic_name', 'composition', 'strength', 'dosage_form', 'drug_schedule', 'cold_chain', 'schedule_c_c1', 'hsn_code', 'gst_rate',
   'category', 'description', 'storage_instructions', 'net_quantity', 'marketed_by', 'manufacturer_name',
   'manufacturer_address', 'country_of_origin',
 ] as const;
@@ -23,7 +23,7 @@ export type DraftField = typeof DRAFT_FIELDS[number];
 export const BULK_FIELDS = ['category', 'hsn_code', 'manufacturer_name', 'manufacturer_address', 'country_of_origin'] as const;
 export type BulkField = typeof BULK_FIELDS[number];
 
-const COLUMNS = `p.id, p.sku, p.name, p.generic_name, p.composition, p.strength, p.dosage_form, p.drug_schedule, p.cold_chain,
+const COLUMNS = `p.id, p.sku, p.name, p.generic_name, p.composition, p.strength, p.dosage_form, p.drug_schedule, p.cold_chain, p.schedule_c_c1,
   p.hsn_code, p.gst_rate, p.category, p.description, p.storage_instructions, p.net_quantity, p.marketed_by,
   p.manufacturer_name, p.manufacturer_address, p.country_of_origin, p.mrp_paise, p.catalogue_state, p.content_status,
   d.from_file, d.cold_chain_decided, d.status, d.created_at, d.updated_at, d.decided_at, d.decision_note,
