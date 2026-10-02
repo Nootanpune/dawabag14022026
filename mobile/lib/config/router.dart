@@ -45,6 +45,7 @@ import '../screens/prescriptions/prescriptions_screen.dart';
 import '../screens/account/password/change_password_screen.dart';
 import '../screens/account/health/health_profile_screen.dart';
 import '../screens/account/medicines/my_medicines_screen.dart';
+import '../services/dose_actions.dart' show doseFromQuery;
 import '../screens/info/info_page_screen.dart';
 import '../screens/shop/substitutes_screen.dart';
 import '../widgets/main_scaffold.dart';
@@ -124,7 +125,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/account/refills', builder: (c, s) => const RefillScreen()),
       // Sprint 33: dose reminders and the health profile (signed-in only via the /account prefix)
-      GoRoute(path: '/account/medicines', builder: (c, s) => const MyMedicinesScreen()),
+      // Sprint 34: ?dose=<reminder ids>&at=<time> highlights the dose from an alert
+      GoRoute(path: '/account/medicines', builder: (c, s) => MyMedicinesScreen(highlight: doseFromQuery(s.uri.queryParameters))),
       GoRoute(path: '/account/health', builder: (c, s) => const HealthProfileScreen()),
       // Change password: from Account, or forced for a temporary password (Sprint 32)
       GoRoute(

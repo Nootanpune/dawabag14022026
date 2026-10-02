@@ -2,26 +2,21 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'local_notifications.dart';
 import 'notification_tap_router.dart';
 import 'push_device_service.dart';
 
 class NotificationService {
-  static final _localNotifications = FlutterLocalNotificationsPlugin();
+  static FlutterLocalNotificationsPlugin get _localNotifications => LocalNotifications.plugin;
   static FirebaseMessaging get _messaging => FirebaseMessaging.instance;
 
   static Future<void> init() async {
     // Request permission
     await _messaging.requestPermission(alert: true, badge: true, sound: true);
 
-    // Local notifications setup
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings();
-    await _localNotifications.initialize(
-      const InitializationSettings(android: androidInit, iOS: iosInit),
-      // Tap on a notification we showed: the order id, or a dose alert (Sprint 33).
-      onDidReceiveNotificationResponse: (NotificationResponse response) =>
-          NotificationTapRouter.openLocalPayload(response.payload),
-    );
+    // Local notifications: one shared set-up (Sprint 34) — order ids, and dose
+    // alerts with Taken / Skip. Taps that launched the app are handled in main().
+    await LocalNotifications.ensureInitialized();
 
     // Create notification channel (Android)
     const channel = AndroidNotificationChannel(
@@ -66,10 +61,6 @@ class NotificationService {
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
       NotificationTapRouter.handleData(initialMessage.data);
-    }
-    final launch = await _localNotifications.getNotificationAppLaunchDetails();
-    if (launch != null && launch.didNotificationLaunchApp) {
-      NotificationTapRouter.openLocalPayload(launch.notificationResponse?.payload);
     }
 
     // Re-register with the server whenever FCM rotates the token.

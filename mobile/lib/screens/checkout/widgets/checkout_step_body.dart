@@ -117,6 +117,7 @@ class CheckoutStepBody extends StatelessWidget {
             shipments: order?.shipments ?? const [],
             demo: paidDemo,
             paidBy: paidBy,
+            prescriptionLabel: prescriptionLabel,
           ),
       };
 }

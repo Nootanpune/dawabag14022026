@@ -5,6 +5,7 @@ import '../../../config/theme.dart';
 import '../../../models/reminder.dart';
 import '../../../providers/reminder_provider.dart';
 import '../../../services/api_service.dart';
+import '../../../services/dose_actions.dart';
 import '../../../services/reminder_api.dart';
 import '../../../widgets/error_retry_view.dart';
 import 'reminder_form_sheet.dart';
@@ -14,7 +15,9 @@ import 'reminder_tile.dart';
 /// change the phone's alerts are set again from the server's list; Taken /
 /// Skipped go straight to the server (adherence).
 class MyMedicinesScreen extends ConsumerWidget {
-  const MyMedicinesScreen({super.key});
+  /// The dose from a tapped alert (Sprint 34), shown highlighted
+  final DoseRef? highlight;
+  const MyMedicinesScreen({super.key, this.highlight});
 
   Future<void> _run(BuildContext context, WidgetRef ref, Future<void> Function() action, {String? done}) async {
     try {
@@ -59,6 +62,7 @@ class MyMedicinesScreen extends ConsumerWidget {
           reminders: list,
           suggestions: suggestions,
           now: DateTime.now().toUtc(),
+          highlight: highlight,
           onAddFrom: (s) => _add(context, ref, from: s),
           onDose: (r, d, status) => _run(context, ref, () => apiService.logDose(r.id, d.scheduledFor, status)),
           onToggle: (r) => _run(context, ref, () => apiService.updateReminder(r.id, {'is_active': !r.isActive})),
@@ -75,10 +79,12 @@ class MyMedicinesScreen extends ConsumerWidget {
 }
 
 /// The screen's content, from server data only (also used by the widget tests).
-class MyMedicinesBody extends StatelessWidget {
+class MyMedicinesBody extends StatefulWidget {
   final List<Reminder> reminders;
   final List<ReminderSuggestion> suggestions;
   final DateTime now;
+  /// Sprint 34: the dose an alert was about — highlighted and scrolled to
+  final DoseRef? highlight;
   final void Function(ReminderSuggestion s) onAddFrom;
   final void Function(Reminder r, DoseToday d, String status) onDose;
   final void Function(Reminder r) onToggle;
@@ -90,6 +96,7 @@ class MyMedicinesBody extends StatelessWidget {
     required this.reminders,
     required this.suggestions,
     required this.now,
+    this.highlight,
     required this.onAddFrom,
     required this.onDose,
     required this.onToggle,
@@ -98,16 +105,49 @@ class MyMedicinesBody extends StatelessWidget {
   });
 
   @override
+  State<MyMedicinesBody> createState() => _MyMedicinesBodyState();
+}
+
+class _MyMedicinesBodyState extends State<MyMedicinesBody> {
+  final _highlightKey = GlobalKey();
+  bool _scrolled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToHighlight());
+  }
+
+  void _scrollToHighlight() {
+    final ctx = _highlightKey.currentContext;
+    if (_scrolled || ctx == null || !mounted) return;
+    _scrolled = true;
+    Scrollable.ensureVisible(ctx, alignment: 0.2, duration: const Duration(milliseconds: 300));
+  }
+
+  bool _isHighlighted(Reminder r) => widget.highlight?.reminderIds.contains(r.id) ?? false;
+
+  @override
   Widget build(BuildContext context) {
-    return ListView(
+    final reminders = widget.reminders;
+    final suggestions = widget.suggestions;
+    final scrollTo = reminders.where(_isHighlighted).firstOrNull;
+    // A plain scroll view (a person has a handful of reminders) so the dose
+    // from an alert is built and can be scrolled to (Sprint 34)
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-      children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(
           'Set the times you take each medicine. You get a reminder on this phone; mark each dose Taken or Skipped. '
           'Reminders do not change your orders or prescriptions — follow your doctor’s advice.',
           style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
         ),
         const SizedBox(height: 12),
+        if (scrollTo != null) ...[
+          Text('Mark the dose from your reminder below (highlighted).',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.amber.shade900)),
+          const SizedBox(height: 8),
+        ],
         if (suggestions.isNotEmpty) ...[
           const Text('From your past orders', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           for (final s in suggestions)
@@ -116,7 +156,12 @@ class MyMedicinesBody extends StatelessWidget {
               dense: true,
               title: Text(s.medicineName),
               subtitle: Text('Order ${s.orderNumber}'),
-              trailing: OutlinedButton(onPressed: () => onAddFrom(s), child: const Text('Set reminder')),
+              trailing: OutlinedButton(
+                // sized to its text (the app theme's outlined buttons are full width)
+                style: OutlinedButton.styleFrom(minimumSize: const Size(64, 36)),
+                onPressed: () => widget.onAddFrom(s),
+                child: const Text('Set reminder'),
+              ),
             ),
           const SizedBox(height: 8),
         ],
@@ -127,14 +172,17 @@ class MyMedicinesBody extends StatelessWidget {
           ),
         for (final r in reminders)
           ReminderTile(
+            // the first highlighted reminder is the one scrolled to
+            key: identical(r, scrollTo) ? _highlightKey : null,
             reminder: r,
-            now: now,
-            onDose: (d, status) => onDose(r, d, status),
-            onToggle: () => onToggle(r),
-            onEdit: () => onEdit(r),
-            onDelete: () => onDelete(r),
+            now: widget.now,
+            highlightAt: _isHighlighted(r) ? widget.highlight!.scheduledFor : null,
+            onDose: (d, status) => widget.onDose(r, d, status),
+            onToggle: () => widget.onToggle(r),
+            onEdit: () => widget.onEdit(r),
+            onDelete: () => widget.onDelete(r),
           ),
-      ],
+      ]),
     );
   }
 }

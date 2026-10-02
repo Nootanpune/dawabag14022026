@@ -6,6 +6,7 @@ import '../../services/api_service.dart';
 import '../../utils/drug_schedule.dart';
 import '../../widgets/error_retry_view.dart';
 import '../../widgets/product_image.dart';
+import '../../widgets/trade_price_banner.dart';
 import '../../providers/product_page_providers.dart';
 import 'widgets/delivery_info_card.dart';
 import 'widgets/medicine_info_view.dart';
@@ -79,6 +80,8 @@ class _Body extends StatelessWidget {
                 coldChain: product['cold_chain'] == true,
               ),
               const SizedBox(height: 16),
+              // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
+              const TradePriceBanner(margin: EdgeInsets.only(bottom: 12)),
               ProductPrice(product: product),
               if (!inStock)
                 Container(

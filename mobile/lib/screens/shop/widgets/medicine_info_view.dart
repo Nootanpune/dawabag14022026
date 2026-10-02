@@ -164,17 +164,21 @@ class SafetyRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final note = item['note']?.toString();
+    // Sprint 34: topic and level on one line (wrapping when the text is large),
+    // the note underneath — fits 360 dp phones at 130 % text without overflow
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(width: 110, child: Text(item['label']?.toString() ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: _bg(item['level']?.toString() ?? ''), borderRadius: BorderRadius.circular(10)),
-          child: Text(item['level_label']?.toString() ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-        ),
-        const SizedBox(width: 8),
-        if (note != null && note.isNotEmpty) Expanded(child: Text(note, style: const TextStyle(fontSize: 13))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          Text(item['label']?.toString() ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: _bg(item['level']?.toString() ?? ''), borderRadius: BorderRadius.circular(10)),
+            child: Text(item['level_label']?.toString() ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+        ]),
+        if (note != null && note.isNotEmpty)
+          Padding(padding: const EdgeInsets.only(top: 2), child: Text(note, style: const TextStyle(fontSize: 13))),
       ]),
     );
   }

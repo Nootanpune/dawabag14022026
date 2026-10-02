@@ -13,6 +13,7 @@ import '../../services/payment_api.dart';
 import '../../services/prescription_api.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/payments/demo_checkout/demo_checkout.dart';
+import '../../widgets/trade_price_banner.dart';
 import 'checkout_flow.dart';
 import 'checkout_prescription.dart';
 import 'checkout_razorpay.dart';
@@ -335,6 +336,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         children: [
           if (!confirmed)
             CheckoutStepBar(steps: checkoutBarLabels(hasRx), currentIndex: _step.barIndex(hasRx)),
+          // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
+          if (!confirmed) const TradePriceBanner(margin: EdgeInsets.fromLTRB(16, 8, 16, 0)),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),

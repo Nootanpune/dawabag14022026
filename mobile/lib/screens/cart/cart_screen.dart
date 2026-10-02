@@ -11,6 +11,7 @@ import 'widgets/cart_prescription_notice.dart';
 import 'widgets/add_more_sheet.dart';
 import 'widgets/cart_summary_card.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/trade_price_banner.dart';
 
 /// Renders the server CartView. Every change is a server call; the screen
 /// never computes prices.
@@ -114,6 +115,8 @@ class CartScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           children: [
             if (busy) const LinearProgressIndicator(minHeight: 2),
+            // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
+            const TradePriceBanner(margin: EdgeInsets.only(bottom: 12)),
             for (final line in cart.items)
               CartLineCard(
                 line: line,

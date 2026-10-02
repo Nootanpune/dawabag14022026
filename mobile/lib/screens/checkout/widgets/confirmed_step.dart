@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../orders/widgets/order_shipments_card.dart';
+import 'rx_policy_note.dart';
 
 class ConfirmedStep extends StatelessWidget {
   final String orderNumber;
@@ -16,7 +17,18 @@ class ConfirmedStep extends StatelessWidget {
   /// How the demo payment was made, e.g. "Card ending 1111 (demo)"
   final String? paidBy;
 
-  const ConfirmedStep({super.key, required this.orderNumber, this.shipments = const [], this.demo = false, this.paidBy});
+  /// Sprint 34 (as the web): the prescription sent with the order, e.g.
+  /// "photo uploaded 02 Oct 2026, 9:56 am"; null when none was needed (C-08)
+  final String? prescriptionLabel;
+
+  const ConfirmedStep({
+    super.key,
+    required this.orderNumber,
+    this.shipments = const [],
+    this.demo = false,
+    this.paidBy,
+    this.prescriptionLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +42,8 @@ class ConfirmedStep extends StatelessWidget {
           child: const Icon(Icons.check_circle, color: Colors.green, size: 40),
         ),
         const SizedBox(height: 20),
-        const Text('Order confirmed!',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+        Text(prescriptionLabel != null ? 'Order placed and paid' : 'Order confirmed!',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         if (paidBy != null)
           Padding(
@@ -47,6 +59,17 @@ class ConfirmedStep extends StatelessWidget {
           ),
         Text('Order ID: $orderNumber',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
+        // Sprint 34: repeat the prescription line, as the web's confirmation (C-08)
+        if (prescriptionLabel != null) ...[
+          const SizedBox(height: 12),
+          RxAttachedNote(label: prescriptionLabel!),
+          const SizedBox(height: 8),
+          Text(
+            'Next: our pharmacist checks your prescription. We pack and dispatch your order once it is accepted, '
+            'and tell you at each step.',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+          ),
+        ],
         const SizedBox(height: 8),
         Text("You'll receive SMS and email updates at every step.",
             style: TextStyle(fontSize: 13, color: Colors.grey.shade400),

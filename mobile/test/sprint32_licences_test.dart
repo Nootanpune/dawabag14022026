@@ -1,10 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:dawabag/models/drug_licence.dart';
 import 'package:dawabag/models/licence_draft.dart';
+import 'package:dawabag/screens/account/licences/licence_copy_picker.dart';
 import 'package:dawabag/screens/account/licences/licence_renewal_form.dart';
 import 'package:dawabag/screens/account/licences/licences_screen.dart';
 
@@ -44,14 +42,14 @@ void main() {
 
   testWidgets('renewal form: form, number, valid till and an optional photo are sent', (tester) async {
     LicenceDraft? sent;
-    XFile? sentPhoto;
+    LicenceCopy? sentPhoto;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: SingleChildScrollView(
           child: LicenceRenewalForm(
             customerType: 'b2b_wholesaler',
             today: '2026-10-02',
-            pickPhoto: () async => XFile.fromData(Uint8List.fromList([1, 2, 3]), path: 'licence.jpg'),
+            pickCopy: () async => const LicenceCopy(path: '/tmp/licence.jpg', name: 'licence.jpg', size: 3),
             onSubmit: (d, photo) async {
               sent = d;
               sentPhoto = photo;
@@ -81,8 +79,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Valid till 02 Oct 2027'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Add a photo of the licence (optional)'));
-    await tester.tap(find.text('Add a photo of the licence (optional)'));
+    await tester.ensureVisible(find.text('Add a photo or PDF of the licence (optional)'));
+    await tester.tap(find.text('Add a photo or PDF of the licence (optional)'));
     await tester.pumpAndSettle();
     expect(find.text('Photo: licence.jpg'), findsOneWidget);
 
@@ -102,7 +100,7 @@ void main() {
           child: LicenceRenewalForm(
             customerType: 'b2b_retailer',
             today: '2026-10-02',
-            pickPhoto: () async => null,
+            pickCopy: () async => null,
             onSubmit: (_, __) async => 'This licence number is already registered to another business',
           ),
         ),

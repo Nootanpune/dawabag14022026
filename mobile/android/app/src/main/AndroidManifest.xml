@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Order and refill updates (Android 13+ asks the user) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Sprint 34: dose alerts survive a phone restart (flutter_local_notifications
+         sets its own stored alerts again; the app re-syncs from the server on start) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- allowBackup off: no copy of app data goes to device or cloud backups; the
@@ -42,9 +45,20 @@
             </intent-filter>
         </activity>
         <!-- Sprint 33: dose alerts set from the server's list of coming doses
-             (flutter_local_notifications). No boot receiver: after a restart the
-             app sets them again from the server when it is opened. -->
+             (flutter_local_notifications). The plugin keeps only its own OS
+             schedule records (time, generic text, reminder ids — no medicine
+             names, C-41); the server stays the authority. -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <!-- Sprint 34: after a restart or an app update the plugin sets its stored alerts again -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+        <!-- Sprint 34: "Taken" / "Skip" on a dose alert, answered in the background -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

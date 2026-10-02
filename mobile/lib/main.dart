@@ -7,6 +7,7 @@ import 'config/router.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/reminder_provider.dart';
+import 'services/local_notifications.dart';
 import 'services/notification_service.dart';
 import 'services/notification_tap_router.dart';
 
@@ -21,6 +22,15 @@ void main() async {
 
   // Push notifications only when Firebase is configured for this build
   if (await startFirebase()) await NotificationService.init();
+
+  // Sprint 34: dose alerts (Taken / Skip) work without Firebase too; a tap that
+  // opened the app is routed once the session is restored.
+  try {
+    await LocalNotifications.ensureInitialized();
+    await LocalNotifications.openLaunchNotification();
+  } catch (_) {
+    // Alerts are a convenience; My medicines shows every dose from the server.
+  }
 
   runApp(const ProviderScope(child: DawabagApp()));
 }
@@ -44,6 +54,11 @@ class _DawabagAppState extends ConsumerState<DawabagApp> {
     );
     // Sprint 33: dose alerts are (re)set from the server's list on start and sign-in
     ref.read(doseAlarmSyncProvider);
+    // Sprint 34: "Taken" / "Skip" answered from an alert while the app is open
+    LocalNotifications.onDoseAnswered = () {
+      ref.invalidate(remindersProvider);
+      ref.read(doseAlarmSyncProvider).sync();
+    };
   }
 
   @override

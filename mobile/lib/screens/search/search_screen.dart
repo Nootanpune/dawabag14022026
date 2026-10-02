@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/typeahead_provider.dart' show kTypeaheadDebounce;
 import '../../widgets/cart_action_button.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/home/search_entry.dart';
+import '../../widgets/trade_price_banner.dart';
 import 'widgets/search_results_list.dart';
 import 'widgets/search_sort_bar.dart';
 
@@ -34,7 +36,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onChanged(String text) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () {
+    // Sprint 34: the same 250 ms as the home search box (kTypeaheadDebounce)
+    _debounce = Timer(kTypeaheadDebounce, () {
       if (mounted) setState(() => _query = text.trim());
     });
   }
@@ -96,16 +99,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
       ),
-      body: _query.isEmpty
-          ? const EmptyState(
+      body: Column(children: [
+        // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
+        const TradePriceBanner(margin: EdgeInsets.fromLTRB(16, 8, 16, 0)),
+        if (_query.isEmpty)
+          const Expanded(
+            child: EmptyState(
               icon: Icons.search,
               title: 'Search for a medicine',
               hint: 'Type a brand or generic name, e.g. paracetamol or cetirizine.',
-            )
-          : Column(children: [
-              SearchSortBar(value: _sort, onChanged: (s) => setState(() => _sort = s)),
-              Expanded(child: SearchResultsList(query: _query, sort: _sort, onSuggestion: _useSuggestion)),
-            ]),
+            ),
+          )
+        else ...[
+          SearchSortBar(value: _sort, onChanged: (s) => setState(() => _sort = s)),
+          Expanded(child: SearchResultsList(query: _query, sort: _sort, onSuggestion: _useSuggestion)),
+        ],
+      ]),
     );
   }
 }

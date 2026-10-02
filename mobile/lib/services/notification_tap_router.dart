@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:go_router/go_router.dart';
 
+import 'dose_actions.dart';
+
 /// Opens the right screen when the user taps a push notification.
 ///
 /// The push data payload carries only `type` and `order_id` (no personal or
@@ -29,10 +31,11 @@ class NotificationTapRouter {
   static String? _pendingPath;
 
   /// A tapped local notification: a dose alert (Sprint 33, payload 'dose:…')
-  /// opens My medicines; anything else is an order id.
+  /// opens My medicines with that dose highlighted (Sprint 34); anything else
+  /// is an order id.
   static void openLocalPayload(String? payload) {
-    if (payload != null && payload.startsWith('dose:')) {
-      _pendingPath = '/account/medicines';
+    if (isDosePayload(payload)) {
+      _pendingPath = myMedicinesLocation(parseDosePayload(payload));
       _flush();
       return;
     }

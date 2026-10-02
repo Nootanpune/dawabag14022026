@@ -3,6 +3,10 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../models/reminder.dart';
+import 'dose_actions.dart';
+import 'local_notifications.dart';
+
+export 'dose_actions.dart' show isDosePayload, kDosePayloadPrefix;
 
 /// Phone alerts for "My medicines" (Sprint 33).
 ///
@@ -10,14 +14,16 @@ import '../models/reminder.dart';
 /// after every change the app asks GET /reminders/upcoming and re-creates its
 /// alerts from that list; nothing about reminders is kept by the app itself.
 /// The alert text never names the medicine (it shows on the lock screen,
-/// C-41) — the tap opens My medicines, where Taken / Skipped go to the server.
+/// C-41). Sprint 34: the alert has "Taken" and "Skip", which send the answer to
+/// the server without opening the app (dose_action_background.dart); the tap
+/// opens My medicines on that dose. After a phone restart the notification
+/// plugin sets its own stored alerts again (boot receiver in the manifest) and
+/// the app re-syncs from the server when it next starts.
 
 /// Our alerts use a fixed id range so they can be replaced without remembering
 /// anything on the phone.
 const int kDoseAlarmBaseId = 700000;
 const int kMaxDoseAlarms = 60;
-const String kDosePayloadPrefix = 'dose:';
-const String kDoseChannelId = 'dawabag_doses';
 
 class DoseAlarm {
   final int id;
@@ -44,23 +50,36 @@ List<DoseAlarm> planDoseAlarms(List<UpcomingDose> doses, DateTime now) {
       id: kDoseAlarmBaseId + out.length,
       at: group.first.at,
       title: 'Time for your medicine',
-      body: group.length == 1 ? 'Tap to mark this dose as taken or skipped.' : 'Tap to mark these ${group.length} doses as taken or skipped.',
-      payload: '$kDosePayloadPrefix${group.first.reminderId}@${group.first.at.toUtc().toIso8601String()}',
+      body: group.length == 1 ? 'Mark this dose as taken or skipped.' : 'Mark these ${group.length} doses as taken or skipped.',
+      // ids only — never the medicine's name (C-41); every reminder due at that minute
+      payload: dosePayload(group.map((d) => d.reminderId).toSet().toList(), group.first.at),
     ));
   }
   return out;
 }
-
-bool isDosePayload(String? payload) => payload != null && payload.startsWith(kDosePayloadPrefix);
 
 /// Where the phone's alerts are set (the plugin in the app; a fake in tests).
 abstract class DoseAlarmScheduler {
   Future<void> replaceAll(List<DoseAlarm> alarms);
 }
 
+/// Android: "Taken" / "Skip" run in the background (showsUserInterface false)
+/// and close the alert. iOS: the same buttons come from [kDoseCategoryId].
+const NotificationDetails kDoseNotificationDetails = NotificationDetails(
+  android: AndroidNotificationDetails(kDoseChannelId, kDoseChannelName,
+      channelDescription: kDoseChannelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+      visibility: NotificationVisibility.private,
+      actions: <AndroidNotificationAction>[
+        AndroidNotificationAction(kDoseActionTaken, 'Taken', cancelNotification: true),
+        AndroidNotificationAction(kDoseActionSkip, 'Skip', cancelNotification: true),
+      ]),
+  iOS: DarwinNotificationDetails(categoryIdentifier: kDoseCategoryId),
+);
+
 class LocalNotificationDoseScheduler implements DoseAlarmScheduler {
-  final FlutterLocalNotificationsPlugin plugin;
-  LocalNotificationDoseScheduler(this.plugin);
+  FlutterLocalNotificationsPlugin get plugin => LocalNotifications.plugin;
 
   static bool _tzReady = false;
 
@@ -70,18 +89,15 @@ class LocalNotificationDoseScheduler implements DoseAlarmScheduler {
       tzdata.initializeTimeZones();
       _tzReady = true;
     }
+    await LocalNotifications.ensureInitialized();
+    // Ask for permission only when there is something to alert about
+    if (alarms.isNotEmpty) await LocalNotifications.requestPermission();
     final india = tz.getLocation('Asia/Kolkata');
     for (var i = 0; i < kMaxDoseAlarms; i++) {
       await plugin.cancel(kDoseAlarmBaseId + i);
     }
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(kDoseChannelId, 'Medicine reminders',
-          channelDescription: 'Reminders you set in My medicines',
-          importance: Importance.high, priority: Priority.high, visibility: NotificationVisibility.private),
-      iOS: DarwinNotificationDetails(),
-    );
     for (final a in alarms) {
-      await plugin.zonedSchedule(a.id, a.title, a.body, tz.TZDateTime.from(a.at, india), details,
+      await plugin.zonedSchedule(a.id, a.title, a.body, tz.TZDateTime.from(a.at, india), kDoseNotificationDetails,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
           payload: a.payload);

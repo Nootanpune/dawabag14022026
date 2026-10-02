@@ -84,6 +84,8 @@ class _DeliveryInfoCardState extends ConsumerState<DeliveryInfoCard> {
           ),
           const SizedBox(width: 8),
           OutlinedButton(
+            // the app theme makes outlined buttons full width; in a row it must size to its text
+            style: OutlinedButton.styleFrom(minimumSize: const Size(64, 44)),
             onPressed: () {
               if (!RegExp(r'^[1-9]\d{5}$').hasMatch(_controller.text)) return;
               setState(() {
@@ -107,7 +109,8 @@ class _DeliveryInfoCardState extends ConsumerState<DeliveryInfoCard> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(d.label != null ? '${d.label} (estimated)' : (d.message ?? ''),
                 style: TextStyle(fontSize: 14, fontWeight: d.label != null ? FontWeight.w600 : FontWeight.normal)),
-            Row(children: [
+            // Sprint 34: wraps on a small phone / large text instead of overflowing
+            Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
               Text('To ${d.pincode ?? ''}${d.city != null ? ' (${d.city})' : ''}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               TextButton(
                 style: TextButton.styleFrom(minimumSize: const Size(0, 28), padding: const EdgeInsets.symmetric(horizontal: 8)),

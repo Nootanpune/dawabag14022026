@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-
 import '../../../models/licence_draft.dart';
 import '../../../utils/ist.dart';
+import 'licence_copy_picker.dart';
 
-/// Sends the licence and the optional photo; returns a plain error, or null when sent.
-typedef LicenceRenewalSubmit = Future<String?> Function(LicenceDraft draft, XFile? photo);
+/// Sends the licence and the optional copy (photo or PDF); returns a plain error, or null when sent.
+typedef LicenceRenewalSubmit = Future<String?> Function(LicenceDraft draft, LicenceCopy? copy);
 
 /// "Send a renewed or another licence" (Sprint 32, as the web's YourLicencesSection):
-/// the form as printed, the number, the valid-till date and an optional photo of
-/// the licence. Checked here with the server's words first; the server checks again.
+/// the form as printed, the number, the valid-till date and an optional photo or
+/// PDF of the licence (PDF since Sprint 34). Checked here with the server's words first; the server checks again.
 class LicenceRenewalForm extends StatefulWidget {
   final String? customerType;
-  /// Camera or gallery; null when cancelled
-  final Future<XFile?> Function() pickPhoto;
+  /// Camera, gallery or PDF; null when cancelled
+  final Future<LicenceCopy?> Function() pickCopy;
   final LicenceRenewalSubmit onSubmit;
   /// India date YYYY-MM-DD (tests pass a fixed day)
   final String? today;
@@ -21,7 +20,7 @@ class LicenceRenewalForm extends StatefulWidget {
   const LicenceRenewalForm({
     super.key,
     required this.customerType,
-    required this.pickPhoto,
+    required this.pickCopy,
     required this.onSubmit,
     this.today,
   });
@@ -36,7 +35,7 @@ class _LicenceRenewalFormState extends State<LicenceRenewalForm> {
   final _issuedBy = TextEditingController();
   String _form = '';
   String _validUpto = '';
-  XFile? _photo;
+  LicenceCopy? _copy;
   bool _pending = false;
   List<String> _problems = const [];
 
@@ -71,14 +70,14 @@ class _LicenceRenewalFormState extends State<LicenceRenewalForm> {
     if (picked != null) setState(() => _validUpto = calendarDayToApi(picked));
   }
 
-  Future<void> _choosePhoto() async {
-    final photo = await widget.pickPhoto();
-    if (photo == null || !mounted) return;
-    if (await photo.length() > kLicenceFileMaxBytes) {
-      setState(() => _problems = const ['This photo is larger than 5 MB. Please take a smaller photo.']);
-      return;
-    }
-    setState(() => _photo = photo);
+  Future<void> _chooseCopy() async {
+    final copy = await widget.pickCopy();
+    if (copy == null || !mounted) return;
+    final problem = licenceCopyProblem(copy);
+    setState(() {
+      _problems = problem == null ? const [] : [problem];
+      if (problem == null) _copy = copy;
+    });
   }
 
   Future<void> _submit() async {
@@ -86,7 +85,7 @@ class _LicenceRenewalFormState extends State<LicenceRenewalForm> {
     setState(() => _problems = problems);
     if (problems.isNotEmpty) return;
     setState(() => _pending = true);
-    final error = await widget.onSubmit(_draft, _photo);
+    final error = await widget.onSubmit(_draft, _copy);
     if (!mounted) return;
     setState(() {
       _pending = false;
@@ -144,16 +143,16 @@ class _LicenceRenewalFormState extends State<LicenceRenewalForm> {
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: _pending ? null : _choosePhoto,
-          icon: const Icon(Icons.photo_camera_outlined, size: 20),
-          label: Text(_photo == null ? 'Add a photo of the licence (optional)' : 'Photo: ${_photo!.name}'),
+          onPressed: _pending ? null : _chooseCopy,
+          icon: Icon(_copy?.isPdf == true ? Icons.picture_as_pdf_outlined : Icons.photo_camera_outlined, size: 20),
+          label: Text(_copy == null ? 'Add a photo or PDF of the licence (optional)' : _copy!.label),
         ),
-        if (_photo != null)
+        if (_copy != null)
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(onPressed: () => setState(() => _photo = null), child: const Text('Remove photo')),
+            child: TextButton(onPressed: () => setState(() => _copy = null), child: const Text('Remove file')),
           ),
-        Text('JPG or PNG, up to 5 MB. Only you and Dawabag’s team can open it.',
+        Text('PDF, JPG or PNG, up to 5 MB. Only you and Dawabag’s team can open it.',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
         if (_problems.isNotEmpty) ...[
           const SizedBox(height: 12),
