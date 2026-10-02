@@ -31,7 +31,7 @@ export async function listHsnCodes(includeInactive = false): Promise<HsnRow[]> {
 }
 
 /** Adds a category, or returns the one already there under the same name. */
-export async function createCategory(rawName: string, userId: string) {
+export async function createCategory(rawName: string, userId: string, mayReactivate = true) {
   const problems = categoryNameProblems(rawName);
   if (problems.length) throw new AppError(problems.join('; '), 400);
   const name = tidyName(rawName);
@@ -40,6 +40,8 @@ export async function createCategory(rawName: string, userId: string) {
       `SELECT id, name, is_active FROM product_categories WHERE name_key = $1 FOR UPDATE`, [categoryKey(name)])).rows[0];
     if (existing) {
       if (!existing.is_active) {
+        // Switched off by an admin in Catalogue lists (Sprint 32): only an admin switches it back on
+        if (!mayReactivate) throw new AppError(`"${existing.name}" was switched off by an admin. Choose another category, or ask an admin to switch it on in Catalogue lists`, 409);
         await c.query('UPDATE product_categories SET is_active = TRUE WHERE id = $1', [existing.id]);
         await writeAuditTx(c, { userId: null, action: 'product_category_reactivated', performedBy: userId,
           newValue: { category_id: existing.id, name: existing.name } });
@@ -56,7 +58,7 @@ export async function createCategory(rawName: string, userId: string) {
 }
 
 /** Adds an HSN code, or returns the one already listed (its description and GST are not changed). */
-export async function createHsnCode(input: { code: string; description: string; gst_rate?: number | null }, userId: string) {
+export async function createHsnCode(input: { code: string; description: string; gst_rate?: number | null }, userId: string, mayReactivate = true) {
   const problems = hsnProblems(input);
   if (problems.length) throw new AppError(problems.join('; '), 400);
   const code = tidyHsn(input.code);
@@ -66,6 +68,9 @@ export async function createHsnCode(input: { code: string; description: string; 
     const existing = (await c.query<HsnRow>(
       'SELECT code, description, gst_rate, is_active FROM hsn_codes WHERE code = $1 FOR UPDATE', [code])).rows[0];
     if (existing) {
+      if (!existing.is_active && !mayReactivate) {
+        throw new AppError(`HSN ${code} was switched off by an admin. Choose another code, or ask an admin to switch it on in Catalogue lists`, 409);
+      }
       // A code taken from the catalogue may have no words yet: fill them in, never overwrite
       if (!existing.description || !existing.is_active) {
         await c.query(
@@ -112,11 +117,16 @@ export async function requireHsn(db: Db, raw: string | null | undefined): Promis
  * list is added (admins may add categories) with an audit entry. Same for a valid
  * HSN code. Returns the values to store.
  */
-export async function registerFromProductForm(db: Db, userId: string, v: { category?: string | null; hsn_code?: string | null; gst_rate?: number | null }) {
+export async function registerFromProductForm(db: Db, userId: string, v: { category?: string | null; hsn_code?: string | null; gst_rate?: number | null },
+  current: { category?: string | null; hsn_code?: string | null } = {}) {
   const out: { category?: string | null; hsn_code?: string | null } = {};
   if (v.category !== undefined && v.category !== null && v.category.trim()) {
     const name = tidyName(v.category);
-    const found = (await db.query<{ name: string }>('SELECT name FROM product_categories WHERE name_key = $1', [categoryKey(name)])).rows[0];
+    const found = (await db.query<{ name: string; is_active: boolean }>('SELECT name, is_active FROM product_categories WHERE name_key = $1', [categoryKey(name)])).rows[0];
+    // A switched-off entry stays on products that have it, but is not chosen anew (Sprint 32)
+    if (found && !found.is_active && categoryKey(current.category ?? '') !== categoryKey(name)) {
+      throw new AppError(`The category "${found.name}" is no longer used: choose another`, 400);
+    }
     if (found) out.category = found.name;
     else {
       const problems = categoryNameProblems(name);
@@ -132,7 +142,10 @@ export async function registerFromProductForm(db: Db, userId: string, v: { categ
   if (v.hsn_code !== undefined && v.hsn_code !== null && v.hsn_code.trim()) {
     const code = tidyHsn(v.hsn_code);
     out.hsn_code = code;
-    const listed = (await db.query('SELECT 1 FROM hsn_codes WHERE code = $1', [code])).rows[0];
+    const listed = (await db.query<{ is_active: boolean }>('SELECT is_active FROM hsn_codes WHERE code = $1', [code])).rows[0];
+    if (listed && !listed.is_active && tidyHsn(current.hsn_code ?? '') !== code) {
+      throw new AppError(`HSN ${code} is no longer used: choose another`, 400);
+    }
     if (!listed && HSN_RE.test(code)) {
       const gst = v.gst_rate != null && (GST_RATES as readonly number[]).includes(v.gst_rate) ? v.gst_rate : null;
       await db.query('INSERT INTO hsn_codes (code, gst_rate, created_by) VALUES ($1, $2, $3) ON CONFLICT (code) DO NOTHING', [code, gst, userId]);

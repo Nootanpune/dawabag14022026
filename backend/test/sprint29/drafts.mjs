@@ -7,6 +7,7 @@
 // Every item name is made up (no real business data).
 import { API, call, check, login, q, signUp } from '../sprint5/lib.mjs';
 import { buildMediVisionWorkbook } from '../fixtures/partnerStockFile.mjs';
+import { licencePartner } from '../support/partnerLicences.mjs';
 
 const PIN = '499929';
 const COM = 'S29Q';
@@ -86,6 +87,7 @@ export async function setup() {
      VALUES ($1, $2, '27ABCDE2929F1Z5', $3, 'Pune', 'Maharashtra', 18.52, 73.85, 'marketplace_partner', 'approved', TRUE, $4, 'dl20b', CURRENT_DATE + 500)
      RETURNING id`, [name, dl, PIN, prefix]))[0].id;
   const V = { A: await vendor('S29 Partner A', 'DL-S29-A', 'S29A'), B: await vendor('S29 Partner B', 'DL-S29-B', 'S29B') };
+  for (const v of Object.values(V)) await licencePartner(q, v);   // Sprint 32: retail + wholesale licences
   await q('INSERT INTO vendor_users (vendor_id, user_id) VALUES ($1, $2), ($3, $4)', [V.A, ids.partnerA, V.B, ids.partnerB]);
   const t = {};
   for (const [k, p] of Object.entries(people)) t[k] = await login(p);

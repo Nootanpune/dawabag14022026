@@ -1,5 +1,6 @@
 // Sprint 5 test data: mobiles 90000005xx, SKU prefix S5-, vendor 'S5 Partner', pincode 499951
 import { call, check, login, q, signUp } from './lib.mjs';
+import { licencePartner } from '../support/partnerLicences.mjs';
 
 const consent = { accept_privacy_notice: true, age_confirmed: true };
 const person = (mobile, name) => ({ customer_type: 'customer', full_name: name, mobile, password: 'Passw0rd!', ...consent });
@@ -86,6 +87,7 @@ export async function setup() {
        approval_status, is_active, invoice_prefix, drug_license_expiry)
      VALUES ('S5 Partner', 'DL-S5-20B', '27ABCDE1234F1Z5', $1, 'Nashik', 'Maharashtra', 20.0110, 73.7900, 'marketplace_partner',
        'approved', TRUE, 'S5P', CURRENT_DATE + 700) RETURNING id`, [PIN]))[0].id;
+  await licencePartner(q, V);   // Sprint 32: sells under checked retail + wholesale licences
   const PP = (await q(`INSERT INTO partner_products (partner_id, product_id, medicine_name, approval_status, listing_status, catalogue_price_accepted)
      VALUES ($1, $2, 'S5 S5-PART', 'approved', 'live', TRUE) RETURNING id`, [V, P.part]))[0].id;
   await q(`INSERT INTO partner_inventory (partner_id, partner_product_id, batch_number, qty_available, expiry_date)

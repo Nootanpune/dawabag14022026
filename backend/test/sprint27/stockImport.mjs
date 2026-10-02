@@ -5,6 +5,7 @@
 // Test data: mobiles 90000027xx, SKUs S27-, vendors 'S27 %', PIN 499927; removed by cleanup().
 import { API, call, check, login, q, signUp } from '../sprint5/lib.mjs';
 import { buildGenericCsv, buildMediVisionWorkbook } from '../fixtures/partnerStockFile.mjs';
+import { licencePartner } from '../support/partnerLicences.mjs';
 
 const PIN = '499927';
 const person = (mobile, name) => ({ customer_type: 'customer', full_name: name, mobile, password: 'Passw0rd!', accept_privacy_notice: true, age_confirmed: true });
@@ -96,6 +97,7 @@ export async function setup() {
      VALUES ($1, $2, '27ABCDE2727F1Z5', $3, 'Pune', 'Maharashtra', 18.52, 73.85, 'marketplace_partner', 'approved', TRUE, $4, 'dl20b', CURRENT_DATE + 500)
      RETURNING id`, [name, dl, PIN, prefix]))[0].id;
   const V = { A: await vendor('S27 Partner A', 'DL-S27-A', 'S27A'), B: await vendor('S27 Partner B', 'DL-S27-B', 'S27B') };
+  for (const v of Object.values(V)) await licencePartner(q, v);   // Sprint 32: retail + wholesale licences
   await q('INSERT INTO vendor_users (vendor_id, user_id) VALUES ($1, $2), ($3, $4)', [V.A, ids.partnerA, V.B, ids.partnerB]);
   // Partner A already lists Betacinol (live) with two batches; BT-OLD is not in the new file
   const pp = (await q(

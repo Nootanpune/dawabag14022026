@@ -2,13 +2,118 @@
 
 ## Current state (2026-10-02)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–20 are done (Sprint 14 video calls wired on web and mobile) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–32 are done (Sprint 14 video calls wired on web and mobile; Sprint 32 uncommitted) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Sprint 32 — app parity (mobile only, 2026-10-02, uncommitted)
+Brings the Flutter app up to the web (gaps listed in Sprints 25, 26, 28, 30). No backend change.
+- **Home search dropdown:** `widgets/home/home_search_box.dart` (OverlayPortal + CompositedTransformFollower
+  under the box; TextField groupId so taps in the list stay inside) replaces the tap-to-open SearchEntry on
+  home. 2+ characters, 250 ms debounce, `providers/typeahead_provider.dart` → GET /products/search?q=&limit=6
+  (+ pincode, as the Search tab). `widgets/search/typeahead_panel.dart` ("N medicines found", options,
+  "No medicines found" + "Did you mean" from /products/search/suggest, "See all results for “q”") and
+  `typeahead_option.dart` (name, generic, ScheduleBadge, buyer's price, "Out of stock", CartQuantityControl
+  Add → − qty +). Submit / See all → `/search?q=` (SearchScreen.didUpdateWidget takes a new query).
+- **Checkout in the web's order:** address → prescription → review → place order → payment
+  (`checkout_flow.dart`: CheckoutStep adds rxFix; checkoutNextStep / checkoutPreviousStep / barIndex /
+  buttonLabel; `placeOrderThenAttachRx` = POST /orders then POST /prescriptions/:id/use-for-order;
+  `attachRxToPlacedOrder` for the retry). `checkout_prescription.dart` now only chooses (GET
+  /prescriptions/my usable ones) or uploads new without an order (POST /prescriptions/upload → chosen);
+  the old pick-a-file-and-upload-with-order path (`uploadOrderPrescription`) is removed. PrescriptionStep
+  = Rx lines, `RxChoiceCard` radio cards (thumbnail from the signed link, "Uploaded <date, time>", status
+  words, "Chosen"), Show all after 4, upload card ("Or upload a new one": photo or PDF), wording hint,
+  RxPolicyNote (C-08/C-37), error box. Review shows "Prescription (… uploaded …) ✓" with Change + policy;
+  button "Place order and pay". A refused prescription → rxFix ("<server reason> Please choose or upload
+  another one for order X."; Back → /orders). Once placed, Back from review leaves checkout.
+- **Forced password change:** `services/api_utils.dart` isPasswordChangeRequired (403 +
+  code PASSWORD_CHANGE_REQUIRED); ApiService interceptor calls `onPasswordChangeRequired`; AuthState
+  `mustChangePassword` (from login/refresh `must_change_password`; completeSignIn skips /users/me and push
+  until changed). `config/password_gate.dart` (router redirect to `/account/change-password?required=1
+  &next=…`, safe continue path). `services/password_api.dart` POST /auth/change-password {current, new,
+  refresh_token} → new session stored (refresh token keychain only). `utils/password_policy.dart` mirrors
+  backend passwordPolicy.ts words. `screens/account/password/` ChangePasswordScreen (forced: no Back,
+  Sign out; voluntary: Account → Change password) + ChangePasswordForm.
+- **Licence renewal in the app:** `models/licence_draft.dart` (forms list, suggested first per account
+  type, licenceDraftProblems = web wording, toBody), `licence_api` submitLicences (POST /users/me/licences)
+  + uploadLicenceCopy (POST /users/me/licences/:id/document, field `file`, ≤5 MB). `/account/licences/renew`
+  LicenceRenewalScreen + LicenceRenewalForm (form dropdown, Other name, number, issued by, valid-till date
+  picker, optional photo via image_picker); list has "Send a renewed or another licence" and Upload /
+  Replace copy on pending licences ("Copy on file").
+- **Schedule badges:** `utils/drug_schedule.dart` (now case-tolerant like the web, + isScheduleH1,
+  scheduleListBadge) and `widgets/schedule_badge.dart` (Rx / Non-scheduled); search result tile,
+  product page Rx notice, cart_actions and ProductBuyBar no longer hard-code schedule lists.
+- Tests: sprint32_search_test (6), sprint32_checkout_test (10), sprint32_password_test (8),
+  sprint32_licences_test (5); sprint26 prescription-step test moved to the new widget API. Flutter
+  120 tests pass; flutter analyze unchanged (13 old infos, no new).
+- Not done: licence copy as PDF from the app (photo only); the confirmation screen does not repeat the
+  prescription line (the web's does); the Search tab keeps its own 350 ms debounce.
+
+## Sprint 32 — selling rights, live licence pricing, dispatcher crash, list management (2026-10-02, uncommitted)
+Closes gaps left by Sprints 23, 28, 30 and 31. Decision row in DECISIONS.md (developer's reading — confirm).
+- A. Selling rights by licence and buyer type (`services/stock/sellingRights.ts`, pure + SQL, C-33/C-07):
+  sale kind = `saleKindFor(pricing_type)` — 'customer' (consumers, teleconsultation patients, signed-out,
+  trade accounts awaiting KYC or with a lapsed licence) = retail; b2b_retailer / b2b_wholesaler /
+  doc_hospital = trade. Partner may supply retail only with a checked, in-date Form 20 or 21 in
+  party_licences; trade only with 20B or 21B (all four = both). No legacy fallback: a partner with no
+  register rows (or only "other") sells to nobody. Dawabag's own stock: business_licences active
+  retail_20/21 resp. wholesale_20b/21b with valid_upto NULL or ≥ today. Missing kind → own stock NOT
+  offered (blocked) + admin dashboard warning. Schedule C/C1 not tracked on products → one licence of
+  the kind is enough (C-comment says where to require 21/21B later). The Sprint 30 "any lapsed licence
+  stops the partner" summary check stays alongside.
+  Same SQL everywhere: `stock/partnerStock.ts` partnerStockSql / partnerNearestExpirySql take the kind;
+  new ownStockSql / ownNearestExpirySql / sellableStockSql; used by search (productSearch.service),
+  product page (productDetail: product row still cached, stock now read LIVE per kind), cart
+  (cart.service productRows), cards (shopping/productCards stockQtySql(pricingType)) and allocation
+  (allocateAndReserve `saleKind`, own candidate only if register allows; partnerCandidates filter).
+  Pricing unchanged. `stock/sellingRightsStatus.ts` + GET `/admin/selling-rights` (admins): dawabag
+  {retail, trade}, partners with live listings {retail, trade}, warnings (dawabag_no_retail_licence,
+  dawabag_no_trade_licence, partner_no_rights) → web `components/admin/SellingRightsWarnings` on /admin.
+  Dev/CI: `src/scripts/devLicenceRegister.ts` (run by scripts/dev-up.sh, refuses production) adds
+  DEV-ONLY placeholder register rows only for a kind not covered. Test partners inserted straight into
+  vendors now get register licences: `backend/test/support/partnerLicences.mjs` licencePartner()
+  (sprint3, 5, 6, 27, 29 fixtures) and e2e partnerStock / partnerDrafts specs.
+- B. Live trade prices (`services/licences/tradePrices.ts`): auth.middleware (authenticate +
+  optionalAuth) sets `pricing_type` via livePricingType — approved (or pending_renewal) b2b_retailer /
+  b2b_wholesaler with any checked licence lapsed (Sprint 30 eligibility) → 'customer' + `trade_paused`
+  {form, label, licence_number, expired_on}. Every price path already reads pricing_type (search, product,
+  cart, checkout preview/order — orders are still refused with the licence named, C-14). GET
+  `/users/me/trade-prices` → web `components/shop/TradePriceBanner` ("Your drug licence Form 20 X expired
+  on 01 Oct 2026 — trade prices are paused until a renewal is checked. Send the renewed licence" →
+  /account/licences) on search, product page, cart and checkout. Refill job still uses
+  effectiveCustomerType (placeOrder refuses lapsed buyers anyway).
+- C. Dispatcher crash (`services/notifications/dispatcher.ts`): cause = channel promises created early
+  and only awaited (allSettled) after more awaits, so a delivery-row FK failure became an unhandled
+  rejection → process exit. Now each channel runs through `safely()` (catch + log at creation), the
+  delivery INSERT … WHERE the notification still exists, FK 23503 on notification/user = quiet skip
+  ("removed meanwhile"). `config/processGuards.ts`: 'unhandledRejection' logs once serving; before the
+  server listens it exits 1 (startup failures still crash); `server.on('error')` exits 1.
+- D. Admin → Catalogue lists (`/admin/catalogue-lists`, nav under Catalogue & stock, PHARMACIST_ROLES;
+  pharmacists read-only): tabs Categories / HSN codes, server search `?q=` (inactive included) or
+  `?all=true`. PATCH `/catalogue-lists/categories/:id` {name?, is_active?} and `/hsn-codes/:code`
+  {code?, description?, gst_rate?, is_active?} (admin, super_admin) — `catalogueLists/manage.service.ts`,
+  rules categoryRenameProblems / hsnEditProblems. Category rename updates products (by name key, drafts
+  and removed included) in the same transaction, clears product cache, audit product_category_renamed
+  {products_updated}; rename onto another entry = 409 (no merging). HSN: code locked once ANY product row
+  uses it (409, plain reason), unused code correctable (not onto a listed one); GST rate is a hint, no
+  product GST changed; audit hsn_code_changed. Switch off/on: audit *_deactivated / *_reactivated;
+  pick-lists show active only; products keep the entry; product form refuses an inactive entry for a
+  NEW choice (registerFromProductForm `current`); "+ New" by a pharmacist on a switched-off entry → 409
+  (only admins reactivate). Web: `components/admin/catalogueLists/*`, `lib/admin/catalogueListsAdmin.ts`.
+- Tests: jest sellingRights (11), tradePrices (8), processGuards (2), dispatcher.crash (3, fails on the
+  old dispatcher), catalogueLists rules (+6); `test/sprint32.smoke.mjs` (90 checks, in test:smoke:
+  20/21-only, 20B/21B-only, all-four and unlicensed partners × retail / trade buyer for search, product,
+  cart and allocation; own stock blocked without a wholesale register licence + dashboard warning; live
+  pricing lapse → banner data → renewal; list management; notifications deleted mid-dispatch, API stays
+  up); e2e `tradePrices.spec.ts`, `catalogueLists.spec.ts` (desktop + phone).
+- Not built: Schedule C/C1 on products (so 21/21B not required per line); a register row's NULL
+  valid-till counts as in force; catalogue import / DB trigger still accept a switched-off category or
+  HSN (only the API forms refuse it); category merge; mobile app banner for paused trade prices (the app
+  gets retail prices from the API already) — mobile/ untouched (another agent).
 
 ## Sprint 31 — queue quick-create (Alt+C) and optional buyer copy (2026-10-02, uncommitted)
 Owner, for "New products to complete": "Category — create new by ALT+C", "HSN code — create new

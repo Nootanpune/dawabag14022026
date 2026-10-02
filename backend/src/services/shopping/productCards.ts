@@ -5,7 +5,8 @@
 // partner's ledger); the pack photo only once a pharmacist approved it (C-19).
 import { query } from '../../config/database';
 import { BuyerType, requiresPrescription } from '../../utils/customerType';
-import { partnerStockSql } from '../stock/partnerStock';
+import { sellableStockSql } from '../stock/partnerStock';
+import { saleKindFor } from '../stock/sellingRights';
 import { approvedImageKeySql, withImageUrls } from '../productImage.service';
 import { buyerColumns } from '../search/productSearch.service';
 
@@ -29,17 +30,15 @@ export interface ProductCard {
 export const SELLABLE_SQL =
   `p.is_active = TRUE AND p.deleted_at IS NULL AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')`;
 
-/** Stock one seller can supply right now (alias p). Same rule as search and cart. */
-export const stockQtySql = () =>
-  `GREATEST((SELECT COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0) FROM inventory_batches b
-     WHERE b.product_id = p.id AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE), ${partnerStockSql('p.id')})`;
+/** Stock one seller may supply to this buyer right now (alias p). Same rule as search, cart and allocation (Sprint 32). */
+export const stockQtySql = (pricingType: string) => sellableStockSql('p.id', saleKindFor(pricingType));
 
 /** Card columns for the buyer type (alias p). */
 export function cardColumnsSql(pricingType: string) {
   const { displayPrice, minQty } = buyerColumns(pricingType);
   return `p.id, p.name, p.generic_name, p.sku, p.category, p.drug_schedule, p.mrp_paise,
           (${displayPrice})::int AS display_price_paise, (${minQty})::int AS min_order_qty,
-          ${approvedImageKeySql()} AS approved_image_key, (${stockQtySql()})::int AS stock_qty`;
+          ${approvedImageKeySql()} AS approved_image_key, (${stockQtySql(pricingType)})::int AS stock_qty`;
 }
 
 /** Turns rows selected with cardColumnsSql into cards (signed photo links). */

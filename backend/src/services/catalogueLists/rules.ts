@@ -75,3 +75,41 @@ export function hsnGstMismatch(hsn: { code: string; gst_rate: number | null } | 
   if (g === Number(hsn.gst_rate)) return null;
   return `HSN ${hsn.code} usually has GST ${hsn.gst_rate}%, but this product is set to ${g}%: check the GST rate (it has not been changed)`;
 }
+
+// ── Sprint 32: managing the lists (Admin → Catalogue lists) ──────────────────
+
+/** Problems with renaming a category; `others` = the other entries of the list. Empty = fine. */
+export function categoryRenameProblems(current: { name: string }, raw: string, others: { name: string }[]): string[] {
+  const problems = categoryNameProblems(raw);
+  if (problems.length) return problems;
+  const clash = findDuplicateCategory(others, raw);
+  if (clash) return [`"${clash.name}" is already in the list — choose a different name (two categories cannot be merged here)`];
+  if (tidyName(raw) === current.name) return ['The new name is the same as the current one'];
+  return [];
+}
+
+export interface HsnEdit { code?: string; description?: string | null; gst_rate?: number | null }
+
+/**
+ * Problems with editing an HSN entry. The code itself can be corrected only while no
+ * product uses it (products and their invoices carry the code); a used code keeps its
+ * number — its description and usual GST rate can still change. Empty = fine.
+ */
+export function hsnEditProblems(current: { code: string; description: string | null }, edit: HsnEdit, usedBy: number, codeTaken: boolean): string[] {
+  const out: string[] = [];
+  const newCode = edit.code === undefined ? current.code : tidyHsn(edit.code);
+  if (newCode !== current.code) {
+    if (usedBy > 0) out.push(`HSN ${current.code} is used by ${usedBy} product${usedBy === 1 ? '' : 's'}, so the code cannot be changed. Change its description or GST rate, or add the right code as a new entry`);
+    else if (!HSN_RE.test(newCode)) out.push('The HSN code must be 4, 6 or 8 digits');
+    else if (codeTaken) out.push(`HSN ${newCode} is already in the list`);
+  }
+  if (edit.description !== undefined) {
+    const d = tidyName(edit.description ?? '');
+    if (d.length < HSN_DESCRIPTION_MIN) out.push('Add a short description (what goods the code covers)');
+    else if (d.length > HSN_DESCRIPTION_MAX) out.push(`Keep the description to ${HSN_DESCRIPTION_MAX} characters`);
+  }
+  if (edit.gst_rate !== undefined && edit.gst_rate !== null && !(GST_RATES as readonly number[]).includes(Number(edit.gst_rate))) {
+    out.push('GST rate must be 0, 5, 12, 18 or 28');
+  }
+  return out;
+}

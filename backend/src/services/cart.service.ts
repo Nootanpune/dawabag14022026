@@ -7,7 +7,8 @@ import { AppError } from '../utils/AppError';
 import { BuyerType, priceField, requiresPrescription } from '../utils/customerType';
 import { evaluateCoupon } from './coupon.service';
 import { freeDeliveryAbovePaise, freeDeliveryProgress } from './delivery/freeDelivery';
-import { partnerStockSql } from './stock/partnerStock';
+import { sellableStockSql } from './stock/partnerStock';
+import { saleKindFor } from './stock/sellingRights';
 import { approvedImageKeySql, imageUrlFor } from './productImage.service';
 
 const BLOCKED_SCHEDULES = ['Schedule X', 'NDPS'];
@@ -39,7 +40,7 @@ export function qtyLimits(type: BuyerType, p: any): { min: number; max: number }
   return { min: 1, max: p.max_qty_per_order };
 }
 
-async function productRows(productIds: string[]) {
+async function productRows(productIds: string[], pricingType: BuyerType) {
   if (!productIds.length) return [];
   return query<any>(
     `SELECT p.id, p.name, p.sku, p.drug_schedule, p.cold_chain, p.s3_image_key,
@@ -50,13 +51,11 @@ async function productRows(productIds: string[]) {
             COALESCE(p.institutional_price_paise, p.offer_price_paise) AS institutional_price_paise,
             p.max_qty_per_order, p.min_order_qty_retailer, p.min_order_qty_wholesaler,
             p.max_qty_per_order_retailer, p.max_qty_per_order_wholesaler,
-            -- the most one seller can supply: Dawabag's batches or one partner's own ledger
-            GREATEST(COALESCE(SUM(b.quantity_available - b.quantity_reserved)
-              FILTER (WHERE b.expiry_date > CURRENT_DATE + 30 AND NOT b.is_recalled), 0)::int, ${partnerStockSql('p.id')}) AS stock_qty
+            -- the most one seller may supply to this buyer: Dawabag's batches or one partner's
+            -- own ledger, only sellers licensed for this kind of sale (Sprint 32, C-33, C-07)
+            (${sellableStockSql('p.id', saleKindFor(pricingType))})::int AS stock_qty
      FROM products p
-     LEFT JOIN inventory_batches b ON b.product_id = p.id
-     WHERE p.id = ANY($1::uuid[])
-     GROUP BY p.id`,
+     WHERE p.id = ANY($1::uuid[])`,
     [productIds]
   );
 }
@@ -66,7 +65,7 @@ export async function getCart(userId: string, pricingType: BuyerType) {
     'SELECT product_id, quantity FROM cart_items WHERE user_id = $1 ORDER BY added_at',
     [userId]
   );
-  const products = new Map((await productRows(rows.map((r) => r.product_id))).map((p) => [p.id, p]));
+  const products = new Map((await productRows(rows.map((r) => r.product_id), pricingType)).map((p) => [p.id, p]));
   const column = priceField(pricingType);
   // Pack photos a customer may see (approved, C-19), signed once per product
   const imageUrls = new Map(await Promise.all([...products.values()].map(async (p) => [p.id, await imageUrlFor(p.approved_image_key)] as const)));
@@ -125,7 +124,7 @@ export async function setCartItem(userId: string, productId: string, quantity: n
     await query('DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2', [userId, productId]);
     return;
   }
-  const [p] = await productRows([productId]);
+  const [p] = await productRows([productId], 'customer');
   if (!p || !p.is_active || p.deleted_at) throw new AppError('Product not found', 404);
   if (BLOCKED_SCHEDULES.includes(p.drug_schedule)) throw new AppError(`${p.name} cannot be ordered online`, 403);
 

@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import TradePriceBanner from '@/components/shop/TradePriceBanner';
 import { useAuthStore } from '@/store/authStore';
 import { useCart, useCartMutations, useSwitchCartLine } from '@/hooks/useCart';
 import { cartShape, cartSuggestionKeys, fetchCheaperOptions } from '@/lib/shop/cartSuggestions';
@@ -53,6 +54,7 @@ export default function CartPage() {
       <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-3">
           <h1 className="text-xl font-semibold mb-4">Cart ({cart.item_count} items)</h1>
+          <TradePriceBanner />
           {cart.items.map((line) => {
             const option = cheaper.find((o) => o.for_product_id === line.product_id);
             return (

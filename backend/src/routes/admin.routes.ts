@@ -20,6 +20,7 @@ import {
   getAdminLicenceDocument, getPartyLicences, postAdminLicenceDocument, postLicenceDecision,
 } from '../controllers/partyLicence.controller';
 import { LICENCE_FILE_MAX_BYTES } from '../services/licences/register.service';
+import { sellingRightsStatus } from '../services/stock/sellingRightsStatus';
 
 const licenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LICENCE_FILE_MAX_BYTES, files: 1 } });
 
@@ -59,6 +60,12 @@ router.get('/stats', authenticate, authorize('admin', 'super_admin'), async (_re
 });
 
 // ─── Admin Users ──────────────────────────────────────────────────────────────
+// Sprint 32: who may be sold to from Dawabag's own stock and from each partner, by
+// licence; warnings for the dashboard (C-07, C-33)
+router.get('/selling-rights', authenticate, authorize('admin', 'super_admin'), async (_req, res, next) => {
+  try { res.json({ success: true, data: await sellingRightsStatus() }); } catch (err) { next(err); }
+});
+
 router.get('/users', authenticate, authorize('admin', 'super_admin'), async (req, res, next) => {
   try {
     const { role, search, page = '1' } = req.query;

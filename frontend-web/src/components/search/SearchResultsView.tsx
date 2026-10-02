@@ -6,6 +6,7 @@ import { Loader2, Search } from 'lucide-react';
 import api from '@/lib/api';
 import { searchKeys, searchProducts, SEARCH_EXAMPLES, type SearchSort } from '@/lib/search/api';
 import { parseSearchState, searchHref, type SearchState } from '@/lib/search/searchUrl';
+import TradePriceBanner from '@/components/shop/TradePriceBanner';
 import Header from '@/components/layout/Header';
 import Breadcrumbs from '@/components/layout/Breadcrumbs';
 import ProductCard from '@/components/shop/ProductCard';
@@ -52,6 +53,7 @@ export default function SearchResultsView() {
       <Header searchQuery={q} />
       <main className="max-w-6xl mx-auto px-4 py-5 sm:py-6">
         <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Search', href: q || category ? '/search' : undefined }, ...(q || category ? [{ label: q ? `“${q}”` : category }] : [])]} />
+        <TradePriceBanner className="mb-3" />
         <h1 className="text-xl font-semibold text-gray-900">{heading}</h1>
         {searching && (
           <div className="mt-3 space-y-3">

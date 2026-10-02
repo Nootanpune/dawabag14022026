@@ -84,6 +84,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/staff/content-review', label: 'Product copy', icon: ClipboardCheck, roles: PHARMACIST_ROLES },
       // Sprint 29 — draft products from partner requests, completed and approved by the pharmacist
       { href: '/staff/new-products', label: 'New products to complete', icon: ListPlus, roles: PHARMACIST_ROLES },
+      // Sprint 32 — rename / correct / switch off categories and HSN codes (admins; pharmacists read-only)
+      { href: '/admin/catalogue-lists', label: 'Catalogue lists', icon: ListTree, roles: PHARMACIST_ROLES },
       // Sprint 28 — Dawabag's admin adds partner pharmacies directly (licences, pharmacists, logins)
       { href: '/admin/partners', label: 'Partners', icon: Store, roles: MANAGER_ROLES },
       { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },

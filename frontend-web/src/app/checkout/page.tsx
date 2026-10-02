@@ -12,6 +12,7 @@ import { buildOrderBody, placeOrder } from '@/lib/checkout';
 import { offerSavedPrescription, prescriptionKeys, type MyPrescription } from '@/lib/prescriptions/api';
 import { prescriptionKind } from '@/lib/prescriptions/describe';
 import { useCart } from '@/hooks/useCart';
+import TradePriceBanner from '@/components/shop/TradePriceBanner';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
 import CheckoutStepIndicator from '@/components/checkout/CheckoutStepIndicator';
@@ -188,6 +189,7 @@ export default function CheckoutPage() {
       <Header />
       <div className="max-w-2xl mx-auto px-4 py-6">
         {step !== 'confirmed' && <CheckoutStepIndicator step={step} showPrescription={needsRx} />}
+        {step !== 'confirmed' && <TradePriceBanner className="mb-4" />}
         {content()}
       </div>
     </div>

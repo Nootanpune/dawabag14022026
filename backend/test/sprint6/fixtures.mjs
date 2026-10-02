@@ -1,5 +1,6 @@
 // Sprint 6 test data: mobiles 90000006xx, SKU prefix S6-, vendor 'S6 Partner', pincode 499961
 import { call, check, login, q, signUp } from '../sprint5/lib.mjs';
+import { licencePartner } from '../support/partnerLicences.mjs';
 
 const consent = { accept_privacy_notice: true, age_confirmed: true };
 const person = (mobile, name) => ({ customer_type: 'customer', full_name: name, mobile, password: 'Passw0rd!', ...consent });
@@ -76,6 +77,7 @@ export async function setup() {
   }
   const V = (await q(`INSERT INTO vendors (name, drug_license_no, gst_number, pincode, city, state, vendor_type, approval_status, is_active, invoice_prefix)
      VALUES ('S6 Partner', 'DL-S6', '27ABCDE6666F1Z5', $1, 'Nashik', 'Maharashtra', 'marketplace_partner', 'approved', TRUE, 'S6P') RETURNING id`, [PIN]))[0].id;
+  await licencePartner(q, V);   // Sprint 32: sells under checked retail + wholesale licences
   await q(`UPDATE users SET role = 'partner' WHERE id = $1`, [ids.partner]);
   await q(`INSERT INTO vendor_users (vendor_id, user_id) VALUES ($1, $2)`, [V, ids.partner]);
   t.partner = await login(people.partner);

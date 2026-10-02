@@ -11,6 +11,7 @@ import { queueNotification } from './notification.service';
 import { TRADE_TYPES, BuyerType, allowsCreditTerms, isBuyerType, priceField, requiresPrescription } from '../utils/customerType';
 import { evaluateCoupon } from './coupon.service';
 import { Allocation, allocateAndReserve } from './allocation.service';
+import { saleKindFor } from './stock/sellingRights';
 import { createShipmentsAndLines } from './shipment.service';
 import { OrderPreview, buildCheckoutSummary } from './checkoutSummary.service';
 import { moveOrderToFulfilment } from './paymentCapture.service';
@@ -186,6 +187,8 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
       })),
       orderValuePaise: subtotalPaise + gstPaise,
       pincode: data.pincode,
+      // Sellers licensed for this buyer's kind of sale only (Sprint 32, C-33, C-07)
+      saleKind: saleKindFor(customerType),
     });
     await recordLowStock(client, lineItems, allocations);
 

@@ -40,6 +40,10 @@ test.beforeAll(async ({}, info) => {
       `INSERT INTO vendors (name, drug_license_no, gst_number, pincode, city, state, vendor_type, approval_status, is_active, drug_license_type, drug_license_expiry)
        VALUES ($1, $2, '27ABCDE1927F1Z5', '411001', 'Pune', 'Maharashtra', 'marketplace_partner', 'approved', TRUE, 'dl20b', CURRENT_DATE + 400)
        RETURNING id`, [`E2E S27 Partner ${info.project.name}`, `DL-E2E-S27-${info.project.name}`])).rows[0].id;
+    // Sprint 32: a partner sells only under checked licences in the register — retail and wholesale here
+    await c.query(`INSERT INTO party_licences (vendor_id, form, licence_number, valid_upto, status, verified_at)
+                   SELECT $1, f, $2, CURRENT_DATE + 400, 'verified', NOW() FROM unnest(ARRAY['dl20', 'dl21', 'dl20b', 'dl21b']) AS f`,
+                  [vendor, `DL-E2E-S27-${info.project.name}`]);
     await c.query('INSERT INTO vendor_users (vendor_id, user_id) SELECT $1, id FROM users WHERE mobile = $2', [vendor, mobile]);
     await c.query(
       `INSERT INTO products (name, generic_name, sku, category, drug_schedule, gst_rate, hsn_code, mrp_paise, offer_price_paise, max_qty_per_order,

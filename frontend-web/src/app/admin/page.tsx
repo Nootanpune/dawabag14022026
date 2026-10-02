@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2, Package, IndianRupee, ClipboardCheck, AlertTriangle, Users } from 'lucide-react';
 import PageHeader from '@/components/admin/PageHeader';
+import SellingRightsWarnings from '@/components/admin/SellingRightsWarnings';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES } from '@/lib/admin/roles';
 import api from '@/lib/api';
@@ -62,6 +63,9 @@ export default function AdminDashboard() {
           <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-gray-300" /></div>
         ) : (
           <>
+            {/* Sprint 32: stock not offered to some buyers because of a drug licence (C-07, C-33) */}
+            <SellingRightsWarnings />
+
             {/* Metric cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
               {metricCards.map((card) => (

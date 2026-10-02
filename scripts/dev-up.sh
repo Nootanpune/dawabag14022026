@@ -34,6 +34,9 @@ fi
 say "Applying migrations"
 (cd "$ROOT/backend" && [ -d node_modules ] || (cd "$ROOT/backend" && npm ci --no-audit --no-fund >/dev/null))
 (cd "$ROOT/backend" && MIGRATIONS_DIR="$ROOT/database" npx ts-node --transpile-only src/db/migrate.ts | tail -3)
+# Dawabag's own stock sells only under its licence register (Sprint 32, C-07): placeholder
+# rows for a development / CI database whose register is empty (never in production)
+(cd "$ROOT/backend" && npx ts-node --transpile-only src/scripts/devLicenceRegister.ts)
 
 if curl -sf "$API_URL/health" >/dev/null 2>&1; then
   say "API already running at $API_URL (restart it to pick up a new environment)"

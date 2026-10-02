@@ -7,7 +7,8 @@ import { queryOne } from '../config/database';
 import { cacheGet, cacheSet } from '../config/redis';
 import { AppError } from '../utils/AppError';
 import { BuyerType, priceField } from '../utils/customerType';
-import { partnerNearestExpirySql, partnerStockSql } from './stock/partnerStock';
+import { ownNearestExpirySql, partnerNearestExpirySql, sellableStockSql } from './stock/partnerStock';
+import { saleKindFor } from './stock/sellingRights';
 import { imageUrlFor } from './productImage.service';
 import { qtyLimits } from './cart.service';
 
@@ -19,19 +20,19 @@ export async function productDetail(productId: string, pricingType: BuyerType) {
   const key = `product:${productId}`;
   let row: any = await cacheGet(key);
   if (!row) {
-    row = await queryOne(
-      `SELECT p.*,
-              -- the most one seller can supply: Dawabag's batches or one partner's own ledger
-              GREATEST(COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0), ${partnerStockSql('p.id')}) AS stock_qty,
-              LEAST(MIN(b.expiry_date), ${partnerNearestExpirySql('p.id')}) AS nearest_expiry
-       FROM products p
-       LEFT JOIN inventory_batches b ON b.product_id = p.id
-         AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE AND b.quantity_available > b.quantity_reserved
-       WHERE p.id = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL
-       GROUP BY p.id`, [productId]);
+    row = await queryOne(`SELECT p.* FROM products p WHERE p.id = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL`, [productId]);
     if (!row) throw new AppError('Product not found', 404);
     await cacheSet(key, row, 300);
   }
+  // Stock is read live for THIS buyer's kind of sale (not cached): the most one seller
+  // licensed to sell to them can supply — Dawabag's batches or one partner's own
+  // ledger — the same rule as search, cart and allocation (Sprint 32, C-33, C-07)
+  const kind = saleKindFor(pricingType);
+  const stock = await queryOne<{ stock_qty: number; nearest_expiry: string | null }>(
+    `SELECT (${sellableStockSql('$1::uuid', kind)})::int AS stock_qty,
+            LEAST(${ownNearestExpirySql('$1::uuid', kind)}, ${partnerNearestExpirySql('$1::uuid', kind)}) AS nearest_expiry`,
+    [productId]);
+  row = { ...row, stock_qty: stock?.stock_qty ?? 0, nearest_expiry: stock?.nearest_expiry ?? null };
 
   const price = Number(row[priceField(pricingType)] ?? row.offer_price_paise);
   const out: Record<string, any> = Object.fromEntries(PUBLIC_FIELDS.map((f) => [f, row[f] ?? null]));

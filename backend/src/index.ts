@@ -11,6 +11,7 @@ import 'dotenv/config';
 import { logger } from './config/logger';
 import { connectDB, getDB } from './config/database';
 import { checkEnv } from './config/env';
+import { installProcessGuards } from './config/processGuards';
 import { connectRedis, getRedis } from './config/redis';
 import { startScheduler, stopScheduler } from './jobs/scheduler';
 import { stopNotificationQueue } from './services/notification.service';
@@ -186,6 +187,9 @@ app.use(notFound);
 app.use(errorHandler);
 
 // ─── Bootstrap ──────────────────────────────────────────────────────────────
+// Unhandled rejections: fatal while starting, logged (never a crash) once serving (Sprint 32)
+const processGuards = installProcessGuards();
+
 async function bootstrap() {
   try {
     const env = checkEnv();
@@ -204,7 +208,13 @@ async function bootstrap() {
     startScheduler();
 
     const server = app.listen(PORT, () => {
+      processGuards.markStarted();
       logger.info(`Dawabag API running on port ${PORT} [${process.env.NODE_ENV}]`);
+    });
+    // A port already in use (or any listen failure) is a startup failure: stop (exit 1)
+    server.on('error', (err) => {
+      logger.error('Failed to start server:', err);
+      process.exit(1);
     });
 
     // Finish in-flight requests, then close connections (container stop / deploy)

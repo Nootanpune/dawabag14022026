@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
 import { AppError } from '../utils/AppError';
 import { queryOne } from '../config/database';
-import { BuyerType, effectiveCustomerType } from '../utils/customerType';
+import { BuyerType } from '../utils/customerType';
+import { livePricingType, TradePause } from '../services/licences/tradePrices';
 
 declare global {
   namespace Express {
@@ -13,7 +14,8 @@ declare global {
         mobile: string;
         customer_type: string;        // as registered
         kyc_status: string | null;
-        pricing_type: BuyerType;      // customer_type once KYC-approved, else 'customer'
+        pricing_type: BuyerType;      // customer_type once KYC-approved (and licences in date), else 'customer'
+        trade_paused: TradePause | null;   // a lapsed drug licence pauses trade prices (Sprint 32, C-14)
       };
     }
   }
@@ -33,14 +35,18 @@ interface AuthUserRow {
   kyc_status: string | null;
 }
 
-function toRequestUser(row: AuthUserRow): NonNullable<Request['user']> {
+// The price type is decided live on every request: a retailer's or wholesaler's
+// licence that lapsed today switches them to retail prices at once (Sprint 32, C-14)
+async function toRequestUser(row: AuthUserRow): Promise<NonNullable<Request['user']>> {
+  const live = await livePricingType(row);
   return {
     id: row.id,
     role: row.role,
     mobile: row.mobile,
     customer_type: row.customer_type || 'customer',
     kyc_status: row.kyc_status,
-    pricing_type: effectiveCustomerType(row.customer_type, row.kyc_status),
+    pricing_type: live.pricing_type,
+    trade_paused: live.trade_paused,
   };
 }
 
@@ -71,7 +77,7 @@ export async function authenticate(
       throw new AppError('Please choose a new password before continuing', 403, true, 'PASSWORD_CHANGE_REQUIRED');
     }
 
-    req.user = toRequestUser(user);
+    req.user = await toRequestUser(user);
     next();
   } catch (error) {
     next(error);
@@ -104,7 +110,7 @@ export function optionalAuth(
            AND must_change_password = FALSE`,
         [payload.sub]
       );
-      if (user) req.user = toRequestUser(user);
+      if (user) req.user = await toRequestUser(user);
       next();
     })
     .catch(() => next());

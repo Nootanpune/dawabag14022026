@@ -210,7 +210,8 @@ export async function updateProduct(req: Request, res: Response, next: NextFunct
     await assertBelowShelfMrp(productId, { ...before, ...updates });
     // Category / HSN spelled as in their lists; a new one is added with an audit entry (Sprint 31, C-46)
     Object.assign(updates, await withTransaction((c) => registerFromProductForm(c, req.user!.id,
-      { category: updates.category, hsn_code: updates.hsn_code, gst_rate: updates.gst_rate ?? before.gst_rate })));
+      { category: updates.category, hsn_code: updates.hsn_code, gst_rate: updates.gst_rate ?? before.gst_rate },
+      { category: before.category, hsn_code: before.hsn_code })));
 
     // Changed copy goes back to the pharmacist (C-19)
     const copyChanged = COPY_FIELDS.some((k) => k in updates && (updates as any)[k] !== before[k]);

@@ -5,7 +5,8 @@
 // the pack photo only once the pharmacist approved it (C-19, by the caller).
 import crypto from 'crypto';
 import { pool } from '../../config/database';
-import { partnerStockSql } from '../stock/partnerStock';
+import { sellableStockSql } from '../stock/partnerStock';
+import { saleKindFor } from '../stock/sellingRights';
 import { approvedImageKeySql } from '../productImage.service';
 import { SearchText, canSearchFuzzy, parseSearchText } from './searchText';
 import { buildProductSearchSql } from './productSearchSql';
@@ -102,9 +103,9 @@ async function run(db: Db, s: CatalogueSearch, text: SearchText | null, fuzzy: b
 
   const { displayPrice, minQty, maxQty } = buyerColumns(s.pricingType);
   // Stock: Dawabag's sellable batches (> 30 days of shelf life, not recalled) or
-  // the most one partner can supply from its own ledger (an order line goes to one seller)
-  const stockQty = `GREATEST((SELECT COALESCE(SUM(b.quantity_available - b.quantity_reserved), 0) FROM inventory_batches b
-       WHERE b.product_id = p.id AND b.expiry_date > CURRENT_DATE + 30 AND b.is_recalled = FALSE), ${partnerStockSql('p.id')})`;
+  // the most one partner can supply from its own ledger (an order line goes to one seller),
+  // counting only sellers whose licence allows a sale to this buyer type (Sprint 32, C-33, C-07)
+  const stockQty = sellableStockSql('p.id', saleKindFor(s.pricingType));
   // Two steps in one statement: (1) rank the matching ids and count them; (2) prices
   // and photo only for the page being shown. A search ranks in-stock first, so step 1
   // works out the stock (an index probe per match); browsing sorts by name only, so

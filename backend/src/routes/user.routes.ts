@@ -95,6 +95,13 @@ router.post('/me/patients', authenticate, async (req, res, next) => {
 
 // Addresses — controllers/address.controller.ts
 // Sprint 30: a business or doctor account's drug licences (C-11, C-14)
+// Sprint 32: whether trade prices are paused by a lapsed drug licence (decided live in
+// auth.middleware; the website shows a banner from this, C-14)
+router.get('/me/trade-prices', authenticate, (req, res) => {
+  const u = req.user!;
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, data: { pricing_type: u.pricing_type, paused: !!u.trade_paused, licence: u.trade_paused } });
+});
 router.get('/me/licences', authenticate, getMyLicences);
 router.post('/me/licences', authenticate, postMyLicences);
 router.post('/me/licences/:id/document', authenticate, licenceUpload.single('file'), postMyLicenceDocument);

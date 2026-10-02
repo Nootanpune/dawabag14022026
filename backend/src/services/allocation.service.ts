@@ -2,11 +2,16 @@
 // Decides which seller fills each order line and reserves that stock, inside
 // the order transaction (docs/DECISIONS.md: allocation rule, partners as
 // seller of record). A line is filled by exactly one seller and one batch.
+// Sprint 32: only sellers whose drug licence allows a sale to THIS buyer type —
+// retail buyers from Form 20/21 holders, trade buyers from Form 20B/21B holders —
+// for partners (party_licences, C-33) and for Dawabag's own stock (its licence
+// register, C-07). Same SQL as the stock shown to the buyer (stock/sellingRights.ts).
 import { PoolClient } from 'pg';
 import { AppError } from '../utils/AppError';
 import { distanceKm, LatLng, toLatLng } from '../utils/geo';
 import { getSetting } from './settings.service';
 import { chooseSeller, ownStockFirst, SellerCandidate } from './sellerSelection';
+import { SaleKind, dawabagMaySupplySql, partnerMaySupplySql } from './stock/sellingRights';
 
 // Batches expiring within this many days are never dispatched (Rulebook C-27)
 const MIN_SHELF_DAYS = 30;
@@ -37,7 +42,7 @@ interface Candidate extends SellerCandidate {
 
 export async function allocateAndReserve(
   client: PoolClient,
-  params: { lines: AllocationLine[]; orderValuePaise: number; pincode: string }
+  params: { lines: AllocationLine[]; orderValuePaise: number; pincode: string; saleKind: SaleKind }
 ): Promise<Allocation[]> {
   const pin = (await client.query(
     `SELECT latitude, longitude, dawabag_delivery_hours, cold_chain_available
@@ -46,6 +51,9 @@ export async function allocateAndReserve(
 
   const premises = await getSetting<{ latitude: number; longitude: number }>('dawabag.premises', null as any, client);
   const dawabagAt = premises ? toLatLng(premises.latitude, premises.longitude) : null;
+
+  // Dawabag's own stock only when its register holds an in-date licence for this kind of sale (C-07)
+  const ownMaySell = (await client.query(`SELECT ${dawabagMaySupplySql(params.saleKind)} AS ok`)).rows[0]?.ok === true;
 
   const ownFirst = ownStockFirst({
     orderValuePaise: params.orderValuePaise,
@@ -66,8 +74,8 @@ export async function allocateAndReserve(
   for (const i of order) {
     const line = params.lines[i];
     const candidates = [
-      ...(await ownCandidate(client, line, dawabagAt, buyerAt, !!pin?.cold_chain_available)),
-      ...(await partnerCandidates(client, line, buyerAt)),
+      ...(ownMaySell ? await ownCandidate(client, line, dawabagAt, buyerAt, !!pin?.cold_chain_available) : []),
+      ...(await partnerCandidates(client, line, buyerAt, params.saleKind)),
     ];
     const chosen = chooseSeller(candidates, ownFirst) as Candidate | null;
     if (!chosen) throw new AppError(`Insufficient stock for ${line.product_name}`, 400);
@@ -118,7 +126,7 @@ async function ownCandidate(
   }];
 }
 
-async function partnerCandidates(client: PoolClient, line: AllocationLine, buyerAt: LatLng | null): Promise<Candidate[]> {
+async function partnerCandidates(client: PoolClient, line: AllocationLine, buyerAt: LatLng | null, kind: SaleKind): Promise<Candidate[]> {
   // Earliest-expiring eligible batch per partner (FEFO within a partner)
   const rows = (await client.query(
     `SELECT DISTINCT ON (v.id)
@@ -136,6 +144,7 @@ async function partnerCandidates(client: PoolClient, line: AllocationLine, buyer
      WHERE v.approval_status = 'approved' AND v.is_active = TRUE
        AND v.vendor_type IN ('marketplace_partner', 'both')
        AND (v.drug_license_expiry IS NULL OR v.drug_license_expiry >= CURRENT_DATE)
+       AND ${partnerMaySupplySql('v', kind)}
      ORDER BY v.id, pi.expiry_date ASC`,
     [line.product_id, line.quantity, line.cold_chain])).rows;
 

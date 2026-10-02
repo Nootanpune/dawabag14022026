@@ -9,6 +9,7 @@
 // 4999xx. Cleaned up before and after. NEVER point it at a production database.
 import { createRequire } from 'module';
 import { startFakes } from './fakes/server.mjs';
+import { licencePartner } from './support/partnerLicences.mjs';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const Redis = require('ioredis');
@@ -146,6 +147,8 @@ async function main() {
       drug_license_type: 'dl20b', drug_license_expiry: '2029-12-31', vendor_type: 'marketplace_partner', invoice_prefix: prefix } });
   }
   check('partners approved with invoice prefixes', r.status === 200, r.json);
+  // Sprint 32: the buyers here are consumers and trade accounts — hold retail and wholesale licences
+  for (const v of [VA, VB]) await licencePartner(q, v);
   r = await call('POST', `/admin/partners/${VA}/users`, { token: admin, body: { mobile: people.partnerA.mobile } });
   check('admin links partner login', r.status === 200, r.json);
   await call('POST', `/admin/partners/${VB}/users`, { token: admin, body: { mobile: people.partnerB.mobile } });
