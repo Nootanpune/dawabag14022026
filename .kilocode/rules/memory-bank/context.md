@@ -39,6 +39,9 @@ the lawyer/CA sign-off.
   it) crashes the API process — not fixed here.
 
 ## Sprint 24 — trial server (2026-10-01, merged to main via PR #1)
+- **Trial LIVE (2026-10-02):** first deploy run 36955107074 green (deploy + APK, demo
+  seed, backup, all checks); secrets rotated and 4 GitHub secrets added. Razorpay test keys
+  still to add (TRIAL_ENV) — checkout stops at payment until then.
 - **Trial status (2026-10-01 evening):** server = the retired PharmaNetra legacy droplet
   64.227.172.8 (owner's choice; Ubuntu 22.04, resized to 4 GB, snapshot taken first).
   Old nginx (pharmanetra.pharmanetra.in, portal.dawabag.com certs) disabled; the old
