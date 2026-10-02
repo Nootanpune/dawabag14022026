@@ -133,6 +133,10 @@ to add items from the cart.
   it) crashes the API process — not fixed here.
 
 ## Sprint 24 — trial server (2026-10-01, merged to main via PR #1)
+- **Trial moved to https://trial.dawabag.com (2026-10-02, deploy run 36966803021):**
+  dawabag.com DNS moved from dead Comodo DNS (ns*.nudns.com) to BigRock (dns1-4.bigrock.in);
+  A records trial/api.trial/files.trial → 64.227.172.8; Vercel apex record removed by owner.
+  Deploys run from the branch via workflow_dispatch (ref = this branch); Sprint 26 live.
 - **Trial LIVE (2026-10-02):** first deploy run 36955107074 green (deploy + APK, demo
   seed, backup, all checks); secrets rotated and 4 GitHub secrets added. Razorpay test keys
   still to add (TRIAL_ENV) — checkout stops at payment until then.
