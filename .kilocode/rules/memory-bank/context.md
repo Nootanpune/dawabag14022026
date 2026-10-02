@@ -595,6 +595,9 @@ to add items from the cart.
   it) crashes the API process — not fixed here.
 
 ## Sprint 24 — trial server (2026-10-01, merged to main via PR #1)
+- **Trial status (2026-10-02 evening):** Sprints 30-33 live (deploy run 37025737154). Open owner
+  question: trust page wording "How a pharmacist checks your order" vs a pharmacist check on
+  every order. Rebrand to DAWA BAG waits for the logo file.
 - **Trial status (2026-10-02 pm):** Sprints 26-29 live (deploy run 37003151653): demo checkout
   per method, partner stock upload (MediVision Platinum), admin Add partner, catalogue drafts +
   pharmacist queue. Owner given a one-paste server script to add Nootan Pharmaceuticals as
