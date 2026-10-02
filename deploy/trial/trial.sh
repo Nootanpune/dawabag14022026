@@ -28,8 +28,17 @@ case "${1:-}" in
     dc up -d --build --remove-orphans
     if [ ${#profile[@]} -gt 0 ]; then
       # The bucket exists and an encrypted write works before anything is uploaded
-      timeout 300 docker compose "${profile[@]}" -f "$ROOT/deploy/staging/compose.yml" --env-file "$ENV_FILE" wait objectstore-init >/dev/null \
-        || { dc logs --no-log-prefix objectstore objectstore-init | tail -20; echo "Object store not ready" >&2; exit 1; }
+      # (not `compose wait`: it reports "no containers" once the one-shot init has
+      # already finished, which on a fresh store it can do within a second)
+      init_state=""
+      for _ in $(seq 1 150); do
+        id="$(dc ps -a -q objectstore-init)"
+        init_state="$([ -n "$id" ] && docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' "$id" || true)"
+        case "$init_state" in exited*|dead*) break ;; esac
+        sleep 2
+      done
+      [ "$init_state" = "exited 0" ] \
+        || { dc logs --no-log-prefix objectstore objectstore-init | tail -20; echo "Object store not ready ($init_state)" >&2; exit 1; }
       dc logs --no-log-prefix objectstore-init | tail -3
     fi
     ;;
