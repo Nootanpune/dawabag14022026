@@ -3,13 +3,22 @@
 // Handles automated (API) + manual (admin) verification for all 4 customer types
 
 import axios from 'axios';
-import { pool } from '../config/database';
+import { pool, withTransaction } from '../config/database';
+import { normaliseForm, REQUIRED } from './licences/forms';
+import { assertNumbersFree, decideLicenceTx, listLicences } from './licences/register.service';
 import { logger } from '../config/logger';
 import { AppError } from '../utils/AppError';
 import { writeAudit } from '../utils/audit';
 import { isBuyerType, requiredKycDocuments } from '../utils/customerType';
 import { queueNotification } from './notification.service';
 import { formatDateIST } from '../utils/ist';
+
+/** Forms a buyer type must hold one of (forms.REQUIRED); none for doctors / hospitals. */
+function requiredFormsFor(customerType: string | undefined): string[] {
+  if (customerType === 'b2b_retailer') return REQUIRED.retailer!.forms;
+  if (customerType === 'b2b_wholesaler') return REQUIRED.wholesaler!.forms;
+  return [];
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface GSTINVerificationResult {
@@ -200,7 +209,8 @@ export class DrugLicenseVerifier {
   static async recordAdminVerification(params: {
     userId: string;
     dlNumber: string;
-    dlType: 'DL-20' | 'DL-21' | 'DL-20B' | 'DL-21B';
+    dlType: string;            // 'DL-20' … as before, or any form ('dl25', 'Form 21B')
+    licenceId?: string;        // Sprint 30: the exact licence in the register
     verified: boolean;
     licenseHolderName?: string;
     validUpto?: string;
@@ -210,10 +220,38 @@ export class DrugLicenseVerifier {
     notes?: string;
   }): Promise<void> {
     const { userId, dlNumber, dlType, verified, adminId } = params;
+    const form = normaliseForm(dlType);
+    if (!form) throw new AppError('dl_type is not a licence form we know', 400);
+
+    // Sprint 30: the decision is made on the buyer's licence in the shared register (the one
+    // given, or a new row for a number the admin read off the document). The summary on users
+    // follows by trigger; kyc_verifications keeps its row per form as before (history).
+    const decided = await withTransaction(async (c) => {
+      let row = params.licenceId
+        ? (await c.query(`SELECT id FROM party_licences WHERE id = $1 AND user_id = $2`, [params.licenceId, userId])).rows[0]
+        : (await c.query(
+          `SELECT id FROM party_licences WHERE user_id = $1 AND form = $2 AND status IN ('pending', 'verified', 'rejected')
+           ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 ELSE 2 END, created_at DESC LIMIT 1`, [userId, form])).rows[0];
+      if (!row) {
+        await assertNumbersFree(c, { userId }, [{ form, licence_number: dlNumber }]);
+        row = (await c.query(
+          `INSERT INTO party_licences (user_id, form, licence_number, status, created_by) VALUES ($1, $2, $3, 'pending', $4) RETURNING id`,
+          [userId, form, dlNumber.trim(), adminId])).rows[0];
+      } else if (dlNumber) {
+        await c.query(`UPDATE party_licences SET licence_number = $2, updated_at = NOW() WHERE id = $1 AND status <> 'verified'`, [row.id, dlNumber.trim()]);
+      }
+      await decideLicenceTx(c, row.id, adminId, { verified, valid_upto: params.validUpto ?? null, reason: params.rejectionReason ?? 'Not accepted' });
+      // Does the application still have a licence of the kind it needs, not rejected?
+      const left = (await c.query(
+        `SELECT u.customer_type, COUNT(p.id) FILTER (WHERE p.status IN ('pending', 'verified') AND p.form = ANY($2)) AS usable
+         FROM users u LEFT JOIN party_licences p ON p.user_id = u.id WHERE u.id = $1 GROUP BY u.customer_type`,
+        [userId, requiredFormsFor((await c.query(`SELECT customer_type FROM users WHERE id = $1`, [userId])).rows[0]?.customer_type)])).rows[0];
+      return { stillUsable: Number(left?.usable ?? 0) > 0 };
+    });
 
     await KYCVerificationStore.save({
       user_id: userId,
-      document_type: `drug_license_${dlType.toLowerCase().replace('-', '')}`,
+      document_type: `drug_license_${form}`,
       input_value: dlNumber,
       verification_method: 'admin_manual',
       result: verified ? 'verified' : 'failed',
@@ -230,21 +268,21 @@ export class DrugLicenseVerifier {
       verified_by_admin_id: adminId,
     });
 
-    // Record the licence result only. Approval is decided by
-    // KYCOrchestrator.checkAndActivate once every required check has passed.
+    // Approval is decided by KYCOrchestrator.checkAndActivate once every required check has
+    // passed. A rejected licence rejects the application only when no licence of the needed
+    // kind (retail 20/21 for a retailer, wholesale 20B/21B for a wholesaler) is left.
+    const rejectApplication = !verified && !decided.stillUsable;
     await pool.query(`
       UPDATE users SET
-        drug_license_verified = $1,
-        drug_license_expiry = COALESCE($2::date, drug_license_expiry),
-        drug_license_holder_name = COALESCE($5, drug_license_holder_name),
-        kyc_status = CASE WHEN $1 = TRUE THEN kyc_status ELSE 'rejected' END,
-        kyc_rejection_reason = CASE WHEN $1 = TRUE THEN kyc_rejection_reason ELSE $4 END,
+        drug_license_holder_name = COALESCE($2, drug_license_holder_name),
+        kyc_status = CASE WHEN $3 THEN 'rejected' ELSE kyc_status END,
+        kyc_rejection_reason = CASE WHEN $3 THEN $4 ELSE kyc_rejection_reason END,
         updated_at = NOW()
-      WHERE id = $3
-    `, [verified, params.validUpto || null, userId, params.rejectionReason || null, params.licenseHolderName || null]);
+      WHERE id = $1
+    `, [userId, params.licenseHolderName || null, rejectApplication, params.rejectionReason || null]);
 
     // If rejected, notify user
-    if (!verified) {
+    if (!verified && rejectApplication) {
       await notifyUserKYCRejected(userId, 'drug_license', params.rejectionReason);
     }
 
@@ -481,12 +519,33 @@ export class KYCOrchestrator {
       `SELECT document_type, result, verification_method, verified_at
        FROM kyc_verifications WHERE user_id = $1`, [userId])).rows;
     const byType = Object.fromEntries(rows.map((r: any) => [r.document_type, r]));
-    const checks = this.requiredChecks(user).map((type) => ({
-      check: type,
-      result: byType[type]?.result ?? 'pending',
-      method: byType[type]?.verification_method ?? null,
-      verified_at: byType[type]?.verified_at ?? null,
-    }));
+    let checks: { check: string; result: string; method: string | null; verified_at: Date | null; licence_id?: string | null; label?: string }[] =
+      this.requiredChecks(user).map((type) => ({
+        check: type,
+        result: byType[type]?.result ?? 'pending',
+        method: byType[type]?.verification_method ?? null,
+        verified_at: byType[type]?.verified_at ?? null,
+      }));
+    // Sprint 30: one check per drug licence in the register (every licence the buyer gave
+    // must be checked; a rejected extra licence does not hold the account back, but a
+    // licence of the kind the buyer type needs must be there — C-11)
+    const needs = requiredFormsFor(user.customer_type);
+    const licences = needs.length ? await listLicences({ userId }) : [];
+    if (needs.length && licences.some((l) => l.id)) {
+      const live = licences.filter((l) => l.status === 'verified' || l.status === 'pending');
+      const licenceChecks = live.map((l) => ({
+        check: l.form === 'other' ? `drug_license_other:${l.form_name}` : `drug_license_${l.form}`,
+        result: l.status === 'verified' ? 'verified' : 'pending',
+        method: l.status === 'verified' ? 'admin_manual' : null,
+        verified_at: l.verified_at ? new Date(l.verified_at) : null,
+        licence_id: l.id, label: l.label,
+      }));
+      if (!live.some((l) => needs.includes(l.form))) {
+        licenceChecks.push({ check: 'drug_license', result: licences.some((l) => l.status === 'rejected') ? 'failed' : 'pending',
+          method: null, verified_at: null, licence_id: null, label: 'Drug licence of the kind this account needs' });
+      }
+      checks = [...checks.filter((c) => !c.check.startsWith('drug_license')), ...licenceChecks];
+    }
     const type = isBuyerType(user.customer_type) ? user.customer_type : 'customer';
     const docs = (await pool.query('SELECT document_type FROM kyc_documents WHERE user_id = $1', [userId]))
       .rows.map((r: any) => r.document_type);

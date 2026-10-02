@@ -25,11 +25,18 @@ export default function LegalBlocks({ info }: { info: LegalInfo }) {
         <p>CIN {orDash(entity?.cin)}</p>
       </Block>
       <Block title="Drug licences">
-        <p>Retail (Form 20) {orDash(dl?.retail_20)}</p>
-        <p>Retail (Form 21) {orDash(dl?.retail_21)}</p>
-        <p>Wholesale (Form 20B) {orDash(dl?.wholesale_20b)}</p>
-        <p>Wholesale (Form 21B) {orDash(dl?.wholesale_21b)}</p>
-        {dl?.valid_upto && <p>Valid up to {formatDateIST(dl.valid_upto)}</p>}
+        {dl?.list?.length ? (
+          dl.list.map((l) => (
+            <p key={`${l.form}-${l.number}`}>{l.label} {l.number}{l.valid_upto ? ` · valid up to ${formatDateIST(l.valid_upto)}` : ''}</p>
+          ))
+        ) : (
+          <>
+            <p>Retail (Form 20) {orDash(dl?.retail_20)}</p>
+            <p>Retail (Form 21) {orDash(dl?.retail_21)}</p>
+            <p>Wholesale (Form 20B) {orDash(dl?.wholesale_20b)}</p>
+            <p>Wholesale (Form 21B) {orDash(dl?.wholesale_21b)}</p>
+          </>
+        )}
       </Block>
       <Block title="Pharmacist in charge">
         <p className="font-medium text-gray-800">{orDash(ph?.name)}</p>

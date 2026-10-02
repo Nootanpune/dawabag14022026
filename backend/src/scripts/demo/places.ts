@@ -24,19 +24,15 @@ export const DEMO_PREMISES = { pincode: '422001', latitude: 19.9975, longitude: 
 // Defaults from database/07_sprint4_fulfilment_compliance.sql, put back by --remove
 export const LEGAL_DEFAULTS: Record<string, unknown> = {
   'legal.entity': { name: 'Dawabag Private Limited', address: '', gstin: '', cin: '' },
-  'legal.drug_licences': { retail_20: '', retail_21: '', wholesale_20b: '', wholesale_21b: '', valid_upto: '' },
   'legal.pharmacist_in_charge': { name: '', registration_no: '' },
   'legal.grievance_officer': { name: '', email: '', phone: '', address: '' },
 };
 
 // Same shapes the admin Settings screen validates (marketplaceAdmin.controller SETTING_SCHEMAS)
 export function demoLegalSettings(): Record<string, unknown> {
-  const validUpto = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
   return {
     'legal.entity': { name: 'Dawabag Private Limited (DEMO trial)', address: 'DEMO address — not a real premises, Nashik 422001, Maharashtra',
       gstin: 'DEMO-NOT-REAL', cin: 'DEMO-NOT-A-REAL-CIN' },
-    'legal.drug_licences': { retail_20: `${DEMO_MARK} (20)`, retail_21: `${DEMO_MARK} (21)`, wholesale_20b: `${DEMO_MARK} (20B)`,
-      wholesale_21b: `${DEMO_MARK} (21B)`, valid_upto: validUpto },
     'legal.pharmacist_in_charge': { name: 'Demo Pharmacist (DEMO)', registration_no: 'DEMO-MSPC-0001' },
     'legal.grievance_officer': { name: 'Demo Grievance Officer (DEMO)', email: 'grievance-demo@example.com', phone: '0000000000',
       address: 'DEMO address — not real, Nashik 422001' },
@@ -62,5 +58,17 @@ export async function seedPlaces(c: PoolClient, adminId: string) {
     await writeAuditTx(c, { userId: null, action: 'setting_changed', performedBy: adminId, notes: 'Trial demo seed',
       oldValue: { key, value: before.value }, newValue: { key, value } });
   }
+  // Dawabag's drug licences live in the licence register (C-07, Sprint 30), shown in the footer from there
+  const validUpto = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
+  for (const [type, form] of DEMO_LICENCE_TYPES) {
+    await c.query(
+      `INSERT INTO business_licences (licence_type, licence_number, valid_upto, renewal_owner, notes, created_by)
+       VALUES ($1, $2, $3, 'Demo owner (DEMO)', 'Trial demo seed — not a real licence', $4)
+       ON CONFLICT (licence_type, licence_number) DO UPDATE SET valid_upto = EXCLUDED.valid_upto, is_active = TRUE, updated_at = NOW()`,
+      [type, `${DEMO_MARK} (${form})`, validUpto, adminId]);
+  }
   return { pincodes: DEMO_PINCODES.length };
 }
+
+/** Demo rows of Dawabag's licence register; --remove deletes rows numbered with DEMO_MARK. */
+export const DEMO_LICENCE_TYPES: [string, string][] = [['retail_20', '20'], ['retail_21', '21'], ['wholesale_20b', '20B'], ['wholesale_21b', '21B']];

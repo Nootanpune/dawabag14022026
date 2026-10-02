@@ -4,6 +4,8 @@ import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
 import { assertSupplierCanSupply } from './supplierCheck';
+import { licenceLine } from '../licences/forms';
+import { listLicences } from '../licences/register.service';
 
 export interface PoInput {
   vendor_id: string;
@@ -85,5 +87,7 @@ export async function getPurchaseOrder(id: string) {
     `SELECT pi.id, pi.product_id, p.name AS product_name, p.sku, pi.quantity, pi.received_qty, pi.unit_price_paise AS unit_cost_paise, pi.gst_rate
      FROM po_items pi JOIN products p ON p.id = pi.product_id WHERE pi.po_id = $1 ORDER BY p.name`, [id]);
   const receipts = await query(`SELECT id, grn_number, supplier_invoice_no, total_paise, created_at FROM goods_receipts WHERE po_id = $1 ORDER BY created_at`, [id]);
-  return { ...po, items, receipts };
+  // Every drug licence of the supplier, as the purchase order shows it (Sprint 30, C-02)
+  const supplier_licences = (await listLicences({ vendorId: po.vendor_id })).filter((l) => l.status === 'verified');
+  return { ...po, items, receipts, supplier_licences, supplier_licence_line: licenceLine(supplier_licences) };
 }

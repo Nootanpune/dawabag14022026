@@ -1,4 +1,5 @@
-import type { FieldErrors, UseFormRegister } from 'react-hook-form';
+import type { Control, FieldErrors, UseFormRegister } from 'react-hook-form';
+import ExtraLicenceRows from './ExtraLicenceRows';
 import {
   RETAILER_DL_TYPES,
   SPECIALITIES,
@@ -12,10 +13,11 @@ interface Props {
   customerType: CustomerType;
   register: UseFormRegister<DetailsFormValues>;
   errors: FieldErrors<DetailsFormValues>;
+  control: Control<DetailsFormValues>;
 }
 
 /** Business fields (retailer / wholesaler) or medical registration fields (doctor). */
-export default function ProfessionalFields({ customerType, register, errors }: Props) {
+export default function ProfessionalFields({ customerType, register, errors, control }: Props) {
   const isB2B = customerType === 'b2b_retailer' || customerType === 'b2b_wholesaler';
   const isDoctor = customerType === 'doc_hospital';
   const dlTypes = customerType === 'b2b_wholesaler' ? WHOLESALER_DL_TYPES : RETAILER_DL_TYPES;
@@ -42,6 +44,7 @@ export default function ProfessionalFields({ customerType, register, errors }: P
               <input {...register('drug_license_number')} placeholder="MH-NSK-123456" className="input" />
             </Field>
           </div>
+          <ExtraLicenceRows control={control} register={register} errors={errors} />
         </>
       )}
 
@@ -67,6 +70,7 @@ export default function ProfessionalFields({ customerType, register, errors }: P
               ))}
             </select>
           </Field>
+          <ExtraLicenceRows control={control} register={register} errors={errors} optionalOnly />
         </>
       )}
     </>

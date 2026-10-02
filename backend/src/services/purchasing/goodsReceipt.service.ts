@@ -90,7 +90,8 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
            taxable_paise, cgst_paise, sgst_paise, igst_paise, total_paise, received_by, checked_by_pharmacist, notes)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id, grn_number`,
         [grnNumber, input.po_id ?? null, input.vendor_id, input.supplier_invoice_no, input.supplier_invoice_date, supplier.gst_number,
-         supplier.drug_license_no, taxable, cgst, sgst, igst, taxable + gst, userId,
+         // every licence of the supplier as checked at receipt (purchase record, C-02)
+         supplier.licence_line, taxable, cgst, sgst, igst, taxable + gst, userId,
          role === 'pharmacist_rx' || role === 'pharmacist_pack' ? userId : null, input.notes ?? null])).rows[0];
     } catch (e: any) {
       if (e.code === '23505') throw new AppError(`Supplier invoice ${input.supplier_invoice_no} has already been received`, 409);
@@ -143,7 +144,8 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
     }
     await writeAuditTx(client, { userId: null, action: 'goods_received', performedBy: userId,
       newValue: { grn_id: grn.id, grn_number: grnNumber, vendor_id: input.vendor_id, po_id: input.po_id ?? null, total_paise: taxable + gst, lines: priced.length } });
-    return { id: grn.id, grn_number: grnNumber, taxable_paise: taxable, gst_paise: gst, total_paise: taxable + gst };
+    return { id: grn.id, grn_number: grnNumber, taxable_paise: taxable, gst_paise: gst, total_paise: taxable + gst,
+      licence_warnings: supplier.licence_warnings };
   });
 }
 

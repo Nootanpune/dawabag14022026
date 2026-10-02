@@ -6,7 +6,9 @@
 // Fixes: GAP-03 (vendor approval workflow), GAP-04 (vendor rating system),
 //        GAP-12 (vendor pincode for distance allocation)
 
-import { pool } from '../config/database';
+import { pool, withTransaction } from '../config/database';
+import { isLicenceForm, isRealDate, LicenceForm } from './licences/forms';
+import { saveCheckedLicencesTx } from './licences/register.service';
 import { logger } from '../config/logger';
 import { AppError } from '../utils/AppError';
 import { invoicePrefixProblem } from './partnerOnboarding/rules';
@@ -17,8 +19,8 @@ export class VendorApprovalService {
   static async approveVendor(params: {
     vendorId: string;
     adminId: string;
-    drugLicenseType: 'dl20' | 'dl21' | 'dl20b' | 'dl21b';
-    drugLicenseExpiry: string; // YYYY-MM-DD
+    drugLicenseType?: LicenceForm;   // not needed when the vendor's licences are already in the register
+    drugLicenseExpiry?: string;      // YYYY-MM-DD
     vendorType: 'supplier' | 'marketplace_partner' | 'both';
     invoicePrefix?: string;   // required for marketplace partners (their own invoice series)
     notes?: string;
@@ -31,23 +33,38 @@ export class VendorApprovalService {
     const prefixProblem = prefix ? invoicePrefixProblem(prefix) : null;
     if (prefixProblem) throw new AppError(prefixProblem, 400);
 
-    const result = await pool.query(
-      `UPDATE vendors SET
-         approval_status      = 'approved',
-         kyc_status           = 'approved',
-         drug_license_type    = $1,
-         drug_license_expiry  = $2,
-         drug_license_verified = TRUE,
-         vendor_type          = $3,
-         approved_by          = $4,
-         approved_at          = NOW(),
-         is_active            = TRUE,
-         invoice_prefix       = COALESCE($6, invoice_prefix),
-         updated_at           = NOW()
-       WHERE id = $5
-       RETURNING name, contact_mobile, contact_email`,
-      [drugLicenseType, drugLicenseExpiry, vendorType, adminId, vendorId, prefix || null]
-    );
+    // Sprint 30: the licence approved here goes into the shared register (checked); a vendor whose
+    // licences are already there keeps them, and the summary columns follow by trigger.
+    if (drugLicenseType && !isLicenceForm(drugLicenseType)) throw new AppError('drug_license_type is not a licence form we know', 400);
+    if (drugLicenseExpiry && !isRealDate(drugLicenseExpiry)) throw new AppError('drug_license_expiry must be a date (YYYY-MM-DD)', 400);
+    const result = await withTransaction(async (c) => {
+      const updated = await c.query(
+        `UPDATE vendors SET
+           approval_status      = 'approved',
+           kyc_status           = 'approved',
+           drug_license_type    = COALESCE($1, drug_license_type),
+           drug_license_expiry  = COALESCE($2::date, drug_license_expiry),
+           drug_license_verified = TRUE,
+           vendor_type          = $3,
+           approved_by          = $4,
+           approved_at          = NOW(),
+           is_active            = TRUE,
+           invoice_prefix       = COALESCE($6, invoice_prefix),
+           updated_at           = NOW()
+         WHERE id = $5
+         RETURNING name, contact_mobile, contact_email, drug_license_no`,
+        [drugLicenseType || null, drugLicenseExpiry || null, vendorType, adminId, vendorId, prefix || null]
+      );
+      const v = updated.rows[0];
+      if (v && drugLicenseType && drugLicenseExpiry) {
+        const checked = (await c.query(`SELECT 1 FROM party_licences WHERE vendor_id = $1 AND status = 'verified' LIMIT 1`, [vendorId])).rows[0];
+        if (!checked) {
+          await c.query(`UPDATE party_licences SET status = 'superseded', updated_at = NOW() WHERE vendor_id = $1 AND status = 'pending'`, [vendorId]);
+          await saveCheckedLicencesTx(c, { vendorId }, [{ form: drugLicenseType, licence_number: v.drug_license_no, valid_upto: drugLicenseExpiry }], adminId);
+        }
+      }
+      return updated;
+    });
 
     if (!result.rows[0]) throw new AppError('Vendor not found', 404);
 

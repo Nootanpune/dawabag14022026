@@ -1,6 +1,7 @@
 // Public legal details for the footer and /legal (C-04 licences on the website,
 // C-36 grievance officer). Read from the server on every visit; editable by a
-// super admin in Settings (PUT /admin/settings/legal.*).
+// super admin in Settings (PUT /admin/settings/legal.*); drug licence numbers come from
+// the licence register (Admin → Licences, C-07).
 import api from '../api';
 
 export interface LegalInfo {
@@ -10,7 +11,10 @@ export interface LegalInfo {
     retail_21: string;
     wholesale_20b: string;
     wholesale_21b: string;
+    /** earliest valid-till of the drug licences listed */
     valid_upto: string;
+    /** every drug licence on Dawabag's licence register (Admin → Licences), Sprint 30 */
+    list?: { form: string; label: string; number: string; valid_upto: string | null }[];
   } | null;
   pharmacist_in_charge: { name: string; registration_no: string } | null;
   grievance_officer: { name: string; email: string; phone: string; address: string } | null;

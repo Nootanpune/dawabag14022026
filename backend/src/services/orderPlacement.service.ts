@@ -15,6 +15,19 @@ import { createShipmentsAndLines } from './shipment.service';
 import { OrderPreview, buildCheckoutSummary } from './checkoutSummary.service';
 import { moveOrderToFulfilment } from './paymentCapture.service';
 import { freeDeliveryAbovePaise, qualifiesForFreeDelivery } from './delivery/freeDelivery';
+import { dawabagDrugLicences, listLicences, partyEligibility, snapshot } from './licences/register.service';
+
+/** The seller of record's licences on each shipment, as on the day of sale — printed on its invoice (C-13). */
+async function snapshotSellerLicences(client: PoolClient, orderId: string) {
+  const shipments = (await client.query(`SELECT id, seller_type, partner_id FROM order_shipments WHERE order_id = $1`, [orderId])).rows;
+  let own: Awaited<ReturnType<typeof dawabagDrugLicences>> | null = null;
+  for (const sh of shipments) {
+    const rows = sh.seller_type === 'partner' && sh.partner_id
+      ? (await listLicences({ vendorId: sh.partner_id }, { client })).filter((l) => l.status === 'verified')
+      : (own ??= await dawabagDrugLicences(client));
+    if (rows.length) await client.query(`UPDATE order_shipments SET seller_drug_licences = $2 WHERE id = $1`, [sh.id, JSON.stringify(snapshot(rows))]);
+  }
+}
 
 export const createOrderSchema = z.object({
   patient_id:           z.string().uuid().optional(),
@@ -59,6 +72,14 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
   const registeredType = buyer.customer_type;
   if (isBuyerType(registeredType) && TRADE_TYPES.includes(registeredType) && buyer.kyc_status !== 'approved') {
     throw new AppError('Your business account is awaiting KYC approval. Orders open once our team verifies your documents.', 403);
+  }
+  // Every checked licence must be in date — on the day it lapses, not only after the nightly job (C-14, Sprint 30)
+  if (registeredType === 'b2b_retailer' || registeredType === 'b2b_wholesaler') {
+    const check = await partyEligibility({ userId }, registeredType === 'b2b_retailer' ? 'retailer' : 'wholesaler');
+    // (a missing kind cannot reach here: KYC approval needs it; older accounts keep the approval they had)
+    if (check.expired.length) {
+      throw new AppError(`Trade orders are paused: ${check.expired.join('; ')}. Send the renewed licence from your account (Your drug licences).`, 403);
+    }
   }
 
   if (registeredType === 'doc_hospital' && !opts.preview && !opts.refill && data.practitioner_declaration !== true) {
@@ -246,6 +267,10 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
 
     // Buyer GSTIN/PAN for invoice
     const buyerRow = await client.query('SELECT gstin, pan_number, drug_license_number FROM users WHERE id = $1', [userId]);
+    // Every checked drug licence of a licensed trade buyer, as on the day of sale (C-13, Sprint 30)
+    const tradeBuyer = isBuyerType(registeredType) && TRADE_TYPES.includes(registeredType);
+    const buyerLicences = tradeBuyer
+      ? (await listLicences({ userId }, { client })).filter((l) => l.status === 'verified') : [];
     const buyerGstin = buyerRow.rows[0]?.gstin || null;
 
     let orderStatus = data.payment_terms === 'prepaid' ? 'pending_payment' : 'confirmed';
@@ -258,8 +283,8 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
          subtotal_paise, discount_paise, shipping_paise, gst_paise,
          total_paise, coupon_id, wallet_used_paise,
          buyer_gstin, buyer_pan, e_invoice_status, buyer_drug_license,
-         refill_subscription_id, refill_for_date
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         refill_subscription_id, refill_for_date, buyer_drug_licences
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING id, order_number, invoice_number`,
       [
         orderNumber, null,   // Dawabag's invoice number is set below if Dawabag ships a line
@@ -270,15 +295,16 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
         buyerGstin, buyerRow.rows[0]?.pan_number||null,
         buyerGstin ? 'pending' : 'not_applicable',
         // Licensed trade buyers only (Rulebook C-13)
-        isBuyerType(registeredType) && TRADE_TYPES.includes(registeredType)
-          ? buyerRow.rows[0]?.drug_license_number || null : null,
+        tradeBuyer ? (buyerRow.rows[0]?.drug_license_number || null)?.slice(0, 100) ?? null : null,
         opts.refill?.subscriptionId ?? null, opts.refill?.forDate ?? null,
+        buyerLicences.length ? JSON.stringify(snapshot(buyerLicences)) : null,
       ]
     );
     const orderId = newOrder.rows[0].id;
 
     // One shipment + invoice per seller of record; lines attached to their shipment
     const shipments = await createShipmentsAndLines(client, orderId, lineItems, allocations);
+    await snapshotSellerLicences(client, orderId);
     const invoiceNumber = shipments.find((sh) => sh.seller_type === 'dawabag')?.invoice_number ?? null;
     if (invoiceNumber) {
       await client.query('UPDATE orders SET invoice_number = $1 WHERE id = $2', [invoiceNumber, orderId]);

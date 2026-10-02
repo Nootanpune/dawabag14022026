@@ -30,6 +30,7 @@ function asPendingVendor(s: Supplier): PendingVendor {
     state: s.state,
     created_at: '',
     dl_portal_url: null,
+    licence_count: s.licence_count,
   };
 }
 
@@ -37,6 +38,7 @@ function asPendingVendor(s: Supplier): PendingVendor {
 function SuppliersScreen() {
   const [adding, setAdding] = useState(false);
   const [approving, setApproving] = useState<Supplier | null>(null);
+  const [editing, setEditing] = useState<Supplier | null>(null);
   const { data, isLoading, error, refetch, isFetching } = useQuery({ queryKey: purchasingKeys.suppliers, queryFn: fetchSuppliers });
 
   return (
@@ -45,7 +47,7 @@ function SuppliersScreen() {
         title="Suppliers"
         subtitle={
           <>
-            Wholesalers Dawabag buys from. Approval uses the same licence check as{' '}
+            Wholesalers and companies Dawabag buys from, with every drug licence they hold. Approval uses the same licence check as{' '}
             <Link href="/admin/vendors" className="text-brand-600 hover:underline">
               Vendors
             </Link>
@@ -61,7 +63,8 @@ function SuppliersScreen() {
         }
       />
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText="No suppliers yet" />
-      {!!data?.length && <SupplierTable suppliers={data} onApprove={setApproving} />}
+      {!!data?.length && <SupplierTable suppliers={data} onApprove={setApproving} onEdit={setEditing} />}
+      {editing && <AddSupplierDialog supplier={editing} onClose={() => setEditing(null)} />}
       {adding && <AddSupplierDialog onClose={() => setAdding(false)} />}
       {approving && <ApproveVendorDialog vendor={asPendingVendor(approving)} onClose={() => setApproving(null)} />}
     </div>

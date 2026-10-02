@@ -11,9 +11,9 @@ import { writeAuditTx } from '../../utils/audit';
 import { checkGstin, gstinStateProblem } from '../../utils/gstin';
 import { todayIST } from '../../utils/ist';
 import { addPartnerLoginTx, LoginIn, LoginOut } from './logins';
-import {
-  invoicePrefixProblem, LICENCE_LABEL, LicenceIn, licenceProblems, licenceSummary, PharmacistIn, pharmacistProblems, sellingRights,
-} from './rules';
+import { invoicePrefixProblem, PharmacistIn, pharmacistProblems, sellingRights } from './rules';
+import { LicenceIn, licenceLine, licenceProblems, licenceSummary } from '../licences/forms';
+import { assertNumbersFree, licenceBadge, licencesByParty, listLicences, saveCheckedLicencesTx } from '../licences/register.service';
 
 export interface PartnerDetailsIn {
   legal_name: string;
@@ -63,15 +63,8 @@ async function assertUnique(c: PoolClient, vendorId: string | null, d: { invoice
       [d.gstin, vendorId])).rows[0];
     if (other) throw new AppError(`A partner with GSTIN ${d.gstin} already exists (${other.name}); open it and edit it instead`, 409);
   }
-  for (const l of d.licences ?? []) {
-    const n = l.licence_number.trim();
-    const other = (await c.query(
-      `SELECT v.name FROM vendor_licences vl JOIN vendors v ON v.id = vl.vendor_id
-       WHERE vl.licence_type = $1 AND vl.licence_number = $2 AND vl.vendor_id IS DISTINCT FROM $3
-       UNION ALL SELECT name FROM vendors WHERE drug_license_no = $2 AND id IS DISTINCT FROM $3 LIMIT 1`,
-      [l.licence_type, n, vendorId])).rows[0];
-    if (other) throw new AppError(`${LICENCE_LABEL[l.licence_type]} number ${n} is already registered to ${other.name}`, 409);
-  }
+  // Every licence number belongs to one business (Sprint 30 register; plain message naming the holder)
+  if (d.licences?.length) await assertNumbersFree(c, vendorId ? { vendorId } : { newParty: 'vendor', gstin: d.gstin }, d.licences);
 }
 
 /** Where the partner is, for nearest-seller allocation: given, else the PIN's centre. */
@@ -81,23 +74,14 @@ async function location(c: PoolClient, d: Pick<PartnerDetailsIn, 'pincode' | 'la
   return { latitude: pin?.latitude ?? null, longitude: pin?.longitude ?? null };
 }
 
+// The partner's licences are checked by the admin entering them (C-02, C-07): saved as
+// verified in the register; the summary every seller check reads follows by trigger.
 async function saveLicencesTx(c: PoolClient, vendorId: string, adminId: string, licences: LicenceIn[]) {
-  await c.query(`DELETE FROM vendor_licences WHERE vendor_id = $1 AND licence_type <> ALL($2)`, [vendorId, licences.map((l) => l.licence_type)]);
-  for (const l of licences) {
-    await c.query(
-      `INSERT INTO vendor_licences (vendor_id, licence_type, licence_number, valid_upto, created_by)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (vendor_id, licence_type) DO UPDATE SET licence_number = EXCLUDED.licence_number,
-         valid_upto = EXCLUDED.valid_upto, updated_at = NOW(),
-         last_alert_days = CASE WHEN vendor_licences.valid_upto IS DISTINCT FROM EXCLUDED.valid_upto THEN NULL ELSE vendor_licences.last_alert_days END`,
-      [vendorId, l.licence_type, l.licence_number.trim(), l.valid_upto, adminId]);
-  }
-  // Keep the summary every seller check reads in step with the register (rules.licenceSummary)
-  const s = licenceSummary(licences);
-  await c.query(
-    `UPDATE vendors SET drug_license_no = $2, drug_license_type = $3, drug_license_expiry = $4, drug_license_verified = TRUE, updated_at = NOW()
-     WHERE id = $1`, [vendorId, s.drug_license_no, s.drug_license_type, s.drug_license_expiry]);
+  await saveCheckedLicencesTx(c, { vendorId }, licences, adminId);
 }
+
+const partnerLicenceProblems = (licences: LicenceIn[], today: string) =>
+  licenceProblems(licences, { party: 'partner', today, requireValidUpto: true });
 
 async function savePharmacistsTx(c: PoolClient, vendorId: string, adminId: string, pharmacists: PharmacistIn[]) {
   const regs = pharmacists.map((p) => p.registration_no.trim().toUpperCase());
@@ -112,7 +96,7 @@ async function savePharmacistsTx(c: PoolClient, vendorId: string, adminId: strin
 }
 
 const auditSummary = (licences?: LicenceIn[], pharmacists?: PharmacistIn[]) => ({
-  ...(licences ? { licences: licences.map((l) => ({ type: l.licence_type, number: l.licence_number.trim(), valid_upto: l.valid_upto })) } : {}),
+  ...(licences ? { licences: licences.map((l) => ({ form: l.form, form_name: l.form_name ?? null, number: l.licence_number.trim(), valid_upto: l.valid_upto })) } : {}),
   ...(pharmacists ? { pharmacists: pharmacists.map((p) => ({ name: p.full_name.trim(), registration_no: p.registration_no.trim().toUpperCase() })) } : {}),
 });
 
@@ -121,7 +105,7 @@ export async function createPartner(adminId: string, d: CreatePartnerIn, ip?: st
   const today = todayIST();
   const gstin = checkedGstin(d.gstin, d.state);
   const prefix = d.invoice_prefix.trim().toUpperCase();
-  fail([...licenceProblems(d.licences, today), ...pharmacistProblems(d.pharmacists), invoicePrefixProblem(prefix) ?? ''].filter(Boolean));
+  fail([...partnerLicenceProblems(d.licences, today), ...pharmacistProblems(d.pharmacists), invoicePrefixProblem(prefix) ?? ''].filter(Boolean));
   if (!d.logins.length) throw new AppError('Add at least one partner login (mobile number)', 400);
   const mobiles = d.logins.map((l) => l.mobile.trim());
   if (new Set(mobiles).size !== mobiles.length) throw new AppError('The same login mobile is entered twice', 400);
@@ -129,7 +113,7 @@ export async function createPartner(adminId: string, d: CreatePartnerIn, ip?: st
   return withTransaction(async (c) => {
     await assertUnique(c, null, { invoice_prefix: prefix, gstin, licences: d.licences });
     const at = await location(c, d);
-    const s = licenceSummary(d.licences);
+    const s = licenceSummary(d.licences.map((l) => ({ ...l, valid_upto: l.valid_upto ?? null })))!;
     const vendor = (await c.query<{ id: string }>(
       `INSERT INTO vendors (name, trade_name, drug_license_no, drug_license_type, drug_license_expiry, drug_license_verified,
                             gst_number, gst_type, contact_name, contact_mobile, contact_email,
@@ -138,7 +122,7 @@ export async function createPartner(adminId: string, d: CreatePartnerIn, ip?: st
        VALUES ($1, $2, $3, $4, $5, TRUE, $6, 'regular', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
                'marketplace_partner', 'approved', 'approved', $17, NOW(), TRUE, $18, $17)
        RETURNING id`,
-      [d.legal_name.trim(), d.trade_name?.trim() || null, s.drug_license_no, s.drug_license_type, s.drug_license_expiry,
+      [d.legal_name.trim(), d.trade_name?.trim() || null, s.number, s.form, s.expiry,
        gstin, d.contact_name.trim(), d.contact_mobile.trim(), d.contact_email?.trim() || null,
        d.address_line1.trim(), d.address_line2?.trim() || null, d.city.trim(), d.state.trim(), d.pincode.trim(),
        at.latitude, at.longitude, adminId, prefix])).rows[0];
@@ -166,7 +150,7 @@ export async function updatePartner(adminId: string, vendorId: string, d: Update
     const gstin = gstinChanged ? checkedGstin(d.gstin ?? before.gst_number ?? '', state) : before.gst_number;
     const prefix = d.invoice_prefix?.trim().toUpperCase();
     fail([
-      ...(d.licences ? licenceProblems(d.licences, today) : []),
+      ...(d.licences ? partnerLicenceProblems(d.licences, today) : []),
       ...(d.pharmacists ? pharmacistProblems(d.pharmacists) : []),
       prefix ? invoicePrefixProblem(prefix) ?? '' : '',
     ].filter(Boolean));
@@ -214,8 +198,6 @@ export async function addPartnerLogin(adminId: string, vendorId: string, login: 
   });
 }
 
-const licenceStatus = `CASE WHEN vl.valid_upto < CURRENT_DATE THEN 'expired' WHEN vl.valid_upto <= CURRENT_DATE + 60 THEN 'expiring' ELSE 'valid' END`;
-
 /** GET /admin/partners/:id — the partner as the admin edits it. */
 export async function getPartner(vendorId: string) {
   const v = await queryOne<any>(
@@ -226,29 +208,35 @@ export async function getPartner(vendorId: string) {
             EXISTS (SELECT 1 FROM invoice_series s WHERE s.series_key = 'P:' || v.id::text AND s.last_number > 0) AS has_invoices
      FROM vendors v WHERE v.id = $1 AND v.vendor_type IN ('marketplace_partner', 'both')`, [vendorId]);
   if (!v) throw new AppError('Partner not found', 404);
-  const [licences, pharmacists, logins] = await Promise.all([
-    query<any>(`SELECT vl.licence_type, vl.licence_number, to_char(vl.valid_upto, 'YYYY-MM-DD') AS valid_upto, ${licenceStatus} AS status
-                FROM vendor_licences vl WHERE vl.vendor_id = $1
-                ORDER BY array_position(ARRAY['dl20','dl21','dl20b','dl21b']::varchar[], vl.licence_type)`, [vendorId]),
+  const [all, pharmacists, logins] = await Promise.all([
+    listLicences({ vendorId }),
     query<any>(`SELECT full_name, registration_no FROM vendor_pharmacists WHERE vendor_id = $1 AND is_active ORDER BY created_at, full_name`, [vendorId]),
     query<any>(`SELECT u.id AS user_id, u.mobile, up.full_name, u.must_change_password, u.is_active, u.last_login_at
                 FROM vendor_users vu JOIN users u ON u.id = vu.user_id LEFT JOIN user_profiles up ON up.user_id = u.id
                 WHERE vu.vendor_id = $1 ORDER BY vu.created_at`, [vendorId]),
   ]);
-  return { ...v, licences, pharmacists, logins, selling_rights: sellingRights(licences, todayIST()) };
+  // Checked licences (with licence_type kept for Sprint 28 clients); renewals sent by the partner wait apart
+  const licences = all.filter((l) => l.status === 'verified').map((l) => ({ ...l, licence_type: l.form }));
+  const waiting = all.filter((l) => l.status !== 'verified');
+  return { ...v, licences, waiting_licences: waiting, licence_line: licenceLine(licences), ...licenceBadge(all),
+    pharmacists, logins, selling_rights: sellingRights(licences, todayIST()) };
 }
 
 /** GET /admin/partners — every marketplace partner with its licences and logins at a glance. */
 export async function listMarketplacePartners() {
-  return query(
+  const rows = await query<any>(
     `SELECT v.id, v.name, v.trade_name, v.pincode, v.city, v.state, v.invoice_prefix, v.vendor_rating, v.gst_number,
             v.approval_status, v.is_active, to_char(v.drug_license_expiry, 'YYYY-MM-DD') AS drug_license_expiry,
             COALESCE(r.commission_pct, 8) AS commission_pct, COALESCE(r.finding_fee_paise, 1500) AS finding_fee_paise,
-            (SELECT COALESCE(json_agg(vl.licence_type ORDER BY vl.licence_type), '[]') FROM vendor_licences vl WHERE vl.vendor_id = v.id) AS licence_types,
+            (SELECT COALESCE(json_agg(pl.form ORDER BY licence_form_rank(pl.form)), '[]') FROM party_licences pl
+              WHERE pl.vendor_id = v.id AND pl.status = 'verified') AS licence_types,
             (SELECT COUNT(*)::int FROM vendor_pharmacists p WHERE p.vendor_id = v.id AND p.is_active) AS pharmacists,
             (SELECT json_agg(json_build_object('user_id', vu.user_id, 'mobile', u.mobile)) FROM vendor_users vu
                JOIN users u ON u.id = vu.user_id WHERE vu.vendor_id = v.id) AS logins
      FROM vendors v LEFT JOIN partner_commission_rates r ON r.partner_id = v.id
      WHERE v.vendor_type IN ('marketplace_partner', 'both')
      ORDER BY v.name`);
+  // Licence count, earliest valid-till and a warning when ≤ 30 days or expired (Sprint 30)
+  const byVendor = await licencesByParty('vendor', rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, ...licenceBadge(byVendor.get(r.id) ?? []) }));
 }

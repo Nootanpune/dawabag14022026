@@ -27,17 +27,6 @@ export const LEGAL_SETTINGS: LegalSettingDef[] = [
     ],
   },
   {
-    key: 'legal.drug_licences',
-    title: 'Drug licences (C-04)',
-    fields: [
-      { name: 'retail_20', label: 'Retail — Form 20', maxLength: 60 },
-      { name: 'retail_21', label: 'Retail — Form 21', maxLength: 60 },
-      { name: 'wholesale_20b', label: 'Wholesale — Form 20B', maxLength: 60 },
-      { name: 'wholesale_21b', label: 'Wholesale — Form 21B', maxLength: 60 },
-      { name: 'valid_upto', label: 'Valid up to', type: 'date' },
-    ],
-  },
-  {
     key: 'legal.pharmacist_in_charge',
     title: 'Pharmacist in charge (C-03)',
     fields: [

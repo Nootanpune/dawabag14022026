@@ -37,6 +37,8 @@ export interface PreviewShipment {
   seller_type: string;
   seller_name: string | null;
   seller_licence: string | null;
+  /** every drug licence of the seller of record (Sprint 30) */
+  seller_licences?: { form: string; label: string; number: string; valid_upto: string | null }[];
   ships_from: string | null;
   delivery_estimate: string;
   cold_chain: boolean;

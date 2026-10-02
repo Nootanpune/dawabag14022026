@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
-  getGoodsReceipts, getOneGoodsReceipt, getOnePurchaseOrder, getPurchaseOrders, getSuppliers, postApprovePo, postCancelPo,
+  getGoodsReceipts, getOneGoodsReceipt, getOnePurchaseOrder, getPurchaseOrders, getSuppliers, getOneSupplier, putSupplier, postApprovePo, postCancelPo,
   postClosePo, postGoodsReceipt, postPurchaseOrder, postSupplier,
 } from '../controllers/purchasing.controller';
 import {
@@ -16,6 +16,8 @@ const store = authorize('admin', 'super_admin', 'pharmacist_pack', 'pharmacist_r
 
 router.get('/suppliers', store, getSuppliers);
 router.post('/suppliers', admin, postSupplier);
+router.get('/suppliers/:id', store, getOneSupplier);
+router.put('/suppliers/:id', admin, putSupplier);
 router.get('/purchase-orders', store, getPurchaseOrders);
 router.post('/purchase-orders', admin, postPurchaseOrder);
 router.get('/purchase-orders/:id', store, getOnePurchaseOrder);

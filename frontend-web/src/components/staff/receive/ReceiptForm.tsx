@@ -53,6 +53,7 @@ export default function ReceiptForm({ po }: { po?: PurchaseOrder }) {
     mutationFn: createReceipt,
     onSuccess: (r) => {
       toast.success(`${r.grn_number} recorded · ${formatPaise(r.total_paise)} incl. GST ${formatPaise(r.gst_paise)}`);
+      (r.licence_warnings ?? []).forEach((w) => toast.warning(`Supplier licence: ${w}`));
       queryClient.invalidateQueries({ queryKey: ['purchasing'] });
       queryClient.invalidateQueries({ queryKey: ['stock'] });
       router.push(`/staff/receive/${r.id}`);

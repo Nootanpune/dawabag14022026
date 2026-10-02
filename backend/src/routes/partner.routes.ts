@@ -1,4 +1,11 @@
 import { Router } from 'express';
+import multer from 'multer';
+import {
+  getPartnerLicenceDocument, getPartnerLicences, postPartnerLicenceDocument, postPartnerLicences,
+} from '../controllers/partyLicence.controller';
+import { LICENCE_FILE_MAX_BYTES } from '../services/licences/register.service';
+
+const licenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LICENCE_FILE_MAX_BYTES, files: 1 } });
 import { authenticate } from '../middleware/auth.middleware';
 import { requirePartner } from '../middleware/partner.middleware';
 import { getMyReturn, getMyReturns } from '../controllers/partner.controller';
@@ -13,6 +20,11 @@ const router = Router();
 router.use(authenticate, requirePartner);
 
 router.get('/me', getMe);
+// Sprint 30: the partner's drug licences; renewals wait for Dawabag's check
+router.get('/licences', getPartnerLicences);
+router.post('/licences', postPartnerLicences);
+router.post('/licences/:id/document', licenceUpload.single('file'), postPartnerLicenceDocument);
+router.get('/licences/:id/document-url', getPartnerLicenceDocument);
 router.get('/catalogue', searchCatalogue);
 router.get('/products', getListings);
 router.post('/products', createListing);

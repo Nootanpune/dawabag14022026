@@ -34,10 +34,12 @@ test.beforeAll(async ({}, info) => {
   } finally { await c.end(); }
 });
 
-async function fillLicence(page: Page, form: string, number: string, validTill: string) {
-  await page.getByLabel(`Holds ${form}`, { exact: true }).check();
-  await page.getByLabel(`${form} licence number`, { exact: true }).fill(number);
-  await page.getByLabel(`${form} valid till`, { exact: true }).fill(validTill);
+// Sprint 30: licences are repeatable rows (form, number, valid till); row 1 starts as Form 20
+async function fillLicence(page: Page, n: number, form: string, number: string, validTill: string) {
+  if (n > 1) await page.getByRole('button', { name: 'Add another licence' }).click();
+  await page.getByLabel(`Licence ${n} — form`, { exact: true }).selectOption(form);
+  await page.getByLabel(`Licence ${n} — number`, { exact: true }).fill(number);
+  await page.getByLabel(`Licence ${n} — valid till`, { exact: true }).fill(validTill);
 }
 
 test('the admin adds a partner with four licences, two pharmacists and two logins', async ({ page }) => {
@@ -61,10 +63,10 @@ test('the admin adds a partner with four licences, two pharmacists and two login
   await expect(page.getByText('The last character does not match — check for a typing mistake')).toBeHidden();
 
   // Drug licences: all four forms
-  await fillLicence(page, 'Form 20', `E2E-${p.tag}-20-01`, plusDays(800));
-  await fillLicence(page, 'Form 21', `E2E-${p.tag}-21-02`, plusDays(800));
-  await fillLicence(page, 'Form 20B', `E2E-${p.tag}-20B-03`, plusDays(500));
-  await fillLicence(page, 'Form 21B', `E2E-${p.tag}-21B-04`, plusDays(500));
+  await fillLicence(page, 1, 'dl20', `E2E-${p.tag}-20-01`, plusDays(800));
+  await fillLicence(page, 2, 'dl21', `E2E-${p.tag}-21-02`, plusDays(800));
+  await fillLicence(page, 3, 'dl20b', `E2E-${p.tag}-20B-03`, plusDays(500));
+  await fillLicence(page, 4, 'dl21b', `E2E-${p.tag}-21B-04`, plusDays(500));
 
   // Pharmacists: two rows
   await page.getByLabel('Pharmacist 1 — full name').fill('E2E Pharmacist One');
@@ -99,6 +101,7 @@ test('the admin adds a partner with four licences, two pharmacists and two login
   // Detail: what it may sell, logins waiting for their own password
   await page.getByRole('link', { name: 'Open the partner' }).click();
   await expect(page.getByText('patients (retail licence) and licensed trade buyers (wholesale licence)')).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Partner drug licences' }).getByTestId('licence-item')).toHaveCount(4);
   await expect(page.getByText('Has not yet changed the temporary password')).toHaveCount(2);
   await expect(page.getByRole('heading', { name: 'Edit details' })).toBeVisible();
 });

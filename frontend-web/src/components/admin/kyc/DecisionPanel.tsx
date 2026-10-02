@@ -4,6 +4,7 @@ import IdentityDecisionForm from './IdentityDecisionForm';
 import DrugLicenseDecisionForm from './DrugLicenseDecisionForm';
 import NmcDecisionForm from './NmcDecisionForm';
 import RejectApplicationButton from './RejectApplicationButton';
+import DecisionCard from './DecisionCard';
 
 /** One decision form per check returned by the server. */
 export default function DecisionPanel({ application }: { application: KycApplication }) {
@@ -23,6 +24,16 @@ export default function DecisionPanel({ application }: { application: KycApplica
           return <IdentityDecisionForm key={key} user={user} documentType={c.check} result={c.result} />;
         }
         if (c.check.startsWith('drug_license')) {
+          // Sprint 30: a licence in the register is checked on its own (Drug licences card)
+          if (c.licence_id) {
+            return (
+              <DecisionCard key={key} title={c.label ?? 'Drug licence'} result={c.result}>
+                <p className="text-xs text-gray-600">
+                  {c.result === 'verified' ? 'Checked.' : 'Check it in Drug licences below: verify with its valid-till date, or say why it is not accepted.'}
+                </p>
+              </DecisionCard>
+            );
+          }
           return <DrugLicenseDecisionForm key={key} user={user} result={c.result} />;
         }
         if (c.check === 'nmc_registration') {

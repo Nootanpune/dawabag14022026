@@ -26,8 +26,9 @@ export const CHECK_LABELS: Record<string, string> = {
   nmc_registration: 'NMC / council registration',
 };
 
-export function checkLabel(check: string): string {
+export function checkLabel(check: string, label?: string): string {
   if (CHECK_LABELS[check]) return CHECK_LABELS[check];
+  if (label) return `Drug licence — ${label}`;
   if (check.startsWith('drug_license')) {
     const form = check.replace('drug_license_', '').toUpperCase();
     return `Drug licence${form && form !== 'DRUG_LICENSE' ? ` (${form.replace('DL', 'DL-')})` : ''}`;

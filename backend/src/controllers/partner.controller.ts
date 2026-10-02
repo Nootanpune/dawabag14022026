@@ -8,6 +8,8 @@ import { listPartnerProducts, submitListing, upsertInventory } from '../services
 import { dispatchShipment, listPartnerShipments, markShipmentDelivered } from '../services/partnerFulfilment.service';
 import { getSettlement, listSettlements } from '../services/settlement.service';
 import { rejectionLabel } from '../utils/rejectionCodes';
+import { licenceLine } from '../services/licences/forms';
+import { licenceBadge, listLicences } from '../services/licences/register.service';
 import { approvedImageKeySql, withImageUrls } from '../services/productImage.service';
 
 // GET /partner/products/:id/inventory — the listing's current batches
@@ -32,7 +34,10 @@ export async function getMe(req: Request, res: Response, next: NextFunction) {
               COALESCE(r.commission_pct, 8) AS commission_pct, COALESCE(r.finding_fee_paise, 1500) AS finding_fee_paise
        FROM vendors v LEFT JOIN partner_commission_rates r ON r.partner_id = v.id
        WHERE v.id = $1`, [req.partner!.vendorId]);
-    res.json({ success: true, data: vendor });
+    // "Your drug licences" (Sprint 30): every licence, renewals waiting for Dawabag's check
+    const licences = await listLicences({ vendorId: req.partner!.vendorId });
+    res.json({ success: true, data: { ...vendor, licences, licence_line: licenceLine(licences.filter((l) => l.status === 'verified')),
+      ...licenceBadge(licences) } });
   } catch (err) { next(err); }
 }
 

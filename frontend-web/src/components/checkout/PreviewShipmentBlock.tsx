@@ -11,7 +11,7 @@ export default function PreviewShipmentBlock({ s }: { s: PreviewShipment }) {
         <div>
           <p className="font-medium text-sm">Sold by {s.seller_name ?? 'a Dawabag marketplace partner'}</p>
           <p className="text-xs text-gray-500">
-            Drug licence {s.seller_licence || '—'}
+            {s.seller_licences && s.seller_licences.length > 1 ? 'Drug licences' : 'Drug licence'} {s.seller_licence || '—'}
             {s.ships_from ? ` · ships from ${s.ships_from}` : ''}
           </p>
         </div>

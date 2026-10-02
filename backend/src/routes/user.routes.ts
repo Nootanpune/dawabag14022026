@@ -4,7 +4,13 @@ import { getAddresses, postAddress, postDefaultAddress, putAddress, removeAddres
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
+import multer from 'multer';
+import {
+  getMyLicenceDocument, getMyLicences, postMyLicenceDocument, postMyLicences,
+} from '../controllers/partyLicence.controller';
+import { LICENCE_FILE_MAX_BYTES } from '../services/licences/register.service';
 
+const licenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LICENCE_FILE_MAX_BYTES, files: 1 } });
 const router = Router();
 
 // GET /api/v1/users/me
@@ -88,6 +94,11 @@ router.post('/me/patients', authenticate, async (req, res, next) => {
 });
 
 // Addresses — controllers/address.controller.ts
+// Sprint 30: a business or doctor account's drug licences (C-11, C-14)
+router.get('/me/licences', authenticate, getMyLicences);
+router.post('/me/licences', authenticate, postMyLicences);
+router.post('/me/licences/:id/document', authenticate, licenceUpload.single('file'), postMyLicenceDocument);
+router.get('/me/licences/:id/document-url', authenticate, getMyLicenceDocument);
 router.get('/me/addresses', authenticate, getAddresses);
 router.post('/me/addresses', authenticate, postAddress);
 router.put('/me/addresses/:id', authenticate, putAddress);

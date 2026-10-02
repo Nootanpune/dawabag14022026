@@ -3,17 +3,14 @@
 // pharmacists, address and portal logins with temporary passwords. Server:
 // POST/GET/PUT /admin/partners, POST /admin/partners/:id/logins.
 import api from '../api';
+import {
+  blankLicence, draftFromView, formLabel, licenceBodies, licenceProblems, type LicenceBadgeData, type LicenceDraft, type LicenceForm, type LicenceView,
+} from '../licences/forms';
 
-export type LicenceForm = 'dl20' | 'dl21' | 'dl20b' | 'dl21b';
-export const LICENCE_FORMS: { form: LicenceForm; label: string; hint: string }[] = [
-  { form: 'dl20', label: 'Form 20', hint: 'Retail — sale to patients' },
-  { form: 'dl21', label: 'Form 21', hint: 'Retail — Schedule C / C1 medicines' },
-  { form: 'dl20b', label: 'Form 20B', hint: 'Wholesale — sale to licensed buyers' },
-  { form: 'dl21b', label: 'Form 21B', hint: 'Wholesale — Schedule C / C1 medicines' },
-];
-export const licenceLabel = (t: string) => LICENCE_FORMS.find((l) => l.form === t)?.label ?? t;
+// Licences: every form a partner holds, as repeatable rows (Sprint 30, shared with suppliers and buyers)
+export type { LicenceForm } from '../licences/forms';
+export const licenceLabel = (t: string) => formLabel(t);
 
-export interface LicenceRow { held: boolean; number: string; valid_upto: string }
 export interface PharmacistRow { full_name: string; registration_no: string }
 export interface LoginRow { mobile: string; full_name: string; temporary_password: string }
 
@@ -30,24 +27,22 @@ export interface PartnerFormValues {
   state: string;
   pincode: string;
   invoice_prefix: string;
-  licences: Record<LicenceForm, LicenceRow>;
+  licences: LicenceDraft[];
   pharmacists: PharmacistRow[];
   logins: LoginRow[];
 }
-
-const noLicence = (): LicenceRow => ({ held: false, number: '', valid_upto: '' });
 
 export function blankPartnerForm(): PartnerFormValues {
   return {
     legal_name: '', trade_name: '', gstin: '', contact_name: '', contact_mobile: '', contact_email: '',
     address_line1: '', address_line2: '', city: '', state: 'Maharashtra', pincode: '', invoice_prefix: '',
-    licences: { dl20: noLicence(), dl21: noLicence(), dl20b: noLicence(), dl21b: noLicence() },
+    licences: [blankLicence('dl20')],
     pharmacists: [{ full_name: '', registration_no: '' }],
     logins: [],
   };
 }
 
-export interface PartnerLicence { licence_type: LicenceForm; licence_number: string; valid_upto: string; status: 'valid' | 'expiring' | 'expired' }
+export type PartnerLicence = LicenceView;
 export interface PartnerLogin { user_id: string; mobile: string; full_name: string | null; must_change_password: boolean; is_active: boolean; last_login_at: string | null }
 export interface PartnerDetail {
   id: string;
@@ -68,11 +63,14 @@ export interface PartnerDetail {
   has_invoices: boolean;
   drug_license_expiry: string | null;
   licences: PartnerLicence[];
+  /** renewals the partner sent from its portal, waiting for the check (and rejected ones) */
+  waiting_licences: PartnerLicence[];
+  licence_line: string | null;
   pharmacists: PharmacistRow[];
   logins: PartnerLogin[];
   selling_rights: { retail: boolean; wholesale: boolean };
 }
-export interface PartnerListRow {
+export interface PartnerListRow extends LicenceBadgeData {
   id: string;
   name: string;
   trade_name: string | null;
@@ -91,9 +89,9 @@ export interface PartnerListRow {
 
 export function formFromDetail(d: PartnerDetail): PartnerFormValues {
   const f = blankPartnerForm();
-  for (const l of d.licences) f.licences[l.licence_type] = { held: true, number: l.licence_number, valid_upto: l.valid_upto };
   return {
     ...f,
+    licences: d.licences.length ? d.licences.map(draftFromView) : f.licences,
     legal_name: d.legal_name ?? '', trade_name: d.trade_name ?? '', gstin: d.gstin ?? '',
     contact_name: d.contact_name ?? '', contact_mobile: d.contact_mobile ?? '', contact_email: d.contact_email ?? '',
     address_line1: d.address_line1 ?? '', address_line2: d.address_line2 ?? '', city: d.city ?? '', state: d.state ?? '',
@@ -109,9 +107,7 @@ function detailsBody(v: PartnerFormValues) {
     contact_name: t(v.contact_name), contact_mobile: t(v.contact_mobile), contact_email: t(v.contact_email) || null,
     address_line1: t(v.address_line1), address_line2: t(v.address_line2) || null, city: t(v.city), state: t(v.state),
     pincode: t(v.pincode), invoice_prefix: t(v.invoice_prefix).toUpperCase(),
-    licences: LICENCE_FORMS.filter(({ form }) => v.licences[form].held).map(({ form }) => ({
-      licence_type: form, licence_number: t(v.licences[form].number), valid_upto: v.licences[form].valid_upto,
-    })),
+    licences: licenceBodies(v.licences),
     pharmacists: v.pharmacists.filter((p) => t(p.full_name) || t(p.registration_no))
       .map((p) => ({ full_name: t(p.full_name), registration_no: t(p.registration_no).toUpperCase() })),
   };
@@ -126,14 +122,7 @@ export const buildUpdateBody = (v: PartnerFormValues) => detailsBody(v);
 /** Early, plain checks before sending (the server repeats all of them). */
 export function formProblems(v: PartnerFormValues, today: string, opts: { withLogins: boolean }): string[] {
   const p: string[] = [];
-  const held = LICENCE_FORMS.filter(({ form }) => v.licences[form].held);
-  if (!held.length) p.push('Tick at least one drug licence and enter its number and valid-till date');
-  for (const { form, label } of held) {
-    const l = v.licences[form];
-    if (l.number.trim().length < 3) p.push(`${label}: enter the licence number`);
-    if (!l.valid_upto) p.push(`${label}: enter the valid-till date`);
-    else if (l.valid_upto < today) p.push(`${label} expired on ${l.valid_upto} — ask the partner for the renewed licence`);
-  }
+  p.push(...licenceProblems(v.licences, { party: 'partner', today, requireValidUpto: true }));
   if (!v.pharmacists.some((x) => x.full_name.trim() && x.registration_no.trim())) p.push('Enter at least one registered pharmacist');
   if (opts.withLogins) {
     if (!v.logins.length) p.push('Add at least one login (mobile number)');

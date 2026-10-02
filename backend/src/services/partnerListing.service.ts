@@ -4,6 +4,9 @@
 import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
+import { eligibility } from './licences/forms';
+import { listLicences } from './licences/register.service';
+import { todayIST } from '../utils/ist';
 import { writeAudit, writeAuditTx } from '../utils/audit';
 import { assertBatchReceivable } from './recallAlerts/receiptGate';
 
@@ -27,8 +30,11 @@ export async function assertPartnerCanSell(vendorId: string, client?: Pick<PoolC
   if (!v || v.approval_status !== 'approved' || !v.is_active) throw new AppError('Your partner account is not approved yet', 403);
   if (!['marketplace_partner', 'both'].includes(v.vendor_type)) throw new AppError('This account is not a marketplace partner', 403);
   if (!v.gst_number) throw new AppError('A GST registration is required to sell on Dawabag', 403);
+  // Every checked licence counts: the summary carries the EARLIEST valid-till (Sprint 30)
   if (v.drug_license_expiry && new Date(v.drug_license_expiry) < new Date(new Date().toDateString())) {
-    throw new AppError('Your drug licence has expired; upload the renewal to continue selling', 403);
+    const check = eligibility(await listLicences({ vendorId }, { client }), 'partner', todayIST());
+    throw new AppError(`Your drug licence has expired${check.expired.length ? ` (${check.expired.join('; ')})` : ''}; `
+      + 'send the renewed licence from My business to continue selling', 403);
   }
 }
 

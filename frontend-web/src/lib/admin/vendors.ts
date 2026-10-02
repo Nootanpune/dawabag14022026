@@ -1,4 +1,5 @@
 import api from '../api';
+import type { LicenceView } from '../licences/forms';
 
 export interface PendingVendor {
   id: string;
@@ -14,13 +15,16 @@ export interface PendingVendor {
   state: string | null;
   created_at: string;
   dl_portal_url: string | null;
+  /** checked licences already in the register (Sprint 30): no form / date needed to approve */
+  licence_count?: number;
+  licences?: LicenceView[];
 }
 
 export type VendorType = 'supplier' | 'marketplace_partner' | 'both';
 
 export interface VendorApproval {
-  drug_license_type: 'dl20' | 'dl21' | 'dl20b' | 'dl21b';
-  drug_license_expiry: string;
+  drug_license_type?: string;
+  drug_license_expiry?: string;
   vendor_type: VendorType;
   /** required for marketplace_partner / both: 2–4 A-Z/0-9, not starting with 0 (DWB, DWS reserved) */
   invoice_prefix?: string;

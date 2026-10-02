@@ -4,6 +4,7 @@ import type { KycQueueRow } from '@/lib/admin/kyc';
 import { CUSTOMER_TYPE_SHORT } from '@/lib/admin/format';
 import StatusBadge from '../StatusBadge';
 import { formatDateTimeIST } from '@/lib/dates';
+import LicenceExpiryBadge from '@/components/licences/LicenceExpiryBadge';
 
 export default function KycQueueTable({ rows }: { rows: KycQueueRow[] }) {
   const router = useRouter();
@@ -38,7 +39,11 @@ export default function KycQueueTable({ rows }: { rows: KycQueueRow[] }) {
               <td className="px-4 py-2.5">
                 <StatusBadge status={r.kyc_status} />
               </td>
-              <td className="px-4 py-2.5 text-xs text-gray-600">{r.drug_license_number || r.nmc_reg_number || '—'}</td>
+              <td className="px-4 py-2.5 text-xs text-gray-600">
+                {r.licences?.length ? <LicenceExpiryBadge b={{ licence_count: r.licence_count ?? 0, pending_count: r.pending_count ?? 0,
+                  earliest_expiry: r.earliest_expiry ?? null, expiry_warning: r.expiry_warning ?? null }} /> : null}
+                <p>{r.licences?.length ? r.licences.map((l) => `${l.label} ${l.licence_number}`).join(', ') : r.drug_license_number || r.nmc_reg_number || '—'}</p>
+              </td>
               <td className="px-4 py-2.5">{String(r.pending_checks)}</td>
               <td className="px-4 py-2.5 text-xs text-gray-500">{formatDateTimeIST(r.kyc_submitted_at)}</td>
             </tr>

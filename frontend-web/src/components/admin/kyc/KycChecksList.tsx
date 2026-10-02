@@ -14,7 +14,7 @@ export default function KycChecksList({ checks }: { checks: KycCheck[] }) {
           {checks.map((c) => (
             <li key={c.check} className="flex items-center justify-between gap-3 py-2">
               <div>
-                <p className="font-medium text-gray-800">{checkLabel(c.check)}</p>
+                <p className="font-medium text-gray-800">{checkLabel(c.check, c.label)}</p>
                 {(c.method || c.verified_at) && (
                   <p className="text-xs text-gray-400">
                     {c.method ? c.method.replace(/_/g, ' ') : ''}

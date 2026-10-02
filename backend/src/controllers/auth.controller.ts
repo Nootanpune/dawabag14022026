@@ -11,6 +11,10 @@ import { sendWelcomeEmail } from '../services/email.service';
 import { AppError } from '../utils/AppError';
 import { logger } from '../config/logger';
 import { requiredKycDocuments } from '../utils/customerType';
+import { licenceList } from '../services/licences/input';
+import { LicenceIn, licenceProblems } from '../services/licences/forms';
+import { assertNumbersFree, submitLicencesTx } from '../services/licences/register.service';
+import { todayIST } from '../utils/ist';
 import { clearSession, issueSession, readRefreshToken } from '../utils/sessionCookie';
 
 // ─── Validation Schemas ─────────────────────────────────────────────────────
@@ -57,8 +61,10 @@ const registerSchema = z.discriminatedUnion('customer_type', [
     email: z.string().email(),
     pincode,
     business_name: z.string().trim().min(2).max(200),
-    drug_license_type: z.enum(['dl20', 'dl21']),
-    drug_license_number: z.string().trim().min(3).max(100),
+    // One licence (older apps) or every licence the shop holds (Sprint 30)
+    drug_license_type: z.enum(['dl20', 'dl21']).optional(),
+    drug_license_number: z.string().trim().min(3).max(100).optional(),
+    licences: licenceList(10).optional(),
     pan_number: pan,
     gstin: z.union([gstin, z.literal('')]).optional(),
     gst_unregistered_declaration: z.boolean().optional(),
@@ -69,8 +75,9 @@ const registerSchema = z.discriminatedUnion('customer_type', [
     email: z.string().email(),
     pincode,
     business_name: z.string().trim().min(2).max(200),
-    drug_license_type: z.enum(['dl20b', 'dl21b']),
-    drug_license_number: z.string().trim().min(3).max(100),
+    drug_license_type: z.enum(['dl20b', 'dl21b']).optional(),
+    drug_license_number: z.string().trim().min(3).max(100).optional(),
+    licences: licenceList(10).optional(),
     gstin,
     pan_number: pan,
   }),
@@ -83,6 +90,8 @@ const registerSchema = z.discriminatedUnion('customer_type', [
     nmc_council_state: z.string().trim().min(2).max(50),
     speciality: z.string().trim().min(2).max(100),
     pan_number: pan,
+    // A hospital or clinic pharmacy may add its drug licences (optional)
+    licences: licenceList(10).optional(),
     gst_unregistered_declaration: z.literal(true, {
       errorMap: () => ({ message: 'Confirm you are not registered under GST' }),
     }),
@@ -92,6 +101,11 @@ const registerSchema = z.discriminatedUnion('customer_type', [
     }),
   }),
 ]).superRefine((d, ctx) => {
+  // Retailers and wholesalers give their drug licence(s): the list, or the older single pair
+  if ((d.customer_type === 'b2b_retailer' || d.customer_type === 'b2b_wholesaler') && !d.licences?.length
+      && !(d.drug_license_type && d.drug_license_number)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['licences'], message: 'Enter your drug licence form and number' });
+  }
   // Decision A: a retailer may be unregistered, but must say so explicitly
   if (d.customer_type === 'b2b_retailer' && !d.gstin && d.gst_unregistered_declaration !== true) {
     ctx.addIssue({
@@ -135,6 +149,17 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       if (emailTaken) throw new AppError('Email already registered', 409);
     }
 
+    // Every drug licence the business gave (C-11): checked for form, dates and kind here,
+    // stored waiting for the admin's check after the account row exists (Sprint 30)
+    const licences: LicenceIn[] = 'licences' in data && data.licences?.length ? data.licences
+      : 'drug_license_type' in data && data.drug_license_type && data.drug_license_number
+        ? [{ form: data.drug_license_type, licence_number: data.drug_license_number }] : [];
+    const party = customer_type === 'b2b_retailer' ? 'retailer' : customer_type === 'b2b_wholesaler' ? 'wholesaler' : 'doctor';
+    if (customer_type !== 'customer') {
+      const problems = licenceProblems(licences, { party, today: todayIST(), requireValidUpto: false });
+      if (problems.length) throw new AppError(problems.join('. '), 400);
+    }
+
     const passwordHash = await bcrypt.hash(
       password,
       parseInt(process.env.BCRYPT_ROUNDS || '12')
@@ -162,14 +187,18 @@ export async function register(req: Request, res: Response, next: NextFunction) 
           trade ? trade.pan_number : null,
           trade && 'gstin' in trade && trade.gstin ? trade.gstin : null,
           trade && 'gst_unregistered_declaration' in trade ? trade.gst_unregistered_declaration === true : false,
-          trade && 'drug_license_type' in trade ? trade.drug_license_type : null,
-          trade && 'drug_license_number' in trade ? trade.drug_license_number : null,
+          licences[0]?.form ?? null,             // summary; the register below is the record (trigger keeps them in step)
+          licences[0]?.licence_number ?? null,
           trade && 'nmc_reg_number' in trade ? trade.nmc_reg_number : null,
           trade && 'nmc_council_state' in trade ? trade.nmc_council_state : null,
           trade && 'speciality' in trade ? trade.speciality : null,
         ]
       );
       const userId = user.rows[0].id;
+      if (licences.length) {
+        await assertNumbersFree(client, { userId }, licences, { revealNames: false });
+        await submitLicencesTx(client, { userId }, licences, userId);
+      }
 
       // Consent log — append-only; purposes per Rulebook C-40 / C-42
       const ip = req.ip || null;

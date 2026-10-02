@@ -5,6 +5,8 @@
 import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { sameState } from './shipment.service';
+import { dawabagDrugLicences, listLicences, snapshot } from './licences/register.service';
+import { TRADE_TYPES } from '../utils/customerType';
 
 const PAN_ON_INVOICE_ABOVE_PAISE = 2_00_000_00;   // ₹2,00,000 for unregistered buyers (URS v3.1)
 
@@ -14,8 +16,10 @@ export interface InvoiceData {
   invoiceNumber: string;
   invoiceDate: Date;
   orderNumber: string;
-  seller: { name: string; address: string; state: string | null; gstin: string | null; drugLicence: string | null };
-  buyer: { name: string; address: string; state: string | null; gstin: string | null; pan: string | null; drugLicence: string | null; unregistered: boolean };
+  // drugLicence: every licence on one line ("Form 20: … · Form 21B: …"); drugLicences: the same as a list (C-13)
+  seller: { name: string; address: string; state: string | null; gstin: string | null; drugLicence: string | null; drugLicences: InvoiceLicence[] };
+  buyer: { name: string; address: string; state: string | null; gstin: string | null; pan: string | null; drugLicence: string | null;
+    drugLicences: InvoiceLicence[]; unregistered: boolean };
   interState: boolean;
   // Registered e-invoice (C-31): printed with its signed QR code
   einvoice: { irn: string; ackNo: string; ackDate: Date; signedQr: string | null } | null;
@@ -28,6 +32,9 @@ export interface InvoiceData {
   totals: { taxablePaise: number; cgstPaise: number; sgstPaise: number; igstPaise: number; totalPaise: number };
 }
 
+export interface InvoiceLicence { form: string; label: string; number: string; valid_upto: string | null }
+const line = (l: InvoiceLicence[]) => (l.length ? l.map((x) => `${x.label}: ${x.number}`).join(' · ') : null);
+
 async function registered(where: string, id: string): Promise<InvoiceData['einvoice']> {
   const e = await queryOne<any>(`SELECT irn, ack_no, ack_date, signed_qr FROM einvoices WHERE ${where} AND status = 'generated'`, [id]);
   return e ? { irn: e.irn, ackNo: e.ack_no, ackDate: e.ack_date, signedQr: e.signed_qr } : null;
@@ -35,14 +42,11 @@ async function registered(where: string, id: string): Promise<InvoiceData['einvo
 
 export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
   const s = await queryOne<any>(
-    `SELECT s.*, o.order_number, o.created_at AS order_date, o.buyer_gstin, o.buyer_pan, o.buyer_drug_license,
+    `SELECT s.*, o.order_number, o.created_at AS order_date, o.buyer_gstin, o.buyer_pan, o.buyer_drug_license, o.buyer_drug_licences,
             a.full_name AS ship_name, concat_ws(', ', a.address_line1, a.city, a.state, a.pincode) AS ship_address, a.state AS ship_state,
             u.business_name, up.full_name AS buyer_name,
             v.name AS partner_name, concat_ws(', ', v.address_line1, v.city, v.state, v.pincode) AS partner_address,
-            v.state AS partner_state, v.gst_number AS partner_gstin,
-            -- every licence the partner holds (Sprint 28 register), like Dawabag's own line (C-13, C-33)
-            COALESCE((SELECT string_agg(vl.licence_number, ' / ' ORDER BY array_position(ARRAY['dl20','dl21','dl20b','dl21b']::varchar[], vl.licence_type))
-                      FROM vendor_licences vl WHERE vl.vendor_id = v.id), v.drug_license_no) AS partner_dl
+            v.state AS partner_state, v.gst_number AS partner_gstin, o.user_id AS buyer_id, u.customer_type AS buyer_type
      FROM order_shipments s
      JOIN orders o ON o.id = s.order_id
      JOIN addresses a ON a.id = o.address_id
@@ -52,19 +56,24 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
      WHERE s.id = $1`, [shipmentId]);
   if (!s) throw new AppError('Shipment not found', 404);
 
-  const [entity, licences] = await Promise.all([
-    queryOne<{ value: any }>(`SELECT value FROM app_settings WHERE key = 'legal.entity'`),
-    queryOne<{ value: any }>(`SELECT value FROM app_settings WHERE key = 'legal.drug_licences'`),
-  ]);
+  // Licences as on the day of sale (snapshots, Sprint 30); invoices of older orders read the register now
+  const entity = await queryOne<{ value: any }>(`SELECT value FROM app_settings WHERE key = 'legal.entity'`);
+  const sellerLicences: InvoiceLicence[] = s.seller_drug_licences
+    ?? snapshot(s.seller_type === 'partner'
+      ? (await listLicences({ vendorId: s.partner_id })).filter((l) => l.status === 'verified')
+      : await dawabagDrugLicences());
+  const buyerLicences: InvoiceLicence[] = s.buyer_drug_licences
+    ?? (s.buyer_drug_license && TRADE_TYPES.includes(s.buyer_type)
+      ? snapshot((await listLicences({ userId: s.buyer_id })).filter((l) => l.status === 'verified')) : []);
   const seller = s.seller_type === 'partner'
-    ? { name: s.partner_name, address: s.partner_address, state: s.partner_state, gstin: s.partner_gstin, drugLicence: s.partner_dl }
+    ? { name: s.partner_name, address: s.partner_address, state: s.partner_state, gstin: s.partner_gstin,
+        drugLicence: line(sellerLicences), drugLicences: sellerLicences }
     : {
         name: entity?.value?.name || 'Dawabag Private Limited',
         address: entity?.value?.address || '',
         state: entity?.value?.state || 'Maharashtra',
         gstin: entity?.value?.gstin || null,
-        drugLicence: [licences?.value?.retail_20, licences?.value?.retail_21, licences?.value?.wholesale_20b, licences?.value?.wholesale_21b]
-          .filter(Boolean).join(' / ') || null,
+        drugLicence: line(sellerLicences), drugLicences: sellerLicences,
       };
 
   const lines = (await query<any>(
@@ -102,7 +111,7 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
       unregistered,
       // PAN printed for unregistered buyers above ₹2,00,000
       pan: unregistered && totals.totalPaise > PAN_ON_INVOICE_ABOVE_PAISE ? s.buyer_pan : null,
-      drugLicence: s.buyer_drug_license,
+      drugLicence: line(buyerLicences) ?? s.buyer_drug_license, drugLicences: buyerLicences,
     },
     interState: !sameState(seller.state, s.ship_state),
     einvoice: s.seller_type === 'dawabag' ? await registered('shipment_id = $1 AND doc_type = \'INV\'', shipmentId) : null,

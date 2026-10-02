@@ -37,6 +37,11 @@ export async function createSupplier(body: NewSupplier): Promise<{ id: string; n
   return data.data;
 }
 
+export async function updateSupplier(id: string, body: Partial<NewSupplier>): Promise<{ vendor_id: string }> {
+  const { data } = await api.put(`${P}/suppliers/${id}`, body);
+  return data.data;
+}
+
 export async function fetchPurchaseOrders(status: PoStatus | ''): Promise<PurchaseOrderRow[]> {
   const { data } = await api.get(`${P}/purchase-orders`, { params: status ? { status } : undefined });
   return data.data?.purchase_orders ?? [];

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { todayIST } from '@/lib/dates';
-import { formProblems, type LicenceForm, type LicenceRow, type PartnerFormValues } from '@/lib/admin/partnerOnboarding';
+import { formProblems, type PartnerFormValues } from '@/lib/admin/partnerOnboarding';
 import AddressFields from './AddressFields';
 import BusinessFields from './BusinessFields';
 import LicenceRows from './LicenceRows';
@@ -26,7 +26,6 @@ export default function PartnerForm({ initial, mode, prefixLocked, pending, erro
   const [problems, setProblems] = useState<string[]>([]);
   const today = todayIST();
   const set = (patch: Partial<PartnerFormValues>) => setV((s) => ({ ...s, ...patch }));
-  const setLicence = (form: LicenceForm, row: LicenceRow) => setV((s) => ({ ...s, licences: { ...s.licences, [form]: row } }));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +38,7 @@ export default function PartnerForm({ initial, mode, prefixLocked, pending, erro
   return (
     <form className="space-y-4" onSubmit={submit} noValidate>
       <BusinessFields v={v} set={set} prefixLocked={prefixLocked} />
-      <LicenceRows licences={v.licences} today={today} onChange={setLicence} />
+      <LicenceRows licences={v.licences} today={today} onChange={(licences) => set({ licences })} />
       <PharmacistRows rows={v.pharmacists} onChange={(pharmacists) => set({ pharmacists })} />
       <AddressFields v={v} set={set} />
       {mode === 'create' && <LoginRows rows={v.logins} onChange={(logins) => set({ logins })} />}

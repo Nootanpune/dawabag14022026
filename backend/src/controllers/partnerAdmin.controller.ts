@@ -5,7 +5,7 @@ import { z } from 'zod';
 import {
   addPartnerLogin, createPartner, getPartner, listMarketplacePartners, updatePartner,
 } from '../services/partnerOnboarding/partnerAdmin.service';
-import { LICENCE_FORMS } from '../services/partnerOnboarding/rules';
+import { licenceList } from '../services/licences/input';
 
 const uuid = z.string().uuid();
 const MOBILE = /^[6-9]\d{9}$/;
@@ -13,14 +13,8 @@ const text = (min: number, max: number, what: string) =>
   z.string({ required_error: `Enter ${what}` }).trim().min(min, `Enter ${what}`).max(max, `${what[0].toUpperCase()}${what.slice(1)} is too long`);
 const mobile = (what: string) => z.string({ required_error: `Enter ${what}` }).trim().regex(MOBILE, `Enter ${what} as a 10-digit Indian mobile number`);
 
-const licence = z.object({
-  // Accepts the form as printed on the licence ("20", "Form 21B", "20b") as well as dl20…dl21b
-  licence_type: z.preprocess(
-    (v) => (typeof v === 'string' ? `dl${v.trim().toLowerCase().replace(/^(form\s*|dl)/, '').replace(/\s+/g, '')}` : v),
-    z.enum(LICENCE_FORMS, { errorMap: () => ({ message: 'Licence form must be 20, 21, 20B or 21B' }) })),
-  licence_number: text(3, 100, 'the licence number'),
-  valid_upto: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the licence valid-till date'),
-});
+// Any drug licence form, as printed ("20", "Form 21B") or dl20…; shared with suppliers and buyers (Sprint 30)
+const licences = licenceList(20);
 const pharmacist = z.object({
   full_name: text(2, 200, 'the pharmacist\'s full name'),
   registration_no: text(2, 100, 'the pharmacist\'s registration number'),
@@ -51,12 +45,12 @@ const details = {
 
 const createSchema = z.object({
   ...details,
-  licences: z.array(licence).max(4),
+  licences,
   pharmacists: z.array(pharmacist).max(20),
   logins: z.array(login).min(1, 'Add at least one partner login (mobile number)').max(10),
 });
 const updateSchema = z.object(details).partial().extend({
-  licences: z.array(licence).max(4).optional(),
+  licences: licences.optional(),
   pharmacists: z.array(pharmacist).max(20).optional(),
 });
 

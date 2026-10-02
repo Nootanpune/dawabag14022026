@@ -5,6 +5,7 @@ import { runLowStockJob } from './lowStock.job';
 import { runSettlementJob } from './settlement.job';
 import { runRefillOrdersJob, runRefillRemindersJob } from './refill.job';
 import { runLicenceRegisterAlerts } from '../services/licence.service';
+import { runPartyLicenceAlerts } from '../services/licences/alerts.service';
 import { runExpiryWatchJob } from './expiryWatch.job';
 import { runEinvoiceSweep } from '../services/einvoice/einvoice.service';
 import { runPaymentSweep } from '../services/payments/reconcile.service';
@@ -48,6 +49,12 @@ export const JOBS: JobDefinition[] = [
     description: 'Warn buyers before drug licence expiry; pause trade ordering on expiry (C-14)',
     cron: '30 1 * * *',                      // daily 01:30
     run: runDailyLicenceExpiryCheck,
+  },
+  {
+    name: 'party_licence_alerts',
+    description: 'Alert admins, partners and buyers 60, 30 and 7 days before (and on) the expiry of each partner, supplier and buyer drug licence (C-02, C-07, C-14, C-33)',
+    cron: '45 1 * * *',                      // daily 01:45
+    run: runPartyLicenceAlerts,
   },
   {
     name: 'gstin_recheck',

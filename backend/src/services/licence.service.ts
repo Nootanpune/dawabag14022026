@@ -6,9 +6,12 @@ import { query, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { queueNotification, sendEmail } from './notification.service';
+import { DAWABAG_DRUG_TYPES, numberKey } from './licences/forms';
 
-export const LICENCE_TYPES = ['retail_20', 'retail_21', 'wholesale_20b', 'wholesale_21b', 'gst', 'shop_establishment',
-  'fssai', 'trade', 'other'] as const;
+// Drug licence types are shown in the footer, at checkout and on invoices (Sprint 30: this register is
+// the only place Dawabag's own licence numbers are kept, C-04 / C-13)
+export const LICENCE_TYPES = ['retail_20', 'retail_21', 'wholesale_20b', 'wholesale_21b', 'restricted_20a', 'restricted_21a',
+  'schedule_x_20f', 'schedule_x_20g', 'gst', 'shop_establishment', 'fssai', 'trade', 'other'] as const;
 export const ALERT_DAYS = [60, 30, 7, 0];
 
 export interface LicenceInput {
@@ -37,6 +40,13 @@ export async function saveLicence(adminId: string, input: LicenceInput, id?: str
     const cols = ['licence_type', 'licence_number', 'issued_by', 'premises', 'valid_from', 'valid_upto',
       'renewal_owner', 'renewal_owner_email', 'notes', 'is_active'] as const;
     const values = cols.map((c) => (input as any)[c] ?? (c === 'is_active' ? true : null));
+    // A drug licence number belongs to one business: refuse one already on a partner, supplier or buyer (Sprint 30)
+    if (input.licence_type in DAWABAG_DRUG_TYPES) {
+      const other = (await client.query(
+        `SELECT COALESCE(v.name, 'a buyer account') AS name FROM party_licences p LEFT JOIN vendors v ON v.id = p.vendor_id
+         WHERE p.number_key = $1 AND p.status IN ('verified', 'pending') LIMIT 1`, [numberKey(input.licence_number)])).rows[0];
+      if (other) throw new AppError(`Licence number ${input.licence_number.trim()} is already registered to ${other.name}; check the number`, 409);
+    }
     let row;
     if (id) {
       const before = (await client.query(`SELECT valid_upto FROM business_licences WHERE id = $1 FOR UPDATE`, [id])).rows[0];

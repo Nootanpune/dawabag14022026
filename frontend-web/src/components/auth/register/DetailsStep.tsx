@@ -44,6 +44,7 @@ export default function DetailsStep({
     watch,
     getValues,
     setError,
+    control,
     formState: { errors },
   } = useForm<DetailsFormValues>({ resolver: zodResolver(schema), defaultValues });
 
@@ -67,7 +68,7 @@ export default function DetailsStep({
         <p className="text-sm text-gray-500 mt-0.5">{option.label}</p>
       </div>
 
-      <ProfessionalFields customerType={customerType} register={register} errors={errors} />
+      <ProfessionalFields customerType={customerType} register={register} errors={errors} control={control} />
 
       {/* ── Contact person ── */}
       <Field

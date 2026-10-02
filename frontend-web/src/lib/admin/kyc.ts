@@ -1,8 +1,10 @@
 import api from '../api';
+import type { LicenceBadgeData, LicenceView } from '../licences/forms';
 
 export type KycQueueType = '' | 'b2b_retailer' | 'b2b_wholesaler' | 'doc_hospital';
 
-export interface KycQueueRow {
+export interface KycQueueRow extends Partial<LicenceBadgeData> {
+  licences?: LicenceView[];
   user_id: string;
   full_name: string;
   mobile: string;
@@ -44,7 +46,7 @@ export interface KycApplicant {
   gstin: string | null;
   gstin_verified: boolean;
   gst_unregistered_declaration: boolean | null;
-  drug_license_type: 'dl20' | 'dl21' | 'dl20b' | 'dl21b' | null;
+  drug_license_type: string | null;
   drug_license_number: string | null;
   drug_license_expiry: string | null;
   drug_license_verified: boolean;
@@ -62,6 +64,9 @@ export interface KycCheck {
   result: string;
   method: string | null;
   verified_at: string | null;
+  /** drug licence checks (Sprint 30): the licence in the register and its label */
+  licence_id?: string | null;
+  label?: string;
 }
 
 export interface KycDocument {
@@ -82,6 +87,9 @@ export interface KycHistoryEntry {
 
 export interface KycApplication {
   user: KycApplicant;
+  /** every drug licence the buyer gave (checked, waiting, not accepted); replaced ones apart */
+  licences: LicenceView[];
+  replaced_licences: LicenceView[];
   checks: KycCheck[];
   missing_documents: string[];
   licence_expired: boolean;

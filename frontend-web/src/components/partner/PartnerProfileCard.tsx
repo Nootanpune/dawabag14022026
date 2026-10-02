@@ -23,10 +23,10 @@ export default function PartnerProfileCard({ me }: { me: PartnerMe }) {
       <dl className="text-sm">
         <Row label="GSTIN" value={me.gst_number} />
         <Row
-          label="Drug licence"
-          value={`${me.drug_license_no ?? '—'}${me.drug_license_type ? ` · ${DL_TYPE_LABELS[me.drug_license_type] ?? me.drug_license_type}` : ''}`}
+          label="Drug licences"
+          value={me.licence_line ?? `${me.drug_license_no ?? '—'}${me.drug_license_type ? ` · ${DL_TYPE_LABELS[me.drug_license_type] ?? me.drug_license_type}` : ''}`}
         />
-        <Row label="Licence expiry" value={formatDateIST(me.drug_license_expiry)} />
+        <Row label="Earliest valid till" value={formatDateIST(me.drug_license_expiry)} />
         <Row label="Invoice prefix" value={me.invoice_prefix} />
         <Row label="Location" value={[me.city, me.pincode].filter(Boolean).join(' ') || '—'} />
         <Row label="Rating" value={me.vendor_rating ?? '—'} />

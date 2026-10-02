@@ -1,7 +1,10 @@
 // src/controllers/purchasing.controller.ts — suppliers, purchase orders, goods receipts
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { query } from '../config/database';
+import { withTransaction } from '../config/database';
+import { licenceList } from '../services/licences/input';
+import { assertNumbersFree } from '../services/licences/register.service';
+import { createSupplier, getSupplier, listSuppliers, updateSupplier } from '../services/purchasing/supplier.service';
 import { writeAudit } from '../utils/audit';
 import { AppError } from '../utils/AppError';
 import {
@@ -15,20 +18,32 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const paise = z.number().int().min(0).max(100_000_000);
 const reason = z.object({ reason: z.string().trim().min(3).max(500) });
 
-// Suppliers are vendors of type 'supplier'; they become usable after the existing approval (POST /vendors/:id/approve)
+// Suppliers are vendors of type 'supplier'; they become usable after the existing approval (POST /vendors/:id/approve).
+// Sprint 30: every drug licence the supplier holds (wholesale 20B/21B, manufacturing 25/28, …) as repeatable rows.
+// The older body with a single drug_license_no is still accepted (its form and valid-till are entered on approval).
+const supplierDetails = {
+  name: z.string().trim().min(2).max(200),
+  gst_number: z.string().trim().toUpperCase().pipe(z.string().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/, 'Enter a valid GSTIN')),
+  state: z.string().trim().min(2).max(100), city: z.string().trim().max(100).optional().nullable(),
+  contact_name: z.string().trim().max(100).optional().nullable(),
+  contact_mobile: z.union([z.string().regex(/^[6-9]\d{9}$/, 'Enter a 10-digit mobile number'), z.literal('')]).optional().nullable().transform((v) => v || null),
+  contact_email: z.union([z.string().email('Enter a valid email address'), z.literal('')]).optional().nullable().transform((v) => v || null),
+};
+
 export async function postSupplier(req: Request, res: Response, next: NextFunction) {
   try {
-    const d = z.object({
-      name: z.string().trim().min(2).max(200), drug_license_no: z.string().trim().min(3).max(100),
-      gst_number: z.string().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/, 'Enter a valid GSTIN'),
-      state: z.string().trim().min(2).max(100), city: z.string().trim().max(100).optional(),
-      contact_name: z.string().trim().max(100).optional(), contact_mobile: z.string().regex(/^[6-9]\d{9}$/).optional(),
-      contact_email: z.string().email().optional(),
-    }).parse(req.body);
-    const rows = await query(
-      `INSERT INTO vendors (name, drug_license_no, gst_number, state, city, contact_name, contact_mobile, contact_email, vendor_type, approval_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'supplier','pending') RETURNING id, name, approval_status`,
-      [d.name, d.drug_license_no, d.gst_number, d.state, d.city ?? null, d.contact_name ?? null, d.contact_mobile ?? null, d.contact_email ?? null]);
+    if (Array.isArray(req.body?.licences)) {
+      const d = z.object({ ...supplierDetails, licences: licenceList(20) }).parse(req.body);
+      return res.status(201).json({ success: true, data: await createSupplier(req.user!.id, d) });
+    }
+    const d = z.object({ ...supplierDetails, drug_license_no: z.string().trim().min(3).max(100) }).parse(req.body);
+    const rows = await withTransaction(async (c) => {
+      await assertNumbersFree(c, { newParty: 'vendor', gstin: d.gst_number }, [{ form: 'other', form_name: 'Drug licence', licence_number: d.drug_license_no }]);
+      return (await c.query(
+        `INSERT INTO vendors (name, drug_license_no, gst_number, state, city, contact_name, contact_mobile, contact_email, vendor_type, approval_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'supplier','pending') RETURNING id, name, approval_status`,
+        [d.name, d.drug_license_no, d.gst_number, d.state, d.city ?? null, d.contact_name ?? null, d.contact_mobile ?? null, d.contact_email ?? null])).rows;
+    });
     await writeAudit({ userId: null, action: 'supplier_added', performedBy: req.user!.id, newValue: { vendor_id: (rows[0] as any).id, name: d.name } });
     res.status(201).json({ success: true, data: rows[0] });
   } catch (e) { next(e); }
@@ -36,11 +51,18 @@ export async function postSupplier(req: Request, res: Response, next: NextFuncti
 
 export async function getSuppliers(_req: Request, res: Response, next: NextFunction) {
   try {
-    const rows = await query(
-      `SELECT id, name, drug_license_no, drug_license_expiry, gst_number, state, approval_status, is_active,
-              (drug_license_expiry IS NOT NULL AND drug_license_expiry >= CURRENT_DATE AND approval_status = 'approved' AND is_active) AS can_supply
-       FROM vendors WHERE vendor_type IN ('supplier', 'both') ORDER BY name`);
-    res.json({ success: true, data: { suppliers: rows } });
+    res.json({ success: true, data: { suppliers: await listSuppliers() } });
+  } catch (e) { next(e); }
+}
+
+export async function getOneSupplier(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: await getSupplier(uuid.parse(req.params.id)) }); } catch (e) { next(e); }
+}
+
+export async function putSupplier(req: Request, res: Response, next: NextFunction) {
+  try {
+    const d = z.object(supplierDetails).partial().extend({ licences: licenceList(20).optional() }).parse(req.body);
+    res.json({ success: true, data: await updateSupplier(req.user!.id, uuid.parse(req.params.id), d) });
   } catch (e) { next(e); }
 }
 

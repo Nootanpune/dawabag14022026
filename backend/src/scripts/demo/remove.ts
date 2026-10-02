@@ -52,7 +52,8 @@ export async function removeDemoData() {
     // Demo people: anything they touched elsewhere loses the link, their own rows go
     for (const [table, col] of [['audit_logs', 'performed_by'], ['app_settings', 'updated_by'], ['products', 'content_reviewed_by'],
       ['doctor_profiles', 'verified_by'], ['vendors', 'approved_by'], ['partner_products', 'reviewed_by'], ['partner_products', 'posted_by'],
-      ['partner_products', 'submitted_by'], ['vendor_users', 'created_by']] as const) {
+      ['partner_products', 'submitted_by'], ['vendor_users', 'created_by'], ['party_licences', 'verified_by'],
+      ['party_licences', 'created_by'], ['business_licences', 'created_by']] as const) {
       await q(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ANY($1)`, [users]);
     }
     for (const t of ['cart_items', 'carts', 'notification_deliveries', 'user_devices', 'notifications', 'addresses', 'consent_records',
@@ -67,6 +68,7 @@ export async function removeDemoData() {
         [key, JSON.stringify(value)]);
       settings += r.length;
     }
+    await q(`DELETE FROM business_licences WHERE licence_number LIKE $1`, [`${DEMO_MARK}%`]);
     return { users: users.length, products: products.length, partners: vendors.length, settingsReset: settings, mark: DEMO_MARK };
   });
   await cacheDel('categories');

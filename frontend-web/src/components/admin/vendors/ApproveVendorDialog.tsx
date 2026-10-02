@@ -31,6 +31,8 @@ export default function ApproveVendorDialog({ vendor, onClose }: { vendor: Pendi
   const [prefix, setPrefix] = useState('');
   const [error, setError] = useState('');
   const partner = isPartnerType(vendorType);
+  // Sprint 30: a vendor whose licences are already entered (with their dates) needs none here
+  const hasLicences = (vendor.licence_count ?? 0) > 0;
 
   const approve = useMutation({
     mutationFn: (body: VendorApproval) => approveVendor(vendor.id, body),
@@ -43,15 +45,14 @@ export default function ApproveVendorDialog({ vendor, onClose }: { vendor: Pendi
   });
 
   const submit = () => {
-    if (!dlType || !expiry) return setError('Licence type and expiry date are required');
+    if (!hasLicences && (!dlType || !expiry)) return setError('Licence form and valid-till date are required');
     if (partner) {
       const prefixError = invoicePrefixError(prefix);
       if (prefixError) return setError(prefixError);
     }
     setError('');
     approve.mutate({
-      drug_license_type: dlType,
-      drug_license_expiry: expiry,
+      ...(!hasLicences && { drug_license_type: dlType || undefined, drug_license_expiry: expiry }),
       vendor_type: vendorType,
       ...(partner && { invoice_prefix: prefix }),
     });
@@ -60,8 +61,11 @@ export default function ApproveVendorDialog({ vendor, onClose }: { vendor: Pendi
   return (
     <Modal title={`Approve ${vendor.name}`} onClose={onClose}>
       <div className="space-y-3 text-sm">
+        {hasLicences ? (
+          <p className="text-gray-600">Its {vendor.licence_count} drug licence(s) are already entered with their valid-till dates.</p>
+        ) : (<>
         <label className="block">
-          <span className="block font-medium text-gray-700 mb-1">Drug licence type</span>
+          <span className="block font-medium text-gray-700 mb-1">Drug licence form</span>
           <select value={dlType} onChange={(e) => setDlType(e.target.value as typeof dlType)} className="input">
             <option value="">Select</option>
             {Object.entries(DL_TYPE_LABELS).map(([value, label]) => (
@@ -72,9 +76,10 @@ export default function ApproveVendorDialog({ vendor, onClose }: { vendor: Pendi
           </select>
         </label>
         <label className="block">
-          <span className="block font-medium text-gray-700 mb-1">Licence expiry</span>
+          <span className="block font-medium text-gray-700 mb-1">Licence valid till</span>
           <input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} className="input" />
         </label>
+        </>)}
         <label className="block">
           <span className="block font-medium text-gray-700 mb-1">Vendor type</span>
           <select value={vendorType} onChange={(e) => setVendorType(e.target.value as VendorType)} className="input">

@@ -11,6 +11,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import StatTile from '@/components/partner/StatTile';
 import PartnerProfileCard from '@/components/partner/PartnerProfileCard';
+import YourLicencesSection from '@/components/licences/YourLicencesSection';
 
 export default function PartnerDashboard() {
   const me = useQuery({ queryKey: partnerKeys.me, queryFn: fetchPartnerMe });
@@ -40,6 +41,7 @@ export default function PartnerDashboard() {
         <StatTile label="Unpaid settlements" value={unpaid} href="/partner/settlements" />
       </div>
       {me.data && <PartnerProfileCard me={me.data} />}
+      {me.data && <div className="mt-4"><YourLicencesSection holder="partner" party="partner" suggested={['dl20', 'dl21', 'dl20b', 'dl21b']} /></div>}
     </div>
   );
 }

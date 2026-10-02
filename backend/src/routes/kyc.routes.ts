@@ -8,6 +8,7 @@ import {
   getVerificationPortalLinks, upgradeDocToRetailer
 } from '../controllers/kyc.controller';
 import { getApplication, getDocumentUrl, rejectApplication, verifyIdentity } from '../controllers/kycAdmin.controller';
+import { putBuyerLicences } from '../controllers/partyLicence.controller';
 import { KYC_MAX_FILE_BYTES, getMyKycDocuments, uploadKycDocument } from '../controllers/kycDocument.controller';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: KYC_MAX_FILE_BYTES, files: 1 } });
@@ -34,6 +35,7 @@ router.post('/admin/verify-identity',         verifyIdentity);
 router.post('/admin/reject',                  rejectApplication);
 
 router.post('/admin/verify-drug-license', adminVerifyDrugLicense);
+router.put('/admin/applications/:userId/licences', putBuyerLicences);   // Sprint 30: every licence of the buyer
 router.post('/admin/verify-nmc',          adminVerifyNMC);
 
 // Super admin only — account type upgrades

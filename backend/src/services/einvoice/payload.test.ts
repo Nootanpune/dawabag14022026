@@ -4,8 +4,8 @@ import { InvoiceData } from '../invoiceData.service';
 const party = { gstin: '27AAACD1234M1Z5', legalName: 'Dawabag Private Limited', address1: 'Plot 1, MIDC', location: 'Nashik', pincode: '422007', stateCode: '27' };
 const doc: InvoiceData = {
   invoiceNumber: 'DWB/2627/00012', invoiceDate: new Date('2026-09-30T20:00:00Z'), orderNumber: 'DB1',
-  seller: { name: 'x', address: 'x', state: 'Maharashtra', gstin: party.gstin, drugLicence: null },
-  buyer: { name: 'y', address: 'y', state: 'Karnataka', gstin: '29AAACR5555K1Z2', pan: null, drugLicence: null, unregistered: false },
+  seller: { name: 'x', address: 'x', state: 'Maharashtra', gstin: party.gstin, drugLicence: null, drugLicences: [] },
+  buyer: { name: 'y', address: 'y', state: 'Karnataka', gstin: '29AAACR5555K1Z2', pan: null, drugLicence: null, drugLicences: [], unregistered: false },
   interState: true, einvoice: null,
   lines: [{ name: 'Paracetamol 500', hsn: '3004.90.99', batch: 'B1', expiry: '2028-03', manufacturer: null, qty: 3,
     mrpPaise: 3000, ratePaise: 2500, taxablePaise: 7500, gstRate: 12, cgstPaise: 0, sgstPaise: 0, igstPaise: 900, totalPaise: 8400 }],

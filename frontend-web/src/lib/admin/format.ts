@@ -1,3 +1,4 @@
+import { FORM_INFO, LICENCE_FORMS } from '../licences/forms';
 // Display helpers for admin screens (no business math — values come from the API).
 
 export const CUSTOMER_TYPE_SHORT: Record<string, string> = {
@@ -7,12 +8,9 @@ export const CUSTOMER_TYPE_SHORT: Record<string, string> = {
   doc_hospital: 'Doctor',
 };
 
-export const DL_TYPE_LABELS: Record<string, string> = {
-  dl20: 'Form 20 (retail)',
-  dl21: 'Form 21 (retail)',
-  dl20b: 'Form 20B (wholesale)',
-  dl21b: 'Form 21B (wholesale)',
-};
+// Every drug licence form (Sprint 30): "Form 20B (wholesale)", "Form 25 (manufacture for sale)" …
+export const DL_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  LICENCE_FORMS.filter((f) => f !== 'other').map((f) => [f, `${FORM_INFO[f].label} (${FORM_INFO[f].hint.charAt(0).toLowerCase()}${FORM_INFO[f].hint.slice(1)})`]));
 
 /** Rupees typed in the UI → paise for the API. Returns null for invalid input. */
 export function rupeesToPaise(rupees: string): number | null {

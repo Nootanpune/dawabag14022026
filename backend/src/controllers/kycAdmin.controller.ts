@@ -8,6 +8,7 @@ import { query, queryOne } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAudit } from '../utils/audit';
 import { getPrivateObjectUrl } from '../services/storage.service';
+import { listLicences } from '../services/licences/register.service';
 import { DrugLicenseVerifier, IdentityVerifier, KYCOrchestrator, NMCVerifier } from '../services/kyc.service';
 
 // GET /kyc/admin/applications/:userId
@@ -41,10 +42,14 @@ export async function getApplication(req: Request, res: Response, next: NextFunc
       [userId]
     );
 
+    // Every drug licence the buyer gave, with its own check (Sprint 30); replaced ones as history
+    const allLicences = await listLicences({ userId }, { history: true });
     res.json({
       success: true,
       data: {
         user,
+        licences: allLicences.filter((l) => l.status !== 'superseded'),
+        replaced_licences: allLicences.filter((l) => l.status === 'superseded'),
         checks: state?.checks ?? [],
         missing_documents: state?.missingDocuments ?? [],
         licence_expired: state?.licenceExpired ?? false,

@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import type { CustomerType } from './registration';
 import { POLICY_LANGUAGES, type PolicyLanguage } from './legal/policies';
+import { todayIST } from './dates';
 
 // ─── Step 2 form ─────────────────────────────────────────────────────────────
 export const MOBILE_REGEX = /^[6-9]\d{9}$/;
@@ -52,6 +53,8 @@ export interface DetailsFormValues {
   business_name: string;
   drug_license_type: string;
   drug_license_number: string;
+  /** every other drug licence the business holds (Sprint 30): e.g. Form 21 next to Form 20 */
+  extra_licences: ExtraLicence[];
   pan_number: string;
   gstin: string;
   gst_unregistered_declaration: boolean;
@@ -66,6 +69,8 @@ export interface DetailsFormValues {
   marketing_consent: boolean;
 }
 
+export interface ExtraLicence { form: string; number: string; valid_upto: string }
+
 export const EMPTY_DETAILS: DetailsFormValues = {
   full_name: '',
   mobile: '',
@@ -77,6 +82,7 @@ export const EMPTY_DETAILS: DetailsFormValues = {
   business_name: '',
   drug_license_type: '',
   drug_license_number: '',
+  extra_licences: [],
   pan_number: '',
   gstin: '',
   gst_unregistered_declaration: false,
@@ -107,6 +113,7 @@ export function buildDetailsSchema(type: CustomerType) {
       business_name: str,
       drug_license_type: str,
       drug_license_number: str,
+      extra_licences: z.array(z.object({ form: str, number: str, valid_upto: str })),
       pan_number: str,
       gstin: str,
       gst_unregistered_declaration: z.boolean(),
@@ -165,6 +172,19 @@ export function buildDetailsSchema(type: CustomerType) {
         }
       }
 
+      // Extra licences: a form and a number each, every form once (the server repeats the checks)
+      const seen = new Set<string>(isB2B && d.drug_license_type ? [d.drug_license_type] : []);
+      d.extra_licences.forEach((l, i) => {
+        const path = ['extra_licences', i, 'number'];
+        if (!l.form) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['extra_licences', i, 'form'], message: 'Choose the licence form' });
+        else if (seen.has(l.form)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['extra_licences', i, 'form'], message: 'This form is already entered' });
+        seen.add(l.form);
+        if (l.number.replace(/[^A-Za-z0-9]/g, '').length < 3) ctx.addIssue({ code: z.ZodIssueCode.custom, path, message: 'Enter the licence number' });
+        if (l.valid_upto && l.valid_upto < todayIST()) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['extra_licences', i, 'valid_upto'], message: 'This licence has expired' });
+        }
+      });
+
       if (type === 'doc_hospital') {
         if (!d.nmc_reg_number.trim()) issue('nmc_reg_number', 'Registration number is required');
         if (!d.nmc_council_state.trim()) issue('nmc_council_state', 'Medical council is required');
@@ -178,6 +198,9 @@ export function buildDetailsSchema(type: CustomerType) {
       }
     });
 }
+
+const extraBodies = (d: DetailsFormValues) => d.extra_licences.filter((l) => l.form || l.number.trim())
+  .map((l) => ({ form: l.form, licence_number: l.number.trim(), valid_upto: l.valid_upto || null }));
 
 /** Builds the POST /auth/register body for the chosen type (only fields that apply). */
 export function buildRegisterPayload(type: CustomerType, d: DetailsFormValues): Record<string, unknown> {
@@ -201,14 +224,15 @@ export function buildRegisterPayload(type: CustomerType, d: DetailsFormValues): 
     const gstin = d.gstin.trim().toUpperCase();
     Object.assign(body, {
       business_name: d.business_name.trim(),
-      drug_license_type: d.drug_license_type,
-      drug_license_number: d.drug_license_number.trim(),
+      // Every licence the business holds (Sprint 30); the first is the one chosen above
+      licences: [{ form: d.drug_license_type, licence_number: d.drug_license_number.trim() }, ...extraBodies(d)],
       pan_number: d.pan_number.trim().toUpperCase(),
       gstin: gstin || undefined,
     });
     if (type === 'b2b_retailer') body.gst_unregistered_declaration = !gstin && d.gst_unregistered_declaration;
   }
 
+  if (type === 'doc_hospital' && d.extra_licences.length) body.licences = extraBodies(d);
   if (type === 'doc_hospital') {
     Object.assign(body, {
       nmc_reg_number: d.nmc_reg_number.trim(),

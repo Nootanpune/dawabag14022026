@@ -94,7 +94,7 @@ export async function run({ t, ids, product }) {
   r = await call('POST', '/admin/partners', { token: t.admin, body: body({ gstin: GSTIN_KA }) });
   check('Karnataka GSTIN at a Maharashtra address refused (state 27)', r.status === 400 && /state code 27/.test(r.json.message), r.json);
   r = await call('POST', '/admin/partners', { token: t.admin, body: body({ licences: [{ ...LICENCES[0], valid_upto: plusDays(-1) }, ...LICENCES.slice(1)] }) });
-  check('expired licence refused with the date', r.status === 400 && /Form 20 \(retail\) licence S28-20-0001 expired on/.test(r.json.message), r.json);
+  check('expired licence refused with the date', r.status === 400 && /Form 20 licence S28-20-0001 expired on/.test(r.json.message), r.json);
   r = await call('POST', '/admin/partners', { token: t.admin, body: body({ pharmacists: [] }) });
   check('at least one registered pharmacist required', r.status === 400 && /registered pharmacist/.test(r.json.message), r.json);
   r = await call('POST', '/admin/partners', { token: t.admin, body: body({ invoice_prefix: 'DWB' }) });
@@ -153,7 +153,7 @@ export async function run({ t, ids, product }) {
   const d = r.json.data;
   check('detail: licences, pharmacists, logins, may sell retail and wholesale', r.status === 200 && d.licences.length === 4
     && d.pharmacists.length === 2 && d.logins.length === 2 && d.selling_rights.retail && d.selling_rights.wholesale
-    && d.licences[0].licence_type === 'dl20' && d.licences.every((l) => l.status === 'valid'), d);
+    && d.licences[0].licence_type === 'dl20' && d.licences.every((l) => l.status === 'verified' && l.validity === 'valid'), d);
 
   console.log('\nFirst sign-in: the temporary password must be changed');
   r = await signIn(LOGINS[0], TEMP[0]);

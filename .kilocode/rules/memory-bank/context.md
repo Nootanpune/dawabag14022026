@@ -10,6 +10,67 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 30 — drug licences for every party (2026-10-02, uncommitted)
+Owner: "All the Drug Licences should be saved and displayed" — retailers, wholesalers,
+suppliers/companies, partners (first partner Nootan Pharmaceuticals, Pune: 20, 21, 20B, 21B).
+Audit (before → after):
+
+| Party | Forms | Stored before | Shown before | Gap fixed in Sprint 30 |
+| --- | --- | --- | --- | --- |
+| Marketplace partner | 20, 21, 20B, 21B (+ any) | vendor_licences (S28, 4 forms only) + vendors.drug_license_* | admin detail, invoice line | moved into party_licences; any form; portal "Your drug licences" + renewals waiting for check; list badge; checkout shows all |
+| Supplier / company | 20B/21B, 25/28, 25A/28A, 25B | vendors.drug_license_no only; form + expiry typed at approval | supplier list (one number), PO header, GRN supplier_dl_no | add/edit with repeatable rows; must hold wholesale or manufacturing licence; all licences on list, PO and GRN record; PO/GRN blocked naming the lapsed licence |
+| Retailer (B2B) | 20 / 21 (+20A/21A) | users.drug_license_number/type/expiry (one) | KYC detail, queue, invoice buyer line | sign-up takes several licences; one KYC check per licence; "Your drug licences" (web + app) with renewal; all printed on B2B invoices |
+| Wholesaler (B2B) | 20B / 21B | same single columns | same | same; must hold 20B or 21B |
+| Doctor / hospital | optional (hospital pharmacy 20/21 or other) | none | none | optional licences at sign-up / account; not required for KYC |
+| Dawabag | 20/21/20B/21B, 20A/21A, 20F/20G | business_licences register AND app_settings legal.drug_licences (two authorities) | footer, checkout, invoices from the setting | register is the one authority (setting copied in and removed); footer/checkout/invoice read the register |
+| Schedule X 20F/20G, homoeopathic 20C/20D | — | not supported | — | accepted as forms (never sold online, C-10); "Other" with a typed form name for anything else (e.g. 21C — not guessed) |
+
+- DB `25_sprint30_party_licences.sql`: `party_licences` (vendor_id XOR user_id, generated party_type,
+  form dl20…dl28a|other + form_name, number + generated number_key (A-Z0-9 upper), issued_by,
+  valid_from/upto, status pending/verified/rejected/superseded, document_* (private store),
+  verified_by/at, last_alert_days). Unique: one verified + one pending per party+form.
+  vendor_licences copied in and replaced by a read VIEW; old single licences of vendors/users/
+  pharmacy_profiles copied (unknown form → "other: Drug licence (form not recorded)").
+  Trigger `refresh_licence_summary` keeps vendors/users drug_license_no|number/_type/_expiry =
+  first CHECKED form (licence_form_rank) + EARLIEST checked valid-till, so every old check
+  (allocation, partnerStock, assertPartnerCanSell, supplierCheck, KYC expiry job) now covers all
+  licences. business_licences types + restricted_20a/21a, schedule_x_20f/20g. orders.buyer_drug_licences,
+  order_shipments.seller_drug_licences (JSONB snapshots, C-13); goods_receipts.supplier_dl_no 600 chars.
+- `services/licences/`: forms (pure: forms, normaliseForm "20"/"Form 21B"/"DL-20B"/"retail_20",
+  REQUIRED kinds per party, licenceProblems, licenceSummary, eligibility {expired, missingKind,
+  warnings ≤30 d}, licenceLine), input (zod, shared), register.service (listLicences with legacy
+  fallback, licencesByParty, licenceBadge, assertNumbersFree — same number on another business
+  refused incl. Dawabag's register; vendor↔buyer of the SAME GSTIN allowed; saveCheckedLicencesTx,
+  submitLicencesTx, decideLicenceTx (verify needs future valid-till; supersedes), scans, Dawabag's
+  licences), alerts.service (job `party_licence_alerts` 01:45, 60/30/7/0 days, admins + partner
+  logins + buyer; push/email only — SMS needs a DLT template).
+- Blocks: partner any checked licence lapsed → not allocated / no listing (C-33); supplier → PO
+  and GRN refused naming the licence (C-02; no wholesale/manufacturing licence = WARNING only,
+  rulebook comments silent); B2B retailer/wholesaler → order refused on the day + nightly
+  pending_renewal (C-14); renewal sent by holder waits; verified renewal re-activates (checkAndActivate).
+- API: /admin/partners (licences any form, detail waiting_licences/licence_line/badge), POST/GET/PUT
+  /purchasing/suppliers[/:id] {licences} (old drug_license_no body still works), POST /vendors/:id/approve
+  (form/date optional when licences exist), GET/POST /partner/licences[/:id/document[-url]],
+  GET/POST /users/me/licences[…], GET /admin/party-licences?filter=waiting|expiring|expired|all,
+  POST /admin/party-licences/:id/decision, …/document(-url), PUT /kyc/admin/applications/:userId/licences;
+  /auth/register `licences` (or old single pair); /kyc/admin/verify-drug-license takes licence_id/any form.
+- Web: shared `components/licences/*` (LicenceRowsEditor, LicenceList, LicenceExpiryBadge,
+  YourLicencesSection, LicenceDecisionDialog, LicenceDocumentButton), `lib/licences/*`; partner
+  form rows; supplier add/edit dialog + table; vendors lists; KYC Drug licences card + per-licence
+  check; register extra licence rows; /account/licences; partner dashboard section; checkout all
+  seller licences; footer list from the register; Licence register page "Partner, supplier and
+  buyer licences" work list; Settings no longer edits drug licence numbers.
+- Mobile: account "Your drug licences" (B2B/doctor accounts) read-only screen (`models/drug_licence.dart`,
+  `services/licence_api.dart`, `screens/account/licences/*`); flutter analyze + test pass (SDK at /opt/flutter-sdk).
+- Tests: jest licences forms + migration (58); `test/sprint30.smoke.mjs` (in test:smoke); e2e
+  `licences.spec.ts` (desktop + phone); `partnerOnboarding.spec.ts` updated; sprint28/sprint5 smoke
+  wording updated; flutter `sprint30_licences_test.dart`.
+- Not built: partner self-registration (does not exist — admin onboards); retail-vs-wholesale
+  rights by buyer type in allocation (unchanged from S28); e-invoice payload has no licence field
+  (IRP schema); delivery labels / settlement statements never showed licences (not added);
+  trade price shown to a buyer whose licence lapsed until the nightly job (orders are refused at once);
+  form numbers 20C/20D/20F/20G/25B per our reading of the Rules — lawyer to confirm.
+
 ## Sprint 29 — draft products from partner requests (2026-10-02, uncommitted)
 The first real partner file (MediVision) has ~329 items not in the catalogue; creating each by
 hand was too slow. Now: requests → admin "Create drafts" → pharmacist completes → partner

@@ -21,6 +21,7 @@ import '../screens/account/grievances/grievance_list_screen.dart';
 import '../screens/account/grievances/new_grievance_screen.dart';
 import '../screens/account/addresses/address_form_screen.dart';
 import '../screens/account/addresses/address_list_screen.dart';
+import '../screens/account/licences/licences_screen.dart';
 import '../screens/account/legal/legal_screen.dart';
 import '../screens/account/legal/policy_screen.dart';
 import '../screens/account/privacy/privacy_screen.dart';
@@ -122,6 +123,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/account/privacy', builder: (c, s) => const PrivacyScreen()),
       // Saved addresses ('/new' before '/:id/edit')
       GoRoute(path: '/account/addresses', builder: (c, s) => const AddressListScreen()),
+      // Sprint 30: a business / doctor account's drug licences (read-only in the app)
+      GoRoute(path: '/account/licences', builder: (c, s) => const LicencesScreen()),
       GoRoute(path: '/account/addresses/new', builder: (c, s) => const AddressFormScreen()),
       GoRoute(
         path: '/account/addresses/:id/edit',

@@ -13,7 +13,7 @@ export async function runCompliance({ t, P, addr, ids }) {
   const own = pv?.shipments?.find((s) => s.seller_type === 'dawabag');
   const part = pv?.shipments?.find((s) => s.seller_type === 'partner');
   check('preview shows one block per seller with licence and delivery estimate', r.status === 200 && own && part
-    && part.seller_name === 'S5 Partner' && part.seller_licence === 'DL-S5-20B' && /2 days/.test(part.delivery_estimate)
+    && part.seller_name === 'S5 Partner' && part.seller_licence?.includes('DL-S5-20B') && /2 days/.test(part.delivery_estimate)
     && /12 hours/.test(own.delivery_estimate), pv);
   check('preview lines carry country of origin and batch expiry', own?.lines?.[0]?.country_of_origin === 'India' && /^\d{4}-\d{2}$/.test(own?.lines?.[0]?.batch_expiry || ''), own?.lines);
   check('preview charge break-up adds up', pv?.charges && pv.charges.items_paise + pv.charges.gst_paise + pv.charges.delivery_paise

@@ -1,6 +1,8 @@
 import api from '../api';
+import type { LicenceBadgeData, LicenceView } from '../licences/forms';
 
-export interface ApprovedVendor {
+export interface ApprovedVendor extends LicenceBadgeData {
+  licences: LicenceView[];
   id: string;
   name: string;
   drug_license_no: string | null;

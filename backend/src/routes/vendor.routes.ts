@@ -3,6 +3,7 @@ import { pool } from '../config/database';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { AppError } from '../utils/AppError';
 import { VendorApprovalService } from '../services/vendor.service';
+import { licenceBadge, licencesByParty } from '../services/licences/register.service';
 import { logger } from '../config/logger';
 import { getRejectionCodes, getReviewQueue, postApproveListing, postListingLive, postRejectListing } from '../controllers/marketplaceAdmin.controller';
 
@@ -19,20 +20,25 @@ router.get('/', authenticate, authorize('admin','super_admin'), async (req: Requ
     if (status) { conditions.push(`approval_status = $${pi}`);   params.push(status); pi++; }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const result = await pool.query(
-      `SELECT id, name, drug_license_no, gst_number, contact_name, contact_mobile,
+      `SELECT id, name, drug_license_no, to_char(drug_license_expiry, 'YYYY-MM-DD') AS drug_license_expiry, gst_number, contact_name, contact_mobile,
               vendor_type, approval_status, vendor_rating, pincode, city, state,
               total_orders_fulfilled, on_time_dispatch_pct, return_rate_pct, created_at
        FROM vendors ${where} ORDER BY created_at DESC LIMIT 50`,
       params
     );
-    res.json({ success: true, data: { vendors: result.rows } });
+    // Every licence, count and earliest valid-till with a ≤ 30-day / expired warning (Sprint 30)
+    const byVendor = await licencesByParty('vendor', result.rows.map((r: any) => r.id));
+    const vendors = result.rows.map((r: any) => ({ ...r, licences: byVendor.get(r.id) ?? [], ...licenceBadge(byVendor.get(r.id) ?? []) }));
+    res.json({ success: true, data: { vendors } });
   } catch (err) { next(err); }
 });
 
 // Pending approval queue
 router.get('/pending-approval', authenticate, authorize('admin','super_admin'), async (_req, res, next) => {
   try {
-    const vendors = await VendorApprovalService.getPendingVendors();
+    const pending = await VendorApprovalService.getPendingVendors();
+    const byVendor = await licencesByParty('vendor', pending.map((v: any) => v.id));
+    const vendors = pending.map((v: any) => ({ ...v, licences: byVendor.get(v.id) ?? [], ...licenceBadge(byVendor.get(v.id) ?? []) }));
     res.json({ success: true, data: { count: vendors.length, vendors } });
   } catch (err) { next(err); }
 });
@@ -41,7 +47,9 @@ router.get('/pending-approval', authenticate, authorize('admin','super_admin'), 
 router.post('/:id/approve', authenticate, authorize('admin','super_admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { drug_license_type, drug_license_expiry, vendor_type, invoice_prefix } = req.body;
-    if (!drug_license_type || !drug_license_expiry) throw new AppError('drug_license_type and drug_license_expiry required', 400);
+    // Sprint 30: a vendor whose licences are already in the register needs no form / date here
+    const checked = await pool.query(`SELECT 1 FROM party_licences WHERE vendor_id = $1 AND status = 'verified' LIMIT 1`, [req.params.id]);
+    if (!checked.rows[0] && (!drug_license_type || !drug_license_expiry)) throw new AppError('drug_license_type and drug_license_expiry required', 400);
     await VendorApprovalService.approveVendor({
       vendorId: req.params.id, adminId: req.user!.id,
       drugLicenseType: drug_license_type, drugLicenseExpiry: drug_license_expiry,

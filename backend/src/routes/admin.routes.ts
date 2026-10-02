@@ -15,6 +15,13 @@ import {
 } from '../controllers/partnerStockImport.controller';
 import { getPartnerDetail, getPartners, postPartner, postPartnerLogin, putPartner } from '../controllers/partnerAdmin.controller';
 import { postCreateDrafts } from '../controllers/catalogueDraft.controller';
+import multer from 'multer';
+import {
+  getAdminLicenceDocument, getPartyLicences, postAdminLicenceDocument, postLicenceDecision,
+} from '../controllers/partyLicence.controller';
+import { LICENCE_FILE_MAX_BYTES } from '../services/licences/register.service';
+
+const licenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LICENCE_FILE_MAX_BYTES, files: 1 } });
 
 const router = Router();
 
@@ -99,6 +106,13 @@ router.post('/jobs/:name/run', authenticate, authorize('super_admin'), runJobNow
 // ─── Sprint 3: marketplace, settlements, settings ───────────────────────────
 const managers = authorize('admin', 'super_admin');
 // Sprint 28: the admin onboards a partner (approved at once), edits it, adds logins
+// Sprint 30: drug licences of partners, suppliers and buyers — work list, checks, scans.
+// Pharmacists (KYC reviewers) see and check buyer licences only (the controller enforces it).
+const licenceReviewers = authorize('admin', 'super_admin', 'pharmacist_rx');
+router.get('/party-licences', authenticate, licenceReviewers, getPartyLicences);
+router.post('/party-licences/:id/decision', authenticate, licenceReviewers, postLicenceDecision);
+router.get('/party-licences/:id/document-url', authenticate, licenceReviewers, getAdminLicenceDocument);
+router.post('/party-licences/:id/document', authenticate, managers, licenceUpload.single('file'), postAdminLicenceDocument);
 router.get('/partners', authenticate, managers, getPartners);
 router.post('/partners', authenticate, managers, postPartner);
 router.get('/partners/:vendorId', authenticate, managers, getPartnerDetail);

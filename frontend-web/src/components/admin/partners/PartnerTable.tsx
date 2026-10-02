@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { licenceLabel, type PartnerListRow } from '@/lib/admin/partnerOnboarding';
-import { formatDateIST } from '@/lib/dates';
+import LicenceExpiryBadge from '@/components/licences/LicenceExpiryBadge';
 import StatusBadge from '../StatusBadge';
 
 /** Every marketplace partner, with licences, pharmacists and logins at a glance. */
@@ -27,7 +27,7 @@ export default function PartnerTable({ partners }: { partners: PartnerListRow[] 
               <td className="px-4 py-2.5 font-mono text-xs">{p.gst_number ?? 'No GSTIN'}</td>
               <td className="px-4 py-2.5 text-xs">
                 <p>{p.licence_types.length ? p.licence_types.map(licenceLabel).join(', ') : 'Not entered here'}</p>
-                {p.drug_license_expiry && <p className="text-gray-500">earliest valid till {formatDateIST(p.drug_license_expiry)}</p>}
+                <LicenceExpiryBadge b={p} />
               </td>
               <td className="px-4 py-2.5 text-xs">{p.logins?.length ?? 0} · pharmacists {p.pharmacists}</td>
               <td className="px-4 py-2.5"><StatusBadge status={p.is_active ? p.approval_status : 'suspended'} /></td>

@@ -1,57 +1,17 @@
 // Partner onboarding rules (Sprint 28): licences, selling rights, pharmacists,
 // invoice prefix and temporary-password strength. Made-up numbers only.
 import { passwordProblem } from '../../utils/passwordPolicy';
-import { invoicePrefixProblem, LicenceIn, licenceProblems, licenceSummary, pharmacistProblems, sellingRights } from './rules';
+import { invoicePrefixProblem, pharmacistProblems, sellingRights } from './rules';
 
 const TODAY = '2026-10-02';
-const all4: LicenceIn[] = [
-  { licence_type: 'dl21b', licence_number: 'TEST-21B-0004', valid_upto: '2029-03-31' },
-  { licence_type: 'dl20', licence_number: 'TEST-20-0001', valid_upto: '2028-12-31' },
-  { licence_type: 'dl20b', licence_number: 'TEST-20B-0003', valid_upto: '2027-06-30' },
-  { licence_type: 'dl21', licence_number: 'TEST-21-0002', valid_upto: '2028-12-31' },
+const all4 = [
+  { form: 'dl21b', valid_upto: '2029-03-31' },
+  { form: 'dl20', valid_upto: '2028-12-31' },
+  { form: 'dl20b', valid_upto: '2027-06-30' },
+  { form: 'dl21', valid_upto: '2028-12-31' },
 ];
 
-describe('licenceProblems', () => {
-  it('accepts all four forms in date', () => {
-    expect(licenceProblems(all4, TODAY)).toEqual([]);
-  });
-
-  it('needs at least one licence', () => {
-    expect(licenceProblems([], TODAY)).toEqual(['Enter at least one drug licence (Form 20, 21, 20B or 21B)']);
-  });
-
-  it('refuses an expired licence with a plain reason', () => {
-    const p = licenceProblems([{ licence_type: 'dl20', licence_number: 'TEST-20-0001', valid_upto: '2026-10-01' }], TODAY);
-    expect(p).toEqual(['Form 20 (retail) licence TEST-20-0001 expired on 2026-10-01 — ask the partner for the renewed licence']);
-  });
-
-  it('accepts a licence valid until today', () => {
-    expect(licenceProblems([{ licence_type: 'dl20', licence_number: 'TEST-20-0001', valid_upto: TODAY }], TODAY)).toEqual([]);
-  });
-
-  it('refuses the same form twice, a missing number and an impossible date', () => {
-    const p = licenceProblems([
-      { licence_type: 'dl20', licence_number: 'TEST-20-0001', valid_upto: '2028-01-01' },
-      { licence_type: 'dl20', licence_number: 'X', valid_upto: '2028-02-30' },
-    ], TODAY);
-    expect(p).toEqual([
-      'Form 20 (retail) is entered twice — a partner holds one licence of each form',
-      'Form 20 (retail): enter the licence number',
-      'Form 20 (retail): enter the valid-till date',
-    ]);
-  });
-});
-
-describe('licenceSummary', () => {
-  it('uses Form 20 as the licence number and the earliest valid-till date', () => {
-    expect(licenceSummary(all4)).toEqual({ drug_license_no: 'TEST-20-0001', drug_license_type: 'dl20', drug_license_expiry: '2027-06-30' });
-  });
-
-  it('falls back to the wholesale licence for a wholesale-only partner', () => {
-    expect(licenceSummary(all4.filter((l) => l.licence_type.endsWith('b')))).toMatchObject({ drug_license_type: 'dl20b' });
-  });
-});
-
+// Licence form / expiry / summary rules: services/licences/forms.test.ts (Sprint 30)
 describe('sellingRights', () => {
   it('retail and wholesale with all four forms', () => {
     expect(sellingRights(all4, TODAY)).toEqual({ retail: true, wholesale: true });
@@ -63,7 +23,10 @@ describe('sellingRights', () => {
     expect(sellingRights([all4[0], all4[2]], TODAY)).toEqual({ retail: false, wholesale: true });
   });
   it('an expired licence gives no right', () => {
-    expect(sellingRights([{ licence_type: 'dl20', valid_upto: '2026-01-01' }], TODAY)).toEqual({ retail: false, wholesale: false });
+    expect(sellingRights([{ form: 'dl20', valid_upto: '2026-01-01' }], TODAY)).toEqual({ retail: false, wholesale: false });
+  });
+  it('a licence still waiting for Dawabag\'s check gives no right', () => {
+    expect(sellingRights([{ form: 'dl20', valid_upto: '2028-01-01', status: 'pending' }], TODAY)).toEqual({ retail: false, wholesale: false });
   });
 });
 

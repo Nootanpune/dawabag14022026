@@ -3,12 +3,15 @@
 // Routes: /api/v1/kyc/*
 
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { pool } from '../config/database';
 import {
   KYCOrchestrator, GSTINVerifier, PANVerifier,
   DrugLicenseVerifier, NMCVerifier
 } from '../services/kyc.service';
 import { AppError } from '../utils/AppError';
+import { licenceBadge, licencesByParty } from '../services/licences/register.service';
+import { normaliseForm } from '../services/licences/forms';
 import { writeAudit } from '../utils/audit';
 import { logger } from '../config/logger';
 
@@ -77,7 +80,9 @@ export const getKYCQueue = async (req: Request, res: Response, next: NextFunctio
 
     query += ' ORDER BY registered_at ASC LIMIT 50';
     const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows });
+    // Licence count and earliest valid-till per applicant (Sprint 30)
+    const byUser = await licencesByParty('user', result.rows.map((r: any) => r.user_id));
+    res.json({ success: true, data: result.rows.map((r: any) => ({ ...r, licences: byUser.get(r.user_id) ?? [], ...licenceBadge(byUser.get(r.user_id) ?? []) })) });
   } catch (err) { next(err); }
 };
 
@@ -94,8 +99,9 @@ export const adminVerifyDrugLicense = async (req: Request, res: Response, next: 
       throw new AppError('user_id, dl_number, dl_type, and verified (boolean) are required', 400);
     }
 
-    if (!['DL-20','DL-21','DL-20B','DL-21B'].includes(dl_type)) {
-      throw new AppError('dl_type must be DL-20, DL-21, DL-20B, or DL-21B', 400);
+    // Any licence form (Sprint 30): 'DL-20' … as before, or '25', 'Form 21B', 'dl20a'
+    if (!normaliseForm(dl_type)) {
+      throw new AppError('dl_type must be a drug licence form such as DL-20, DL-21, DL-20B or DL-21B', 400);
     }
 
     if (!verified && !rejection_reason) {
@@ -106,6 +112,7 @@ export const adminVerifyDrugLicense = async (req: Request, res: Response, next: 
       userId: user_id,
       dlNumber: dl_number,
       dlType: dl_type,
+      licenceId: req.body.licence_id ? z.string().uuid().parse(req.body.licence_id) : undefined,
       verified,
       licenseHolderName: license_holder_name,
       validUpto: valid_upto,
@@ -266,6 +273,16 @@ export const upgradeDocToRetailer = async (req: Request, res: Response, next: Ne
           updated_at            = NOW()
         WHERE id = $5
       `, [new_gstin || null, drug_license_number, drug_license_type, req.user!.id, user_id]);
+
+      // The retail licence goes into the buyer's licence register, waiting for the check (Sprint 30)
+      const upgradeForm = normaliseForm(drug_license_type);
+      if (upgradeForm) {
+        await pool.query(
+          `INSERT INTO party_licences (user_id, form, licence_number, status, created_by)
+           SELECT $1, $2, $3, 'pending', $4
+           WHERE NOT EXISTS (SELECT 1 FROM party_licences WHERE user_id = $1 AND form = $2 AND status = 'pending')`,
+          [user_id, upgradeForm, String(drug_license_number).trim(), req.user!.id]);
+      }
 
       // Log in audit_log
       await pool.query(`

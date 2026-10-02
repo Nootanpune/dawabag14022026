@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
+import '../../models/drug_licence.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -136,6 +137,12 @@ class AccountScreen extends ConsumerWidget {
           const SizedBox(height: 16),
 
           // Menu sections
+          // Sprint 30: retailers, wholesalers and doctors / hospitals see their drug licences
+          if (kLicenceAccountTypes.contains(user['customer_type']))
+            _Section('Business', [
+              _MenuItem(icon: Icons.verified_outlined, label: 'Your drug licences', onTap: () => context.push('/account/licences')),
+            ]),
+
           _Section('Orders', [
             _MenuItem(icon: Icons.receipt_long, label: 'My orders', onTap: () => context.go('/orders')),
             _MenuItem(icon: Icons.description_outlined, label: 'Prescriptions', onTap: () => context.push('/account/prescriptions')),

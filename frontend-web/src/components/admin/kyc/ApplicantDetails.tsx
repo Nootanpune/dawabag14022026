@@ -37,15 +37,9 @@ export default function ApplicantDetails({ user }: { user: KycApplicant }) {
         )}
         {!isDoctor && (
           <>
-            <Row
-              label="Drug licence"
-              value={
-                user.drug_license_number
-                  ? `${user.drug_license_number}${user.drug_license_type ? ` · ${DL_TYPE_LABELS[user.drug_license_type] ?? user.drug_license_type}` : ''}`
-                  : '—'
-              }
-            />
-            <Row label="Licence valid to" value={formatDateIST(user.drug_license_expiry)} />
+            <Row label="First licence" value={user.drug_license_number
+              ? `${user.drug_license_number}${user.drug_license_type ? ` · ${DL_TYPE_LABELS[user.drug_license_type] ?? user.drug_license_type}` : ''}` : '—'} />
+            <Row label="Earliest valid till (checked)" value={formatDateIST(user.drug_license_expiry)} />
           </>
         )}
         {isDoctor && (

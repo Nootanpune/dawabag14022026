@@ -29,7 +29,7 @@ function PoDetail({ id }: { id: string }) {
             title={po.po_number}
             subtitle={
               <>
-                {po.supplier_name} · DL {po.drug_license_no ?? '—'} · GSTIN {po.gst_number ?? '—'}
+                {po.supplier_name} · GSTIN {po.gst_number ?? '—'} · Drug licences {po.supplier_licence_line ?? po.drug_license_no ?? '—'}
               </>
             }
             onRefresh={() => refetch()}

@@ -169,6 +169,11 @@ export function buildMessage(payload: NotificationPayload) {
       },
       push: { title: 'Privacy request update', body: `Your ${payload.requestType} request: ${payload.status}` },
     },
+    // Sprint 30: a partner's, supplier's or buyer's drug licence nearing expiry (C-07)
+    party_licence_expiring: {
+      email: { subject: 'Drug licence renewal due', body: payload.text || '' },
+      push: { title: 'Drug licence renewal due', body: payload.text || '' },
+    },
     business_licence_expiring: {
       email: { subject: 'Licence renewal due', body: payload.text || '' },
       push: { title: 'Licence renewal due', body: payload.text || '' },

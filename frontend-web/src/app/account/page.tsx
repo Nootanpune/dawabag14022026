@@ -1,8 +1,11 @@
 'use client';
 import Link from 'next/link';
-import { ClipboardList, FileUp, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText, Stethoscope } from 'lucide-react';
+import { ClipboardList, FileUp, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText, Stethoscope, BadgeCheck } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
+
+// Business and doctor accounts keep their drug licences here (Sprint 30)
+const LICENCE_TYPES = ['b2b_retailer', 'b2b_wholesaler', 'doc_hospital'];
 
 const LINKS = [
   { href: '/orders', label: 'My orders', icon: ClipboardList },
@@ -19,6 +22,8 @@ const LINKS = [
 
 export default function AccountPage() {
   const user = useAuthStore((s) => s.user);
+  const links = LICENCE_TYPES.includes(user?.customer_type ?? '')
+    ? [{ href: '/account/licences', label: 'Your drug licences', icon: BadgeCheck }, ...LINKS] : LINKS;
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -26,7 +31,7 @@ export default function AccountPage() {
         <h1 className="text-lg font-semibold">{user?.full_name ?? 'My account'}</h1>
         <p className="text-sm text-gray-500 mb-4">+91 {user?.mobile}</p>
         <div className="card p-0 divide-y divide-gray-100">
-          {LINKS.map(({ href, label, icon: Icon }) => (
+          {links.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50">
               <Icon className="w-4 h-4 text-brand-600" />
               <span className="flex-1">{label}</span>

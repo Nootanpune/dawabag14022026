@@ -2,6 +2,7 @@
 import { ExternalLink } from 'lucide-react';
 import type { PendingVendor } from '@/lib/admin/vendors';
 import { formatDateIST } from '@/lib/dates';
+import LicenceList from '@/components/licences/LicenceList';
 
 interface Props {
   vendors: PendingVendor[];
@@ -36,7 +37,7 @@ export default function PendingVendorsTable({ vendors, onApprove, onReject }: Pr
                 <p className="text-gray-400">{v.contact_email ?? ''}</p>
               </td>
               <td className="px-4 py-2.5 text-xs">
-                <p>{v.drug_license_no ?? '—'}</p>
+                <LicenceList licences={v.licences ?? []} compact label={`${v.name} drug licences`} empty={v.drug_license_no ?? '—'} />
                 <p className="text-gray-400">{v.gst_number ?? 'No GSTIN'}</p>
                 {v.dl_portal_url && (
                   <a

@@ -2,7 +2,9 @@
 // bigint sums can arrive as strings, so display code goes through formatPaise.
 export type Paise = number | string;
 
-export interface Supplier {
+import type { LicenceBadgeData, LicenceBody, LicenceView } from '../licences/forms';
+
+export interface Supplier extends LicenceBadgeData {
   id: string;
   name: string;
   drug_license_no: string | null;
@@ -11,13 +13,17 @@ export interface Supplier {
   state: string | null;
   approval_status: string;
   is_active: boolean;
-  /** approved, active and licence unexpired (C-02) */
+  /** approved, active and every licence unexpired (C-02) */
   can_supply: boolean;
+  city?: string | null;
+  /** every drug licence (Sprint 30): wholesale 20B/21B, manufacturing 25/28, … */
+  licences: LicenceView[];
+  licence_line: string | null;
 }
 
 export interface NewSupplier {
   name: string;
-  drug_license_no: string;
+  licences: LicenceBody[];
   gst_number: string;
   state: string;
   city?: string;
@@ -73,6 +79,9 @@ export interface PurchaseOrder extends Omit<PurchaseOrderRow, 'lines' | 'ordered
   gst_number: string | null;
   items: PoItem[];
   receipts: PoReceiptRef[];
+  /** every checked licence of the supplier (Sprint 30) */
+  supplier_licences?: LicenceView[];
+  supplier_licence_line?: string | null;
 }
 
 export interface NewPurchaseOrder {
@@ -168,4 +177,6 @@ export interface ReceiptResult {
   taxable_paise: number;
   gst_paise: number;
   total_paise: number;
+  /** supplier licences ending within 30 days, or no wholesale / manufacturing licence (warning, C-02) */
+  licence_warnings?: string[];
 }

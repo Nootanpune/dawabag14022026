@@ -15,6 +15,7 @@ import KycDocumentsList from '@/components/admin/kyc/KycDocumentsList';
 import PortalLinks from '@/components/admin/kyc/PortalLinks';
 import KycHistory from '@/components/admin/kyc/KycHistory';
 import DecisionPanel from '@/components/admin/kyc/DecisionPanel';
+import BuyerLicencesCard from '@/components/admin/kyc/BuyerLicencesCard';
 import CreditLimitEditor from '@/components/admin/credit/CreditLimitEditor';
 
 const CREDIT_TYPES = ['b2b_retailer', 'b2b_wholesaler'];
@@ -47,6 +48,7 @@ export default function KycApplicationPage() {
           <div className="lg:col-span-3 space-y-4">
             <KycWarnings licenceExpired={data.licence_expired} missing={data.missing_documents} />
             <DecisionPanel application={data} />
+            {user.customer_type !== 'customer' && <BuyerLicencesCard key={data.licences.map((l) => `${l.id}${l.status}`).join()} application={data} />}
             {showCredit && (
               <CreditLimitEditor
                 key={user.credit_limit_paise}

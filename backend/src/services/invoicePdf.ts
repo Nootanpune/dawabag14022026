@@ -30,17 +30,24 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
     doc.moveDown();
 
     const top = doc.y;
-    party(doc, 36, top, 'Sold by (seller of record)', [
+    // Every drug licence of the seller and of a licensed buyer, one per line (C-13, Sprint 30)
+    const licenceLines = (l: InvoiceData['seller']['drugLicences'], single: string | null, prefix: string) =>
+      (l?.length ? [`${prefix}:`, ...l.map((x) => `  ${x.label}: ${x.number}${x.valid_upto ? ` (valid till ${x.valid_upto})` : ''}`)]
+        : single ? [`${prefix}: ${single}`] : []);
+    const sellerEnd = party(doc, 36, top, 'Sold by (seller of record)', [
       d.seller.name, d.seller.address, `State: ${d.seller.state ?? '-'}`,
-      `GSTIN: ${d.seller.gstin ?? '-'}`, `Drug licence: ${d.seller.drugLicence ?? '-'}`,
+      `GSTIN: ${d.seller.gstin ?? '-'}`,
+      ...(licenceLines(d.seller.drugLicences, d.seller.drugLicence, 'Drug licences').length
+        ? licenceLines(d.seller.drugLicences, d.seller.drugLicence, 'Drug licences') : ['Drug licence: -']),
     ]);
-    party(doc, 306, top, 'Billed / shipped to', [
+    const buyerEnd = party(doc, 306, top, 'Billed / shipped to', [
       d.buyer.name, d.buyer.address, `State (place of supply): ${d.buyer.state ?? '-'}`,
       `GSTIN: ${d.buyer.unregistered ? 'Unregistered Buyer' : d.buyer.gstin}`,
       ...(d.buyer.pan ? [`PAN: ${d.buyer.pan}`] : []),
-      ...(d.buyer.drugLicence ? [`Buyer drug licence: ${d.buyer.drugLicence}`] : []),
+      ...licenceLines(d.buyer.drugLicences, d.buyer.drugLicence, 'Buyer drug licences'),
     ]);
-    doc.y = top + 110;
+    doc.y = Math.max(top + 110, sellerEnd + 8, buyerEnd + 8);
+    doc.x = 36;
 
     const cols = d.interState
       ? [['Item', 150], ['HSN', 42], ['Batch/Exp', 62], ['Qty', 26], ['MRP', 46], ['Rate', 46], ['Taxable', 52], ['IGST', 60], ['Total', 56]]
@@ -67,10 +74,11 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
   });
 }
 
-function party(doc: PDFKit.PDFDocument, x: number, y: number, title: string, lines: string[]) {
+function party(doc: PDFKit.PDFDocument, x: number, y: number, title: string, lines: string[]): number {
   doc.font('Helvetica-Bold').fontSize(9).text(title, x, y, { width: 250 });
   doc.font('Helvetica').fontSize(8.5);
   for (const l of lines) doc.text(l || ' ', x, doc.y, { width: 250 });
+  return doc.y;
 }
 
 function row(doc: PDFKit.PDFDocument, cells: string[], cols: (string | number)[][], header: boolean) {

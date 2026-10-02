@@ -131,8 +131,7 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'delivery.free_above_paise': z.number().int().min(0).max(10_000_000).nullable(),
   // Sprint 4 — public legal details (C-03, C-04, C-36)
   'legal.entity': z.object({ name: z.string().min(2).max(200), address: z.string().max(500), gstin: z.string().max(15), cin: z.string().max(21) }).strict(),
-  'legal.drug_licences': z.object({ retail_20: z.string().max(60), retail_21: z.string().max(60), wholesale_20b: z.string().max(60),
-    wholesale_21b: z.string().max(60), valid_upto: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/) }).strict(),
+  // Dawabag's drug licence numbers are edited in the licence register (Admin → Licences), not here (Sprint 30)
   'legal.pharmacist_in_charge': z.object({ name: z.string().max(200), registration_no: z.string().max(60) }).strict(),
   'legal.grievance_officer': z.object({ name: z.string().max(200), email: z.union([z.string().email(), z.literal('')]),
     phone: z.string().max(20), address: z.string().max(500) }).strict(),

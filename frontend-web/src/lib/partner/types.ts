@@ -1,3 +1,4 @@
+import type { LicenceView } from '../licences/forms';
 // Shapes returned by the partner portal API (/partner/*). Money is integer paise.
 
 export interface PartnerMe {
@@ -15,6 +16,9 @@ export interface PartnerMe {
   vendor_rating: number | string | null;
   commission_pct: number | string | null;
   finding_fee_paise: number | null;
+  /** every drug licence (Sprint 30) */
+  licences?: LicenceView[];
+  licence_line?: string | null;
 }
 
 export interface CatalogueProduct {

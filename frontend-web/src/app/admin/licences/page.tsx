@@ -7,6 +7,7 @@ import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import LicenceTable from '@/components/admin/licences/LicenceTable';
 import LicenceFormDialog from '@/components/admin/licences/LicenceFormDialog';
+import PartyLicencesSection from '@/components/admin/licences/PartyLicencesSection';
 
 // Licence register with renewal owners (C-07)
 export default function AdminLicencesPage() {
@@ -16,7 +17,7 @@ export default function AdminLicencesPage() {
     <div>
       <PageHeader
         title="Licence register"
-        subtitle="Every licence the business holds, its validity and who renews it"
+        subtitle="Every licence Dawabag holds, its validity and who renews it — these numbers are shown in the footer, at checkout and on invoices"
         onRefresh={() => refetch()}
         refreshing={isFetching}
         actions={
@@ -27,6 +28,7 @@ export default function AdminLicencesPage() {
       />
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText="No licences recorded yet" />
       {!!data?.length && <LicenceTable rows={data} onEdit={setEditing} />}
+      <PartyLicencesSection />
       {editing && <LicenceFormDialog licence={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
   );

@@ -6,6 +6,8 @@ import { fetchApprovedPartners, partnerAdminKeys, type ApprovedVendor } from '@/
 import QueryState from '../QueryState';
 import LinkPartnerLoginDialog from './LinkPartnerLoginDialog';
 import CommissionDialog from './CommissionDialog';
+import LicenceList from '@/components/licences/LicenceList';
+import LicenceExpiryBadge from '@/components/licences/LicenceExpiryBadge';
 
 /** Approved marketplace partners: link a portal login, set commission. */
 export default function PartnersSection() {
@@ -42,7 +44,8 @@ export default function PartnersSection() {
                     </p>
                   </td>
                   <td className="px-4 py-2.5 text-xs">
-                    <p>{v.drug_license_no ?? '—'}</p>
+                    <LicenceExpiryBadge b={v} />
+                    <LicenceList licences={v.licences ?? []} compact label={`${v.name} drug licences`} />
                     <p className="text-gray-400">{v.gst_number ?? 'No GSTIN'}</p>
                   </td>
                   <td className="px-4 py-2.5 text-xs">
