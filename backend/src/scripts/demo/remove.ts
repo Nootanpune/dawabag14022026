@@ -35,6 +35,11 @@ export async function removeDemoData() {
     await q('DELETE FROM doctor_profiles WHERE id = ANY($1)', [doctors]);
     await q('DELETE FROM partner_inventory WHERE partner_id = ANY($1) OR partner_product_id IN (SELECT id FROM partner_products WHERE product_id = ANY($2))', [vendors, products]);
     await q('DELETE FROM partner_products WHERE partner_id = ANY($1) OR product_id = ANY($2)', [vendors, products]);
+    // Stock imports (Sprint 27): the demo partner's go with it (cascade); other partners lose links to demo products
+    await q('DELETE FROM partner_item_links WHERE partner_id = ANY($1) OR product_id = ANY($2)', [vendors, products]);
+    await q(`UPDATE partner_product_requests SET product_id = NULL, status = 'open', resolved_by = NULL, resolved_at = NULL
+             WHERE product_id = ANY($1)`, [products]);
+    await q('UPDATE partner_stock_import_rows SET product_id = NULL, match_method = NULL WHERE product_id = ANY($1)', [products]);
     await q('DELETE FROM vendor_users WHERE vendor_id = ANY($1) OR user_id = ANY($2)', [vendors, users]);
     await q('DELETE FROM vendor_performance_history WHERE vendor_id = ANY($1)', [vendors]);
     await q('DELETE FROM vendors WHERE id = ANY($1)', [vendors]);

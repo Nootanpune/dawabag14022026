@@ -38,6 +38,10 @@
   logins linked through `vendor_users` (role 'partner', guard `middleware/partner.middleware.ts`).
   Partner portal `/api/v1/partner/*`; listings sell at catalogue price; settlements in
   `services/settlement.service.ts` with arithmetic in `services/settlementMath.ts`.
+  Partner stock import (Sprint 27): `services/partnerStockImport/*` reads a billing-software
+  export in memory, keeps parsed lines in `partner_stock_import_rows`, matches strictly
+  (item links → listing SKU → exact name+strength+pack) and applies through
+  `partnerListing.upsertInventoryTx` into the partner's own `partner_inventory`.
 - **Refills:** `services/refill.service.ts` + `services/mandate.service.ts` (Razorpay
   recurring; untested without keys). Payment capture → `services/paymentCapture.service.ts`.
   Razorpay client + webhook signature: `services/razorpay.client.ts` (raw-body HMAC).

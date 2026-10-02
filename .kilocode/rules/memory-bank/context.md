@@ -10,6 +10,53 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 27 — partner stock import (2026-10-02, uncommitted)
+First partner: Nootan Pharmaceuticals, Pune (20/21 + 20B/21B), billing software MediVision
+Platinum (Allied Softtech). The owner's real export ("Stock Report Of Batch-wise Products",
+sheet "Report": 8 title rows, headings Product name | Unit | Com | Shelf | Tax% | StkIn dt |
+Batch no | ExpDt | Purc rate | PTR | MRP | Sale rate 1 (text) | Qty | Value; name only on a
+product's first batch row; "Totals:" after each product; "Generated at … MediVision Platinum"
+footer) was read for format only — never committed. Format-agnostic import:
+- DB `22_sprint27_partner_stock_import.sql`: `partner_stock_imports` (draft/applied/cancelled,
+  headers, mapping, summary, result, sha256), `partner_stock_import_rows` (raw cells + parsed,
+  status matched/needs_review/problem/skipped, problems/warnings/candidates),
+  `partner_import_mappings` (one per partner, by heading name), `partner_item_links`
+  (item_key → product; manual/auto/admin), `partner_product_requests` (open/linked/rejected).
+- `services/partnerStockImport/`: readFile (exceljs in memory; CSV/TSV; HTML-as-.xls; binary
+  .xls refused with "Save As .xlsx/CSV"; merged banner counted once; heading row = row naming
+  most fields), fields (synonyms, `suggestMapping`, MediVision preset by headings or footer),
+  rows (fill-down, totals/footer skipped, "10+2" qty, text rupees), values (expiry: Excel
+  date/serial, DD/MM/YYYY, MM/YY → month end, MMM-YY), normalise + match (item link → listing
+  SKU → catalogue: same name words AND strengths, pack not different, company code not
+  different, exactly one product — else needs review with suggestions), validate (missing
+  batch/expiry/qty/MRP, expired or ≤ 30 days C-27, sale/PTR > MRP C-16, MRP below Dawabag's
+  selling price C-16, Schedule X/NDPS C-10, recall/alert C-28, same batch twice: added if
+  same expiry month else problem), evaluate (server-side check stored on rows), import.service
+  (upload, mapping save, link/unlink, bulk new-product requests, cancel, admin resolve),
+  apply.service (one transaction; reuses `partnerListing.upsertInventoryTx` + `insertListingTx`).
+- Apply: per product with a matched line — listing created if missing (catalogue price
+  accepted; H1 details; partner GST/licence check) and pending Dawabag review; each batch =
+  qty + free, never below reserved; the partner's other batches of that product NOT in the file
+  → qty = reserved (0); batches in the file on a problem line untouched; products not in the
+  file untouched; refrigerated items need "stored at 2–8 °C" (C-25); exact matches saved as
+  auto links; one audit entry (C-46); applying twice 409; drafts older than 24 h refused;
+  nothing applied → 400 and rollback. Item key without item code = name|unit|company.
+- API `/partner/stock-imports` (POST multipart, GET list/one/rows, PUT mapping, POST recheck,
+  PATCH rows/:rowId {product_id|null}, POST request-new-products, apply, cancel); admin
+  `/admin/partner-stock-imports[/:id[/rows]]`, `/admin/partner-product-requests[/:id/resolve]`.
+- Web: partner nav "Upload stock" → `/partner/stock-import` (drag & drop, history) and
+  `/partner/stock-import/[id]` (steps: columns → check lines (Matched / Needs review /
+  Problems / Ignored, link dialog, request new) → Apply dialog → result);
+  `components/partner/stockImport/*`, `lib/partner/stockImport.ts`. Admin "Partner stock
+  files" (`/admin/partner-stock`: requests to link/close, uploads list).
+- Fixtures: `backend/test/fixtures/partnerStockFile.mjs` (synthetic MediVision workbook + CSV
+  builders) and generated `partner-stock-sample-medivision.xlsx` / `partner-stock-sample.csv`
+  (demo partner items). Owner guide `deploy/trial/PARTNER_STOCK_IMPORT.md`.
+- Tests: jest 5 suites (60 tests) in `services/partnerStockImport/`; `test/sprint27.smoke.mjs`
+  (in test:smoke); e2e `partnerStock.spec.ts` (desktop + phone).
+- Not built yet: partner API key / scheduled file drop, "full stock" flag (zero products
+  missing from the file), mobile app screens, old binary .xls reading.
+
 ## Sprint 26 — customer journey fixes (2026-10-02, uncommitted)
 Owner walked the live trial after Sprint 25 (tests green, experience poor): search "not
 working", no quantity choice, no back button, prescription unclear at payment, "Pay
@@ -896,3 +943,4 @@ deployment per docs/Dawabag_Beta_Deployment_Guide.docx.
 | 2026-10-01 | Sprint 6: security fixes, deployability, catalogue import, final records, GST reports, saved Rx, cold chain, incidents |
 | 2026-10-01 | Sprint 7: purchasing, goods receipt, stock adjustments, destruction register, counts, expiry watch, AWS SDK v3 |
 | 2026-10-01 | Sprints 8–13: notifications, courier, e-invoicing, purchase returns, teleconsultation, payments, security review, languages, retention, riders, call tokens, GST lock, WhatsApp |
+| 2026-10-02 | Sprint 27: partner stock import (MediVision preset, matching, apply to partner ledger) |

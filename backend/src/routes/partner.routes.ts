@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
 import { requirePartner } from '../middleware/partner.middleware';
 import { getMyReturn, getMyReturns } from '../controllers/partner.controller';
+import stockImportRoutes from './partnerStockImport.routes';
 import {
   createListing, getInventory, getListings, getMe, getMySettlement, getMySettlements, getShipments,
   postDelivered, postDispatch, putInventory, searchCatalogue,
@@ -24,5 +25,7 @@ router.get('/returns', getMyReturns);
 router.get('/returns/:id', getMyReturn);
 router.get('/settlements', getMySettlements);
 router.get('/settlements/:id', getMySettlement);
+// Stock file upload from the partner's billing software (Sprint 27)
+router.use('/stock-imports', stockImportRoutes);
 
 export default router;

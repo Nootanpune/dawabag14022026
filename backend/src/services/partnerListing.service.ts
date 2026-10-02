@@ -20,10 +20,10 @@ export interface ListingInput {
 }
 
 // Partner must be approved, GST-registered and hold an unexpired licence (C-33)
-async function assertPartnerCanSell(vendorId: string) {
-  const v = await queryOne<any>(
-    `SELECT approval_status, is_active, gst_number, drug_license_expiry, vendor_type
-     FROM vendors WHERE id = $1`, [vendorId]);
+export async function assertPartnerCanSell(vendorId: string, client?: Pick<PoolClient, 'query'>) {
+  const sql = `SELECT approval_status, is_active, gst_number, drug_license_expiry, vendor_type
+               FROM vendors WHERE id = $1`;
+  const v = client ? (await client.query(sql, [vendorId])).rows[0] : await queryOne<any>(sql, [vendorId]);
   if (!v || v.approval_status !== 'approved' || !v.is_active) throw new AppError('Your partner account is not approved yet', 403);
   if (!['marketplace_partner', 'both'].includes(v.vendor_type)) throw new AppError('This account is not a marketplace partner', 403);
   if (!v.gst_number) throw new AppError('A GST registration is required to sell on Dawabag', 403);
@@ -33,7 +33,7 @@ async function assertPartnerCanSell(vendorId: string) {
 }
 
 // Schedule H1 needs a named pharmacist and a secure-storage declaration (task 22)
-function h1Problems(schedule: string | null, l: { h1_pharmacist_name?: string | null; h1_pharmacist_reg_no?: string | null; h1_secure_storage_declared?: boolean | null }): string | null {
+export function h1Problems(schedule: string | null, l: { h1_pharmacist_name?: string | null; h1_pharmacist_reg_no?: string | null; h1_secure_storage_declared?: boolean | null }): string | null {
   if (schedule !== 'Schedule H1') return null;
   if (!l.h1_pharmacist_name || !l.h1_pharmacist_reg_no) return 'Schedule H1 listings need the registered pharmacist\'s name and registration number';
   if (!l.h1_secure_storage_declared) return 'Schedule H1 listings need the secure-storage declaration';
@@ -53,7 +53,20 @@ export async function submitListing(vendorId: string, userId: string, input: Lis
   const h1 = h1Problems(product.drug_schedule, input);
   if (h1) throw new AppError(h1, 400);
 
-  const row = await queryOne<{ id: string }>(
+  const row = await withTransaction((c) => insertListingTx(c, vendorId, userId, product, input));
+  if (!row) throw new AppError('You have already listed this product', 409);
+  return row;
+}
+
+/**
+ * The listing row (catalogue price accepted; H1 details already checked by the
+ * caller) and its audit entry. Returns null when the partner already lists it.
+ * Used by the catalogue "List this product" flow and by stock import (Sprint 27).
+ */
+export async function insertListingTx(c: PoolClient, vendorId: string, userId: string,
+  product: { id: string; name: string; generic_name: string | null; drug_schedule: string; gst_rate: number | null; mrp_paise: number; cold_chain: boolean },
+  input: Omit<ListingInput, 'product_id'>) {
+  const row = (await c.query<{ id: string }>(
     `INSERT INTO partner_products
        (partner_id, product_id, medicine_name, generic_name, partner_sku, drug_schedule, gst_rate, mrp_paise,
         cold_chain, prescription_required, catalogue_price_accepted,
@@ -66,9 +79,9 @@ export async function submitListing(vendorId: string, userId: string, input: Lis
      ['Schedule H', 'Schedule H1'].includes(product.drug_schedule),
      input.h1_pharmacist_name || null, input.h1_pharmacist_reg_no || null, !!input.h1_secure_storage_declared,
      product.drug_schedule === 'Schedule H1' ? new Date() : null, userId]
-  );
-  if (!row) throw new AppError('You have already listed this product', 409);
-  await writeAudit({ userId, action: 'partner_listing_submitted', performedBy: userId,
+  )).rows[0];
+  if (!row) return null;
+  await writeAuditTx(c, { userId, action: 'partner_listing_submitted', performedBy: userId,
     newValue: { vendor_id: vendorId, partner_product_id: row.id, product_id: product.id } });
   return row;
 }
@@ -93,44 +106,60 @@ export interface BatchInput {
   expiry_date: string;
   manufactured_date?: string;
   cold_chain_confirmed?: boolean;
+  /** Partner's own cost, kept in its ledger, never shown to buyers (stock import only) */
+  purchase_price_paise?: number | null;
 }
 
 // Absolute stock per batch; never below what is already reserved for orders
 export async function upsertInventory(vendorId: string, partnerProductId: string, batches: BatchInput[], userId: string) {
-  return withTransaction(async (client: PoolClient) => {
-    const pp = (await client.query(
-      'SELECT id, product_id, cold_chain FROM partner_products WHERE id = $1 AND partner_id = $2', [partnerProductId, vendorId])).rows[0];
-    if (!pp) throw new AppError('Listing not found', 404);
-    for (const b of batches) {
-      if (pp.cold_chain && !b.cold_chain_confirmed) {
-        throw new AppError(`Batch ${b.batch_number}: confirm cold storage (2–8 °C) for this refrigerated product`, 400);
-      }
-      // A recalled batch, or one on a regulator alert, cannot be listed (C-28)
-      await assertBatchReceivable(client, pp.product_id, b.batch_number);
-      const existing = (await client.query(
-        `SELECT qty_reserved FROM partner_inventory WHERE partner_product_id = $1 AND batch_number = $2 FOR UPDATE`,
-        [partnerProductId, b.batch_number])).rows[0];
-      if (existing && b.qty_available < existing.qty_reserved) {
-        throw new AppError(`Batch ${b.batch_number}: ${existing.qty_reserved} units are reserved for orders`, 400);
-      }
-      await client.query(
-        `INSERT INTO partner_inventory
-           (partner_product_id, partner_id, batch_number, qty_available, expiry_date, manufactured_date, cold_chain_confirmed)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (partner_product_id, batch_number) DO UPDATE SET
-           qty_available = EXCLUDED.qty_available, expiry_date = EXCLUDED.expiry_date,
-           manufactured_date = EXCLUDED.manufactured_date,
-           cold_chain_confirmed = EXCLUDED.cold_chain_confirmed, last_updated_at = NOW()`,
-        [partnerProductId, vendorId, b.batch_number, b.qty_available, b.expiry_date,
-         b.manufactured_date || null, !!b.cold_chain_confirmed]
-      );
+  return withTransaction((client: PoolClient) => upsertInventoryTx(client, vendorId, partnerProductId, batches, userId));
+}
+
+/**
+ * The same write inside the caller's transaction: the listing stock editor (one
+ * listing) and stock import (Sprint 27, many listings in one transaction, one audit
+ * entry for the whole file — audit: false) both use it, so the rules are the same:
+ * cold storage confirmed for refrigerated products (C-25), recalled or alerted
+ * batches refused (C-28), never below what is reserved for orders.
+ */
+export async function upsertInventoryTx(client: PoolClient, vendorId: string, partnerProductId: string, batches: BatchInput[], userId: string,
+  opts: { audit?: boolean } = {}) {
+  const pp = (await client.query(
+    'SELECT id, product_id, cold_chain FROM partner_products WHERE id = $1 AND partner_id = $2', [partnerProductId, vendorId])).rows[0];
+  if (!pp) throw new AppError('Listing not found', 404);
+  for (const b of batches) {
+    if (pp.cold_chain && !b.cold_chain_confirmed) {
+      throw new AppError(`Batch ${b.batch_number}: confirm cold storage (2–8 °C) for this refrigerated product`, 400);
     }
+    // A recalled batch, or one on a regulator alert, cannot be listed (C-28)
+    await assertBatchReceivable(client, pp.product_id, b.batch_number);
+    const existing = (await client.query(
+      `SELECT qty_reserved FROM partner_inventory WHERE partner_product_id = $1 AND batch_number = $2 FOR UPDATE`,
+      [partnerProductId, b.batch_number])).rows[0];
+    if (existing && b.qty_available < existing.qty_reserved) {
+      throw new AppError(`Batch ${b.batch_number}: ${existing.qty_reserved} units are reserved for orders`, 400);
+    }
+    await client.query(
+      `INSERT INTO partner_inventory
+         (partner_product_id, partner_id, batch_number, qty_available, expiry_date, manufactured_date, cold_chain_confirmed, purchase_price_paise)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (partner_product_id, batch_number) DO UPDATE SET
+         qty_available = EXCLUDED.qty_available, expiry_date = EXCLUDED.expiry_date,
+         manufactured_date = EXCLUDED.manufactured_date,
+         cold_chain_confirmed = EXCLUDED.cold_chain_confirmed,
+         purchase_price_paise = COALESCE(EXCLUDED.purchase_price_paise, partner_inventory.purchase_price_paise),
+         last_updated_at = NOW()`,
+      [partnerProductId, vendorId, b.batch_number, b.qty_available, b.expiry_date,
+       b.manufactured_date || null, !!b.cold_chain_confirmed, b.purchase_price_paise ?? null]
+    );
+  }
+  if (opts.audit !== false) {
     await writeAuditTx(client, { userId, action: 'partner_inventory_updated', performedBy: userId,
       newValue: { vendor_id: vendorId, partner_product_id: partnerProductId, batches: batches.map((b) => [b.batch_number, b.qty_available]) } });
-    return (await client.query(
-      `SELECT batch_number, qty_available, qty_reserved, expiry_date, cold_chain_confirmed
-       FROM partner_inventory WHERE partner_product_id = $1 ORDER BY expiry_date`, [partnerProductId])).rows;
-  });
+  }
+  return (await client.query(
+    `SELECT batch_number, qty_available, qty_reserved, expiry_date, cold_chain_confirmed
+     FROM partner_inventory WHERE partner_product_id = $1 ORDER BY expiry_date`, [partnerProductId])).rows;
 }
 
 // ── Dawabag review ───────────────────────────────────────────────────────────

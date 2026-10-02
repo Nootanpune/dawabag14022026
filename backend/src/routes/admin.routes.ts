@@ -10,6 +10,9 @@ import {
   getSettings, getSettlementDetail, getSettlements, linkPartnerUser, listPartners, postGenerateSettlements,
   postSettlementPaid, postShipmentDelivered, putSetting, setCommission,
 } from '../controllers/marketplaceAdmin.controller';
+import {
+  adminGetStockImport, adminGetStockImportRows, adminListProductRequests, adminListStockImports, adminResolveProductRequest,
+} from '../controllers/partnerStockImport.controller';
 
 const router = Router();
 
@@ -96,6 +99,12 @@ const managers = authorize('admin', 'super_admin');
 router.get('/partners', authenticate, managers, listPartners);
 router.post('/partners/:vendorId/users', authenticate, managers, linkPartnerUser);
 router.put('/partners/:vendorId/commission', authenticate, managers, setCommission);
+// Partner stock imports (Sprint 27): read-only for admins; new-product requests resolved here
+router.get('/partner-stock-imports', authenticate, managers, adminListStockImports);
+router.get('/partner-stock-imports/:id', authenticate, managers, adminGetStockImport);
+router.get('/partner-stock-imports/:id/rows', authenticate, managers, adminGetStockImportRows);
+router.get('/partner-product-requests', authenticate, managers, adminListProductRequests);
+router.post('/partner-product-requests/:id/resolve', authenticate, managers, adminResolveProductRequest);
 router.post('/shipments/:id/delivered', authenticate, managers, postShipmentDelivered);
 router.get('/settlements', authenticate, managers, getSettlements);
 router.post('/settlements/generate', authenticate, managers, postGenerateSettlements);

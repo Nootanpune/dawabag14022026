@@ -81,6 +81,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/products/photos', label: 'Pack photos', icon: Images, roles: MANAGER_ROLES },
       { href: '/staff/content-review', label: 'Product copy', icon: ClipboardCheck, roles: PHARMACIST_ROLES },
       { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },
+      // Sprint 27 — partners' stock files and the items they ask Dawabag to add
+      { href: '/admin/partner-stock', label: 'Partner stock files', icon: PackagePlus, roles: MANAGER_ROLES },
       { href: '/admin/stock', label: 'Low stock', icon: PackageX, roles: MANAGER_ROLES },
       { href: '/staff/stock', label: 'Stock', icon: Boxes, roles: STORE_ROLES },
       { href: '/admin/stock-adjustments', label: 'Stock adjustments', icon: SlidersHorizontal, roles: MANAGER_ROLES },
