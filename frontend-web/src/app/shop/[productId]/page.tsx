@@ -9,8 +9,14 @@ import QueryState from '@/components/admin/QueryState';
 import ProductSummary from '@/components/shop/ProductSummary';
 import ProductDeclarations from '@/components/shop/ProductDeclarations';
 import TradePriceBanner from '@/components/shop/TradePriceBanner';
+import DeliveryInfo from '@/components/shop/DeliveryInfo';
+import ProductTrustStrip from '@/components/shop/ProductTrustStrip';
+import SubstitutesPreview from '@/components/shop/substitutes/SubstitutesPreview';
+import MedicineInfo from '@/components/shop/medicineInfo/MedicineInfo';
 
-// Product page: buyer's own price, declarations (C-17), approved copy only (C-19)
+// Product page: buyer's own price, declarations (C-17), approved copy only (C-19);
+// Sprint 33: delivery date / expiry / cold chain, trust links, substitutes, and the
+// pharmacist-reviewed medicine information (hidden until approved; empty sections hidden).
 export default function ProductPage() {
   const { productId } = useParams<{ productId: string }>();
   const { data, isLoading, error } = useQuery({ queryKey: productKeys.one(productId), queryFn: () => fetchProduct(productId) });
@@ -28,6 +34,10 @@ export default function ProductPage() {
         {data && (
           <>
             <ProductSummary p={data} />
+            <DeliveryInfo p={data} />
+            <ProductTrustStrip />
+            <SubstitutesPreview productId={data.id} />
+            <MedicineInfo productId={data.id} />
             <ProductDeclarations p={data} />
           </>
         )}

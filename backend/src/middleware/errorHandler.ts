@@ -8,6 +8,8 @@ const REDACTED_FIELDS = new Set([
   'password', 'otp', 'temporary_password', 'current_password', 'new_password', 'logins', 'refresh_token', 'pan_number', 'gstin',
   'drug_license_number', 'nmc_reg_number', 'email', 'mobile',
   'diagnosis', 'advice', 'chief_complaint', 'notes', 'items', 'reason', 'instructions', 'patient_name', 'address_line1', 'address_line2',
+  // Sprint 33: health profile and dose reminders are health data
+  'allergies', 'conditions', 'current_medicines', 'medicine_name', 'dose', 'full_name',
 ]);
 
 function redact(body: unknown): unknown {

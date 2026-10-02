@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { adminProductKeys, fetchProductForEdit, updateProduct } from '@/lib/admin/products';
@@ -27,6 +28,10 @@ export default function EditProductPage() {
           <PageHeader
             title={`Edit ${data.name}`}
             subtitle="Only changed fields are sent. Trade prices, NPPA ceiling, order minimums and reorder level are not shown here — leave them blank to keep the saved values."
+            actions={
+              // Sprint 33: structured medicine information (draft → pharmacist review, C-19)
+              <Link href={`/staff/medicine-info/${id}`} className="btn-outline text-sm">Medicine information</Link>
+            }
           />
           {!data.content_reviewed && (
             <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mb-3">

@@ -43,6 +43,10 @@ import '../screens/doctor/portal/doctor_consultations_screen.dart';
 import '../screens/admin/admin_screen.dart';
 import '../screens/prescriptions/prescriptions_screen.dart';
 import '../screens/account/password/change_password_screen.dart';
+import '../screens/account/health/health_profile_screen.dart';
+import '../screens/account/medicines/my_medicines_screen.dart';
+import '../screens/info/info_page_screen.dart';
+import '../screens/shop/substitutes_screen.dart';
 import '../widgets/main_scaffold.dart';
 import 'password_gate.dart';
 
@@ -107,12 +111,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/shop/:productId',
         builder: (c, s) => ProductDetailScreen(productId: s.pathParameters['productId']!),
       ),
+      // Sprint 33: every substitute for a medicine; trust pages (public)
+      GoRoute(
+        path: '/medicine/:productId/substitutes',
+        builder: (c, s) => SubstitutesScreen(productId: s.pathParameters['productId']!),
+      ),
+      GoRoute(path: '/trust/:key', builder: (c, s) => InfoPageScreen(pageKey: s.pathParameters['key']!)),
       GoRoute(path: '/checkout', builder: (c, s) => const CheckoutScreen()),
       GoRoute(
         path: '/orders/:orderId',
         builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['orderId']!),
       ),
       GoRoute(path: '/account/refills', builder: (c, s) => const RefillScreen()),
+      // Sprint 33: dose reminders and the health profile (signed-in only via the /account prefix)
+      GoRoute(path: '/account/medicines', builder: (c, s) => const MyMedicinesScreen()),
+      GoRoute(path: '/account/health', builder: (c, s) => const HealthProfileScreen()),
       // Change password: from Account, or forced for a temporary password (Sprint 32)
       GoRoute(
         path: kChangePasswordPath,

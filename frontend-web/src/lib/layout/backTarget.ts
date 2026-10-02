@@ -9,6 +9,9 @@ export function parentPath(pathname: string): string {
     return parts.length > 2 ? `/${parts.slice(0, 2).join('/')}` : '/account';
   }
   if (pathname.startsWith('/policies/')) return '/policies';
+  // Sprint 33: /medicine/<id>/substitutes → that medicine's page
+  const sub = pathname.match(/^\/medicine\/([^/]+)\/substitutes/);
+  if (sub) return `/shop/${sub[1]}`;
   return '/';
 }
 

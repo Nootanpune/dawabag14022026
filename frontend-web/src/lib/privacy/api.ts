@@ -54,6 +54,7 @@ export const PURPOSE_LABELS: Record<string, string> = {
   whatsapp: 'Send order and refill updates on WhatsApp',
   privacy_notice: 'Privacy notice accepted',
   age_18_plus: 'Confirmed 18 years or older',
+  health_profile: 'Keep my health profile for the pharmacists (Account → Health profile)',
 };
 
 export async function fetchConsents(): Promise<Consents> {

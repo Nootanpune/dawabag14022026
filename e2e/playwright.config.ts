@@ -20,6 +20,6 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /(public|a11y|partnerStock|partnerOnboarding|partnerDrafts|licences|tradePrices|catalogueLists)\.spec\.ts/ },
+    { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /(public|a11y|partnerStock|partnerOnboarding|partnerDrafts|licences|tradePrices|catalogueLists|medicinePage)\.spec\.ts/ },
   ],
 });

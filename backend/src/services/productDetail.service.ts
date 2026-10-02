@@ -11,6 +11,7 @@ import { ownNearestExpirySql, partnerNearestExpirySql, sellableStockSql } from '
 import { saleKindFor } from './stock/sellingRights';
 import { imageUrlFor } from './productImage.service';
 import { qtyLimits } from './cart.service';
+import { COLD_CHAIN_NOTE, expiryMonthLabel } from './productPage/deliveryEstimate';
 
 const PUBLIC_FIELDS = ['id', 'name', 'generic_name', 'sku', 'category', 'drug_schedule', 'hsn_code', 'gst_rate',
   'marketed_by', 'composition', 'storage_instructions', 'cold_chain', 'mrp_paise', 's3_image_key',
@@ -49,6 +50,10 @@ export async function productDetail(productId: string, pricingType: BuyerType) {
     // FEFO: the earliest-expiring sellable batch is the one supplied (C-27)
     supplied_batch_expiry: row.nearest_expiry ? new Date(row.nearest_expiry).toISOString().slice(0, 7) : null,
     nearest_expiry: row.nearest_expiry,
+    // Sprint 33: "Expires on or after Mar 2027" — the earliest batch any seller would supply (FEFO, > 30 days left)
+    expires_on_or_after: expiryMonthLabel(row.nearest_expiry ? new Date(row.nearest_expiry).toISOString() : null),
+    // 2–8 °C products travel in an insulated pack (C-25)
+    cold_chain_note: row.cold_chain ? COLD_CHAIN_NOTE : null,
     discount_pct: row.mrp_paise ? Math.round(((row.mrp_paise - price) / row.mrp_paise) * 100) : 0,
     requires_prescription: ['Schedule H', 'Schedule H1'].includes(row.drug_schedule),
     // This buyer's own order limits, as the cart applies them (Sprint 26: quantity before Add)

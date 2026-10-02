@@ -42,6 +42,7 @@ import {
   Images,
   Store,
   ListPlus,
+  BookOpenCheck,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
@@ -121,6 +122,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/staff/telemedicine-lists', label: 'Telemedicine lists', icon: ListTree, roles: TELE_LIST_ROLES },
       { href: '/admin/licences', label: 'Licences', icon: BadgeCheck, roles: MANAGER_ROLES },
       { href: '/admin/policies', label: 'Policies', icon: FileText, roles: MANAGER_ROLES },
+      // Sprint 33 — "Genuine medicines", "Expired, damaged and recalled", "How a pharmacist checks your order"
+      { href: '/admin/info-pages', label: 'Trust pages', icon: BookOpenCheck, roles: MANAGER_ROLES },
     ],
   },
   {

@@ -6,6 +6,7 @@ import 'config/firebase_config.dart';
 import 'config/router.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/reminder_provider.dart';
 import 'services/notification_service.dart';
 import 'services/notification_tap_router.dart';
 
@@ -41,6 +42,8 @@ class _DawabagAppState extends ConsumerState<DawabagApp> {
       (_, signedIn) => NotificationTapRouter.setSignedIn(signedIn),
       fireImmediately: true,
     );
+    // Sprint 33: dose alerts are (re)set from the server's list on start and sign-in
+    ref.read(doseAlarmSyncProvider);
   }
 
   @override

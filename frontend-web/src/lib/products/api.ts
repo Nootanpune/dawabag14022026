@@ -26,6 +26,10 @@ export interface ProductDetail {
   country_of_origin: string | null;
   /** YYYY-MM of the batch that will be supplied (FEFO) */
   supplied_batch_expiry: string | null;
+  /** Sprint 33: "Mar 2027" — expiry of the earliest batch any seller would supply (> 30 days left) */
+  expires_on_or_after?: string | null;
+  /** Sprint 33: insulated-pack note for 2–8 °C products (C-25); null otherwise */
+  cold_chain_note?: string | null;
   /** null until a pharmacist approves the copy */
   description: string | null;
   content_reviewed: boolean;

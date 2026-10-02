@@ -1,5 +1,5 @@
-// Is another product the same medicine? Used only to SUGGEST a cheaper option in
-// the cart (Sprint 25); never to swap anything. Pure, unit-tested in
+// Is another product the same medicine? Used only to SUGGEST: a cheaper option in
+// the cart (Sprint 25) and the substitutes list on the product page (Sprint 33); never to swap anything. Pure, unit-tested in
 // sameMedicine.test.ts. Deliberately conservative — a product is "the same" only
 // when ALL of these match:
 //   • generic (salt) name, ignoring case and punctuation;
@@ -60,6 +60,25 @@ export function releaseType(name: string): string {
   return RELEASE.filter(([, re]) => re.test(n)).map(([k]) => k).join('+') || 'plain';
 }
 
+// Route of use (Sprint 33): eye drops and oral drops are both "liquid", but never the
+// same medicine for the buyer. Anything not marked otherwise is taken by mouth or as
+// its dosage form implies.
+const ROUTES: [string, RegExp][] = [
+  ['eye', /\b(eye|ophthalmic|opth)\b/],
+  ['ear', /\b(ear|otic)\b/],
+  ['nasal', /\b(nasal|nose)\b/],
+  ['inhaled', /\b(inhaler|inhalation|respules?|rotacaps?|nebuli[sz]er)\b/],
+  ['vaginal', /\b(vaginal|pessary|pessaries)\b/],
+  ['rectal', /\b(rectal|suppositor(y|ies))\b/],
+];
+
+export function routeOf(name: string): string {
+  const n = name.toLowerCase();
+  for (const [route, re] of ROUTES) if (re.test(n)) return route;
+  const form = dosageForm(name);
+  return form === 'injection' ? 'injection' : form === 'topical' ? 'skin' : 'oral';
+}
+
 const pack = (q: string | null | undefined) => words(q ?? '');
 
 /** A key equal for two products only when they are the same medicine; null = never suggest. */
@@ -67,7 +86,7 @@ export function medicineKey(m: MedicineFacts): string | null {
   const generic = normaliseGeneric(m.generic_name);
   const strengths = strengthNumbers(m.name);
   if (!generic || !strengths.length) return null;
-  return [generic, strengths.join(','), dosageForm(m.name), releaseType(m.name), m.drug_schedule ?? ''].join('|');
+  return [generic, strengths.join(','), dosageForm(m.name), releaseType(m.name), routeOf(m.name), m.drug_schedule ?? ''].join('|');
 }
 
 export function isSameMedicine(a: MedicineFacts, b: MedicineFacts): boolean {

@@ -6,7 +6,12 @@ import '../../services/api_service.dart';
 import '../../utils/drug_schedule.dart';
 import '../../widgets/error_retry_view.dart';
 import '../../widgets/product_image.dart';
+import '../../providers/product_page_providers.dart';
+import 'widgets/delivery_info_card.dart';
+import 'widgets/medicine_info_view.dart';
 import 'widgets/product_badges.dart';
+import 'widgets/product_trust_strip.dart';
+import 'widgets/substitutes_section.dart';
 import 'widgets/product_buy_bar.dart';
 import 'widgets/product_declarations.dart';
 import 'widgets/product_price.dart';
@@ -84,10 +89,17 @@ class _Body extends StatelessWidget {
                       style: TextStyle(fontSize: 13, color: Colors.red.shade800, fontWeight: FontWeight.w600)),
                 ),
               if (isRxSchedule(product['drug_schedule']?.toString())) const _RxNotice(),
+              // Sprint 33: delivery date, supplied batch's expiry, cold-chain note, trust pages
+              DeliveryInfoCard(product: product),
+              const ProductTrustStrip(),
               if (description != null && description.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text(description, style: const TextStyle(fontSize: 14, height: 1.45)),
               ],
+              // Sprint 33: same medicine from other makers (a list only, C-08)
+              SubstitutesSection(productId: product['id']?.toString() ?? ''),
+              // Sprint 33: pharmacist-reviewed medicine information (C-19), one accordion per section
+              _MedicineInfo(productId: product['id']?.toString() ?? ''),
               ProductDeclarations(product: product),
               const SizedBox(height: 100),
             ],
@@ -96,6 +108,18 @@ class _Body extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The approved medicine information, if any (hidden while loading or when none).
+class _MedicineInfo extends ConsumerWidget {
+  final String productId;
+  const _MedicineInfo({required this.productId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref.watch(medicineInfoProvider(productId)).maybeWhen(
+        data: (info) => MedicineInfoView(info: info),
+        orElse: () => const SizedBox.shrink(),
+      );
 }
 
 /// Prescription-only medicine: a pharmacist verifies the prescription before
