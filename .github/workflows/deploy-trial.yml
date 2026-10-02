@@ -62,6 +62,14 @@ jobs:
           if [ -n "$missing" ]; then
             echo "::error::Missing repository secrets:$missing (deploy/trial/TRIAL.md, step 3)"; exit 1
           fi
+          # Every line must be blank, a # comment or NAME=value (a pasted shell prompt
+          # such as "root@server:~#" otherwise breaks docker compose). Line numbers
+          # only: the content is secret.
+          bad=$(printf '%s\n' "$TRIAL_ENV" | tr -d '\r' \
+            | grep -nvE '^[[:space:]]*$|^[[:space:]]*#|^[A-Za-z_][A-Za-z0-9_]*=' | cut -d: -f1 | paste -sd, -)
+          if [ -n "$bad" ]; then
+            echo "::error::TRIAL_ENV line(s) $bad are not settings (each line must be NAME=value or start with #). Usually a copied server prompt or a wrapped line: edit the secret and delete those lines."; exit 1
+          fi
           val() { printf '%s\n' "$TRIAL_ENV" | sed -n "s/^$1=//p" | tail -1 | tr -d '\r'; }
           for k in APP_ENV WEB_DOMAIN API_DOMAIN DB_PASSWORD JWT_ACCESS_SECRET JWT_REFRESH_SECRET ACME_EMAIL; do
             [ -n "$(val "$k")" ] || { echo "::error::TRIAL_ENV has no $k — regenerate it with deploy/trial/make-trial-env.sh"; exit 1; }
