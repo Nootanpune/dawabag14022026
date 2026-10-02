@@ -14,7 +14,10 @@ const text = (min: number, max: number, what: string) =>
 const mobile = (what: string) => z.string({ required_error: `Enter ${what}` }).trim().regex(MOBILE, `Enter ${what} as a 10-digit Indian mobile number`);
 
 const licence = z.object({
-  licence_type: z.enum(LICENCE_FORMS, { errorMap: () => ({ message: 'Licence form must be 20, 21, 20B or 21B' }) }),
+  // Accepts the form as printed on the licence ("20", "Form 21B", "20b") as well as dl20…dl21b
+  licence_type: z.preprocess(
+    (v) => (typeof v === 'string' ? `dl${v.trim().toLowerCase().replace(/^(form\s*|dl)/, '').replace(/\s+/g, '')}` : v),
+    z.enum(LICENCE_FORMS, { errorMap: () => ({ message: 'Licence form must be 20, 21, 20B or 21B' }) })),
   licence_number: text(3, 100, 'the licence number'),
   valid_upto: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the licence valid-till date'),
 });
