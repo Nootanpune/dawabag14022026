@@ -11,6 +11,7 @@ import { FieldGroup, TextField } from './EditorFields';
 import SafetyFields from './SafetyFields';
 import FactFields from './FactFields';
 import PairsFields from './PairsFields';
+import ImportedDraftBanner from './ImportedDraftBanner';
 
 /**
  * Writes medicine information as a draft and sends it to the pharmacist's review
@@ -42,6 +43,8 @@ export default function MedicineInfoEditor({ data }: { data: InfoEditorData }) {
 
   return (
     <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }} aria-label="Medicine information editor">
+      {/* Sprint 45: imported from a drafts file — check every line before sending (C-19) */}
+      {open?.source === 'imported_draft' && <ImportedDraftBanner meta={open.import_meta} partner={open.import_partner_name} />}
       <div className="card text-sm space-y-1" data-testid="info-status">
         <p>
           <span className="font-semibold">Live for buyers: </span>

@@ -4,6 +4,9 @@ import {
   getMedicineInfo, getMedicineInfoEditor, getMedicineInfoQueue, getMedicineInfoReturned, postMedicineInfoReview, postMedicineInfoSubmit, putMedicineInfoDraft,
 } from '../controllers/medicineInfo.controller';
 import { getDeliveryEstimate, getSubstitutes } from '../controllers/productPage.controller';
+import {
+  draftsFileUpload, getImportedDraftCounts, getImportedDrafts, getInfoDraftsTemplate, getInfoImportPartners, postInfoDraftsImport,
+} from '../controllers/medicineInfoImport.controller';
 
 // Product page information — /api/v1/medicines/* (Sprint 33)
 const router = Router();
@@ -13,6 +16,14 @@ const writers = authorize('pharmacist_rx', 'admin', 'super_admin');
 router.get('/info-review/queue', authenticate, writers, getMedicineInfoQueue);
 // Sprint 36: what a second pharmacist rejected, back to the person who wrote it
 router.get('/info-review/returned', authenticate, writers, getMedicineInfoReturned);
+
+// Sprint 45: drafts written outside Dawabag for one partner's products — imported as DRAFTS only;
+// a registered pharmacist checks and sends, a second one approves (C-19); each import audited (C-46)
+router.get('/info-imports/template', authenticate, writers, getInfoDraftsTemplate);
+router.get('/info-imports/partners', authenticate, writers, getInfoImportPartners);
+router.get('/info-imports/drafts', authenticate, writers, getImportedDrafts);
+router.get('/info-imports/counts', authenticate, writers, getImportedDraftCounts);
+router.post('/info-imports', authenticate, writers, draftsFileUpload, postInfoDraftsImport);
 
 // Buyers (public; the price and Rx rule follow the signed-in buyer's type)
 router.get('/:productId/info', getMedicineInfo);

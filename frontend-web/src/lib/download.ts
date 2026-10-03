@@ -46,3 +46,18 @@ export async function normaliseBlobError(err: any): Promise<any> {
   }
   return err;
 }
+
+/** Hand text the server built (e.g. a CSV in an API answer) to the browser's save dialog. Nothing is kept. */
+export function saveTextAsFile(text: string, name: string, type = 'text/csv;charset=utf-8'): void {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+}

@@ -11,6 +11,7 @@ import { medicineInfoKeys, reviewInfo } from '@/lib/medicineInfo/api';
 import { presentSections, withDefaults, type InfoQueueItem } from '@/lib/medicineInfo/types';
 import { previewSections } from '@/lib/medicineInfo/form';
 import InfoSectionBody from '@/components/shop/medicineInfo/InfoSectionBody';
+import ImportedDraftBanner from './ImportedDraftBanner';
 
 /**
  * One version of medicine information waiting for review (C-19), shown exactly as
@@ -51,6 +52,7 @@ export default function InfoReviewCard({ v }: { v: InfoQueueItem }) {
         <Link href={`/staff/medicine-info/${v.product_id}`} className="text-xs text-brand-700 underline self-start">Open in the editor</Link>
       </div>
       {!!v.author_names?.length && <p className="text-xs text-gray-500">Written by {v.author_names.join(', ')}</p>}
+      {v.source === 'imported_draft' && <ImportedDraftBanner meta={v.import_meta} compact />}
       {own && (
         <p className="text-xs rounded-lg bg-amber-50 border border-amber-200 p-2 text-amber-900" data-testid="own-version">
           You wrote or sent this version, so another registered pharmacist must approve it. You can still withdraw it.

@@ -139,6 +139,7 @@ const uploadLimiter = rateLimit({
 const UPLOAD_PATHS = [
   '/api/v1/prescriptions/upload', '/api/v1/catalogue/import', '/api/v1/kyc/documents', '/api/v1/written-orders/upload',
   /^\/api\/v1\/partner\/stock-imports\/?$/,   // the file itself, not the steps after it
+  /^\/api\/v1\/medicines\/info-imports\/?$/,   // Sprint 45: medicine-information drafts workbook
   /^\/api\/v1\/partner-feed\//,               // Sprint 36: the billing software's key path (per address; per key in the route)
   /^\/api\/v1\/(users\/me|partner)\/licences\/[^/]+\/document$/,
   /^\/api\/v1\/admin\/party-licences\/[^/]+\/document$/,

@@ -512,6 +512,28 @@ and the **tax invoice is issued at that approval** (DECISIONS.md, Sprint 44 rows
   register for the drugs inspector — period, CSV, links to the certificate and written order
   (5-minute, every view logged). Uploads need the object store (`AWS_S3_BUCKET`).
 
+## 7i. Imported medicine-information drafts (Sprint 45)
+
+- Staff → *Import medicine information drafts* (`/staff/medicine-info-imports`, admins and
+  pharmacists). Choose the partner (e.g. Nootan), then upload the drafts workbook: an .xlsx
+  (≤ 10 MB, ≤ 5,000 rows) with a sheet named `drafts` whose first row is exactly
+  `item_name, pack, company, assumed_composition, composition_confidence, drafting_note,
+  content_json` (any order). *Download template* gives the empty workbook. The file is read
+  in memory and not kept.
+- `item_name`, `pack`, `company` must be written exactly as the partner's billing export
+  prints them: the row is matched through that partner's item links (the same key the stock
+  import uses). Items the partner has not linked yet — apply its stock file or link the item
+  under Partner stock files / Requests first — come back as "Not in catalogue yet" with a
+  CSV; import the same file again later and only the newly linked products are filled.
+- Nothing reaches buyers: every row becomes a DRAFT. Pharmacists work through
+  *Imported drafts to check* (`/staff/medicine-info-imported`, by partner): open, check every
+  line against the pack insert (yellow banner shows the assumed composition and the
+  drafter's note), edit, send. Only a pharmacist with a valid registration can send an
+  imported draft; a second pharmacist approves it on *Medicine information to approve*.
+- Approved information and information waiting for review are never changed by an import.
+  Tick "replace unapproved drafts only" to overwrite open drafts with the file's words.
+- Audit: `product_info_drafts_imported` (who, partner, file name + SHA-256, counts; no text).
+
 ## 7a. Development and CI
 
 - One command brings a fresh machine to a running, migrated API against the fake

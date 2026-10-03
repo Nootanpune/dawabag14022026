@@ -12,6 +12,9 @@
 // approve it — a SECOND registered pharmacist must (the database refuses
 // an approval by an author too: product_info_four_eyes). A rejection goes back to the
 // authors ("Returned to you"); the previous approved text stays live throughout.
+// Sprint 45: a version imported from a drafts file (source 'imported_draft', written
+// outside Dawabag) starts with no authors; only a REGISTERED pharmacist may send it for
+// review (they become its author by checking it), and a second one approves (C-19).
 import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
@@ -24,7 +27,8 @@ const VERSION_COLS = `v.id, v.product_id, v.version, v.status, v.content, v.flag
   (SELECT full_name FROM user_profiles WHERE user_id = v.updated_by) AS updated_by_name,
   (SELECT full_name FROM user_profiles WHERE user_id = v.submitted_by) AS submitted_by_name,
   (SELECT full_name FROM user_profiles WHERE user_id = v.reviewed_by) AS reviewed_by_name,
-  (SELECT COALESCE(array_agg(up.full_name ORDER BY up.full_name), '{}') FROM user_profiles up WHERE up.user_id = ANY(v.author_ids)) AS author_names`;
+  (SELECT COALESCE(array_agg(up.full_name ORDER BY up.full_name), '{}') FROM user_profiles up WHERE up.user_id = ANY(v.author_ids)) AS author_names,
+  v.source, v.import_meta, v.import_partner_id, (SELECT name FROM vendors WHERE id = v.import_partner_id) AS import_partner_name`;
 
 /** Adds a person to a version's authors (no duplicates). */
 const ADD_AUTHOR = (param: string) => `author_ids = CASE WHEN ${param} = ANY(author_ids) THEN author_ids ELSE array_append(author_ids, ${param}) END`;
@@ -99,6 +103,15 @@ export async function saveInfoDraft(userId: string, productId: string, input: un
   });
 }
 
+export const IMPORTED_SEND_MESSAGE = 'An imported draft must be checked against the pack insert and sent by a registered pharmacist';
+
+/** Sprint 45: the sender of an imported draft is a pharmacist with a valid council registration (C-19, Sprint 39 gate). */
+async function assertRegisteredPharmacist(client: PoolClient, userId: string) {
+  const u = (await client.query(`SELECT role, pharmacist_reg_no FROM users WHERE id = $1`, [userId])).rows[0];
+  if (u?.role !== 'pharmacist_rx' || !u.pharmacist_reg_no) throw new AppError(IMPORTED_SEND_MESSAGE, 403);
+  await assertStaffRegistrationValid(client, userId, u.pharmacist_reg_no);
+}
+
 /** Send the draft to the pharmacist's review (C-19). */
 export async function submitInfo(userId: string, productId: string) {
   return withTransaction(async (client) => {
@@ -106,6 +119,7 @@ export async function submitInfo(userId: string, productId: string) {
     const open = await openVersion(client, productId);
     if (!open) throw new AppError('There is no draft to send for review', 409);
     if (open.status === 'pending_review') throw new AppError('This version is already waiting for review', 409);
+    if (open.source === 'imported_draft') await assertRegisteredPharmacist(client, userId);
     const problems = submitProblems(parseInfoContent(open.content));
     if (problems.length) throw new AppError(problems.join('. '), 400);
     await client.query(

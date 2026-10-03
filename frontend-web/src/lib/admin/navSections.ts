@@ -98,6 +98,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/staff/content-review', label: 'Product copy', icon: ClipboardCheck, roles: PHARMACIST_ROLES },
       // Sprint 36 — medicine information approved by a second pharmacist (four eyes, C-19)
       { href: '/staff/medicine-info-approvals', label: 'Medicine information to approve', icon: BookOpenCheck, roles: PHARMACIST_ROLES },
+      // Sprint 45 — drafts written outside Dawabag for one partner's products: checked by a pharmacist, approved by a second (C-19)
+      { href: '/staff/medicine-info-imported', label: 'Imported drafts to check', icon: BookOpenCheck, roles: PHARMACIST_ROLES },
+      { href: '/staff/medicine-info-imports', label: 'Import medicine information drafts', icon: FileSpreadsheet, roles: PHARMACIST_ROLES },
       // Sprint 29 — draft products from partner requests, completed and approved by the pharmacist
       { href: '/staff/new-products', label: 'New products to complete', icon: ListPlus, roles: PHARMACIST_ROLES },
       // Sprint 39 — online-sale status per product: a pharmacist allows (dated reference); pharmacists / admins stop (C-10)

@@ -124,6 +124,21 @@ export interface InfoVersion {
   /** Sprint 36 (four eyes): everyone who wrote or sent this version, and who decided it */
   author_names?: string[];
   reviewed_by_name?: string | null;
+  /** Sprint 45: 'imported_draft' = written outside Dawabag and imported for a pharmacist to check */
+  source?: 'editor' | 'imported_draft';
+  import_meta?: ImportMeta | null;
+  import_partner_name?: string | null;
+}
+
+/** Sprint 45: what the drafter said about an imported draft (staff only; never shown to buyers). */
+export interface ImportMeta {
+  assumed_composition: string;
+  composition_confidence: 'high' | 'medium' | 'low';
+  drafting_note: string | null;
+  item_name?: string;
+  pack?: string | null;
+  company?: string | null;
+  imported_at?: string;
 }
 
 export interface InfoEditorData {
