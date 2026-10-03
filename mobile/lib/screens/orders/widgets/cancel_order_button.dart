@@ -29,10 +29,7 @@ class _CancelOrderButtonState extends ConsumerState<CancelOrderButton> {
     bool isError = false;
     try {
       final data = await apiService.cancelOrder(widget.orderId, reason);
-      final refund = asInt(data['refund_paise']);
-      message = refund > 0
-          ? 'Order cancelled. Refund of ${formatPrice(refund)} started.'
-          : 'Order cancelled.';
+      message = cancelledMessage(data);
     } catch (e) {
       message = ApiService.errorMessage(e, fallback: 'Could not cancel this order');
       isError = true;
@@ -54,6 +51,18 @@ class _CancelOrderButtonState extends ConsumerState<CancelOrderButton> {
             : const Icon(Icons.cancel_outlined, size: 18),
         label: const Text('Cancel order'),
       );
+}
+
+/// What the buyer reads after POST /orders/:id/cancel. Sprint 39 (C-37): an
+/// amount only held for the pharmacist's check is released (`released_paise`),
+/// so it says "not charged", not "refund"; anything already taken is refunded.
+String cancelledMessage(Map<String, dynamic> data) {
+  final refund = asInt(data['refund_paise']);
+  final released = asInt(data['released_paise']);
+  final parts = <String>['Order cancelled.'];
+  if (released > 0) parts.add('You have not been charged — the ${formatPrice(released)} held is released.');
+  if (refund > 0) parts.add('Refund of ${formatPrice(refund)} started.');
+  return parts.join(' ');
 }
 
 class _ReasonDialog extends StatefulWidget {
@@ -88,7 +97,8 @@ class _ReasonDialogState extends State<_ReasonDialog> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Any amount you paid will be refunded to the way you paid.',
+            const Text('Any amount you paid will be refunded to the way you paid. An amount only held for '
+                'the pharmacist check is released — you are not charged.',
                 style: TextStyle(fontSize: 13)),
             const SizedBox(height: 12),
             TextField(

@@ -26,6 +26,8 @@ const kServerTypes = [
   'business_licence_expiring', 'adr_serious', 'security_incident', 'job_failed', 'recall_alert',
   'recall_alert_overdue', 'expiry_watch', 'eprescription_issued', 'out_for_delivery', 'courier_rx_delivered',
   'courier_rto', 'low_stock_digest', 'stock_feed_checks', 'stock_feed_stale',
+  // Sprint 39
+  'payment_authorised', 'payment_hold_expiring', 'pharmacist_registration_expiring', 'online_sale_status_changed',
 ];
 
 /// Records each call; answers 200.

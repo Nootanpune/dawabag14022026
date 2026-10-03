@@ -7,7 +7,9 @@ import '../../utils/prescription_describe.dart';
 /// The prescription chosen for an Rx order (Sprint 32, as the web since Sprint 26):
 /// chosen BEFORE the order is placed — one the buyer uploaded earlier, or a new
 /// upload (POST /prescriptions/upload without an order, then chosen) — and sent
-/// with the order right after it is placed (POST /prescriptions/:id/use-for-order).
+/// WITH the order as `prescription_id` (Sprint 39: POST /orders refuses a
+/// prescription order without one). [attachTo] is only for a placed order whose
+/// payment was refused with PRESCRIPTION_REQUIRED (POST /prescriptions/:id/use-for-order).
 /// The pharmacist checks it before dispatch (C-08). Files go only to the server's
 /// object store (C-41). Held in memory only; the server's order is the record.
 class CheckoutPrescription {

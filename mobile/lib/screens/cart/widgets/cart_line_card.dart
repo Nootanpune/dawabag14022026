@@ -66,7 +66,10 @@ class CartLineCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  issue ?? 'Currently unavailable',
+                  // Sprint 39 (C-10): say plainly why, and what to do
+                  line.notForOnlineSale
+                      ? '$issue. Dawabag cannot sell this product online right now — please remove it to order the rest.'
+                      : issue ?? 'Currently unavailable',
                   style: const TextStyle(fontSize: 12, color: AppTheme.errorRed),
                 ),
               ),
@@ -125,7 +128,8 @@ class CartLineCard extends StatelessWidget {
             ),
             _QtyButton(
               icon: Icons.add,
-              enabled: !busy && line.canIncrease && !rxPaused,
+              // Sprint 39: a product not sold online cannot be raised either (C-10)
+              enabled: !busy && line.canIncrease && !rxPaused && !line.notForOnlineSale,
               onTap: () => onQuantityChange(line.quantity + 1),
             ),
             const Spacer(),

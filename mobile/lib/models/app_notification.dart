@@ -12,6 +12,9 @@ class AppNotification {
   final bool isRead;
   final String? sentAt;
   final String? orderId;
+  /// Sprint 39: order_cancelled for an order whose payment was only held —
+  /// the hold is released and the buyer was not charged (C-37)
+  final bool notCharged;
 
   const AppNotification({
     required this.id,
@@ -21,7 +24,16 @@ class AppNotification {
     this.isRead = false,
     this.sentAt,
     this.orderId,
+    this.notCharged = false,
   });
+
+  /// The text to show: the server's, plus "not charged" when it did not say so.
+  String get displayBody {
+    if (!notCharged || body.toLowerCase().contains('not been charged') || body.toLowerCase().contains('not charged')) {
+      return body;
+    }
+    return body.isEmpty ? 'You have not been charged.' : '$body — you have not been charged';
+  }
 
   factory AppNotification.fromJson(Map<String, dynamic> j) {
     final data = asMap(j['data']);
@@ -34,6 +46,7 @@ class AppNotification {
       isRead: asBool(j['is_read']),
       sentAt: asString(j['sent_at']),
       orderId: (order == null || order.isEmpty) ? null : order,
+      notCharged: asBool(data['notCharged'] ?? data['not_charged']),
     );
   }
 }

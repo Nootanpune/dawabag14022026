@@ -14,6 +14,7 @@ import 'widgets/handover_code_card.dart';
 import 'widgets/order_aftercare_card.dart';
 import 'widgets/order_bill_card.dart';
 import 'widgets/order_items_card.dart';
+import 'widgets/order_payment_card.dart';
 import 'widgets/order_shipments_card.dart';
 import 'widgets/order_timeline_card.dart';
 import 'widgets/refill_order_card.dart';
@@ -81,6 +82,11 @@ class OrderDetailScreen extends ConsumerWidget {
       ],
       OrderBillCard(order: order),
       gap,
+      // Sprint 39: held until the pharmacist's check / charged / released (C-37)
+      if (OrderPaymentCard.showsFor(order)) ...[
+        OrderPaymentCard(order: order),
+        gap,
+      ],
       // Refunds, credit notes and returns (C-37)
       OrderAftercareCard(order: order),
       if (status == 'delivered') ...[

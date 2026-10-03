@@ -20,6 +20,8 @@ class PaymentStep extends StatelessWidget {
   /// e.g. "photo uploaded 02 Oct 2026, 9:56 am"; null when no prescription is needed
   final String? prescriptionLabel;
   final String? notice;
+  /// Sprint 39 (C-37): the amount is only held until the pharmacist's check
+  final String? chargeNote;
 
   const PaymentStep({
     super.key,
@@ -29,6 +31,7 @@ class PaymentStep extends StatelessWidget {
     this.onDemoPay,
     this.prescriptionLabel,
     this.notice,
+    this.chargeNote,
   });
 
   @override
@@ -44,7 +47,7 @@ class PaymentStep extends StatelessWidget {
               children: [
                 SummaryRow('Order', orderNumber),
                 const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
-                SummaryRow('Total payable', formatPrice(totalPaise),
+                SummaryRow(chargeNote != null ? 'Amount to authorise' : 'Total payable', formatPrice(totalPaise),
                     bold: true, valueColor: AppTheme.brandTeal),
                 const SizedBox(height: 6),
                 Text('Includes all taxes (GST) and delivery. No cash on delivery.',
@@ -53,6 +56,10 @@ class PaymentStep extends StatelessWidget {
             ),
           ),
         ),
+        if (chargeNote != null) ...[
+          const SizedBox(height: 12),
+          ChargeAfterCheckNote(note: chargeNote!),
+        ],
         if (prescriptionLabel != null) ...[
           const SizedBox(height: 12),
           RxAttachedNote(label: prescriptionLabel!),

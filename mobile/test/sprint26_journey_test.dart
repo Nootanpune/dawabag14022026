@@ -57,7 +57,7 @@ void main() {
         expect(find.text(m), findsOneWidget);
       }
       expect(find.textContaining('Prescription (photo uploaded 02 Oct 2026, 9:56 am) ✓'), findsOneWidget);
-      expect(find.textContaining('get a full refund'), findsOneWidget);
+      expect(find.textContaining('you are not charged'), findsOneWidget);
     });
     testWidgets('no way to pay online: a plain sentence', (tester) async {
       await tester.pumpWidget(_wrap(const PaymentStep(orderNumber: 'DWB-2', totalPaise: 100, options: PaymentOptions())));

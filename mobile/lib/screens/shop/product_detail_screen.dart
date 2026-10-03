@@ -8,6 +8,7 @@ import '../../widgets/error_retry_view.dart';
 import '../../widgets/product_image.dart';
 import '../../widgets/trade_price_banner.dart';
 import '../../providers/product_page_providers.dart';
+import 'widgets/product_not_online_view.dart';
 import 'widgets/product_rx_pause_banner.dart';
 import 'widgets/delivery_info_card.dart';
 import 'widgets/medicine_info_view.dart';
@@ -36,10 +37,13 @@ class ProductDetailScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Product details')),
       body: productAsync.when(
         loading: () => const Center(child: CircularProgressIndicator(color: AppTheme.brandTeal)),
-        error: (e, _) => ErrorRetryView(
-          message: ApiService.errorMessage(e, fallback: 'Could not load this product'),
-          onRetry: () => ref.invalidate(productDetailProvider(productId)),
-        ),
+        // Sprint 39: 404 = not offered online (C-10) — a plain page, not a retry
+        error: (e, _) => ProductNotOnlineView.matches(e)
+            ? const ProductNotOnlineView()
+            : ErrorRetryView(
+                message: ApiService.errorMessage(e, fallback: 'Could not load this product'),
+                onRetry: () => ref.invalidate(productDetailProvider(productId)),
+              ),
         data: (product) => _Body(product: product),
       ),
       bottomNavigationBar: productAsync.maybeWhen(

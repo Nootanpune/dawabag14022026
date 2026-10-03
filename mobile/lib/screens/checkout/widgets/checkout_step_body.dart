@@ -42,6 +42,11 @@ class CheckoutStepBody extends StatelessWidget {
   final bool paidDemo;
   /// how the demo payment was made, e.g. "HDFC netbanking (demo)"
   final String? paidBy;
+  /// Sprint 39: "You'll only be charged after our pharmacist checks your
+  /// prescription." while the amount is only held until that check; else null
+  final String? chargeNote;
+  /// The payment came back authorised (held), not captured (C-37)
+  final bool paidAuthorised;
 
   const CheckoutStepBody({
     super.key,
@@ -71,6 +76,8 @@ class CheckoutStepBody extends StatelessWidget {
     this.paymentNotice,
     this.paidDemo = false,
     this.paidBy,
+    this.chargeNote,
+    this.paidAuthorised = false,
   });
 
   Widget _prescriptionStep({String? error}) => PrescriptionStep(
@@ -93,7 +100,7 @@ class CheckoutStepBody extends StatelessWidget {
             selectedId: selectedAddressId,
             onSelect: onSelectAddress,
           ),
-        CheckoutStep.prescription => _prescriptionStep(),
+        CheckoutStep.prescription => _prescriptionStep(error: rxError),
         CheckoutStep.review => ReviewStep(
             summary: summary,
             isPractitioner: isPractitioner,
@@ -102,6 +109,7 @@ class CheckoutStepBody extends StatelessWidget {
             orderPlaced: order != null,
             rxLabel: prescriptionLabel,
             onChangeRx: onChangeRx,
+            chargeNote: chargeNote,
           ),
         CheckoutStep.rxFix => _prescriptionStep(error: rxError),
         CheckoutStep.payment => PaymentStep(
@@ -111,6 +119,7 @@ class CheckoutStepBody extends StatelessWidget {
             onDemoPay: onDemoPay,
             prescriptionLabel: prescriptionLabel,
             notice: paymentNotice,
+            chargeNote: chargeNote,
           ),
         CheckoutStep.confirmed => ConfirmedStep(
             orderNumber: order?.orderNumber ?? '',
@@ -118,6 +127,9 @@ class CheckoutStepBody extends StatelessWidget {
             demo: paidDemo,
             paidBy: paidBy,
             prescriptionLabel: prescriptionLabel,
+            totalPaise: order?.totalPaise ?? 0,
+            authorised: paidAuthorised,
+            chargeNote: chargeNote,
           ),
       };
 }

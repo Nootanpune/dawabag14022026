@@ -59,65 +59,34 @@ void main() {
     });
   });
 
-  group('placing the order (same calls, same order as the web)', () {
+  group('placing the order (Sprint 39: the prescription goes WITH the order)', () {
     const rxOrder = PlacedOrder(id: 'o1', orderNumber: 'DWB-1', totalPaise: 10000, requiresPrescription: true);
-    const plainOrder = PlacedOrder(id: 'o2', orderNumber: 'DWB-2', totalPaise: 5000);
 
-    test('POST /orders first, then use-for-order with the chosen prescription → payment', () async {
+    test('a payment refused for want of a prescription: send one with the placed order, then pay', () async {
       final calls = <String>[];
-      final out = await placeOrderThenAttachRx(
-        place: () async {
-          calls.add('POST /orders');
-          return rxOrder;
-        },
-        attach: (orderId) async => calls.add('POST /prescriptions/rx1/use-for-order $orderId'),
-        rxChosen: true,
-        errorText: (e) => '$e',
-      );
-      expect(calls, ['POST /orders', 'POST /prescriptions/rx1/use-for-order o1']);
+      final out = await attachRxToPlacedOrder(rxOrder,
+          attach: (orderId) async => calls.add('POST /prescriptions/rx1/use-for-order $orderId'),
+          rxChosen: true,
+          errorText: (e) => '$e');
+      expect(calls, ['POST /prescriptions/rx1/use-for-order o1']);
       expect(out.next, CheckoutStep.payment);
       expect(out.rxError, isNull);
     });
 
     test('a refused prescription keeps the order and asks for another one', () async {
-      final out = await placeOrderThenAttachRx(
-        place: () async => rxOrder,
-        attach: (_) async => throw 'This prescription has expired.',
-        rxChosen: true,
-        errorText: (e) => '$e',
-      );
+      final out = await attachRxToPlacedOrder(rxOrder,
+          attach: (_) async => throw 'This prescription has expired.', rxChosen: true, errorText: (e) => '$e');
       expect(out.order.orderNumber, 'DWB-1');
       expect(out.next, CheckoutStep.rxFix);
       expect(out.rxError, 'This prescription has expired. Please choose or upload another one for order DWB-1.');
-
-      final retry = await attachRxToPlacedOrder(out.order, attach: (_) async {}, rxChosen: true, errorText: (e) => '$e');
-      expect(retry.next, CheckoutStep.payment);
     });
 
-    test('no prescription needed: no prescription call', () async {
+    test('nothing chosen yet: stays on the prescription step', () async {
       var attached = false;
-      final out = await placeOrderThenAttachRx(
-        place: () async => plainOrder,
-        attach: (_) async => attached = true,
-        rxChosen: false,
-        errorText: (e) => '$e',
-      );
+      final out = await attachRxToPlacedOrder(rxOrder,
+          attach: (_) async => attached = true, rxChosen: false, errorText: (e) => '$e');
       expect(attached, isFalse);
-      expect(out.next, CheckoutStep.payment);
-    });
-
-    test('a failed POST /orders sends nothing else', () async {
-      var attached = false;
-      await expectLater(
-        placeOrderThenAttachRx(
-          place: () async => throw 'out of stock',
-          attach: (_) async => attached = true,
-          rxChosen: true,
-          errorText: (e) => '$e',
-        ),
-        throwsA('out of stock'),
-      );
-      expect(attached, isFalse);
+      expect(out.next, CheckoutStep.rxFix);
     });
   });
 
@@ -151,7 +120,7 @@ void main() {
       // C-08 / C-37: plain words on what happens if it is not accepted
       expect(find.byType(RxPolicyNote), findsOneWidget);
       expect(find.textContaining('we tell you why'), findsOneWidget);
-      expect(find.textContaining('get a full refund'), findsOneWidget);
+      expect(find.textContaining('you are not charged'), findsOneWidget);
     });
 
     testWidgets('no prescriptions yet: upload yours; more than four: Show all', (tester) async {

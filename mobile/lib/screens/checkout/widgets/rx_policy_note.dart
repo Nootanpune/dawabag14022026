@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// What happens to a prescription order — the existing process, not a new
-/// policy: the pharmacist checks it before dispatch (C-08); if it is not
-/// accepted the buyer is told why and can send a new one, or cancel for a full
-/// refund to the way they paid (cancellation.service, C-37).
+import '../../../config/theme.dart';
+
+/// What happens to a prescription order: the pharmacist checks it before
+/// dispatch (C-08); if it is not accepted the buyer is told why and can send a
+/// new one, or cancel. Sprint 39 (C-37): the payment is only held until the
+/// check, so a cancelled or refused order is never charged.
 class RxPolicyNote extends StatelessWidget {
   const RxPolicyNote({super.key});
 
@@ -14,10 +16,38 @@ class RxPolicyNote extends StatelessWidget {
       decoration: BoxDecoration(color: const Color(0xFFE6F1FB), borderRadius: BorderRadius.circular(10)),
       child: const Text(
         'Our pharmacist checks your prescription before anything is dispatched. If it cannot be accepted, '
-        'we tell you why. You can then send a new prescription, or cancel the order and get a full refund '
-        'to the way you paid.',
+        'we tell you why. You can then send a new prescription, or cancel the order — the amount held is '
+        'released and you are not charged.',
         style: TextStyle(fontSize: 12, color: Color(0xFF0C447C)),
       ),
+    );
+  }
+}
+
+/// Sprint 39 (C-37): "You'll only be charged after our pharmacist checks your
+/// prescription." — the server's `charge_note` when it sent one.
+class ChargeAfterCheckNote extends StatelessWidget {
+  final String note;
+  const ChargeAfterCheckNote({super.key, required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('charge-after-check-note'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.brandTeal50,
+        border: Border.all(color: AppTheme.brandTeal100),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.verified_user_outlined, color: AppTheme.brandTeal700, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(note,
+              style: const TextStyle(fontSize: 13, color: AppTheme.brandTeal700, fontWeight: FontWeight.w600)),
+        ),
+      ]),
     );
   }
 }

@@ -1,5 +1,6 @@
 import '../models/checkout_summary.dart';
 import '../models/json_utils.dart';
+import '../models/payment_result.dart';
 import 'api_service.dart';
 import 'api_utils.dart';
 import '../utils/prescription_status.dart';
@@ -45,6 +46,7 @@ extension CheckoutApi on ApiService {
     String? couponCode,
     required String pincode,
     bool? practitionerDeclaration,
+    String? prescriptionId,
   }) =>
       {
         'address_id': addressId,
@@ -52,6 +54,8 @@ extension CheckoutApi on ApiService {
         if (couponCode != null) 'coupon_code': couponCode,
         'pincode': pincode,
         if (practitionerDeclaration != null) 'practitioner_declaration': practitionerDeclaration,
+        // Sprint 39: the prescription goes WITH the order, chosen before payment (C-08)
+        if (prescriptionId != null) 'prescription_id': prescriptionId,
       };
 
   /// POST /orders/preview (same body as POST /orders) → the checkout summary
@@ -62,7 +66,9 @@ extension CheckoutApi on ApiService {
   }
 
   /// POST /orders [body] → the `order` object (id, order_number,
-  /// total_paise, requires_prescription, shipments).
+  /// total_paise, requires_prescription, shipments; Sprint 39: prescription,
+  /// capture). A prescription order without `prescription_id` is refused
+  /// (422 PRESCRIPTION_REQUIRED) and nothing is placed.
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> body) async {
     final res = await dio.post('/orders', data: body);
     final order = apiData(res)['order'];
@@ -70,24 +76,29 @@ extension CheckoutApi on ApiService {
   }
 
   /// POST /payments/create-order { order_id } → razorpay_key_id, amount,
-  /// razorpay_order_id.
+  /// razorpay_order_id; Sprint 39: capture ('now' | 'after_pharmacist_check')
+  /// and charge_note. The server creates the Razorpay order with the capture
+  /// setting, so the app passes nothing about capture. 422
+  /// PRESCRIPTION_REQUIRED while the order has no prescription with it.
   Future<Map<String, dynamic>> createPaymentOrder(String orderId) async {
     final res = await dio.post('/payments/create-order', data: {'order_id': orderId});
     return Map<String, dynamic>.from(res.data['data'] as Map);
   }
 
-  /// POST /payments/verify — the server checks the Razorpay signature.
-  Future<void> verifyPayment({
+  /// POST /payments/verify — the server checks the Razorpay signature. Sprint 39:
+  /// `payment_status` 'authorized' = held until the pharmacist's check (C-37).
+  Future<PaymentResult> verifyPayment({
     required String? razorpayOrderId,
     required String? razorpayPaymentId,
     required String? razorpaySignature,
     required String? orderId,
   }) async {
-    await dio.post('/payments/verify', data: {
+    final res = await dio.post('/payments/verify', data: {
       'razorpay_order_id': razorpayOrderId,
       'razorpay_payment_id': razorpayPaymentId,
       'razorpay_signature': razorpaySignature,
       'order_id': orderId,
     });
+    return PaymentResult.fromVerify(apiData(res));
   }
 }

@@ -50,7 +50,10 @@ const Map<String, NotificationKind> kNotificationKinds = {
   'out_for_delivery': NotificationKind(Icons.delivery_dining_outlined, 'Out for delivery', NotificationTarget.order),
   'delivered': NotificationKind(Icons.check_circle_outline, 'Delivered', NotificationTarget.order),
   'order_status': NotificationKind(Icons.receipt_long_outlined, 'Order update', NotificationTarget.order),
+  // may carry notCharged (Sprint 39): an amount only held was released, never taken (C-37)
   'order_cancelled': NotificationKind(Icons.cancel_outlined, 'Order cancelled', NotificationTarget.order),
+  // Sprint 39: a prescription order's payment is held until the pharmacist's check (C-08, C-37)
+  'payment_authorised': NotificationKind(Icons.verified_user_outlined, 'Payment authorised', NotificationTarget.order),
   'credit_due': NotificationKind(Icons.account_balance_wallet_outlined, 'Payment due', NotificationTarget.order),
   // C-28: a recalled batch the buyer received
   'batch_recall': NotificationKind(Icons.warning_amber_outlined, 'Recall notice', NotificationTarget.order, attention: true),
@@ -90,6 +93,13 @@ const Map<String, NotificationKind> kNotificationKinds = {
   // Sprint 37: partner live stock feed (managed on the website)
   'stock_feed_checks': NotificationKind(Icons.priority_high, 'Stock items to check', NotificationTarget.staff),
   'stock_feed_stale': NotificationKind(Icons.sync_problem_outlined, 'Stock feed stale', NotificationTarget.staff),
+  // Sprint 39: staff and partners — handled on the website
+  'payment_hold_expiring': NotificationKind(Icons.hourglass_bottom_outlined, 'Prescription order waiting',
+      NotificationTarget.staff),
+  'pharmacist_registration_expiring': NotificationKind(Icons.badge_outlined, 'Pharmacist registration renewal due',
+      NotificationTarget.staff),
+  'online_sale_status_changed': NotificationKind(Icons.storefront_outlined, 'Product switched off for online sale',
+      NotificationTarget.staff),
 };
 
 NotificationKind notificationKind(String? type) => kNotificationKinds[type] ?? kUnknownNotification;

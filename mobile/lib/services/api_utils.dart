@@ -109,3 +109,24 @@ const kRxSalesPaused = 'RX_SALES_PAUSED';
 /// True when the server refused the call because prescription sales are paused.
 bool isRxSalesPaused(Object error) =>
     error is DioException && error.response?.statusCode == 409 && apiErrorCode(error) == kRxSalesPaused;
+
+/// Code the server sends (422) when an order with prescription medicines has no
+/// prescription with it (Sprint 39, C-08): POST /orders without `prescription_id`,
+/// and /payments/create-order or /payments/demo for an order still without one.
+/// The envelope's `message` is ready for the buyer and is shown as is.
+const kPrescriptionRequired = 'PRESCRIPTION_REQUIRED';
+
+/// True when the server refused the call until a prescription goes with the order.
+bool isPrescriptionRequired(Object error) =>
+    error is DioException && error.response?.statusCode == 422 && apiErrorCode(error) == kPrescriptionRequired;
+
+/// Code the server sends (403) for a product a pharmacist has not allowed for
+/// online sale (Sprint 39, C-10): adding it to the cart, or ordering it.
+const kNotForOnlineSale = 'NOT_FOR_ONLINE_SALE';
+
+/// True when the server refused a product that is not sold online.
+bool isNotForOnlineSale(Object error) =>
+    error is DioException && error.response?.statusCode == 403 && apiErrorCode(error) == kNotForOnlineSale;
+
+/// The HTTP status of an API error, if any.
+int? apiErrorStatus(Object error) => error is DioException ? error.response?.statusCode : null;

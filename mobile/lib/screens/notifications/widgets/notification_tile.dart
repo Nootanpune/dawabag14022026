@@ -39,9 +39,9 @@ class NotificationTile extends StatelessWidget {
                 children: [
                   Text(title,
                       style: TextStyle(fontSize: 14, fontWeight: n.isRead ? FontWeight.w500 : FontWeight.w700)),
-                  if (n.body.isNotEmpty) ...[
+                  if (n.displayBody.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    Text(n.body, style: TextStyle(fontSize: 13, height: 1.3, color: AppTheme.muted(context))),
+                    Text(n.displayBody, style: TextStyle(fontSize: 13, height: 1.3, color: AppTheme.muted(context))),
                   ],
                   if (n.sentAt != null) ...[
                     const SizedBox(height: 4),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../config/theme.dart';
 import '../../../models/checkout_summary.dart';
+import '../../../utils/payment_hold.dart';
 import 'review_charges_card.dart';
 import 'review_shipment_card.dart';
 import 'rx_policy_note.dart';
@@ -20,6 +21,8 @@ class ReviewStep extends StatelessWidget {
   final String? rxLabel;
   /// Back to the prescription step (only before the order is placed)
   final VoidCallback? onChangeRx;
+  /// Sprint 39: shown when the amount is only held until the pharmacist's check
+  final String? chargeNote;
 
   const ReviewStep({
     super.key,
@@ -30,6 +33,7 @@ class ReviewStep extends StatelessWidget {
     required this.orderPlaced,
     this.rxLabel,
     this.onChangeRx,
+    this.chargeNote,
   });
 
   @override
@@ -56,6 +60,11 @@ class ReviewStep extends StatelessWidget {
           RxAttachedNote(label: rxLabel!, onChange: orderPlaced ? null : onChangeRx),
           const SizedBox(height: 8),
           const RxPolicyNote(),
+          const SizedBox(height: 12),
+        ],
+        // Sprint 39 (C-37): the preview says the payment waits for the pharmacist's check
+        if (chargeNote != null || s.chargeAfterCheck) ...[
+          ChargeAfterCheckNote(note: chargeNoteOr(chargeNote)),
           const SizedBox(height: 12),
         ],
         ReviewChargesCard(summary: s),

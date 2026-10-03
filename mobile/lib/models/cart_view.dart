@@ -61,6 +61,10 @@ class CartLine {
         requiresPrescription: j['requires_prescription'] == true,
       );
 
+  /// Sprint 39 (C-10): a pharmacist has not allowed this product for online
+  /// sale (the server's line issue). It blocks checkout until removed.
+  bool get notForOnlineSale => issue == kNotForOnlineSaleIssue;
+
   /// Whether the + button may be offered (the server still has the final say).
   bool get canIncrease {
     final max = maxQty;
@@ -160,6 +164,31 @@ class CartView {
       '${rxSalesPaused ?? ''} Please remove ${pausedItems.map((l) => l.name).join(', ')} from your cart to order the rest.'
           .trim();
 
+  /// Sprint 39 (C-10): lines a pharmacist has not allowed for online sale.
+  List<CartLine> get notForSaleItems => items.where((l) => l.notForOnlineSale).toList();
+
+  /// Lines that hold checkout until they are removed: paused prescription lines
+  /// (Sprint 38) and products not sold online (Sprint 39), each line once.
+  List<CartLine> get blockedItems {
+    final seen = <String>{};
+    return [...pausedItems, ...notForSaleItems].where((l) => seen.add(l.productId)).toList();
+  }
+
+  bool get hasBlockedItems => blockedItems.isNotEmpty;
+
+  /// What the buyer reads when checkout is blocked (paused lines, products not sold online).
+  String get checkoutBlockedMessage {
+    final blocked = blockedItems;
+    if (blocked.isEmpty) return '';
+    if (notForSaleItems.isEmpty) return pausedCheckoutMessage;
+    final off = notForSaleItems.map((l) => l.name).toList();
+    final reasons = [
+      if (hasPausedItems && rxSalesPaused != null) rxSalesPaused!,
+      '${off.join(', ')} ${off.length == 1 ? 'is' : 'are'} not available for online sale.',
+    ];
+    return '${reasons.join(' ')} Please remove ${blocked.map((l) => l.name).join(', ')} from your cart to order the rest.';
+  }
+
   bool get hasIssues => items.any((l) => !l.available || l.issue != null);
 
   CartLine? lineFor(String productId) {
@@ -194,6 +223,10 @@ class CartView {
     );
   }
 }
+
+/// The server's cart line issue for a product not allowed for online sale
+/// (backend cart.service, Sprint 39).
+const kNotForOnlineSaleIssue = 'Not available for online sale';
 
 int _int(Object? v) {
   if (v is int) return v;

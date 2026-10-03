@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../orders/widgets/order_shipments_card.dart';
+import '../../../utils/formatters.dart';
+import '../../../utils/payment_hold.dart';
 import 'rx_policy_note.dart';
 
 class ConfirmedStep extends StatelessWidget {
@@ -21,6 +23,12 @@ class ConfirmedStep extends StatelessWidget {
   /// "photo uploaded 02 Oct 2026, 9:56 am"; null when none was needed (C-08)
   final String? prescriptionLabel;
 
+  /// Sprint 39 (C-37): the payment came back authorised — the amount is held,
+  /// not charged, until our pharmacist checks the prescription
+  final bool authorised;
+  final int totalPaise;
+  final String? chargeNote;
+
   const ConfirmedStep({
     super.key,
     required this.orderNumber,
@@ -28,6 +36,9 @@ class ConfirmedStep extends StatelessWidget {
     this.demo = false,
     this.paidBy,
     this.prescriptionLabel,
+    this.authorised = false,
+    this.totalPaise = 0,
+    this.chargeNote,
   });
 
   @override
@@ -42,13 +53,31 @@ class ConfirmedStep extends StatelessWidget {
           child: const Icon(Icons.check_circle, color: Colors.green, size: 40),
         ),
         const SizedBox(height: 20),
-        Text(prescriptionLabel != null ? 'Order placed and paid' : 'Order confirmed!',
+        Text(
+            authorised
+                ? 'Order placed — payment authorised'
+                : prescriptionLabel != null
+                    ? 'Order placed and paid'
+                    : 'Order confirmed!',
+            textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
+        if (authorised) ...[
+          Text('Amount held: ${formatPrice(totalPaise)} — not charged yet',
+              key: const ValueKey('confirmed-amount-held'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ChargeAfterCheckNote(
+            note: '${chargeNoteOr(chargeNote)} The amount stays held on your card or UPI until then. '
+                'If your order cannot be supplied, the hold is released and you are not charged.',
+          ),
+          const SizedBox(height: 8),
+        ],
         if (paidBy != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: Text('Paid by: $paidBy', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            child: Text('${authorised ? 'Authorised with' : 'Paid by'}: $paidBy', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           ),
         if (demo)
           Container(

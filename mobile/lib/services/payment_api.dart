@@ -1,3 +1,4 @@
+import '../models/payment_result.dart';
 import 'api_service.dart';
 import 'api_utils.dart';
 
@@ -45,16 +46,18 @@ extension PaymentApi on ApiService {
   }
 
   /// POST /payments/demo — trial only; the server records it through the same
-  /// path as a captured Razorpay payment. Returns whether it was paid.
+  /// path as a Razorpay payment. Sprint 39: a prescription order is only
+  /// authorised (simulated) until the pharmacist's check — `payment_status`
+  /// 'authorized' — and 422 PRESCRIPTION_REQUIRED while it has no prescription.
   /// [provider]: the bank or wallet chosen (never card data); kept in the audit only.
-  Future<bool> payOrderDemo(String orderId, {required String method, String? provider, bool fail = false}) async {
+  Future<PaymentResult> payOrderDemo(String orderId, {required String method, String? provider, bool fail = false}) async {
     final res = await dio.post('/payments/demo', data: {
       'order_id': orderId,
       'method': method,
       if (provider != null) 'provider': provider,
       'outcome': fail ? 'failure' : 'success',
     });
-    return apiData(res)['paid'] == true;
+    return PaymentResult.fromDemo(apiData(res));
   }
 
   /// POST /consultations/:id/pay/demo — trial only.

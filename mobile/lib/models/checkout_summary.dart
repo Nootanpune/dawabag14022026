@@ -1,3 +1,4 @@
+import '../utils/payment_hold.dart';
 import 'json_utils.dart';
 import 'policy.dart';
 
@@ -11,6 +12,10 @@ class CheckoutSummary {
   final String? paymentTerms;
   final String? returnsNote;
   final List<PolicyRef> policies;
+  /// Sprint 39: the order needs a prescription with it before payment (C-08)
+  final bool prescriptionRequired;
+  /// Sprint 39: 'now' | 'after_pharmacist_check' (held until the check, C-37)
+  final String capture;
 
   const CheckoutSummary({
     this.shipments = const [],
@@ -18,7 +23,12 @@ class CheckoutSummary {
     this.paymentTerms,
     this.returnsNote,
     this.policies = const [],
+    this.prescriptionRequired = false,
+    this.capture = kCaptureNow,
   });
+
+  /// The payment is only authorised now and charged after the pharmacist's check.
+  bool get chargeAfterCheck => capturesAfterCheck(capture);
 
   factory CheckoutSummary.fromJson(Map<String, dynamic> json) => CheckoutSummary(
         shipments: asMapList(json['shipments']).map(PreviewShipment.fromJson).toList(),
@@ -26,6 +36,8 @@ class CheckoutSummary {
         paymentTerms: asString(json['payment_terms']),
         returnsNote: asString(json['returns_note']),
         policies: PolicyRef.listFrom(json['policies']),
+        prescriptionRequired: json['prescription_required'] == true,
+        capture: asString(json['capture']) ?? kCaptureNow,
       );
 }
 

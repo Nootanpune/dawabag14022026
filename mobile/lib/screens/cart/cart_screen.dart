@@ -96,8 +96,9 @@ class CartScreen extends ConsumerWidget {
     }
 
     final busy = cartState.isUpdating;
-    // Sprint 38: the server refuses checkout while paused prescription lines are in the cart
-    final canCheckout = !busy && cart.orderableItems.isNotEmpty && !cart.hasPausedItems;
+    // Sprint 38: the server refuses checkout while paused prescription lines are in the cart;
+    // Sprint 39: so too while a product not allowed for online sale is (C-10)
+    final canCheckout = !busy && cart.orderableItems.isNotEmpty && !cart.hasBlockedItems;
 
     return Scaffold(
       appBar: AppBar(
@@ -144,10 +145,10 @@ class CartScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             CartSummaryCard(cart: cart),
-            if (cart.hasPausedItems) ...[
+            if (cart.hasBlockedItems) ...[
               const SizedBox(height: 8),
               Text(
-                cart.pausedCheckoutMessage,
+                cart.checkoutBlockedMessage,
                 key: const ValueKey('cart-paused-checkout'),
                 style: const TextStyle(fontSize: 12, color: AppTheme.errorRed),
               ),
