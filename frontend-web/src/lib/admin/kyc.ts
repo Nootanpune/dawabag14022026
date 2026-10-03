@@ -151,6 +151,9 @@ export interface NmcDecision {
   verified: boolean;
   doctor_name_as_per_register?: string;
   qualification?: string;
+  /** Sprint 44: needed to verify — until when the registration is valid (FDA Pune circular 16/2026) */
+  valid_till?: string;
+  practitioner_kind?: 'doctor' | 'institution';
   rejection_reason?: string;
   notes?: string;
 }

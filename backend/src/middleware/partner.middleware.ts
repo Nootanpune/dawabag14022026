@@ -26,7 +26,7 @@ export async function requirePartner(req: Request, _res: Response, next: NextFun
     if (!v) throw new AppError('This login is not linked to a partner', 403);
     req.partner = { vendorId: v.id, name: v.name, approvalStatus: v.approval_status, isActive: v.is_active };
     // A suspended or unapproved partner may only look at its account, settlements and returns
-    const readOnly = req.method === 'GET' && /^\/(me|settlements|returns|h1-register)(\/|$)/.test(req.path);   // Sprint 38: its H1 register stays readable (C-09)
+    const readOnly = req.method === 'GET' && /^\/(me|settlements|returns|h1-register|practitioner-sales)(\/|$)/.test(req.path);   // Sprint 38: its H1 register stays readable (C-09)
     if ((v.approval_status !== 'approved' || !v.is_active) && !readOnly) {
       throw new AppError('Your partner account is not active; contact Dawabag', 403);
     }

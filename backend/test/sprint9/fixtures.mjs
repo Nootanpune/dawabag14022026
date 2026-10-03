@@ -1,4 +1,5 @@
 // Sprint 9 test data: mobiles 90000009xx, SKU prefix S9-, vendors 'S9 %', PIN codes 499991 (Karnataka buyer), 499992 (premises)
+import { releaseInDb } from '../support/pharmacistCheck.mjs';
 import { call, check, login, q, signUp } from '../sprint5/lib.mjs';
 
 const consent = { accept_privacy_notice: true, age_confirmed: true };
@@ -91,7 +92,10 @@ export async function order({ t, P, addr }, who = 'trader', qty = 2) {
       [o.id, `order_S9_${pay}_${Date.now()}`, `pay_S9_${pay}_${Date.now()}`, o.total_paise]);
     await q(`UPDATE orders SET status = 'packing' WHERE id = $1`, [o.id]);
   }
-  const s = (await q(`SELECT id, invoice_number FROM order_shipments WHERE order_id = $1`, [o.id]))[0];
+  // Sprint 44: the invoice (number, date) is issued at the pharmacist's release — released here (stand-in)
+  const id = (await q(`SELECT id FROM order_shipments WHERE order_id = $1`, [o.id]))[0].id;
+  await releaseInDb(q, id);
+  const s = (await q(`SELECT id, invoice_number FROM order_shipments WHERE id = $1`, [id]))[0];
   return { order: o, shipmentId: s.id, invoiceNumber: s.invoice_number };
 }
 

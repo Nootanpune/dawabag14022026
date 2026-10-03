@@ -2,6 +2,8 @@
 // Buyers may cancel until packing starts; staff until dispatch. Cancelling
 // releases reserved stock and prescription quantities, issues a credit note
 // against each seller's invoice, and refunds what was paid (refund.service).
+// Sprint 44: a shipment not yet invoiced (before the pharmacist's approval) gets no
+// credit note — there is no invoice to reverse.
 import { withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
@@ -10,7 +12,7 @@ import { queueNotification } from './notification.service';
 import { recordRefund, refundableAmount, sendGatewayRefunds } from './refund.service';
 import { releaseOrderReservations } from './shipment.service';
 import { releaseHeldPaymentTx } from './payments/rxHold/hold.service';
-import { closeEditRefundsTx } from './orderEdit/editRefunds';
+import { closeEditExtrasTx, closeEditRefundsTx } from './orderEdit/editRefunds';
 
 const OPEN = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing', 'packed'];
 
@@ -59,6 +61,8 @@ export async function cancelOrder(orderId: string, actor: { id: string | null; s
     const released = await releaseHeldPaymentTx(client, orderId, reason, actor.id);
     // Sprint 43: changes made while the payment was only held need no refund — nothing is charged
     if (released > 0) await closeEditRefundsTx(client, orderId);
+    // Sprint 44: a difference still to pay for a change is not owed any more
+    await closeEditExtrasTx(client, orderId);
     await writeAuditTx(client, { userId: o.user_id, action: 'order_cancelled', performedBy: actor.id,
       newValue: { order_id: orderId, by_staff: actor.staff, refund_paise: refundable, released_paise: released, by_system: actor.id === null,
         credit_notes: creditNotes.filter(Boolean).map((c: any) => c.credit_note_number) }, notes: reason });

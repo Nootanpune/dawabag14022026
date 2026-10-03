@@ -57,6 +57,7 @@ import purchasingRoutes from './routes/purchasing.routes';
 import stockControlRoutes from './routes/stockControl.routes';
 import courierRoutes from './routes/courier.routes';
 import einvoiceRoutes from './routes/einvoice.routes';
+import { practitionerSalesRouter, writtenOrderRouter } from './routes/practitionerSales.routes';
 // Sprint 33: medicine information, substitutes, delivery date, trust pages, reminders, health profile
 import medicineRoutes from './routes/medicines.routes';
 import infoPageRoutes from './routes/infoPages.routes';
@@ -136,7 +137,7 @@ const uploadLimiter = rateLimit({
   message: limitMessage('Too many uploads. Please try again in a few minutes.'),
 });
 const UPLOAD_PATHS = [
-  '/api/v1/prescriptions/upload', '/api/v1/catalogue/import', '/api/v1/kyc/documents',
+  '/api/v1/prescriptions/upload', '/api/v1/catalogue/import', '/api/v1/kyc/documents', '/api/v1/written-orders/upload',
   /^\/api\/v1\/partner\/stock-imports\/?$/,   // the file itself, not the steps after it
   /^\/api\/v1\/partner-feed\//,               // Sprint 36: the billing software's key path (per address; per key in the route)
   /^\/api\/v1\/(users\/me|partner)\/licences\/[^/]+\/document$/,
@@ -233,6 +234,8 @@ app.use(`${api}/partner-provenance`, provenanceRoutes);  // Sprint 39: who suppl
 app.use(`${api}/gdp`, gdpRoutes);                        // Sprint 40: GDP records per batch, excursion holds (C-25)
 app.use(`${api}/recall-drills`, recallDrillRoutes);      // Sprint 40: mock recall drills (C-28)
 app.use(`${api}/self-inspections`, selfInspectionRoutes); // Sprint 40: self-inspection register (C-34)
+app.use(`${api}/practitioner-sales`, practitionerSalesRouter); // Sprint 44: sales to doctors / institutions (r.65(9)(b))
+app.use(`${api}/written-orders`, writtenOrderRouter);           // Sprint 44: signed written orders of doctors / institutions
 
 // ─── Error Handling ─────────────────────────────────────────────────────────
 app.use(notFound);

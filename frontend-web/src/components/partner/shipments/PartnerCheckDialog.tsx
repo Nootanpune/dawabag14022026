@@ -8,6 +8,7 @@ import type { PartnerShipment } from '@/lib/partner/types';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import Modal from '@/components/admin/Modal';
 import ShipmentLines from './ShipmentLines';
+import PartnerWrittenOrders from './PartnerWrittenOrders';
 
 type Decision = 'release' | 'hold' | 'reject';
 const DONE: Record<Decision, string> = { release: 'released for packing', hold: 'put on hold', reject: 'not supplied — the order is cancelled and refunded' };
@@ -43,6 +44,12 @@ export default function PartnerCheckDialog({ shipment: s, onClose }: { shipment:
   return (
     <Modal title={`Pharmacist check — ${s.order_number}`} onClose={onClose} size="lg">
       <ShipmentLines lines={s.lines} />
+      {s.extra_payment_pending && (
+        <p role="status" className="text-xs rounded-lg bg-amber-50 border border-amber-200 p-2 mt-3">
+          The buyer changed this order and has not yet paid the difference. Release it once that payment is made.
+        </p>
+      )}
+      {s.practitioner_order && <PartnerWrittenOrders ids={s.written_order_ids ?? []} />}
       {s.pharmacist_check === 'held' && s.pharmacist_check_note && (
         <p className="text-xs rounded-lg bg-gray-100 p-2 mt-3"><span className="font-semibold">On hold:</span> {s.pharmacist_check_note}</p>
       )}

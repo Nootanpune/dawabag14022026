@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import { getPartnerPractitionerRegister } from '../controllers/practitionerSales.controller';
 import {
   getPartnerLicenceDocument, getPartnerLicences, postPartnerLicenceDocument, postPartnerLicences,
 } from '../controllers/partyLicence.controller';
@@ -53,6 +54,8 @@ router.post('/shipments/:id/dispatch', postDispatch);
 router.post('/shipments/:id/delivered', postDelivered);
 // Sprint 38: the partner's own Schedule H1 register (it is the licensee, C-09)
 router.get('/h1-register', getPartnerH1Register);
+// Sprint 44: its own sales to doctors / institutions (FDA Pune circular 16/2026; r.65(9)(b))
+router.get('/practitioner-sales', getPartnerPractitionerRegister);
 router.get('/h1-register/verify', getPartnerH1Verify);
 router.get('/returns', getMyReturns);
 router.get('/returns/:id', getMyReturn);

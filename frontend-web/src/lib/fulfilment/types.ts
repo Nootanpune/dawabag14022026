@@ -34,6 +34,10 @@ export interface CheckQueueItem {
   customer_type: string;
   lines: CheckLine[];
   signals: CheckSignal[];
+  /** Sprint 44: the buyer still owes the difference for a change — cannot be approved yet */
+  extra_payment_pending?: boolean;
+  /** Sprint 44: signed written orders on a doctor / institution order (r.65(9)(b)) */
+  written_orders?: number;
 }
 
 /** GET /fulfilment/checks/:orderId */

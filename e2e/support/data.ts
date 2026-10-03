@@ -11,6 +11,10 @@ export const people = {
   admin: { customer_type: 'customer', full_name: 'E2E Admin', mobile: '9000001901', password: 'Passw0rd!', ...consent },
   buyer: { customer_type: 'customer', full_name: 'E2E Buyer', mobile: '9000001902', password: 'Passw0rd!', ...consent },
   pharmacist: { customer_type: 'customer', full_name: 'E2E Pharmacist', mobile: '9000001903', password: 'Passw0rd!', ...consent },
+  // Sprint 44: a doctor buying for the clinic (Drugs Rules r.65(9)(b) — written order, verified registration)
+  doctor: { customer_type: 'doc_hospital', full_name: 'Dr. E2E Meera Joshi', mobile: '9000001904', password: 'Passw0rd!', pincode: '499919',
+    nmc_reg_number: 'MMC-E2E-44', nmc_council_state: 'Maharashtra Medical Council', speciality: 'General Physician', pan_number: 'ABCDE1944J',
+    gst_unregistered_declaration: true, practitioner_declaration: true, ...consent },
 };
 
 export const db = () => new Client({ connectionString: process.env.DATABASE_URL });

@@ -43,6 +43,9 @@ export default function CheckoutPage() {
   const [rxError, setRxError] = useState('');
   const [paidDemo, setPaidDemo] = useState<{ paidBy?: string } | null>(null); // in memory only: how the trial's demo payment was made
   const [authorised, setAuthorised] = useState(false); // the payment is held until the pharmacist's check (Sprint 39)
+  // Sprint 44: a doctor's / institution's signed written order for this cart (r.65(9)(b)) — held by the server, id here
+  const [writtenOrderId, setWrittenOrderId] = useState<string | null>(null);
+  const isPractitioner = customerType === 'doc_hospital';
 
   const { data: addresses, isLoading: addressLoading } = useQuery({
     queryKey: ADDRESSES_QUERY_KEY,
@@ -80,7 +83,7 @@ export default function CheckoutPage() {
     }
     setPlacing(true);
     try {
-      const placed: PlacedOrder = await placeOrder(buildOrderBody(address, cart, declaration, needsRx ? rx?.id : null));
+      const placed: PlacedOrder = await placeOrder(buildOrderBody(address, cart, declaration, needsRx ? rx?.id : null, isPractitioner ? writtenOrderId : null));
       setOrder(placed);
       // Ordered lines were removed from the server cart; the prescription is now with the order
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY });
@@ -145,7 +148,8 @@ export default function CheckoutPage() {
       return (
         <ReviewStep
           body={previewBody}
-          needsDeclaration={customerType === 'doc_hospital'}
+          needsDeclaration={isPractitioner}
+          writtenOrder={isPractitioner ? { items: previewBody.items, value: writtenOrderId, onChange: setWrittenOrderId } : undefined}
           placing={placing}
           rx={needsRx ? rx : null}
           onChangeRx={() => setStep('prescription')}

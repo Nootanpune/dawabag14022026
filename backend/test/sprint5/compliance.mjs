@@ -1,5 +1,6 @@
 // Checkout disclosure, doctor declaration, policies, product declarations and copy
 // review, side-effect reports, licence register, addresses, signed invoice links
+import { releaseInDb } from '../support/pharmacistCheck.mjs';
 import { call, check, q } from './lib.mjs';
 import { PIN } from './fixtures.mjs';
 
@@ -124,6 +125,7 @@ export async function runCompliance({ t, P, addr, ids }) {
 
   console.log('Signed invoice links and privacy requests');
   const ship = (await q(`SELECT s.id FROM order_shipments s JOIN orders o ON o.id = s.order_id WHERE o.user_id = $1 LIMIT 1`, [ids.doctor]))[0].id;
+  await releaseInDb(q, ship);   // Sprint 44: the invoice exists from the pharmacist's release
   r = await call('GET', `/invoices/shipments/${ship}/link`, { token: t.doctor });
   const url = r.json.data?.url;
   check('buyer gets a 5-minute signed invoice link', /\?exp=\d+&sig=[0-9a-f]{64}$/.test(url || ''), r.json);

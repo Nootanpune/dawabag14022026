@@ -12,8 +12,9 @@ const signed = z.object({ razorpay_order_id: z.string().min(5), razorpay_payment
 
 export async function createPaymentOrder(req: Request, res: Response, next: NextFunction) {
   try {
-    const { order_id } = z.object({ order_id: z.string().uuid() }).parse(req.body);
-    res.json({ success: true, data: await createOrderPayment(req.user!.id, order_id) });
+    // Sprint 44: order_edit_id = pay the difference for an order change made before the invoice
+    const { order_id, order_edit_id } = z.object({ order_id: z.string().uuid(), order_edit_id: z.string().uuid().optional() }).parse(req.body);
+    res.json({ success: true, data: await createOrderPayment(req.user!.id, order_id, order_edit_id) });
   } catch (e) { next(e); }
 }
 

@@ -6,6 +6,7 @@
 // Test data (made up): mobiles 90000030xx, vendors 'S30 %', SKU S30-, PIN 499930, numbers S30-….
 import { call, check, login, q, redis, signUp } from '../sprint5/lib.mjs';
 import { pdfText } from './pdfText.mjs';
+import { releaseInDb } from '../support/pharmacistCheck.mjs';
 
 const PIN = '499930';
 const consent = { accept_privacy_notice: true, age_confirmed: true };
@@ -239,7 +240,10 @@ export async function run({ t, ids, product }) {
   check('retailer orders from the partner', r.status === 201, r.json);
   const orderId = r.json.data?.order?.id;
   const snap = (await q(`SELECT o.buyer_drug_licences, s.seller_drug_licences, s.id AS shipment_id FROM orders o JOIN order_shipments s ON s.order_id = o.id WHERE o.id = $1`, [orderId]))[0];
-  check('licences kept as on the day of sale', snap?.buyer_drug_licences?.length === 2 && snap.seller_drug_licences?.length === 4, snap);
+  // Sprint 44: the seller's licences are frozen at the pharmacist's release with the invoice (sprint42 / sprint44 suites);
+  // the buyer's are kept on the order from placement
+  check('licences kept as on the day of sale', snap?.buyer_drug_licences?.length === 2, snap);
+  await releaseInDb(q, snap?.shipment_id);
   r = await call('GET', `/invoices/shipments/${snap?.shipment_id}.pdf`, { token: retToken, raw: true });
   const text = r.status === 200 ? pdfText(r.buf) : '';
   check('invoice PDF prints the seller\'s 4 licences', ['S30-MH-20-0001', 'S30-MH-21-0002', 'S30-MH-20B-0003', 'S30-MH-21B-0004'].every((n) => text.includes(n))

@@ -34,7 +34,7 @@ export interface InvoiceData {
   sellerType?: 'dawabag' | 'partner';
   /** Sprint 35: the registered pharmacist who checked and released this shipment (C-08); Sprint 42: council as at the check */
   pharmacist?: { name: string; regNo: string; council?: string | null } | null;
-  /** Sprint 42: the sale as fixed at order placement — channel and the licences the lines were sold under (C-07, C-13, C-33) */
+  /** Sprint 42: the sale record — channel and the licences the lines were sold under (C-07, C-13, C-33); fixed at invoice issue since Sprint 44 */
   sale?: { channel: 'retail' | 'wholesale' | null; licences: InvoiceLicence[]; source: 'sale' | 'backfill' | null };
 }
 
@@ -61,6 +61,10 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
      LEFT JOIN vendors v ON v.id = s.partner_id
      WHERE s.id = $1`, [shipmentId]);
   if (!s) throw new AppError('Shipment not found', 404);
+  // Sprint 44: the tax invoice exists from the pharmacist's approval of the shipment
+  if (!s.invoice_number) {
+    throw new AppError('The tax invoice is issued when our pharmacist approves this part of the order.', 404, true, 'INVOICE_NOT_ISSUED');
+  }
 
   // Licences as on the day of sale: the shipment's frozen sale record (Sprint 42; Sprint 30
   // snapshots; older shipments were filled by migration 37). Only a shipment without one
@@ -108,7 +112,8 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
   const unregistered = !s.buyer_gstin;
   return {
     invoiceNumber: s.invoice_number,
-    invoiceDate: s.created_at,
+    // Sprint 44: the date the invoice was issued (the pharmacist's approval); before Sprint 44 = placement
+    invoiceDate: s.invoice_issued_at ?? s.created_at,
     orderNumber: s.order_number,
     seller,
     buyer: {

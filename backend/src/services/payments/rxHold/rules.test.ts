@@ -58,4 +58,9 @@ describe('authorise-then-capture rules (Sprint 39, C-08, C-37)', () => {
     expect(authorisationGone('authorized')).toBe(false);
     expect(authorisationGone('captured')).toBe(false);
   });
+  it('Sprint 44: not captured while the buyer owes the difference for an order change', () => {
+    const base = { paymentStatus: 'authorized', orderStatus: 'rx_verified', rxLinesWaiting: 0, rxShipments: [{ status: 'pending', pharmacist_check: 'released' }] };
+    expect(captureReadiness(base)).toEqual({ ready: true });
+    expect(captureReadiness({ ...base, extraPaymentDue: true })).toEqual({ ready: false, reason: 'the difference for an order change is not paid yet' });
+  });
 });

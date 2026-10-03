@@ -19,7 +19,10 @@ describe('only permitted products reach buyers (Sprint 39)', () => {
     ['services/refill.service.ts', /online_sale_status = 'permitted'/],
     ['controllers/product.controller.ts', /online_sale_status = 'permitted'/],
     ['services/cart.service.ts', /online_sale_status !== 'permitted'/],
-    ['services/orderPlacement.service.ts', /online_sale_status !== 'permitted'/],
+    // Sprint 44: order placement and lines added before the invoice share services/orderLines/pricing.ts
+    ['services/orderLines/pricing.ts', /online_sale_status !== 'permitted'/],
+    ['services/orderPlacement.service.ts', /priceOrderLine\(/],
+    ['services/orderEdit/edit.service.ts', /sellableProduct\(/],
   ])('%s checks the online-sale status', (file, re) => {
     expect(read(file)).toMatch(re);
   });

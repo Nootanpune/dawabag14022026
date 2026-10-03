@@ -123,37 +123,63 @@ export interface OrderDetail {
   credit_notes: OrderCreditNote[];
   refunds: OrderRefund[];
   returns: OrderReturn[];
-  /** Sprint 43: the buyer may lower quantities / remove lines until packing starts (URS-074) */
+  /** Sprint 44: the buyer may change the order (lower, remove, raise, add) until the pharmacist approves it */
   can_edit?: boolean;
   edit_block_reason?: string | null;
   edits?: OrderEdit[];
+  /** Sprint 44: the difference to pay for a change (second payment) */
+  extra_payment?: { order_edit_id: string; amount_paise: number; status: string } | null;
+  /** Sprint 44: "The tax invoice is issued when our pharmacist approves the order." while not yet issued */
+  invoice_note?: string | null;
+  /** Sprint 44: a doctor / institution order's signed written order(s) (Drugs Rules r.65(9)(b)) */
+  written_orders?: { id: string; kind: 'upload' | 'in_app'; signed_at: string; order_edit_id: string | null }[];
+  pricing_type?: string | null;
   /** Sprint 39: a prescription order's payment is authorised until the pharmacist's check, then captured (or released) */
   payment?: { status: string; capture: 'now' | 'after_pharmacist_check'; authorised_at: string | null; captured_at: string | null;
     released_at: string | null; note?: string } | null;
 }
 
-/** Sprint 43: one change the buyer made before packing */
+/** One change the buyer made (Sprint 43: after the invoice, with a credit note; Sprint 44: before the invoice) */
 export interface OrderEdit {
   id: string;
   edited_at: string;
-  lines: { order_item_id: string; product_name: string; from_qty: number; to_qty: number }[];
+  stage?: 'after_invoice' | 'before_invoice';
+  lines: { order_item_id: string | null; product_name: string; from_qty: number; to_qty: number; kind?: 'lowered' | 'removed' | 'raised' | 'added' }[];
   credit_notes: { credit_note_number: string; shipment_id: string; total_paise: number }[];
   refund_paise: number;
-  /** none · recorded (refund on its way) · after_capture (refunded right after the held payment is taken) · not_needed */
-  refund_status: 'none' | 'recorded' | 'after_capture' | 'not_needed';
+  /** none · recorded (refund on its way) · after_capture (refunded right after the held payment is taken) · not_needed · credit_bill */
+  refund_status: 'none' | 'recorded' | 'after_capture' | 'not_needed' | 'credit_bill';
+  extra_paise?: number;
+  /** none · awaiting_payment · authorised · paid · on_credit_bill · superseded · cancelled */
+  extra_status?: string;
+  sent_to_pharmacist?: boolean;
 }
 
 export interface EditResult {
   id: string;
   refund_paise: number;
   refund_status: OrderEdit['refund_status'];
-  credit_notes: string[];
+  extra_paise: number;
+  extra_status: string;
+  extra_payment: { order_edit_id: string; amount_paise: number; capture: 'now' | 'after_pharmacist_check' } | null;
+  sent_to_pharmacist: boolean;
   message: string;
 }
 
-/** POST /orders/:id/edit — lower quantities (0 removes the line); the server issues credit notes and refunds. */
-export async function editOrder(id: string, lines: { order_item_id: string; quantity: number }[]): Promise<EditResult> {
-  const { data } = await api.post(`/orders/${id}/edit`, { lines });
+export interface EditRequest {
+  /** existing lines: the new quantity (0 removes, more raises) */
+  lines: { order_item_id: string; quantity: number }[];
+  /** medicines to add */
+  add: { product_id: string; quantity: number }[];
+  /** needed when a prescription medicine is added or raised (C-08) */
+  prescription_id?: string;
+  /** a doctor / institution adding anything: their signed written order (r.65(9)(b)) */
+  written_order_id?: string;
+}
+
+/** POST /orders/:id/edit — the server re-prices, allocates and settles the money. */
+export async function editOrder(id: string, body: EditRequest): Promise<EditResult> {
+  const { data } = await api.post(`/orders/${id}/edit`, body);
   return data.data;
 }
 
@@ -192,7 +218,7 @@ export const REFUND_SOURCE_LABELS: Record<string, string> = {
 };
 export const CREDIT_NOTE_REASON_LABELS: Record<string, string> = {
   cancellation: 'order cancelled',
-  order_edit: 'order changed before packing',
+  order_edit: 'order changed after it was invoiced',
 };
 
 export const REFUND_METHOD_LABELS: Record<string, string> = {

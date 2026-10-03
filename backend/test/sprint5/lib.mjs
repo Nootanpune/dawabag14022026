@@ -4,6 +4,7 @@ const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const Redis = require('ioredis');
 import { applySprint39Defaults, withPrescription } from '../support/sprint39Fixtures.mjs';
+import { verifyPractitioners, withWrittenOrder } from '../support/sprint44Fixtures.mjs';
 
 export const API = (process.env.API_URL || 'http://localhost:4000') + '/api/v1';
 export const ORIGIN = process.env.API_URL || 'http://localhost:4000';
@@ -23,9 +24,10 @@ export function check(name, cond, detail) {
 state.sprint39Defaults = true;
 
 export async function call(method, path, opts = {}) {
-  if (state.sprint39Defaults && !opts.absolute && db._connected) await applySprint39Defaults(db);
+  if (state.sprint39Defaults && !opts.absolute && db._connected) { await applySprint39Defaults(db); await verifyPractitioners(db); }
   if (state.sprint39Defaults && method === 'POST' && path === '/orders' && opts.body && !opts.noAutoRx) {
-    return withPrescription(db, (body) => rawCall(method, path, { ...opts, body }), opts.body, opts.token);
+    // Sprint 44: a doctor signs a written order when checkout asks for one (support/sprint44Fixtures.mjs)
+    return withPrescription(db, (body) => withWrittenOrder(db, (b) => rawCall(method, path, { ...opts, body: b }), body, opts.token), opts.body, opts.token);
   }
   return rawCall(method, path, opts);
 }

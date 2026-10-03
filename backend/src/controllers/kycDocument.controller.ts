@@ -77,7 +77,10 @@ export async function uploadKycDocument(req: Request, res: Response, next: NextF
     if (before.type === 'customer') {
       throw new AppError('Documents are only needed for business and doctor accounts', 400);
     }
-    if (!EDITABLE_STATUSES.includes(before.user.kyc_status)) {
+    // Sprint 44: a doctor / institution sends the renewed registration certificate at any time
+    // (staff verify it again; the copy they checked is the one kept with each sale, r.65(9)(b))
+    const renewal = before.type === 'doc_hospital' && document_type === 'nmc_certificate';
+    if (!EDITABLE_STATUSES.includes(before.user.kyc_status) && !renewal) {
       throw new AppError('Documents cannot be changed while the account is ' + before.user.kyc_status, 409);
     }
     const optional: KycDocumentType[] = before.type === 'doc_hospital' ? ['clinic_address_proof'] : [];

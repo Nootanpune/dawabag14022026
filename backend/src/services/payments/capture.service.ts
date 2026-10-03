@@ -7,6 +7,7 @@
 // Money for an order that was cancelled meanwhile goes straight back (C-37).
 import { PoolClient } from 'pg';
 import { refundEditsAfterCaptureTx } from '../orderEdit/editRefunds';
+import { recordEditCaptureTx } from '../orderEdit/extraPayment';
 import { withTransaction } from '../../config/database';
 import { logger } from '../../config/logger';
 import { writeAuditTx } from '../../utils/audit';
@@ -41,13 +42,15 @@ async function captureConsultation(client: PoolClient, p: GatewayPayment): Promi
 }
 
 async function captureOrder(client: PoolClient, p: GatewayPayment, actor: string | null): Promise<(CaptureOutcome & { refundIds?: string[]; notify?: any }) | null> {
-  const pay = (await client.query(`SELECT order_id, amount_paise, status FROM payments WHERE gateway_order_id = $1 FOR UPDATE`, [p.order_id])).rows[0];
+  const pay = (await client.query(`SELECT order_id, amount_paise, status, order_edit_id FROM payments WHERE gateway_order_id = $1 FOR UPDATE`, [p.order_id])).rows[0];
   if (!pay) return null;
   if (['captured', 'partially_refunded', 'refunded'].includes(pay.status)) return { kind: 'order', outcome: 'already recorded', orderId: pay.order_id };
   if (Number(p.amount) !== Number(pay.amount_paise)) {
     logger.error(`Captured amount mismatch for gateway order ${p.order_id}`);
     return { kind: 'order', outcome: 'amount mismatch; left for accounts', orderId: pay.order_id };
   }
+  // Sprint 44: the second payment for an order change (orderEdit/extraPayment.ts)
+  if (pay.order_edit_id) return captureEditPayment(client, p, pay, actor);
   // Sprint 39: a prescription order's authorisation, captured after the pharmacist check
   const held = pay.status === 'authorized' || pay.status === 'released';
   await client.query(`UPDATE payments SET status = 'captured', gateway_payment_id = $2, method = COALESCE($3, method), paid_at = NOW(), captured_at = NOW(),
@@ -83,6 +86,22 @@ async function captureOrder(client: PoolClient, p: GatewayPayment, actor: string
     newValue: { order_id: pay.order_id, gateway_order_id: p.order_id, gateway_payment_id: p.id, order_status: status } });
   return { kind: 'order', outcome: `order paid → ${status}`, orderId: pay.order_id,
     notify: { userId: order.user_id, type: 'payment_confirmed', orderId: pay.order_id, orderNumber: order.order_number, status } };
+}
+
+async function captureEditPayment(client: PoolClient, p: GatewayPayment, pay: { order_id: string; status: string; order_edit_id: string },
+  actor: string | null): Promise<CaptureOutcome & { refundIds?: string[] }> {
+  await client.query(`UPDATE payments SET status = 'captured', gateway_payment_id = $2, method = COALESCE($3, method), paid_at = NOW(), captured_at = NOW(),
+                        capture_failure = NULL WHERE gateway_order_id = $1`, [p.order_id, p.id, p.method ?? null]);
+  const r = pay.status === 'released' ? 'refund' : await recordEditCaptureTx(client, pay, p.id, actor);
+  if (r === 'refund') {
+    // Paid for a change no longer owed (or after its hold was released): straight back (C-37)
+    const back = await recordRefund(client, { orderId: pay.order_id, amountPaise: Number(p.amount), source: 'order_edit', userId: null,
+      preferGatewayPaymentId: p.id });
+    return { kind: 'order', outcome: 'order change no longer owed: refunded', orderId: pay.order_id, refundIds: back.gatewayRefundIds };
+  }
+  // The last held payment of the order captured: what changes took off goes back now (Sprint 43)
+  const editRefunds = await refundEditsAfterCaptureTx(client, pay.order_id);
+  return { kind: 'order', outcome: 'order change payment captured', orderId: pay.order_id, refundIds: editRefunds };
 }
 
 /** What applyCaptureTx leaves for after the commit (gateway refunds, notifications). */

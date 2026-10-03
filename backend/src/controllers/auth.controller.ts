@@ -97,6 +97,10 @@ const registerSchema = z.discriminatedUnion('customer_type', [
     nmc_reg_number: z.string().trim().min(2).max(50),
     nmc_council_state: z.string().trim().min(2).max(50),
     speciality: z.string().trim().min(2).max(100),
+    // Sprint 44: a doctor, or a medical institution (hospital / clinic / nursing home) whose
+    // registration number above is its responsible doctor's; name in business_name (r.65(9)(b))
+    practitioner_kind: z.enum(['doctor', 'institution']).optional().default('doctor'),
+    business_name: z.string().trim().min(2).max(200).optional(),
     pan_number: pan,
     // A hospital or clinic pharmacy may add its drug licences (optional)
     licences: licenceList(10).optional(),
@@ -203,6 +207,11 @@ export async function register(req: Request, res: Response, next: NextFunction) 
         ]
       );
       const userId = user.rows[0].id;
+      if (customer_type === 'doc_hospital') {
+        // Sprint 44: the registration waits for Dawabag staff to verify it with the certificate copy
+        await client.query(`UPDATE users SET practitioner_kind = $2, nmc_status = 'pending' WHERE id = $1`,
+          [userId, trade && 'practitioner_kind' in trade ? trade.practitioner_kind : 'doctor']);
+      }
       if (licences.length) {
         await assertNumbersFree(client, { userId }, licences, { revealNames: false });
         await submitLicencesTx(client, { userId }, licences, userId);

@@ -50,7 +50,17 @@ export default function ProfessionalFields({ customerType, register, errors, con
 
       {isDoctor && (
         <>
-          <Field label="NMC / Council registration number" error={errors.nmc_reg_number?.message}>
+          {/* Sprint 44: an institution names its responsible doctor's registration below (r.65(9)(b)) */}
+          <Field label="Registering as" error={errors.practitioner_kind?.message}>
+            <select {...register('practitioner_kind')} className="input">
+              <option value="doctor">A doctor (my own registration)</option>
+              <option value="institution">A hospital, clinic or nursing home</option>
+            </select>
+          </Field>
+          <Field label="Hospital / clinic name (institutions)" error={errors.business_name?.message}>
+            <input {...register('business_name')} placeholder="Sunrise Nursing Home" className="input" />
+          </Field>
+          <Field label="NMC / Council registration number (the responsible doctor's, for an institution)" error={errors.nmc_reg_number?.message}>
             <input {...register('nmc_reg_number')} placeholder="e.g. 2011/05/1234" className="input" />
           </Field>
           <Field label="Medical council" error={errors.nmc_council_state?.message}>

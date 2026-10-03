@@ -10,12 +10,15 @@ export default function NmcDecisionForm({ user, result }: { user: KycApplicant; 
   const [council, setCouncil] = useState(user.nmc_council_state ?? '');
   const [nameAsPerRegister, setNameAsPerRegister] = useState('');
   const [qualification, setQualification] = useState('');
+  // Sprint 44: verified only with the valid-till date and the uploaded certificate (r.65(9)(b))
+  const [validTill, setValidTill] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const decision = useKycDecision<NmcDecision>(user.id, verifyNmc);
 
   const send = (verified: boolean, rejection_reason?: string) => {
     if (!nmcNumber.trim() || !council.trim()) return setError('Registration number and council are required');
+    if (verified && !validTill) return setError('Enter until when the registration is valid (certificate or council register)');
     setError('');
     decision.mutate({
       user_id: user.id,
@@ -24,6 +27,7 @@ export default function NmcDecisionForm({ user, result }: { user: KycApplicant; 
       verified,
       doctor_name_as_per_register: nameAsPerRegister.trim() || undefined,
       qualification: qualification.trim() || undefined,
+      valid_till: validTill || undefined,
       rejection_reason,
       notes: notes.trim() || undefined,
     });
@@ -48,7 +52,11 @@ export default function NmcDecisionForm({ user, result }: { user: KycApplicant; 
           <span className="text-xs text-gray-500">Qualification (optional)</span>
           <input value={qualification} onChange={(e) => setQualification(e.target.value)} className="input" />
         </label>
-        <label className="block sm:col-span-2">
+        <label className="block">
+          <span className="text-xs text-gray-500">Valid till (needed to verify)</span>
+          <input type="date" value={validTill} onChange={(e) => setValidTill(e.target.value)} className="input" />
+        </label>
+        <label className="block">
           <span className="text-xs text-gray-500">Notes (optional)</span>
           <input value={notes} onChange={(e) => setNotes(e.target.value)} className="input" />
         </label>

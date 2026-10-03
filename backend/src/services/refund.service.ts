@@ -34,7 +34,7 @@ export async function refundableAmount(client: PoolClient, orderId: string): Pro
   return Math.max(paid - Number(r.refunded), 0);
 }
 
-async function planLegs(client: PoolClient, orderId: string, amount: number): Promise<Leg[]> {
+async function planLegs(client: PoolClient, orderId: string, amount: number, preferPaymentId?: string | null): Promise<Leg[]> {
   const o = (await client.query(
     `SELECT total_paise, wallet_used_paise, payment_terms, credit_settled_at, credit_adjusted_paise
      FROM orders WHERE id = $1 FOR UPDATE`, [orderId])).rows[0];
@@ -59,7 +59,9 @@ async function planLegs(client: PoolClient, orderId: string, amount: number): Pr
             - COALESCE((SELECT SUM(r.amount_paise) FROM refunds r WHERE r.gateway_payment_id = p.gateway_payment_id
                         AND r.method = 'gateway' AND r.status <> 'failed'), 0) AS refundable
      FROM payments p WHERE p.order_id = $1 AND p.status IN ('captured', 'partially_refunded')
-       AND p.gateway_payment_id IS NOT NULL FOR UPDATE OF p`, [orderId])).rows;
+       AND p.gateway_payment_id IS NOT NULL
+     -- Sprint 44: a payment that is itself being given back (e.g. for an order change no longer owed) first
+     ORDER BY (p.gateway_payment_id = $2) DESC, p.created_at FOR UPDATE OF p`, [orderId, preferPaymentId ?? ''])).rows;
   for (const p of pays) take('gateway', Number(p.refundable), p.gateway_payment_id);
   const walletBack = Number((await client.query(
     `SELECT COALESCE(SUM(amount_paise), 0) AS n FROM refunds WHERE order_id = $1 AND method = 'wallet'`, [orderId])).rows[0].n);
@@ -73,11 +75,11 @@ async function planLegs(client: PoolClient, orderId: string, amount: number): Pr
 // Records the refund legs; returns ids of gateway legs to send after commit
 export async function recordRefund(
   client: PoolClient,
-  r: { orderId: string; amountPaise: number; source: RefundSource; returnId?: string | null; userId: string | null },
+  r: { orderId: string; amountPaise: number; source: RefundSource; returnId?: string | null; userId: string | null; preferGatewayPaymentId?: string | null },
 ): Promise<{ legs: any[]; gatewayRefundIds: string[] }> {
   if (r.amountPaise <= 0) return { legs: [], gatewayRefundIds: [] };
   const o = (await client.query('SELECT user_id FROM orders WHERE id = $1', [r.orderId])).rows[0];
-  const legs = await planLegs(client, r.orderId, r.amountPaise);
+  const legs = await planLegs(client, r.orderId, r.amountPaise, r.preferGatewayPaymentId);
   const out: any[] = [];
   const gatewayRefundIds: string[] = [];
   for (const leg of legs) {

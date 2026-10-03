@@ -198,8 +198,13 @@ async function main() {
   r = await call('GET', '/products/search?q=S2-OTC', { token: retailer });
   check('approved retailer now sees PTR', r.json.data?.products?.find((p) => p.sku === 'S2-OTC')?.display_price_paise === 7500, r.json.data?.products);
 
+  // Sprint 44: verifying needs until when the registration is valid (FDA Pune circular 16/2026; r.65(9)(b))
   r = await call('POST', '/kyc/admin/verify-nmc', { token: admin, body: {
     user_id: doc.user_id, nmc_number: 'MMC-S2-01', council_state: 'Maharashtra', verified: true } });
+  check('NMC verify without a valid-till date refused (Sprint 44)', r.status === 400 && /valid/.test(r.json.message ?? ''), r.json);
+  r = await call('POST', '/kyc/admin/verify-nmc', { token: admin, body: {
+    user_id: doc.user_id, nmc_number: 'MMC-S2-01', council_state: 'Maharashtra', verified: true,
+    valid_till: new Date(Date.now() + 400 * 864e5).toISOString().slice(0, 10) } });
   check('NMC verified without PAN does NOT activate (old count bug)', r.json.data?.account_activated === false, r.json);
   r = await call('POST', '/kyc/admin/verify-identity', { token: admin, body: { user_id: doc.user_id, document_type: 'pan', verified: true } });
   check('NMC + PAN → doctor activated', r.json.data?.account_activated === true, r.json);

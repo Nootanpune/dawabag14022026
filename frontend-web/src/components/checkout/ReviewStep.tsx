@@ -11,6 +11,8 @@ import ChargeBreakup from './ChargeBreakup';
 import PractitionerDeclaration from './PractitionerDeclaration';
 import RxAttachedLine, { type ChosenRx } from './rx/RxAttachedLine';
 import RxPolicyNote from './rx/RxPolicyNote';
+import WrittenOrderPicker from '@/components/practitioner/WrittenOrderPicker';
+import RegistrationStatusCard from '@/components/practitioner/RegistrationStatusCard';
 
 interface Props {
   body: OrderBody;
@@ -24,12 +26,14 @@ interface Props {
   backLabel?: string;
   onBack: () => void;
   onPlace: (declaration: boolean) => void;
+  /** Sprint 44: doctors / institutions attach a signed written order (Drugs Rules r.65(9)(b)) */
+  writtenOrder?: { items: { product_id: string; quantity: number }[]; value: string | null; onChange: (id: string | null) => void };
 }
 
 const RETURN_POLICIES: PolicyKey[] = ['refund', 'cancellation', 'shipping'];
 
 /** Everything the buyer must see before paying (C-35): sellers, licences, lines, charges, returns and policies. */
-export default function ReviewStep({ body, needsDeclaration, placing, rx, onChangeRx, backLabel = 'Back', onBack, onPlace }: Props) {
+export default function ReviewStep({ body, needsDeclaration, placing, rx, onChangeRx, backLabel = 'Back', onBack, onPlace, writtenOrder }: Props) {
   const [declared, setDeclared] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: checkoutKeys.preview(body),
@@ -60,6 +64,8 @@ export default function ReviewStep({ body, needsDeclaration, placing, rx, onChan
             <p className="whitespace-pre-line">{data.returns_note}</p>
             <PolicyLinks keys={policyKeys} newTab />
           </div>
+          {writtenOrder && <RegistrationStatusCard compact />}
+          {writtenOrder && <WrittenOrderPicker items={writtenOrder.items} value={writtenOrder.value} onChange={writtenOrder.onChange} />}
           {needsDeclaration && <PractitionerDeclaration checked={declared} onChange={setDeclared} />}
         </>
       )}
@@ -69,7 +75,7 @@ export default function ReviewStep({ body, needsDeclaration, placing, rx, onChan
         </button>
         <button
           onClick={() => onPlace(declared)}
-          disabled={placing || !data || (needsDeclaration && !declared)}
+          disabled={placing || !data || (needsDeclaration && !declared) || (!!writtenOrder && !writtenOrder.value)}
           className="btn-primary flex-1 py-3 flex items-center justify-center gap-2"
         >
           {placing && <Loader2 className="w-4 h-4 animate-spin" />}

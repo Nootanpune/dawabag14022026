@@ -134,6 +134,11 @@ export interface PartnerShipment {
   pharmacist_name?: string | null;
   pharmacist_reg_no?: string | null;
   pharmacist_checked_at?: string | null;
+  /** Sprint 44: a doctor / institution order — its signed written orders (r.65(9)(b)) */
+  practitioner_order?: boolean;
+  written_order_ids?: string[];
+  /** Sprint 44: the buyer changed the order and has not yet paid the difference — cannot be released */
+  extra_payment_pending?: boolean;
 }
 
 /** One of the partner's registered pharmacists (Sprint 28, recorded by Dawabag's admin) */

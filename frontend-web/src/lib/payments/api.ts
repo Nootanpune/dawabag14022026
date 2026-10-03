@@ -41,3 +41,15 @@ export async function payConsultationDemo(consultationId: string, choice: DemoCh
   const { data } = await api.post(`/consultations/${consultationId}/pay/demo`, { ...choice, outcome });
   return data.data;
 }
+
+/** Sprint 44: the difference for an order change, in the trial's demo */
+export async function payEditDemo(orderId: string, orderEditId: string, choice: DemoChoice, outcome: 'success' | 'failure'): Promise<DemoResult> {
+  const { data } = await api.post('/payments/demo', { order_id: orderId, order_edit_id: orderEditId, ...choice, outcome });
+  return data.data;
+}
+
+/** Sprint 44: a Razorpay order for the difference of an order change */
+export async function createEditPayment(orderId: string, orderEditId: string) {
+  const { data } = await api.post('/payments/create-order', { order_id: orderId, order_edit_id: orderEditId });
+  return data.data as { razorpay_order_id: string; razorpay_key_id: string; amount: number; capture: 'now' | 'after_pharmacist_check' };
+}

@@ -18,6 +18,8 @@ export interface OrderBody {
   practitioner_declaration?: boolean;
   /** Sprint 39: the prescription for the order's prescription lines, chosen before payment (C-08) */
   prescription_id?: string;
+  /** Sprint 44: a doctor's / institution's signed written order (Drugs Rules r.65(9)(b)) */
+  written_order_id?: string;
 }
 
 export interface PreviewLine {
@@ -65,7 +67,7 @@ export interface CheckoutPreview {
   policies: { doc_key: PolicyKey; version: number; title: string; effective_from: string }[];
 }
 
-export function buildOrderBody(address: Address, cart: CartView, declaration?: boolean, prescriptionId?: string | null): OrderBody {
+export function buildOrderBody(address: Address, cart: CartView, declaration?: boolean, prescriptionId?: string | null, writtenOrderId?: string | null): OrderBody {
   return {
     address_id: address.id,
     pincode: address.pincode,
@@ -73,6 +75,7 @@ export function buildOrderBody(address: Address, cart: CartView, declaration?: b
     coupon_code: cart.coupon?.valid ? cart.coupon.code : undefined,
     ...(declaration ? { practitioner_declaration: true } : {}),
     ...(prescriptionId ? { prescription_id: prescriptionId } : {}),
+    ...(writtenOrderId ? { written_order_id: writtenOrderId } : {}),
   };
 }
 

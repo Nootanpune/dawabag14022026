@@ -24,6 +24,10 @@ export async function listPartnerShipments(vendorId: string, status?: string) {
             s.pharmacist_check, s.pharmacist_check_note, s.pharmacist_name, s.pharmacist_reg_no, s.pharmacist_checked_at,
             s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at, s.created_at,
             o.order_number, o.status AS order_status,
+            -- Sprint 44: a doctor / institution order's signed written orders (r.65(9)(b)); a difference still to pay
+            o.pricing_type = 'doc_hospital' AS practitioner_order,
+            (SELECT COALESCE(json_agg(w.id ORDER BY w.signed_at), '[]'::json) FROM written_orders w WHERE w.order_id = o.id) AS written_order_ids,
+            EXISTS (SELECT 1 FROM order_edits e WHERE e.order_id = o.id AND e.extra_status = 'awaiting_payment') AS extra_payment_pending,
             a.full_name AS ship_to_name, a.mobile AS ship_to_mobile, a.address_line1, a.city, a.state, a.pincode,
             json_agg(json_build_object(
               'product_name', oi.product_name, 'sku', oi.sku, 'quantity', oi.supply_qty,

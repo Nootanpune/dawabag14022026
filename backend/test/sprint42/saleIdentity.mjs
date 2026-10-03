@@ -1,5 +1,6 @@
-// Sprint 42 A — the sale identity of each shipment is fixed at the sale (order placement) and
-// cannot be changed afterwards (handover D15; C-05, C-07, C-08, C-13, C-33, C-46):
+// Sprint 42 A — the sale identity of each shipment is fixed at the sale and cannot be changed
+// afterwards. Sprint 44: the sale (tax invoice) is the pharmacist's release, no longer order
+// placement — the record is written in the release transaction (handover D15; C-05, C-07, C-08, C-13, C-33, C-46):
 // seller licences and the licence each line was sold under, sale channel, buyer type and
 // licences; the pharmacist of record is filled once at the check. Invoices and the sales
 // register read the frozen record, not today's licence register.
@@ -24,6 +25,20 @@ async function paidOrder(items) {
   const rows = await q(`SELECT * FROM order_shipments WHERE order_id = $1`, [order.id]);
   return { order, own: rows.find((s) => s.seller_type === 'dawabag'), partner: rows.find((s) => s.seller_type === 'partner') };
 }
+/** Sprint 44: the sale happens at the pharmacist's release (own: Dawabag's pharmacist; partner: its own). */
+async function release(o) {
+  if (o.own) {
+    const r = await call('POST', `/fulfilment/shipments/${o.own.id}/check`, { token: t.pharmacistB, body: { decision: 'release' } });
+    if (r.status !== 200) throw new Error(`release: ${JSON.stringify(r.json)}`);
+    o.own = await shipment(o.own.id);
+  }
+  if (o.partner) {
+    const r = await call('POST', `/partner/shipments/${o.partner.id}/check`, { token: t.partner, body: { decision: 'release', vendor_pharmacist_id: V.pharmacist } });
+    if (r.status !== 200) throw new Error(`partner release: ${JSON.stringify(r.json)}`);
+    o.partner = await shipment(o.partner.id);
+  }
+  return o;
+}
 const shipment = async (id) => (await q(`SELECT * FROM order_shipments WHERE id = $1`, [id]))[0];
 const lines = (id) => q(`SELECT product_id, sale_licence_form, sale_licence_number, price_field FROM order_items WHERE shipment_id = $1`, [id]);
 const identity = (s) => JSON.stringify([s.sale_channel, s.sale_buyer_type, s.seller_drug_licences, s.sale_licences, s.buyer_drug_licences,
@@ -44,9 +59,17 @@ async function apiLogin() {
 }
 
 export async function runSaleIdentity() {
-  console.log('\nA. Sale identity per shipment, fixed at order placement');
+  console.log('\nA. Sale identity per shipment, fixed at the sale (Sprint 44: the pharmacist\'s release, with the invoice)');
   const a = await paidOrder([{ product_id: P.otc, quantity: 2 }, { product_id: P.feed, quantity: 1 }]);
   check('the order is split: Dawabag ships one line, the partner the other', !!a.own && !!a.partner, { own: !!a.own, partner: !!a.partner });
+  check('Sprint 44: placed and paid, not yet approved — no invoice and no sale record yet', !a.own.invoice_number && !a.partner.invoice_number
+    && !a.own.sale_identity_frozen_at && !a.partner.sale_identity_frozen_at, { own: a.own.invoice_number, partner: a.partner.invoice_number });
+  // The pharmacist of record (below): one pharmacist holds, another releases
+  let r0 = await call('POST', `/fulfilment/shipments/${a.own.id}/check`, { token: t.pharmacist, body: { decision: 'hold', reason: 'Calling the buyer about the dose' } });
+  check('a pharmacist holds the shipment (no invoice yet)', r0.status === 200 && !(await shipment(a.own.id)).invoice_number, r0.json);
+  await release(a);
+  check('released: each shipment now has its invoice number and date', /^DWB\//.test(a.own.invoice_number ?? '') && !!a.own.invoice_issued_at
+    && !!a.partner.invoice_number && !!a.partner.invoice_issued_at, { own: a.own.invoice_number, partner: a.partner.invoice_number });
   for (const [who, s, number] of [['Dawabag', a.own, LIC.own20], ['partner', a.partner, LIC.partner20]]) {
     const ls = await lines(s.id);
     check(`${who} shipment: recorded at the sale — retail channel, buyer type, frozen`, s.sale_identity_source === 'sale' && s.sale_channel === 'retail'
@@ -77,7 +100,7 @@ export async function runSaleIdentity() {
   const row = r.json.data?.rows?.find?.((x) => x.invoice_number === a.own.invoice_number) ?? (Array.isArray(r.json.data) ? r.json.data.find((x) => x.invoice_number === a.own.invoice_number) : null);
   check('the sales register: channel and the licence sold under, from the sale record', row?.sale_channel === 'retail'
     && row?.sold_under_licences === `Form 20: ${LIC.own20}` && row?.sale_record === 'sale', row ?? r.json);
-  const b = await paidOrder([{ product_id: P.otc, quantity: 1 }]);
+  const b = await release(await paidOrder([{ product_id: P.otc, quantity: 1 }]));
   check('a sale after the renewal is recorded under the new number', (await lines(b.own.id))[0]?.sale_licence_number === LIC.own20New);
 
   // ── The database refuses changes (C-46) ───────────────────────────────────
@@ -115,21 +138,14 @@ export async function runSaleIdentity() {
 
     // ── Pharmacist of record: filled once at the check ──────────────────────
     console.log('\nPharmacist of record: filled once at the check, then final');
-    check('before the check: no pharmacist and no registration recorded', !(await shipment(a.own.id)).pharmacist_registration);
-    e = await refused(plain, `UPDATE order_shipments SET pharmacist_check = 'held', pharmacist_name = 'S42 Someone', pharmacist_reg_no = 'X',
-      pharmacist_checked_at = NOW(), pharmacist_check_note = 'waiting for the buyer' WHERE id = $1`, [a.own.id]);
-    check('… a hold may be written before the decision', e === null, e);
-    await q(`UPDATE order_shipments SET pharmacist_check = 'pending', pharmacist_name = NULL, pharmacist_reg_no = NULL, pharmacist_checked_at = NULL,
-      pharmacist_check_note = NULL WHERE id = $1`, [a.own.id]);
-    r = await call('POST', `/fulfilment/shipments/${a.own.id}/check`, { token: t.pharmacist, body: { decision: 'hold', reason: 'Calling the buyer about the dose' } });
-    check('a pharmacist holds the shipment', r.status === 200, r.json);
-    r = await call('POST', `/fulfilment/shipments/${a.own.id}/check`, { token: t.pharmacistB, body: { decision: 'release' } });
+    // (Sprint 44: the hold and the release were made above, before the identity checks — the release is the sale)
+    let r = await call('GET', `/orders/${a.order.id}`, { token: t.opsAdmin });
     let s = await shipment(a.own.id);
-    check('another pharmacist releases it: the release names them, with their registration as at the check', r.status === 200
-      && s.pharmacist_check === 'released' && s.pharmacist_checked_by === ids.pharmacistB && s.pharmacist_reg_no === 'MSPC-S39-2'
+    check('another pharmacist released it: the release names them, with their registration as at the check',
+      s.pharmacist_check === 'released' && s.pharmacist_checked_by === ids.pharmacistB && s.pharmacist_reg_no === 'MSPC-S39-2'
       && s.pharmacist_registration?.registration_no === 'MSPC-S39-2' && s.pharmacist_registration?.kind === 'staff'
       && s.pharmacist_registration?.state_council === 'Maharashtra State Pharmacy Council' && s.pharmacist_registration?.verified === true
-      && s.pharmacist_registration?.recorded === 'at_check', { r: r.json, s: { by: s.pharmacist_checked_by, reg: s.pharmacist_registration } });
+      && s.pharmacist_registration?.recorded === 'at_check', { s: { by: s.pharmacist_checked_by, reg: s.pharmacist_registration } });
     const released = JSON.stringify([s.pharmacist_name, s.pharmacist_reg_no, s.pharmacist_checked_by, String(s.pharmacist_checked_at), s.pharmacist_registration]);
     r = await call('POST', `/fulfilment/shipments/${a.own.id}/check`, { token: t.pharmacist, body: { decision: 'release' } });
     check('a second decision is refused', r.status === 409, r.json);
@@ -151,12 +167,11 @@ export async function runSaleIdentity() {
     text = r.status === 200 ? pdfText(r.buf) : '';
     check('the invoice names the pharmacist with the council as at the check', /Checked by pharmacist .*MSPC-S39-2 \(Maharashtra State Pharmacy Council\)/.test(text), text.slice(-700));
 
-    // Partner shipment: released by the partner's own pharmacist, snapshot of that registration
-    r = await call('POST', `/partner/shipments/${a.partner.id}/check`, { token: t.partner, body: { decision: 'release', vendor_pharmacist_id: V.pharmacist } });
+    // Partner shipment: released (above) by the partner's own pharmacist, snapshot of that registration
     s = await shipment(a.partner.id);
-    check('the partner\'s pharmacist releases the partner shipment: their registration kept', r.status === 200
-      && s.pharmacist_registration?.kind === 'partner' && s.pharmacist_registration?.registration_no === 'MSPC-S39-P1'
-      && s.pharmacist_registration?.valid_till === inDays(365), { r: r.json, reg: s.pharmacist_registration });
+    check('the partner\'s pharmacist released the partner shipment: their registration kept',
+      s.pharmacist_registration?.kind === 'partner' && s.pharmacist_registration?.registration_no === 'MSPC-S39-P1'
+      && s.pharmacist_registration?.valid_till === inDays(365), { reg: s.pharmacist_registration });
     e = await refused(plain, `UPDATE order_shipments SET vendor_pharmacist_id = NULL WHERE id = $1`, [a.partner.id]);
     check('… and cannot be changed afterwards', e?.code === 'P0001', e);
   } finally {
@@ -165,7 +180,9 @@ export async function runSaleIdentity() {
   }
 
   // ── Shipments from before Sprint 42: filled by the migration, marked backfilled ──
-  const open = (await q(`SELECT COUNT(*)::int AS n FROM order_shipments WHERE sale_identity_frozen_at IS NULL`))[0].n;
+  // Sprint 44: every INVOICED shipment of this suite has its record (not yet approved = not yet sold)
+  const open = (await q(`SELECT COUNT(*)::int AS n FROM order_shipments s JOIN orders o ON o.id = s.order_id
+                         WHERE s.sale_identity_frozen_at IS NULL AND s.invoice_number IS NOT NULL AND o.user_id = $1`, [ids.buyer]))[0].n;
   const bf = (await q(`SELECT COUNT(*)::int AS n, COUNT(*) FILTER (WHERE sale_channel IS NOT NULL AND sale_licences IS NOT NULL)::int AS complete
                        FROM order_shipments WHERE sale_identity_source = 'backfill'`))[0];
   check('every shipment has a frozen sale record (older ones backfilled and marked so)', open === 0 && bf.n === bf.complete, { open, backfilled: bf });

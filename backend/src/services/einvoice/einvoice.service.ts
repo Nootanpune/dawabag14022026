@@ -23,7 +23,8 @@ async function required(client: PoolClient, shipmentId: string): Promise<{ invoi
   if ((await getSetting('einvoice.enabled', false, client)) !== true) return null;
   const s = (await client.query(
     `SELECT s.invoice_number FROM order_shipments s JOIN orders o ON o.id = s.order_id
-     WHERE s.id = $1 AND s.seller_type = 'dawabag' AND COALESCE(o.buyer_gstin, '') <> ''`, [shipmentId])).rows[0];
+     WHERE s.id = $1 AND s.seller_type = 'dawabag' AND COALESCE(o.buyer_gstin, '') <> ''
+       AND s.invoice_number IS NOT NULL   -- Sprint 44: issued at the pharmacist's approval`, [shipmentId])).rows[0];
   return s ?? null;
 }
 
@@ -95,7 +96,7 @@ async function partiesFor(client: PoolClient, shipmentId: string): Promise<Einvo
     ? (await client.query(`SELECT city FROM pincode_serviceability WHERE pincode = $1`, [premises.pincode])).rows[0]?.city : null;
   const b = (await client.query(
     `SELECT o.buyer_gstin, u.business_name, up.full_name, a.full_name AS ship_name, concat_ws(', ', a.address_line1, a.address_line2) AS addr,
-            a.city, a.state, a.pincode, s.created_at AS invoice_date
+            a.city, a.state, a.pincode, COALESCE(s.invoice_issued_at, s.created_at) AS invoice_date
      FROM order_shipments s JOIN orders o ON o.id = s.order_id JOIN users u ON u.id = o.user_id
      LEFT JOIN user_profiles up ON up.user_id = o.user_id JOIN addresses a ON a.id = o.address_id WHERE s.id = $1`, [shipmentId])).rows[0];
   const seller: Party = { gstin: entity?.gstin ?? '', legalName: entity?.name ?? '', address1: entity?.address ?? '',

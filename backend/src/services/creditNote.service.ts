@@ -1,4 +1,6 @@
 // src/services/creditNote.service.ts — GST credit notes (Rulebook C-30, C-37)
+// Sprint 44: only against an ISSUED invoice (issued at the pharmacist's approval) — a change
+// or cancellation before that needs no credit note.
 // A cancellation or an approved return reverses the seller's tax invoice with a
 // credit note in the seller's own gap-free series: '<invoice prefix>C/<FY>/n'
 // (16 characters at most, CGST Rule 46).
@@ -26,6 +28,8 @@ export async function issueCreditNote(
   const shipment = (await client.query(
     `SELECT id, order_id, invoice_number, partner_id FROM order_shipments WHERE id = $1`, [input.shipmentId])).rows[0];
   if (!shipment) throw new AppError('Shipment not found', 404);
+  // Sprint 44: a credit note reverses an issued invoice; before the invoice there is nothing to credit
+  if (!shipment.invoice_number) throw new AppError('No tax invoice has been issued for this shipment yet', 409, true, 'INVOICE_NOT_ISSUED');
 
   const items = (await client.query(
     `SELECT oi.id, oi.quantity, oi.line_total_paise, oi.gst_amount_paise, oi.cgst_paise, oi.sgst_paise, oi.igst_paise,
@@ -70,8 +74,11 @@ export async function issueCreditNote(
     total_paise: taxable + gst, partner_id: shipment.partner_id };
 }
 
-// Credit notes for every open line of a shipment (cancellation)
+// Credit notes for every open line of a shipment (cancellation). Sprint 44: a shipment
+// cancelled before its invoice was issued (before the pharmacist's approval) needs none.
 export async function creditWholeShipment(client: PoolClient, shipmentId: string, reason: string, userId: string | null) {
+  const invoiced = (await client.query(`SELECT invoice_number FROM order_shipments WHERE id = $1`, [shipmentId])).rows[0]?.invoice_number;
+  if (!invoiced) return null;
   const lines = (await client.query(
     `SELECT oi.id AS order_item_id,
             oi.quantity - COALESCE((SELECT SUM(ci.quantity) FROM credit_note_items ci WHERE ci.order_item_id = oi.id), 0)::int AS quantity

@@ -17,6 +17,7 @@ import { createOrderSchema, placeOrder } from '../services/orderPlacement.servic
 import { approvedImageKeySql, withImageUrls } from '../services/productImage.service';
 import { orderCheckState } from '../services/pharmacistCheck/rules';
 import { orderEditState } from '../services/orderEdit/edit.service';
+import { writtenOrdersFor } from '../services/practitionerSales/writtenOrder.service';
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -86,7 +87,7 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
 
     // Seller of record per shipment (C-05); partners shown by name
     const shipments = await query<any>(
-      `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.invoice_number, s.status,
+      `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.invoice_number, s.invoice_issued_at, s.status,
               s.total_paise, s.courier_partner, s.awb_number, s.dispatched_at, s.delivered_at,
               s.seal_number, s.handover_code_required, s.received_by_name, s.received_by_relation, s.tracking_status, s.rto_at,
               -- Sprint 35: who checked and released it (C-08); the hold note is for staff only
@@ -110,7 +111,7 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
 
     // Sprint 39: how the order is paid — a prescription order is only authorised until the pharmacist's check (C-37)
     const pay = await queryOne<any>(
-      `SELECT status, capture_mode, authorised_at, captured_at, released_at FROM payments WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`, [id]);
+      `SELECT status, capture_mode, authorised_at, captured_at, released_at FROM payments WHERE order_id = $1 AND order_edit_id IS NULL ORDER BY created_at DESC LIMIT 1`, [id]);
     const [creditNotes, refunds, returns] = await Promise.all([
       query(`SELECT id, credit_note_number, shipment_id, reason, total_paise, created_at FROM credit_notes WHERE order_id = $1 ORDER BY created_at`, [id]),
       query(`SELECT id, source, method, amount_paise, status, processed_at, created_at FROM refunds WHERE order_id = $1 ORDER BY created_at`, [id]),
@@ -123,11 +124,23 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     // Sprint 43: the buyer may lower quantities / remove lines until packing starts (URS-074)
     const editState = await orderEditState(orderResult, shipments);
     const mine = orderResult.user_id === userId;
+    // Sprint 44: a doctor / institution order's signed written order(s) (Drugs Rules r.65(9)(b))
+    const writtenOrders = await writtenOrdersFor(null, id);
+    const payments = await query<any>(
+      `SELECT id, status, amount_paise, capture_mode, order_edit_id, authorised_at, captured_at, released_at, created_at
+       FROM payments WHERE order_id = $1 AND status <> 'created' ORDER BY created_at`, [id]);
 
     res.json({ success: true, data: {
       ...orderResult, items, shipments,
       requires_prescription: needsRx, can_cancel: canCancel,
       can_edit: mine && editState.can_edit, edit_block_reason: mine ? editState.edit_block_reason : null, edits: editState.edits,
+      // Sprint 44: the difference to pay for a change (POST /payments/create-order {order_id, order_edit_id})
+      extra_payment: editState.extra_payment,
+      // Sprint 44: the tax invoice is issued per seller when our pharmacist approves that part of the order
+      invoice_note: shipments.some((sh: any) => !sh.invoice_number && sh.status !== 'cancelled')
+        ? 'The tax invoice is issued when our pharmacist approves the order.' : null,
+      written_orders: writtenOrders,
+      payments: payments.map((p: any) => ({ ...p, purpose: p.order_edit_id ? 'order_change' : 'order' })),
       pharmacist_check: orderCheckState(shipments),
       credit_notes: creditNotes, refunds, returns,
       payment: pay ? { status: pay.status, capture: pay.capture_mode === 'manual' ? 'after_pharmacist_check' : 'now',

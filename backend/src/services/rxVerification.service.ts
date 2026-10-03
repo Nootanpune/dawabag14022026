@@ -10,7 +10,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { queueNotification } from './notification.service';
 import { rxRequiredLines } from './rxGate.service';
-import { releaseOwnAfterPrescription } from './pharmacistCheck/check.service';
+import { assertReleasableTx, releaseOwnAfterPrescription } from './pharmacistCheck/check.service';
 import { captureHeldPaymentQuietly } from './payments/rxHold/hold.service';
 import { assertStaffRegistrationValid } from './pharmacistRegistration/gate.service';
 
@@ -43,8 +43,17 @@ async function pharmacist(client: PoolClient, userId: string) {
 // an append-only row in rx_dispense_ledger (the database re-checks the balance under a
 // lock and moves retain_until to N years after this dispense; C-08, C-34).
 async function dispenseAgainst(client: PoolClient, prescriptionId: string, orderId: string, pharmacistId: string) {
-  const lines = (await rxRequiredLines(client, orderId)).filter((l) => !l.prescription_id);
-  if (!lines.length) throw new AppError('This order has no prescription lines waiting for review', 400);
+  const waiting = (await rxRequiredLines(client, orderId)).filter((l) => !l.prescription_id);
+  if (!waiting.length) throw new AppError('This order has no prescription lines waiting for review', 400);
+  // Sprint 44: a buyer who added a medicine before the invoice may have sent a second
+  // prescription for it. Lines not on THIS prescription then wait for that other one;
+  // with no other prescription attached they are refused as before (C-08).
+  const onThis = new Set((await client.query(
+    `SELECT product_id FROM prescription_items WHERE prescription_id = $1`, [prescriptionId])).rows.map((r: any) => r.product_id));
+  const otherPending = (await client.query(
+    `SELECT 1 FROM prescriptions WHERE order_id = $1 AND id <> $2 AND status = 'pending' LIMIT 1`, [orderId, prescriptionId])).rows.length > 0;
+  const lines = otherPending ? waiting.filter((l) => onThis.has(l.product_id)) : waiting;
+  if (!lines.length) throw new AppError('None of the medicines waiting on this order is on this prescription', 400);
   for (const l of lines) {
     // Lock the line first, then read its balance (the ledger trigger takes the same lock)
     const item = (await client.query(
@@ -61,8 +70,10 @@ async function dispenseAgainst(client: PoolClient, prescriptionId: string, order
       [prescriptionId, l.product_id, l.quantity, orderId, l.order_item_id, pharmacistId]);
     await client.query(`UPDATE order_items SET prescription_id = $2 WHERE id = $1`, [l.order_item_id, prescriptionId]);
   }
-  await client.query(
-    `UPDATE orders SET status = 'rx_verified', updated_at = NOW() WHERE id = $1 AND status = 'rx_pending'`, [orderId]);
+  if (!(await rxRequiredLines(client, orderId)).some((l) => !l.prescription_id)) {
+    await client.query(
+      `UPDATE orders SET status = 'rx_verified', updated_at = NOW() WHERE id = $1 AND status = 'rx_pending'`, [orderId]);
+  }
   return lines.length;
 }
 
@@ -79,6 +90,8 @@ function verifyPrescriptionTx(pharmacistId: string, prescriptionId: string, inpu
     if (!rx) throw new AppError('Prescription not found', 404);
     if (rx.status !== 'pending') throw new AppError(`Prescription is already ${rx.status}`, 409);
     if (!rx.order_id) throw new AppError('Prescription is not attached to an order', 400);
+    // Sprint 44: not approved while the buyer still owes the difference for a change
+    await assertReleasableTx(client, rx.order_id);
 
     const prescribedOn = new Date(input.prescribed_on);
     const ageDays = (Date.now() - prescribedOn.getTime()) / 864e5;
@@ -160,6 +173,7 @@ function applyPrescriptionTx(pharmacistId: string, prescriptionId: string, order
     if (rx.status !== 'verified') throw new AppError('Only verified prescriptions can be reused', 400);
     if (rx.user_id !== rx.order_user) throw new AppError('Prescription belongs to a different buyer', 400);
     if (!rx.valid_until || new Date(rx.valid_until) < new Date(new Date().toDateString())) throw new AppError('Prescription has expired', 400);
+    await assertReleasableTx(client, orderId);   // Sprint 44
     const covered = await dispenseAgainst(client, prescriptionId, orderId, pharmacistId);
     await writeAuditTx(client, { userId: rx.user_id, action: 'prescription_reused', performedBy: pharmacistId,
       newValue: { prescription_id: prescriptionId, order_id: orderId, lines_covered: covered } });

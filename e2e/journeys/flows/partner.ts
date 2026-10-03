@@ -39,7 +39,7 @@ export async function partnerOrder(browser: Browser, story: Story) {
   story.orders.partner = await orderNumberOnScreen(buyer.page);
   await buyerShot('Order paid', `The buyer orders and pays exactly as before; order ${story.orders.partner} is placed with the pharmacy nearest to the buyer that has the stock.`);
   await buyer.page.goto(`/orders/${await orderIdOf(story.orders.partner)}`);
-  await buyerShot('Sold by the partner', `The order page names ${PARTNER.name} as the seller, with its own invoice number (C-05, C-13).`, { fullPage: true });
+  await buyerShot('Sold by the partner', `The order page names ${PARTNER.name} as the seller; its own invoice number is issued when the partner's pharmacist approves the parcel (C-05, C-13; Sprint 44).`, { fullPage: true });
 
   // ── The partner sends it from its own shop ──
   const part = await newSession(browser, 'laptop');
@@ -48,7 +48,7 @@ export async function partnerOrder(browser: Browser, story: Story) {
   await part.page.goto('/partner/shipments');
   const card = part.page.locator('div.card', { hasText: story.orders.partner });
   await card.first().waitFor();
-  await partShot('Shipment to send', 'Paid orders for the partner: where to send them, what to pack, the batch and expiry, and the invoice in the partner\'s own series to print.', { fullPage: true });
+  await partShot('Shipment to send', 'Paid orders for the partner: where to send them, what to pack, the batch and expiry; the invoice in the partner\'s own series is issued when its pharmacist releases the parcel (Sprint 44).', { fullPage: true });
   const [sid] = await shipmentsOf(story.orders.partner);
   // Sprint 35: the partner's own registered pharmacist checks and releases it first (C-08)
   const vendor = (await dbRow(`SELECT id FROM vendors WHERE name = $1`, [PARTNER.name]))!.id;

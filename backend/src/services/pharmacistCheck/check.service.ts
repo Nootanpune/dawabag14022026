@@ -10,13 +10,16 @@ import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
-import { assertRxCleared } from '../rxGate.service';
+import { assertRxCleared, rxRequiredLines } from '../rxGate.service';
 import { cancelOrder } from '../cancellation.service';
 import { queueNotification } from '../notification.service';
 import { captureHeldPaymentQuietly } from '../payments/rxHold/hold.service';
 import { assertStaffRegistrationValid } from '../pharmacistRegistration/gate.service';
 import { CHECKABLE_ORDER_STATES, CheckDecision, SignalLine, abuseSignals, canDecide, reasonProblem } from './rules';
 import { partnerRegistrationAtCheck, staffRegistrationAtCheck } from '../saleIdentity/pharmacist';
+import { recordShipmentSaleIdentityTx } from '../saleIdentity/record.service';
+import { PRACTITIONER_TYPE } from '../practitionerSales/rules';
+import { writtenOrdersFor } from '../practitionerSales/writtenOrder.service';
 
 export interface Checker { userId: string; name: string; regNo: string; vendorPharmacistId?: string | null }
 
@@ -50,7 +53,9 @@ export async function checkQueue() {
     `SELECT s.id AS shipment_id, s.invoice_number, s.total_paise, s.cold_chain, s.created_at,
             s.pharmacist_check, s.pharmacist_check_note, s.pharmacist_checked_at,
             o.id AS order_id, o.order_number, o.status AS order_status, o.payment_terms, o.patient_id,
-            up.full_name AS buyer_name, u.customer_type
+            up.full_name AS buyer_name, u.customer_type,
+            EXISTS (SELECT 1 FROM order_edits e WHERE e.order_id = o.id AND e.extra_status = 'awaiting_payment') AS extra_payment_pending,
+            (SELECT COUNT(*)::int FROM written_orders w WHERE w.order_id = o.id) AS written_orders
      FROM order_shipments s
      JOIN orders o ON o.id = s.order_id
      JOIN users u ON u.id = o.user_id
@@ -81,7 +86,11 @@ export async function orderCheckDetail(orderId: string) {
     `SELECT s.id, s.seller_type, COALESCE(v.name, 'Dawabag') AS seller_name, s.status, s.pharmacist_check,
             s.pharmacist_check_note, s.pharmacist_name, s.pharmacist_reg_no, s.pharmacist_checked_at
      FROM order_shipments s LEFT JOIN vendors v ON v.id = s.partner_id WHERE s.order_id = $1 ORDER BY s.seller_type, v.name`, [orderId]);
-  return { order: o, lines: lines.map((l) => ({ ...lineOut(l), shipment_id: l.shipment_id })), signals: abuseSignals(lines as SignalLine[]), shipments };
+  // Sprint 44: a doctor / institution order shows its signed written order(s) (r.65(9)(b))
+  const written = await writtenOrdersFor(null, orderId);
+  const extra = await queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM order_edits WHERE order_id = $1 AND extra_status = 'awaiting_payment'`, [orderId]);
+  return { order: o, lines: lines.map((l) => ({ ...lineOut(l), shipment_id: l.shipment_id })), signals: abuseSignals(lines as SignalLine[]), shipments,
+    written_orders: written, extra_payment_pending: (extra?.n ?? 0) > 0 };
 }
 
 /** Sprint 42: the checker's registration as at this check — kept on the shipment, filled once (C-03, C-08). */
@@ -95,16 +104,48 @@ const registrationAtCheck = (client: PoolClient, who: Checker) => (who.vendorPha
  * afterwards (trigger order_shipments_identity_final, Sprint 42).
  */
 export async function recordRelease(client: PoolClient, shipmentIds: string[], who: Checker, via: string, buyerId: string, orderId: string) {
-  const registration = shipmentIds.length ? JSON.stringify(await registrationAtCheck(client, who)) : null;
+  if (!shipmentIds.length) return [];
+  // Sprint 44: nothing is approved while the buyer still owes the extra for a change, and a
+  // doctor / institution order needs its signed written order (r.65(9)(b))
+  await assertReleasableTx(client, orderId);
+  const registration = JSON.stringify(await registrationAtCheck(client, who));
+  const invoices: { shipment_id: string; invoice_number: string }[] = [];
   for (const id of shipmentIds) {
-    await client.query(
+    // Sprint 44: the release issues the tax invoice (trigger order_shipments_issue_invoice, migration 39);
+    // the sale record is frozen first, in the same transaction, for the lines as finally supplied
+    await recordShipmentSaleIdentityTx(client, id);
+    const inv = (await client.query(
       `UPDATE order_shipments SET pharmacist_check = 'released', pharmacist_checked_by = $2, pharmacist_checked_at = NOW(),
          pharmacist_name = $3, pharmacist_reg_no = $4, vendor_pharmacist_id = $5, pharmacist_check_note = NULL,
          pharmacist_registration = $6
-       WHERE id = $1`, [id, who.userId, who.name, who.regNo, who.vendorPharmacistId ?? null, registration]);
+       WHERE id = $1 RETURNING invoice_number`, [id, who.userId, who.name, who.regNo, who.vendorPharmacistId ?? null, registration])).rows[0];
+    invoices.push({ shipment_id: id, invoice_number: inv?.invoice_number });
     await writeAuditTx(client, { userId: buyerId, action: 'pharmacist_check_released', performedBy: who.userId,
       newValue: { order_id: orderId, shipment_id: id, pharmacist_name: who.name, pharmacist_reg_no: who.regNo,
-        vendor_pharmacist_id: who.vendorPharmacistId ?? null, via } });
+        vendor_pharmacist_id: who.vendorPharmacistId ?? null, via, invoice_number: inv?.invoice_number ?? null } });
+    await writeAuditTx(client, { userId: buyerId, action: 'tax_invoice_issued', performedBy: who.userId,
+      newValue: { order_id: orderId, shipment_id: id, invoice_number: inv?.invoice_number ?? null, at: 'pharmacist_release' } });
+  }
+  return invoices;
+}
+
+/**
+ * Sprint 44: refuses the approval (409) while an extra payment for an order change is not yet
+ * authorised, or when a doctor / institution order has no signed written order.
+ */
+export async function assertReleasableTx(client: PoolClient, orderId: string) {
+  const o = (await client.query(
+    `SELECT o.pricing_type,
+            EXISTS (SELECT 1 FROM order_edits e WHERE e.order_id = o.id AND e.extra_status = 'awaiting_payment') AS extra_due,
+            EXISTS (SELECT 1 FROM written_orders w WHERE w.order_id = o.id) AS written
+     FROM orders o WHERE o.id = $1`, [orderId])).rows[0];
+  if (o?.extra_due) {
+    throw new AppError('The buyer changed this order and has not yet paid the difference. It can be approved once that payment is made.',
+      409, true, 'EXTRA_PAYMENT_PENDING');
+  }
+  if (o?.pricing_type === PRACTITIONER_TYPE && !o.written) {
+    throw new AppError('This doctor / institution order has no signed written order attached; it cannot be supplied (Drugs Rules 1945, r.65(9)(b)).',
+      409, true, 'WRITTEN_ORDER_REQUIRED');
   }
 }
 
@@ -117,6 +158,9 @@ export async function releaseOwnAfterPrescription(client: PoolClient, orderId: s
   const who = await dawabagPharmacist(client, pharmacistId);
   const o = (await client.query(`SELECT user_id, status FROM orders WHERE id = $1`, [orderId])).rows[0];
   if (!o || !CHECKABLE_ORDER_STATES.includes(o.status)) return 0;
+  // Sprint 44: an order with prescriptions still to check (e.g. a second one for a medicine the
+  // buyer added) is released once every prescription line is covered
+  if ((await rxRequiredLines(client, orderId)).some((l) => !l.prescription_id)) return 0;
   const ids = (await client.query(
     `SELECT id FROM order_shipments WHERE order_id = $1 AND seller_type = 'dawabag' AND status = 'pending'
        AND pharmacist_check IN ('pending', 'held') FOR UPDATE`, [orderId])).rows.map((r: any) => r.id);
@@ -170,8 +214,9 @@ export async function decide(
     if (decision === 'release') {
       // A prescription line still waiting blocks the release too (C-08)
       await assertRxCleared(client, s.order_id, s.id);
-      await recordRelease(client, [s.id], who, 'order_check', s.user_id, s.order_id);
-      return { s, result: { shipment_id: s.id, pharmacist_check: 'released', pharmacist_name: who.name, pharmacist_reg_no: who.regNo } };
+      const [inv] = await recordRelease(client, [s.id], who, 'order_check', s.user_id, s.order_id);
+      return { s, result: { shipment_id: s.id, pharmacist_check: 'released', pharmacist_name: who.name, pharmacist_reg_no: who.regNo,
+        invoice_number: inv?.invoice_number ?? null } };
     }
     await client.query(
       `UPDATE order_shipments SET pharmacist_check = 'held', pharmacist_checked_by = $2, pharmacist_checked_at = NOW(),

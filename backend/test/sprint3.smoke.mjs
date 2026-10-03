@@ -215,7 +215,13 @@ async function main() {
                          VALUES ($1, 'S3 Buyer', $2, '1 Lane', 'Nashik', 'MH', $3) RETURNING id`,
     [buyerU.user_id, people.buyer.mobile, BUYER_PIN]))[0].id;
   const order = (items) => call('POST', '/orders', { token: buyer, body: { address_id: addr, pincode: BUYER_PIN, items } });
-  const shipmentsOf = async (orderId) => q(
+  // Sprint 44: the invoice number is taken at the pharmacist's release (no longer at placement);
+  // each order's shipments are released here (stand-in) so the series checks below still apply
+  const shipmentsOf = async (orderId) => {
+    for (const s of await q(`SELECT id FROM order_shipments WHERE order_id = $1 AND pharmacist_check = 'pending'`, [orderId])) await releaseInDb(q, s.id);
+    return shipmentRows(orderId);
+  };
+  const shipmentRows = async (orderId) => q(
     `SELECT s.seller_type, v.name AS partner, s.invoice_number, s.total_paise,
             (SELECT array_agg(p.sku ORDER BY p.sku) FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.shipment_id = s.id) AS skus
      FROM order_shipments s LEFT JOIN vendors v ON v.id = s.partner_id WHERE s.order_id = $1 ORDER BY s.seller_type, v.name`, [orderId]);

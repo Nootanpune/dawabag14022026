@@ -484,6 +484,34 @@ verification, the order check, partner releases and medicine-information approva
 Pharmacists working before Sprint 39 were carried over as "not yet recorded" (allowed,
 with a warning) — complete their records before go-live.
 
+## 7h. Invoice at approval, order changes, sales to doctors (Sprint 44)
+
+Owner decision 2026-10-03: an order can be changed only **before the pharmacist's approval**,
+and the **tax invoice is issued at that approval** (DECISIONS.md, Sprint 44 rows).
+
+- **Invoice numbers.** A shipment takes its seller's gap-free number (Dawabag `DWB/…`, a
+  partner its own prefix) when a registered pharmacist releases it — the database does it in
+  the release itself (trigger `order_shipments_issue_invoice`, migration 39). Orders placed but
+  not yet approved show "The tax invoice is issued when our pharmacist approves the order." A
+  cancellation or change before approval takes no number and needs no credit note. GST
+  registers, GSTR-1 and e-invoicing read the issue date (`invoice_issued_at`). Invoices issued
+  before Sprint 44 keep their numbers and dates. A partner without an invoice prefix cannot be
+  released ("The partner's invoice series is not set up") — set it at approval.
+- **Second payments.** A change that raises the value waits for the buyer's payment of the
+  difference (order page "Pay the difference"; Razorpay order with `notes.order_edit_id`); the
+  pharmacist's release and prescription verification answer 409 `EXTRA_PAYMENT_PENDING` until
+  it is paid (or authorised, for an order with prescription medicines). Nothing times it out
+  yet (owner to decide); staff may cancel the order. Razorpay webhooks need no change.
+- **Doctor / institution buyers** (FDA Maharashtra circular Drug/Wholesalers Memo./16/2026/1,
+  r.64(2), r.65(9)(b)): Admin → *Doctor registrations* lists accounts needing attention —
+  check the council's register and the uploaded certificate, then **Verify** with the
+  valid-till date (or Not verified / Suspend with a reason). Doctors verified before Sprint 44
+  must be re-verified with valid-till and the certificate before their next order. Every order
+  needs a signed written order (uploaded, or signed in the app with the doctor's password);
+  the pharmacist sees it in the check. *Sales to doctors* (Admin and Partner portals) is the
+  register for the drugs inspector — period, CSV, links to the certificate and written order
+  (5-minute, every view logged). Uploads need the object store (`AWS_S3_BUCKET`).
+
 ## 7a. Development and CI
 
 - One command brings a fresh machine to a running, migrated API against the fake
@@ -739,6 +767,9 @@ search works without typo matching; to add it later, as a superuser:
    admin and super-admin switches it on, then Settings → "Two-step sign-in" → required
    (security review Sprints 35–40 #16: without it an SMS code alone resets an admin's password).
 10. `HEALTH_ENC_KEY` set and kept in the secret store (section 6 "Health data key").
+11. Doctor / hospital accounts: each registration verified with valid-till and the certificate
+    copy (Admin → Doctor registrations, section 7h); the lawyer / FDA's view on what counts as a
+    "signed" in-app written order recorded in DECISIONS.md (Sprint 44 row).
 
 ## 9. Incidents
 

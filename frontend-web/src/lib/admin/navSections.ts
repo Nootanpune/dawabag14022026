@@ -142,6 +142,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/licences', label: 'Licences', icon: BadgeCheck, roles: MANAGER_ROLES },
       // Sprint 39 — pharmacist registration validity (C-03) and who supplied each partner batch (C-02, C-28)
       { href: '/admin/pharmacist-registrations', label: 'Pharmacist registrations', icon: IdCard, roles: MANAGER_ROLES },
+      // Sprint 44: sales to doctors / institutions (r.65(9)(b); FDA Pune circular 16/2026)
+      { href: '/admin/practitioners', label: 'Doctor registrations', icon: IdCard, roles: PHARMACIST_ROLES },
+      { href: '/admin/practitioner-sales', label: 'Sales to doctors', icon: BookOpenCheck, roles: PHARMACIST_ROLES },
       { href: '/admin/partner-provenance', label: 'Partner batch suppliers', icon: Waypoints, roles: MANAGER_ROLES },
       // Sprint 38 — emergency stop for prescription-medicine sales (super-admin acts) and the chain checks (C-08, C-09, C-46)
       { href: '/admin/emergency-stop', label: 'Emergency stop', icon: OctagonPause, roles: MANAGER_ROLES },

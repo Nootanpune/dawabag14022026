@@ -3,6 +3,7 @@
 // Routes: /api/v1/kyc/*
 
 import { Request, Response, NextFunction } from 'express';
+import { decideRegistration } from '../services/practitionerSales/registration.service';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import {
@@ -145,12 +146,14 @@ export const adminVerifyDrugLicense = async (req: Request, res: Response, next: 
 };
 
 // ── ADMIN: Verify NMC Registration ────────────────────────────────────────────
+// Sprint 44: through the practitioner registration decision (services/practitionerSales):
+// verifying needs the valid-till date and the uploaded certificate copy (Drugs Rules r.65(9)(b);
+// FDA Pune circular Drug/Wholesalers Memo./16/2026/1 — keep a copy of the registration).
 export const adminVerifyNMC = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
       user_id, nmc_number, council_state, verified,
-      doctor_name_as_per_register, qualification,
-      registration_date, registration_status,
+      doctor_name_as_per_register, qualification, valid_till, practitioner_kind,
       rejection_reason, notes
     } = req.body;
 
@@ -160,32 +163,24 @@ export const adminVerifyNMC = async (req: Request, res: Response, next: NextFunc
     if (!verified && !rejection_reason) {
       throw new AppError('rejection_reason required when verified = false', 400);
     }
-
-    await NMCVerifier.recordAdminVerification({
-      userId: user_id,
-      nmcNumber: nmc_number,
-      councilState: council_state,
-      verified,
-      doctorNameAsPerRegister: doctor_name_as_per_register,
-      qualification,
-      registrationDate: registration_date,
-      registrationStatus: registration_status,
-      rejectionReason: rejection_reason,
-      adminId: req.user!.id,
-      notes,
+    const r = await decideRegistration(req.user!.id, String(user_id), {
+      decision: verified ? 'verify' : 'reject', registration_number: String(nmc_number), council: String(council_state),
+      valid_till: valid_till ?? null, name_as_per_register: doctor_name_as_per_register ?? null, qualification: qualification ?? null,
+      kind: practitioner_kind === 'institution' ? 'institution' : practitioner_kind === 'doctor' ? 'doctor' : undefined,
+      reason: rejection_reason ?? null, notes: notes ?? null,
     });
-
     await writeAudit({
       userId: user_id, action: verified ? 'kyc_check_verified' : 'kyc_check_failed',
       performedBy: req.user!.id, newValue: { check: 'nmc_registration' }, notes: rejection_reason ?? notes,
     });
-    const activated = verified ? await KYCOrchestrator.checkAndActivate(user_id, req.user!.id) : false;
+    const activated = r.account_activated;
 
     res.json({
       success: true,
       data: {
         verified,
         account_activated: activated,
+        registration: r.registration,
         message: activated
           ? 'NMC verified. All checks passed. Doctor account is now ACTIVE.'
           : verified

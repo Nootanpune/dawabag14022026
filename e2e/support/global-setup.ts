@@ -36,6 +36,13 @@ export default async function globalSetup(config: FullConfig) {
     await c.query(`INSERT INTO addresses (user_id, full_name, mobile, address_line1, city, state, pincode, is_default)
                    SELECT id, 'E2E Buyer', '9000001999', '19 Lake Road', 'Nashik', 'Maharashtra', $2, TRUE FROM users WHERE mobile = $1`,
                    [people.buyer.mobile, PIN]);
+    // Sprint 44: the doctor's account approved and council registration verified by staff (valid till, certificate copy checked)
+    await c.query(`UPDATE users SET kyc_status = 'approved', kyc_approved_at = NOW(), nmc_status = 'verified', nmc_valid_till = CURRENT_DATE + 365,
+                     nmc_verified_at = NOW(), nmc_certificate_key = 'kyc/e2e/nmc_certificate/e2e.pdf', nmc_doctor_name_as_per_register = 'Meera Joshi',
+                     practitioner_kind = 'doctor' WHERE mobile = $1`, [people.doctor.mobile]);
+    await c.query(`INSERT INTO addresses (user_id, full_name, mobile, address_line1, city, state, pincode, is_default)
+                   SELECT id, 'E2E Joshi Clinic', '9000001998', '19 Clinic Road', 'Nashik', 'Maharashtra', $2, TRUE FROM users WHERE mobile = $1`,
+                   [people.doctor.mobile, PIN]);
     const token = (await call('POST', '/auth/login', { mobile: people.admin.mobile, password: people.admin.password })).json.data?.access_token;
     const product = await call('POST', '/products', {
       name: 'E2E Paracetamol 500', sku: 'E2E-PARA', category: 'Pain relief', drug_schedule: 'OTC', gst_rate: 12, hsn_code: '30049099',

@@ -13,9 +13,11 @@ import { writeAudit } from '../../utils/audit';
 import { applyCapture } from './capture.service';
 import { paymentFailed } from './webhook.service';
 import { DEMO_ORDER_PREFIX, DEMO_PAYMENT_PREFIX, demoPaymentsEnabled, type PaymentMethod } from './paymentMode';
+import { assertWrittenOrderOnOrder } from '../practitionerSales/writtenOrder.service';
 import { assertPrescriptionProvided } from '../prescriptions/requirement.service';
 import { needsManualCapture, recordAuthorisation } from './rxHold/hold.service';
 import { HOLD_WORDING } from './rxHold/rules';
+import { editPaymentTarget } from '../orderEdit/extraPayment';
 
 /** provider: the bank (netbanking) or wallet chosen in the demo checkout — audit only (Sprint 27) */
 export interface DemoPaymentInput { method: PaymentMethod; outcome: 'success' | 'failure'; provider?: string }
@@ -32,6 +34,29 @@ const ids = () => {
   return { order: `${DEMO_ORDER_PREFIX}${r}`, payment: `${DEMO_PAYMENT_PREFIX}${r}` };
 };
 
+/** Sprint 44: the difference for an order change, paid in the trial's demo (held for an order with prescription medicines). */
+export async function payEditDemo(userId: string, orderId: string, orderEditId: string, input: DemoPaymentInput) {
+  assertDemoPayments();
+  const t = await editPaymentTarget(userId, orderId, orderEditId);
+  await assertOrderPayable(pool, orderId);
+  const manual = await withTransaction((c) => needsManualCapture(c, orderId));
+  const id = ids();
+  await query(`INSERT INTO payments (order_id, gateway, gateway_order_id, status, amount_paise, method, capture_mode, order_edit_id)
+               VALUES ($1, 'demo', $2, 'created', $3, $4, $5, $6)`, [orderId, id.order, t.amountPaise, input.method, manual ? 'manual' : 'automatic', orderEditId]);
+  if (input.outcome === 'failure') {
+    await paymentFailed({ order_id: id.order });
+    return { order_id: orderId, order_edit_id: orderEditId, paid: false, demo: true };
+  }
+  const outcome = manual
+    ? (await recordAuthorisation({ id: id.payment, order_id: id.order, amount: t.amountPaise, method: input.method, status: 'authorized' }, userId))?.outcome
+    : (await applyCapture({ id: id.payment, order_id: id.order, amount: t.amountPaise, method: input.method, status: 'captured' }, userId)).outcome;
+  await writeAudit({ userId, action: manual ? 'demo_payment_authorised' : 'demo_payment_captured', performedBy: userId,
+    newValue: { demo: true, order_id: orderId, order_edit_id: orderEditId, gateway_order_id: id.order, gateway_payment_id: id.payment,
+      method: input.method, ...via(input), amount_paise: t.amountPaise, outcome } });
+  return { order_id: orderId, order_edit_id: orderEditId, paid: true, demo: true, payment_id: id.payment,
+    payment_status: manual ? 'authorized' as const : 'captured' as const, ...(manual ? { charge_note: HOLD_WORDING.checkout } : {}) };
+}
+
 export async function payOrderDemo(userId: string, orderId: string, input: DemoPaymentInput) {
   assertDemoPayments();
   const order = await queryOne<{ id: string; order_number: string; total_paise: number; status: string; user_id: string }>(
@@ -44,6 +69,8 @@ export async function payOrderDemo(userId: string, orderId: string, input: DemoP
   // (simulated) until the pharmacist check passes — exactly as with Razorpay (C-08, C-37)
   const manual = await withTransaction(async (c) => {
     await assertPrescriptionProvided(c, order.id);
+    // Sprint 44: a doctor / institution order is paid for only with its signed written order (r.65(9)(b))
+    await assertWrittenOrderOnOrder(c, order.id);
     return needsManualCapture(c, order.id);
   });
 

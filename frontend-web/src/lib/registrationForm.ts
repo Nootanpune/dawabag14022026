@@ -61,6 +61,8 @@ export interface DetailsFormValues {
   nmc_reg_number: string;
   nmc_council_state: string;
   speciality: string;
+  /** Sprint 44: a doctor, or a medical institution (its responsible doctor's registration above) */
+  practitioner_kind: 'doctor' | 'institution';
   practitioner_declaration: boolean;
   /** language the privacy notice was read in; consent cites that notice version + language (C-40) */
   notice_language: PolicyLanguage;
@@ -89,6 +91,7 @@ export const EMPTY_DETAILS: DetailsFormValues = {
   nmc_reg_number: '',
   nmc_council_state: '',
   speciality: '',
+  practitioner_kind: 'doctor',
   practitioner_declaration: false,
   notice_language: 'en',
   accept_privacy_notice: false,
@@ -120,6 +123,7 @@ export function buildDetailsSchema(type: CustomerType) {
       nmc_reg_number: str,
       nmc_council_state: str,
       speciality: str,
+      practitioner_kind: z.enum(['doctor', 'institution']),
       practitioner_declaration: z.boolean(),
       notice_language: z.enum(POLICY_LANGUAGES),
       accept_privacy_notice: z.boolean(),
@@ -189,6 +193,7 @@ export function buildDetailsSchema(type: CustomerType) {
         if (!d.nmc_reg_number.trim()) issue('nmc_reg_number', 'Registration number is required');
         if (!d.nmc_council_state.trim()) issue('nmc_council_state', 'Medical council is required');
         if (!d.speciality.trim()) issue('speciality', 'Select your speciality');
+        if (d.practitioner_kind === 'institution' && !d.business_name.trim()) issue('business_name', 'Enter the hospital, clinic or nursing home name');
         if (!d.gst_unregistered_declaration) {
           issue('gst_unregistered_declaration', 'Please confirm the GST declaration');
         }
@@ -238,6 +243,8 @@ export function buildRegisterPayload(type: CustomerType, d: DetailsFormValues): 
       nmc_reg_number: d.nmc_reg_number.trim(),
       nmc_council_state: d.nmc_council_state.trim(),
       speciality: d.speciality,
+      practitioner_kind: d.practitioner_kind,   // Sprint 44 (r.65(9)(b))
+      ...(d.practitioner_kind === 'institution' ? { business_name: d.business_name.trim() } : {}),
       pan_number: d.pan_number.trim().toUpperCase(),
       gst_unregistered_declaration: d.gst_unregistered_declaration,
       practitioner_declaration: d.practitioner_declaration, // C-15

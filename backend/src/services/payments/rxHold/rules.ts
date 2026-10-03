@@ -77,6 +77,8 @@ export interface ReadinessInput {
   rxLinesWaiting: number;
   /** shipments that hold at least one prescription line */
   rxShipments: { status: string; pharmacist_check: string }[];
+  /** Sprint 44: the buyer still owes the difference for an order change */
+  extraPaymentDue?: boolean;
 }
 
 /** Order states in which a held payment may be captured (paid-for work goes on). */
@@ -88,6 +90,7 @@ export function captureReadiness(i: ReadinessInput): Readiness {
   if (i.paymentStatus !== 'authorized') return { ready: false, reason: `payment is ${i.paymentStatus}` };
   if (!CAPTURABLE_ORDER_STATES.includes(i.orderStatus)) return { ready: false, reason: `order is ${i.orderStatus}` };
   if (i.rxLinesWaiting > 0) return { ready: false, reason: 'prescription not yet verified' };
+  if (i.extraPaymentDue) return { ready: false, reason: 'the difference for an order change is not paid yet' };
   const live = i.rxShipments.filter((s) => s.status !== 'cancelled');
   if (live.some((s) => s.pharmacist_check !== 'released')) return { ready: false, reason: 'pharmacist check not yet passed' };
   return { ready: true };

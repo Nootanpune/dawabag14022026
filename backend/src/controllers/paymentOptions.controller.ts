@@ -4,7 +4,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { DEMO_PROVIDERS, PAYMENT_METHODS, demoProviderValid, paymentMode } from '../services/payments/paymentMode';
-import { payConsultationDemo, payOrderDemo } from '../services/payments/demoPayment.service';
+import { payConsultationDemo, payEditDemo, payOrderDemo } from '../services/payments/demoPayment.service';
 
 const demoBody = z.object({
   method: z.enum(PAYMENT_METHODS).default('upi'),
@@ -29,8 +29,9 @@ export function getPaymentOptions(_req: Request, res: Response) {
 
 export async function postDemoOrderPayment(req: Request, res: Response, next: NextFunction) {
   try {
-    const { order_id, ...input } = checked(demoBody.extend({ order_id: z.string().uuid() }).parse(req.body));
-    const data = await payOrderDemo(req.user!.id, order_id, input);
+    const { order_id, order_edit_id, ...input } = checked(demoBody.extend({ order_id: z.string().uuid(), order_edit_id: z.string().uuid().optional() }).parse(req.body));
+    // Sprint 44: order_edit_id = the difference for an order change
+    const data = order_edit_id ? await payEditDemo(req.user!.id, order_id, order_edit_id, input) : await payOrderDemo(req.user!.id, order_id, input);
     res.json({ success: true, message: data.paid ? 'Demo payment recorded — no money moved' : 'Demo payment failed (simulated)', data });
   } catch (e) { next(e); }
 }

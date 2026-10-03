@@ -15,12 +15,14 @@ const LICENCES = (col: string) =>
   `(SELECT string_agg((l->>'label') || ': ' || (l->>'number'), ' · ') FROM jsonb_array_elements(COALESCE(${col}, '[]'::jsonb)) l)`;
 
 // One row per Dawabag tax invoice (cancelled ones stay; their credit notes reverse them).
+// Sprint 44: invoices are dated by their issue (the pharmacist's approval, invoice_issued_at);
+// a shipment never invoiced (cancelled or changed before approval) is in no register.
 // Sprint 42: the sale channel, the licences sold under, the buyer's licences and the
 // pharmacist of record come from the shipment's sale record as fixed at the sale (C-07,
 // C-08, C-13) — not from today's licence register; sale_record says if it was backfilled.
 export async function salesRegister({ from, to }: Range) {
   return query(
-    `SELECT s.invoice_number, s.created_at::date AS invoice_date, o.order_number, ${BUYER} AS buyer_name,
+    `SELECT s.invoice_number, s.invoice_issued_at::date AS invoice_date, o.order_number, ${BUYER} AS buyer_name,
             o.buyer_gstin, CASE WHEN o.buyer_gstin IS NULL THEN 'B2C' ELSE 'B2B' END AS supply_type,
             a.state AS place_of_supply, s.subtotal_paise AS taxable_paise,
             SUM(oi.cgst_paise)::int AS cgst_paise, SUM(oi.sgst_paise)::int AS sgst_paise, SUM(oi.igst_paise)::int AS igst_paise,
@@ -33,14 +35,14 @@ export async function salesRegister({ from, to }: Range) {
      FROM order_shipments s JOIN orders o ON o.id = s.order_id JOIN addresses a ON a.id = o.address_id
      JOIN users u ON u.id = o.user_id LEFT JOIN user_profiles up ON up.user_id = o.user_id
      JOIN order_items oi ON oi.shipment_id = s.id
-     WHERE s.seller_type = 'dawabag' AND s.created_at::date BETWEEN $1 AND $2
+     WHERE s.seller_type = 'dawabag' AND s.invoice_issued_at::date BETWEEN $1 AND $2
      GROUP BY s.id, o.id, a.id, u.id, up.full_name ORDER BY s.invoice_number`, [from, to]);
 }
 
 export async function creditNoteRegister({ from, to }: Range) {
   return query(
     `SELECT cn.credit_note_number, cn.created_at::date AS note_date, s.invoice_number AS against_invoice,
-            s.created_at::date AS invoice_date, ${BUYER} AS buyer_name, o.buyer_gstin,
+            s.invoice_issued_at::date AS invoice_date, ${BUYER} AS buyer_name, o.buyer_gstin,
             CASE WHEN o.buyer_gstin IS NULL THEN 'B2C' ELSE 'B2B' END AS supply_type, a.state AS place_of_supply,
             cn.reason, cn.taxable_paise, cn.cgst_paise, cn.sgst_paise, cn.igst_paise, cn.total_paise
      FROM credit_notes cn JOIN order_shipments s ON s.id = cn.shipment_id JOIN orders o ON o.id = cn.order_id
@@ -56,7 +58,7 @@ export async function hsnSummary({ from, to }: Range) {
        SELECT p.hsn_code, oi.gst_rate, oi.quantity AS qty, oi.line_total_paise - oi.gst_amount_paise AS taxable,
               oi.cgst_paise AS cgst, oi.sgst_paise AS sgst, oi.igst_paise AS igst
        FROM order_items oi JOIN order_shipments s ON s.id = oi.shipment_id JOIN products p ON p.id = oi.product_id
-       WHERE s.seller_type = 'dawabag' AND s.created_at::date BETWEEN $1 AND $2
+       WHERE s.seller_type = 'dawabag' AND s.invoice_issued_at::date BETWEEN $1 AND $2
        UNION ALL
        SELECT p.hsn_code, oi.gst_rate, -ci.quantity, -ci.taxable_paise,
               -CASE WHEN oi.igst_paise > 0 THEN 0 ELSE ci.gst_paise / 2 END,
@@ -79,7 +81,7 @@ export async function gstr1Summary({ from, to }: Range) {
             SUM(oi.cgst_paise)::bigint AS cgst_paise, SUM(oi.sgst_paise)::bigint AS sgst_paise, SUM(oi.igst_paise)::bigint AS igst_paise
      FROM order_items oi JOIN order_shipments s ON s.id = oi.shipment_id JOIN orders o ON o.id = s.order_id
      JOIN addresses a ON a.id = o.address_id
-     WHERE s.seller_type = 'dawabag' AND s.created_at::date BETWEEN $1 AND $2
+     WHERE s.seller_type = 'dawabag' AND s.invoice_issued_at::date BETWEEN $1 AND $2
      GROUP BY 1, 2, 3
      UNION ALL
      SELECT CASE WHEN o.buyer_gstin IS NULL THEN 'CDNUR' ELSE 'CDNR' END, a.state, oi.gst_rate, COUNT(DISTINCT cn.id)::int,

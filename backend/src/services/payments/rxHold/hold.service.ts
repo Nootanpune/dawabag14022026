@@ -21,6 +21,7 @@ import { rxRequiredLines } from '../../rxGate.service';
 import { getRazorpay } from '../../razorpay.client';
 import { afterCapture, applyCaptureTx, CaptureRecord, GatewayPayment } from '../capture.service';
 import { isDemoPaymentId } from '../paymentMode';
+import { recordEditAuthorisationTx } from '../../orderEdit/extraPayment';
 import {
   DEFAULT_RX_HOLD, HOLD_WORDING, Readiness, RxHoldSettings, authorisationGone, captureReadiness, holdAction, holdTimes, parseRxHoldSettings,
 } from './rules';
@@ -54,9 +55,11 @@ export async function holdReadiness(client: PoolClient, orderId: string): Promis
   const shipmentIds = [...new Set(lines.map((l) => l.shipment_id).filter(Boolean))];
   const rxShipments = shipmentIds.length
     ? (await client.query(`SELECT status, pharmacist_check FROM order_shipments WHERE id = ANY($1::uuid[])`, [shipmentIds])).rows : [];
+  // Sprint 44: not while the buyer still owes the difference for a change
+  const extraDue = (await client.query(`SELECT 1 FROM order_edits WHERE order_id = $1 AND extra_status = 'awaiting_payment' LIMIT 1`, [orderId])).rows.length > 0;
   const r = captureReadiness({
     paymentStatus: payment.status, orderStatus: order?.status ?? 'missing',
-    rxLinesWaiting: lines.filter((l) => !l.prescription_id).length, rxShipments,
+    rxLinesWaiting: lines.filter((l) => !l.prescription_id).length, rxShipments, extraPaymentDue: extraDue,
   });
   return { ...r, payment };
 }
@@ -68,12 +71,17 @@ export async function holdReadiness(client: PoolClient, orderId: string): Promis
 export async function recordAuthorisation(p: GatewayPayment, actor: string | null = null): Promise<{ outcome: string; orderId?: string } | null> {
   const r = await withTransaction(async (client) => {
     const pay = (await client.query(
-      `SELECT id, order_id, amount_paise, status, capture_mode FROM payments WHERE gateway_order_id = $1 FOR UPDATE`, [p.order_id])).rows[0];
+      `SELECT id, order_id, amount_paise, status, capture_mode, order_edit_id FROM payments WHERE gateway_order_id = $1 FOR UPDATE`, [p.order_id])).rows[0];
     if (!pay || pay.capture_mode !== 'manual') return null;
     if (pay.status !== 'created' && pay.status !== 'failed') return { outcome: `already ${pay.status}`, orderId: pay.order_id };
     if (Number(p.amount) !== Number(pay.amount_paise)) {
       logger.error(`Authorised amount mismatch for gateway order ${p.order_id}`);
       return { outcome: 'amount mismatch; left for accounts', orderId: pay.order_id };
+    }
+    // Sprint 44: the second payment for an order change, held like the order's own (extraPayment.ts)
+    if (pay.order_edit_id) {
+      const t = holdTimes(new Date(), await rxHoldSettings(client));
+      return { outcome: await recordEditAuthorisationTx(client, pay, p, t, actor), orderId: pay.order_id };
     }
     const order = (await client.query('SELECT status, user_id, order_number FROM orders WHERE id = $1 FOR UPDATE', [pay.order_id])).rows[0];
     if (!['pending_payment', 'payment_failed'].includes(order.status)) {
@@ -146,6 +154,17 @@ async function authorisationLost(orderId: string, gatewayStatus: string) {
  * concurrent callers never both ask the gateway to capture.
  */
 export async function captureHeldPayment(orderId: string, actor: string | null = null): Promise<{ captured: boolean; outcome: string }> {
+  // Sprint 44: an order may hold two authorisations (its own and an order change's): each is captured
+  let first = await captureOneHeldPayment(orderId, actor);
+  for (let i = 0; first.captured && i < 5; i++) {
+    const next = await captureOneHeldPayment(orderId, actor);
+    if (!next.captured) break;
+    first = { captured: true, outcome: `${first.outcome}; ${next.outcome}` };
+  }
+  return first;
+}
+
+async function captureOneHeldPayment(orderId: string, actor: string | null): Promise<{ captured: boolean; outcome: string }> {
   const r = await withTransaction(async (client): Promise<{ captured: boolean; outcome: string; record?: CaptureRecord; lost?: string }> => {
     await client.query('SELECT id FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
     const ready = await holdReadiness(client, orderId);

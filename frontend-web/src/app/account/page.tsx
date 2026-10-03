@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ClipboardList, FileUp, Repeat, ChevronRight, MessageSquareWarning, ShieldCheck, MapPin, Undo2, HeartPulse, FileText, Stethoscope, BadgeCheck, AlarmClock, Activity } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/layout/Header';
+import RegistrationStatusCard from '@/components/practitioner/RegistrationStatusCard';
 
 // Business and doctor accounts keep their drug licences here (Sprint 30)
 const LICENCE_TYPES = ['b2b_retailer', 'b2b_wholesaler', 'doc_hospital'];
@@ -33,6 +34,8 @@ export default function AccountPage() {
       <div className="max-w-2xl mx-auto px-4 py-6">
         <h1 className="text-lg font-semibold">{user?.full_name ?? 'My account'}</h1>
         <p className="text-sm text-gray-500 mb-4">+91 {user?.mobile}</p>
+        {/* Sprint 44: a doctor's / institution's registration as Dawabag verified it (r.65(9)(b)) */}
+        {user?.customer_type === 'doc_hospital' && <RegistrationStatusCard />}
         <div className="card p-0 divide-y divide-gray-100">
           {links.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50">

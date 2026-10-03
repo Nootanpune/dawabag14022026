@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { API, call, check, q } from '../sprint5/lib.mjs';
 import { PIN, markPaid } from './fixtures.mjs';
-import { releaseForPacking } from '../support/pharmacistCheck.mjs';
+import { releaseForPacking, releaseInDb } from '../support/pharmacistCheck.mjs';
 import { releaseShipmentGdpHolds } from '../support/gdpHolds.mjs';
 
 const require = createRequire(import.meta.url);
@@ -88,6 +88,7 @@ export async function runOperations({ t, P, addr, ids }) {
   r = await call('POST', '/orders', { token: t.buyer, body: { address_id: addr.buyer, pincode: PIN, items: [{ product_id: P.otc, quantity: 2 }] } });
   const ord = r.json.data.order;
   const shipId = (await q(`SELECT id FROM order_shipments WHERE order_id = $1`, [ord.id]))[0].id;
+  await releaseInDb(q, shipId);   // Sprint 44: the invoice is issued at the pharmacist's release
   check('invoice amounts cannot be edited', /final/.test(await tryQ(`UPDATE order_shipments SET total_paise = 1 WHERE id = $1`, [shipId])));
   check('invoiced lines cannot be edited', /final/.test(await tryQ(`UPDATE order_items SET unit_price_paise = 1 WHERE order_id = $1`, [ord.id])));
   check('invoice status can still move', (await tryQ(`UPDATE order_shipments SET courier_partner = 'X' WHERE id = $1`, [shipId])) === 'ok');

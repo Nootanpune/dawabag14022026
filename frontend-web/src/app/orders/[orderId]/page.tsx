@@ -13,6 +13,8 @@ import OrderShipmentsCard from '@/components/orders/OrderShipmentsCard';
 import CancelOrderCard from '@/components/orders/CancelOrderCard';
 import EditOrderCard from '@/components/orders/edit/EditOrderCard';
 import OrderEditsCard from '@/components/orders/edit/OrderEditsCard';
+import ExtraPaymentCard from '@/components/orders/edit/ExtraPaymentCard';
+import WrittenOrdersCard from '@/components/orders/WrittenOrdersCard';
 import RefundsCard from '@/components/orders/RefundsCard';
 import PaymentHoldCard from '@/components/orders/PaymentHoldCard';
 import OrderBillCard from '@/components/orders/OrderBillCard';
@@ -46,6 +48,7 @@ export default function OrderDetailPage() {
                   {formatDateIST(order.created_at)}
                   {order.invoice_number ? ` · Invoice ${order.invoice_number}` : ''}
                 </p>
+                {order.invoice_note && <p className="text-xs text-gray-500" data-testid="invoice-note">{order.invoice_note}</p>}
               </div>
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusInfo.color}`}>{statusInfo.label}</span>
               <button onClick={() => refetch()} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400" aria-label="Refresh">
@@ -57,8 +60,10 @@ export default function OrderDetailPage() {
             <OrderTimeline order={order} />
             <OrderShipmentsCard order={order} />
             <OrderItemsCard order={order} />
+            <ExtraPaymentCard order={order} />
             <EditOrderCard order={order} />
             <OrderEditsCard order={order} />
+            <WrittenOrdersCard order={order} />
             {order.can_cancel && <CancelOrderCard orderId={order.id} />}
             <PaymentHoldCard order={order} />
             <RefundsCard order={order} />

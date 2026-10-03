@@ -25,6 +25,8 @@ export async function runAftercare({ t, P, addr, ids }) {
   const reservedBefore = (await q(`SELECT quantity_reserved FROM inventory_batches WHERE product_id = $1`, [P.own]))[0].quantity_reserved;
   r = await call('POST', `/orders/${o1.id}/cancel`, { token: t.trader, body: { reason: 'Not mine' } });
   check("another buyer cannot cancel the order", r.status === 404, r.json);
+  // Sprint 44: invoiced at the pharmacist's release; cancelling after it reverses the invoice by credit note
+  await releaseInDb(q, (await shipment(o1.id)).id);
   r = await call('POST', `/orders/${o1.id}/cancel`, { token: t.buyer, body: { reason: 'Ordered by mistake' } });
   const methods = (r.json.data?.refunds || []).map((l) => `${l.method}:${l.status}`).sort();
   check('buyer cancels a paid order: gateway leg pending, wallet leg refunded at once', r.status === 200
@@ -114,6 +116,7 @@ export async function runAftercare({ t, P, addr, ids }) {
   r = await order([{ product_id: P.part, quantity: 2 }]);
   const o4 = r.json.data.order;
   await markPaid(o4.id, o4.total_paise);
+  await releaseInDb(q, (await shipment(o4.id)).id);   // Sprint 35: the partner's pharmacist releases it (C-08); Sprint 44: invoice issued then
   const s4 = await shipment(o4.id);
   check('partner line shipped under the partner invoice series', /^S5P\//.test(s4.invoice_number), s4);
   await releaseInDb(q, s4.id);   // Sprint 35: the partner's pharmacist releases it (C-08)

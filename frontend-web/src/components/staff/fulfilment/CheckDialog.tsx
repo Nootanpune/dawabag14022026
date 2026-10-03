@@ -12,6 +12,7 @@ import Modal from '@/components/admin/Modal';
 import BuyerHealthNote from './BuyerHealthNote';
 import CheckLinesTable from './CheckLinesTable';
 import CheckSignals from './CheckSignals';
+import WrittenOrderNote from './WrittenOrderNote';
 
 const DONE: Record<CheckDecision, string> = {
   release: 'released for packing',
@@ -54,6 +55,12 @@ export default function CheckDialog({ item, onClose }: { item: CheckQueueItem; o
       {item.pharmacist_check === 'held' && item.pharmacist_check_note && (
         <p className="text-xs rounded-lg bg-gray-100 p-2 mb-3"><span className="font-semibold">On hold:</span> {item.pharmacist_check_note}</p>
       )}
+      {item.extra_payment_pending && (
+        <p role="status" className="text-xs rounded-lg bg-amber-50 border border-amber-200 p-2 mb-3" data-testid="extra-payment-pending">
+          The buyer changed this order and has not yet paid the difference. It can be released once that payment is made.
+        </p>
+      )}
+      {item.customer_type === 'doc_hospital' && <WrittenOrderNote orderId={item.order_id} count={item.written_orders ?? 0} />}
       <BuyerHealthNote orderId={item.order_id} />
       <CheckLinesTable lines={item.lines} />
       <div className="mt-3"><CheckSignals signals={item.signals} /></div>
