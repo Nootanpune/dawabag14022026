@@ -7,6 +7,7 @@ import '../../models/json_utils.dart';
 import '../../providers/order_detail_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/ist.dart';
+import '../../utils/pharmacist_check.dart';
 import '../../widgets/error_retry_view.dart';
 import 'widgets/cancel_order_button.dart';
 import 'widgets/handover_code_card.dart';
@@ -114,7 +115,11 @@ class _Header extends StatelessWidget {
   const _Header({required this.order, required this.status});
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) {
+    // While the pharmacist check is open the chip says so (Sprint 36, C-08)
+    final chip = checkChipLabel(status, orderCheckState(order));
+    final held = orderCheckState(order) == CheckState.held && chip != null;
+    return Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
@@ -129,16 +134,20 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.brandTeal50,
-              borderRadius: BorderRadius.circular(20),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: held ? AppTheme.amberBadge : AppTheme.brandTeal50,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(chip ?? status.replaceAll('_', ' '),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600, color: held ? AppTheme.amberText : AppTheme.brandTeal700)),
             ),
-            child: Text(status.replaceAll('_', ' '),
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.brandTeal700)),
           ),
         ],
       );
+  }
 }

@@ -85,7 +85,7 @@ void main() {
         200,
         {
           'success': true,
-          'message': 'OTP sent',
+          'message': 'If this mobile number has an account, a code has been sent to it',
           'data': {'otp_sent': true}
         }
       ),
@@ -216,13 +216,13 @@ void main() {
       expect(find.text('Invalid or expired OTP'), findsOneWidget);
     });
 
-    testWidgets('a server without the reset step offers sign-in with the OTP', (tester) async {
-      await throughOtp(tester); // no answer for /auth/reset-password → the API's "Route … not found"
+    // Sprint 36: the server's words since Sprint 35 say "code", not "OTP"
+    testWidgets('"The code is wrong or has expired" also goes back to the code step', (tester) async {
+      api.answers['/auth/reset-password'] = (400, {'success': false, 'message': 'The code is wrong or has expired'});
+      await throughOtp(tester);
       await enterPasswords(tester, 'Kmrt7392Hpwa', 'Kmrt7392Hpwa');
-      expect(find.text('Sign in with the OTP instead'), findsOneWidget);
-      await tester.tap(find.text('Sign in with OTP'));
-      await tester.pumpAndSettle();
-      expect(find.text('OTP for 9876543210'), findsOneWidget);
+      expect(find.text('Enter the OTP'), findsOneWidget);
+      expect(find.text('The code is wrong or has expired'), findsOneWidget);
     });
   });
 
@@ -257,9 +257,10 @@ void main() {
     expect(resetPasswordProblem(next: 'Kmrt7392Hpwa', again: 'Kmrt7392Hpwa'), isNull);
   });
 
-  test('an unknown route is told apart from a real 404 answer', () {
-    expect(isMissingRoute({'message': 'Route POST /api/v1/auth/reset-password not found'}), isTrue);
-    expect(isMissingRoute({'message': 'Mobile not registered'}), isFalse);
-    expect(isMissingRoute('<html>'), isTrue);
+  test('code problems are told apart from other errors', () {
+    expect(isCodeProblem('Invalid or expired OTP'), isTrue);
+    expect(isCodeProblem('The code is wrong or has expired'), isTrue);
+    expect(isCodeProblem('Too many wrong codes. Ask for a new code.'), isTrue);
+    expect(isCodeProblem('Password must be at least 8 characters'), isFalse);
   });
 }

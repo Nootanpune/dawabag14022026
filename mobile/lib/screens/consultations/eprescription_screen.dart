@@ -86,11 +86,11 @@ class _EPrescriptionScreenState extends ConsumerState<EPrescriptionScreen> {
               const SizedBox(height: 8),
               // The app writes no files (server is the single source of truth);
               // the PDF copy is offered on the website instead.
-              ListTile(
+              const ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.picture_as_pdf_outlined),
-                title: const Text('Download as PDF', style: TextStyle(fontSize: 14)),
-                subtitle: const Text(
+                leading: Icon(Icons.picture_as_pdf_outlined),
+                title: Text('Download as PDF', style: TextStyle(fontSize: 14)),
+                subtitle: Text(
                   'Available when you sign in on the Dawabag website (dawabag.in).',
                   style: TextStyle(fontSize: 12),
                 ),

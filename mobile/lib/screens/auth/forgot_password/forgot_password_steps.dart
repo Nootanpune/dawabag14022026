@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../config/theme.dart';
+import '../../../services/password_reset_api.dart' show codeSentText;
 import '../../../utils/mobile_number.dart';
 import '../../../utils/password_policy.dart';
 import '../../../widgets/brand/labeled_field.dart';
@@ -75,8 +76,8 @@ class ResetMobileStep extends StatelessWidget {
           children: [
             const ResetHeading(
               title: 'Forgot password',
-              text: 'We will send a 6-digit OTP to your registered mobile number. '
-                  'After that you choose a new password.',
+              text: "Enter the mobile number of your account. If it has a Dawabag account, we'll send a "
+                  '6-digit code to it. After that you choose a new password.',
             ),
             LabeledField(
               label: 'Mobile number',
@@ -126,7 +127,8 @@ class ResetOtpStep extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ResetHeading(title: 'Enter the OTP', text: 'We sent a 6-digit OTP to +91 $mobile.'),
+          // Same words whether or not the number has an account (Sprint 36)
+          ResetHeading(title: 'Enter the OTP', text: codeSentText(mobile)),
           OtpInput(key: otpKey, onChanged: onChanged),
           Align(
             alignment: Alignment.centerRight,

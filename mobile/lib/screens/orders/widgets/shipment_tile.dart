@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../config/theme.dart';
 import '../../../models/json_utils.dart';
 import '../../../models/shipment_tracking.dart';
 import '../../../services/api_service.dart';
 import '../../../services/invoice_api.dart';
 import '../../../utils/formatters.dart';
+import '../../../utils/pharmacist_check.dart';
 import '../../../widgets/open_pdf_button.dart';
+import 'pharmacist_check_notice.dart';
 import 'tracking_timeline.dart';
 
 /// One shipment: seller, tax invoice, status, seal number and who received
@@ -43,6 +46,9 @@ class ShipmentTile extends StatelessWidget {
     final detailed = orderId != null && id.isNotEmpty;
     final tracking = ShipmentTracking.fromShipment(shipment);
     final grey = TextStyle(fontSize: 11, color: Colors.grey.shade600);
+    // Sprint 36: who checked this shipment before packing, or where the check stands (C-08)
+    final checkedBy = pharmacistLineFor(shipment);
+    final checkNote = shipmentCheckNote(shipment);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,6 +65,12 @@ class ShipmentTile extends StatelessWidget {
                   Text(sellerLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   if (invoice != null) Text('Tax invoice $invoice', style: grey),
                   if (detailed && status != null) Text('Status: ${status.replaceAll('_', ' ')}', style: grey),
+                  if (checkedBy != null) CheckedByText(checkedBy),
+                  if (checkNote != null)
+                    Text(checkNote,
+                        style: grey.copyWith(
+                            color: shipment['pharmacist_check'] == CheckState.held ? AppTheme.amberText : null,
+                            fontWeight: shipment['pharmacist_check'] == CheckState.held ? FontWeight.w600 : null)),
                   // Tamper-evident seal on the pack (C-26)
                   if (seal != null) Text('Seal no. $seal', style: grey),
                   if (receivedBy != null)

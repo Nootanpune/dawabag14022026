@@ -44,15 +44,15 @@ class _PinCodeBannerState extends State<PinCodeBanner> {
             border: Border.all(color: AppTheme.brandTeal100, style: BorderStyle.solid),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Row(
+          child: const Row(
             children: [
-              const Icon(Icons.location_on_outlined, color: AppTheme.brandTeal, size: 16),
-              const SizedBox(width: 8),
-              const Expanded(
+              Icon(Icons.location_on_outlined, color: AppTheme.brandTeal, size: 16),
+              SizedBox(width: 8),
+              Expanded(
                 child: Text('Enter pin code to check delivery',
                   style: TextStyle(fontSize: 13, color: AppTheme.brandTeal700)),
               ),
-              const Icon(Icons.chevron_right, color: AppTheme.brandTeal, size: 18),
+              Icon(Icons.chevron_right, color: AppTheme.brandTeal, size: 18),
             ],
           ),
         ),

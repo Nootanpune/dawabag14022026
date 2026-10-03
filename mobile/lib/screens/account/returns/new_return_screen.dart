@@ -100,7 +100,7 @@ class _NewReturnScreenState extends ConsumerState<NewReturnScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             DropdownButtonFormField<String>(
-              value: _reason,
+              initialValue: _reason,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'What went wrong?'),
               items: kReturnReasons.entries

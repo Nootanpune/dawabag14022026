@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/password_reset_api.dart' show codeSentText;
 import '../../services/registration_api.dart';
 import '../../widgets/otp_input.dart';
 
-/// Stand-alone OTP screen (used from login when the mobile is not yet
-/// verified). The registration flow embeds its own OTP step.
+/// Stand-alone OTP screen (sign-in with OTP, and login when the mobile is not
+/// yet verified). The registration flow embeds its own OTP step. Sprint 36:
+/// the server answers "code sent" for every mobile, so the wording is neutral.
 class OTPScreen extends ConsumerStatefulWidget {
   final String mobile;
   const OTPScreen({super.key, required this.mobile});
@@ -62,7 +64,7 @@ class _OTPScreenState extends ConsumerState<OTPScreen> {
       if (!mounted) return;
       _startResendTimer();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('OTP sent to +91 ${widget.mobile}')),
+        SnackBar(content: Text(codeSentText(widget.mobile))),
       );
     } catch (e) {
       if (!mounted) return;
@@ -107,11 +109,11 @@ class _OTPScreenState extends ConsumerState<OTPScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 16),
-            Text('Enter the OTP sent to',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 15)),
+            const Text('Enter the 6-digit code',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             const SizedBox(height: 4),
-            Text('+91 ${widget.mobile}',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            Text(codeSentText(widget.mobile),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 15, height: 1.35)),
             const SizedBox(height: 36),
 
             OtpInput(

@@ -33,7 +33,7 @@ class StepDetails extends StatelessWidget {
             const SizedBox(height: 16),
 
             if (c.isB2B) ...[
-              RegisterSectionTitle('Business details'),
+              const RegisterSectionTitle('Business details'),
               registerTextField(c.businessCtrl, c.isRetailer ? 'Pharmacy / hospital name' : 'Firm name',
                   validator: (v) => (v == null || v.trim().length < 2)
                       ? 'Business name is required'
@@ -58,7 +58,7 @@ class StepDetails extends StatelessWidget {
             ],
 
             if (c.isDoctor) ...[
-              RegisterSectionTitle('Registration details'),
+              const RegisterSectionTitle('Registration details'),
               registerTextField(c.nmcRegCtrl, 'NMC / State Medical Council reg. number',
                   caps: true,
                   validator: (v) => (v == null || v.trim().isEmpty)

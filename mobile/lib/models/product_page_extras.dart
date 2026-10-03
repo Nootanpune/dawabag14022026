@@ -95,6 +95,11 @@ class InfoPage {
       );
 }
 
+/// Trust pages (server `info_pages.page_key`, same slugs as the website's
+/// /trust/<key>) with the short link labels the website's product page uses.
+/// The page itself — title included — always comes from the server: Sprint 35
+/// retitled 'pharmacist-checked' "Every order is checked by a pharmacist"
+/// (migration 30); the slug did not change.
 const List<(String, String)> kInfoPages = [
   ('genuine-medicines', 'Genuine medicines'),
   ('expired-damaged-recalled', 'Expired, damaged or recalled'),

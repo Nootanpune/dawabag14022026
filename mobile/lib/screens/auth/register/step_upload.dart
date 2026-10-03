@@ -22,8 +22,8 @@ class StepUpload extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Row(
-          children: const [
+        const Row(
+          children: [
             Icon(Icons.verified, color: AppTheme.brandTeal),
             SizedBox(width: 8),
             Expanded(

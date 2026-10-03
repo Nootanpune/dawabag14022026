@@ -164,7 +164,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: authState.isLoading ? _spinner() : const Text('Sign in'),
                 ),
               ] else ...[
-                Text('We will send a 6-digit OTP to this number.',
+                Text("If this number has a Dawabag account, we'll send a 6-digit code to it.",
                     style: TextStyle(fontSize: 13.5, color: AppTheme.muted(context))),
                 const SizedBox(height: 20),
                 ElevatedButton(

@@ -44,7 +44,7 @@ class NotificationService {
             priority: Priority.high,
           ),
         ),
-        payload: NotificationTapRouter.orderIdFor(message.data),
+        payload: NotificationTapRouter.pathFor(message.data),
       );
     });
 

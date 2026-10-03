@@ -43,7 +43,7 @@ class _ConsentCheckboxesState extends State<ConsentCheckboxes> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DropdownButtonFormField<String>(
-          value: normalizePolicyLanguage(c.noticeLanguage),
+          initialValue: normalizePolicyLanguage(c.noticeLanguage),
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Read the privacy notice in'),
           items: kPolicyLanguages.entries

@@ -49,6 +49,7 @@ import '../screens/account/health/health_profile_screen.dart';
 import '../screens/account/medicines/my_medicines_screen.dart';
 import '../services/dose_actions.dart' show doseFromQuery;
 import '../screens/info/info_page_screen.dart';
+import '../screens/notifications/notifications_screen.dart';
 import '../screens/shop/substitutes_screen.dart';
 import '../widgets/main_scaffold.dart';
 import 'password_gate.dart';
@@ -133,6 +134,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (c, s) => OrderDetailScreen(orderId: s.pathParameters['orderId']!),
       ),
       GoRoute(path: '/account/refills', builder: (c, s) => const RefillScreen()),
+      // Sprint 36: the in-app notification inbox (signed-in only via the /account prefix)
+      GoRoute(path: '/account/notifications', builder: (c, s) => const NotificationsScreen()),
       // Sprint 33: dose reminders and the health profile (signed-in only via the /account prefix)
       // Sprint 34: ?dose=<reminder ids>&at=<time> highlights the dose from an alert
       GoRoute(path: '/account/medicines', builder: (c, s) => MyMedicinesScreen(highlight: doseFromQuery(s.uri.queryParameters))),

@@ -181,7 +181,8 @@ class AccountScreen extends ConsumerWidget {
 
           _Section('Account', [
             _MenuItem(icon: Icons.person_outline, label: 'Edit profile', onTap: () {}),
-            _MenuItem(icon: Icons.notifications_outlined, label: 'Notification settings', onTap: () {}),
+            // Sprint 36: order updates, holds, refunds… from the server's inbox
+            _MenuItem(icon: Icons.notifications_outlined, label: 'Notifications', onTap: () => context.push('/account/notifications')),
             _MenuItem(icon: Icons.lock_outline, label: 'Change password', onTap: () => context.push(kChangePasswordPath)),
             _MenuItem(
               icon: Icons.logout,

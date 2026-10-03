@@ -106,7 +106,7 @@ Widget registerDlTypeField(RegisterController c, Map<String, String> options) =>
     label: 'Drug licence type',
     child: DropdownButtonFormField<String>(
       key: ValueKey('dl_type_${c.customerType}'),
-      value: options.containsKey(c.dlType) ? c.dlType : null,
+      initialValue: options.containsKey(c.dlType) ? c.dlType : null,
       isExpanded: true,
       decoration: const InputDecoration(),
       items: options.entries.map((e) => DropdownMenuItem<String>(value: e.key, child: Text(e.value))).toList(),
@@ -117,7 +117,7 @@ Widget registerDlTypeField(RegisterController c, Map<String, String> options) =>
 Widget registerSpecialityField(RegisterController c) => LabeledField(
     label: 'Speciality',
     child: DropdownButtonFormField<String>(
-      value: c.speciality,
+      initialValue: c.speciality,
       isExpanded: true,
       decoration: const InputDecoration(),
       items: kSpecialities.map((s) => DropdownMenuItem<String>(value: s, child: Text(s))).toList(),

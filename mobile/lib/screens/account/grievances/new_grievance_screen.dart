@@ -88,7 +88,7 @@ class _NewGrievanceScreenState extends ConsumerState<NewGrievanceScreen> {
               const SizedBox(height: 12),
             ],
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(labelText: 'What is it about?'),
               items: kGrievanceCategories.entries
                   .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))

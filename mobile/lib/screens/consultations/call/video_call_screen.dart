@@ -134,9 +134,9 @@ class _CallViewState extends State<_CallView> {
                 ),
                 CallStatusBanner(phase: _call.phase, otherPerson: _call.otherPerson, message: _call.message),
                 if (_call.permissionBlocked)
-                  TextButton(
+                  const TextButton(
                     onPressed: openAppSettings,
-                    child: const Text('Open settings', style: TextStyle(color: Colors.white)),
+                    child: Text('Open settings', style: TextStyle(color: Colors.white)),
                   ),
                 if (_call.isOver)
                   Padding(
