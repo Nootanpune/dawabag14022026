@@ -6,7 +6,8 @@ extension RegisterPayload on RegisterController {
     final type = customerType!;
     final email = emailCtrl.text.trim();
     final pincode = pincodeCtrl.text.trim();
-    final referral = referralCtrl.text.trim();
+    // Sprint 38 (C-20): doctors and hospitals have no referral field and send none
+    final referral = isDoctor ? '' : referralCtrl.text.trim();
     final pan = panCtrl.text.trim().toUpperCase();
     final gstin = gstinCtrl.text.trim().toUpperCase();
 

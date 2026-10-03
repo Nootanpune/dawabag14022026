@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/cart_actions.dart' show cartErrorSnackBar;
 import '../../providers/cart_provider.dart';
 import 'widgets/cart_coupon_card.dart';
 import 'widgets/cart_line_card.dart';
@@ -11,6 +12,7 @@ import 'widgets/cart_prescription_notice.dart';
 import 'widgets/add_more_sheet.dart';
 import 'widgets/cart_summary_card.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/rx_sales_banner.dart';
 import '../../widgets/trade_price_banner.dart';
 
 /// Renders the server CartView. Every change is a server call; the screen
@@ -27,9 +29,7 @@ class CartScreen extends ConsumerWidget {
 
   void _showError(BuildContext context, String? error) {
     if (error == null || !context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(error), backgroundColor: Colors.red),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(cartErrorSnackBar(error));
   }
 
   @override
@@ -96,7 +96,8 @@ class CartScreen extends ConsumerWidget {
     }
 
     final busy = cartState.isUpdating;
-    final canCheckout = !busy && cart.orderableItems.isNotEmpty;
+    // Sprint 38: the server refuses checkout while paused prescription lines are in the cart
+    final canCheckout = !busy && cart.orderableItems.isNotEmpty && !cart.hasPausedItems;
 
     return Scaffold(
       appBar: AppBar(
@@ -117,10 +118,13 @@ class CartScreen extends ConsumerWidget {
             if (busy) const LinearProgressIndicator(minHeight: 2),
             // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
             const TradePriceBanner(margin: EdgeInsets.only(bottom: 12)),
+            // Sprint 38: emergency stop on prescription medicines (C-08)
+            RxSalesBanner(serverMessage: cart.rxSalesPaused, margin: const EdgeInsets.only(bottom: 12)),
             for (final line in cart.items)
               CartLineCard(
                 line: line,
                 busy: busy,
+                rxPaused: cart.rxSalesPaused != null && line.requiresPrescription,
                 onQuantityChange: (q) => _run(context, notifier.setQuantity(line.productId, q)),
                 onRemove: () => _run(context, notifier.remove(line.productId)),
               ),
@@ -140,6 +144,14 @@ class CartScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             CartSummaryCard(cart: cart),
+            if (cart.hasPausedItems) ...[
+              const SizedBox(height: 8),
+              Text(
+                cart.pausedCheckoutMessage,
+                key: const ValueKey('cart-paused-checkout'),
+                style: const TextStyle(fontSize: 12, color: AppTheme.errorRed),
+              ),
+            ],
             if (cart.hasIssues) ...[
               const SizedBox(height: 8),
               const Text(

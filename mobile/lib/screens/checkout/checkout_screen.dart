@@ -7,12 +7,15 @@ import '../../models/checkout_summary.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/sales_status_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/api_utils.dart';
 import '../../services/checkout_api.dart';
 import '../../services/payment_api.dart';
 import '../../services/prescription_api.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/payments/demo_checkout/demo_checkout.dart';
+import '../../widgets/rx_sales_banner.dart';
 import '../../widgets/trade_price_banner.dart';
 import 'checkout_flow.dart';
 import 'checkout_prescription.dart';
@@ -107,6 +110,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return null;
     }
     final cart = ref.read(cartProvider).view;
+    // Sprint 38: the server refuses the whole order while paused prescription
+    // lines are in the cart (C-08) — say so before asking it
+    if (cart.hasPausedItems) {
+      _showError(cart.pausedCheckoutMessage);
+      return null;
+    }
     if (cart.orderableItems.isEmpty) {
       _showError('Your cart has no items that can be ordered');
       return null;
@@ -120,6 +129,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     try {
       await request();
     } catch (e) {
+      // Sprint 38: paused while checking out — the server's own words, and fresh state
+      if (isRxSalesPaused(e)) _refreshRxPause();
       _showError(ApiService.errorMessage(e, fallback: fallback));
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -293,7 +304,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: Colors.red,
+      // long server refusals (e.g. the emergency-stop message) need time to read
+      duration: Duration(seconds: msg.length > 90 ? 8 : 4),
+    ));
+  }
+
+  /// The emergency stop came on: ask the server again for the banner and cart.
+  void _refreshRxPause() {
+    if (!mounted) return;
+    ref.invalidate(salesStatusProvider);
+    ref.read(cartProvider.notifier).load();
   }
 
   void _onBack() {
@@ -323,6 +346,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _selectedAddressId = addresses.first['id']?.toString();
     }
     ref.watch(cartProvider.select((s) => s.view.requiresPrescription));
+    final cartRxPaused = ref.watch(cartProvider.select((s) => s.view.rxSalesPaused));
     final isPractitioner = ref.watch(authProvider.select((s) => s.customerType == 'doc_hospital'));
     final hasRx = _requiresPrescription;
     final confirmed = _step == CheckoutStep.confirmed;
@@ -338,6 +362,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             CheckoutStepBar(steps: checkoutBarLabels(hasRx), currentIndex: _step.barIndex(hasRx)),
           // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
           if (!confirmed) const TradePriceBanner(margin: EdgeInsets.fromLTRB(16, 8, 16, 0)),
+          // Sprint 38: emergency stop on prescription medicines (C-08)
+          if (!confirmed) RxSalesBanner(serverMessage: cartRxPaused, margin: const EdgeInsets.fromLTRB(16, 8, 16, 0)),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),

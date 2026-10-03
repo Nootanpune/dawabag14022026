@@ -8,6 +8,7 @@ import '../../widgets/error_retry_view.dart';
 import '../../widgets/product_image.dart';
 import '../../widgets/trade_price_banner.dart';
 import '../../providers/product_page_providers.dart';
+import 'widgets/product_rx_pause_banner.dart';
 import 'widgets/delivery_info_card.dart';
 import 'widgets/medicine_info_view.dart';
 import 'widgets/product_badges.dart';
@@ -82,6 +83,8 @@ class _Body extends StatelessWidget {
               const SizedBox(height: 16),
               // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
               const TradePriceBanner(margin: EdgeInsets.only(bottom: 12)),
+              // Sprint 38: emergency stop on prescription medicines (C-08)
+              ProductRxPauseBanner(schedule: product['drug_schedule']?.toString()),
               ProductPrice(product: product),
               if (!inStock)
                 Container(

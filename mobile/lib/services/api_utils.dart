@@ -99,3 +99,13 @@ String? apiErrorCode(Object error) {
 /// True when the server refused the call until the password is changed.
 bool isPasswordChangeRequired(Object error) =>
     error is DioException && error.response?.statusCode == 403 && apiErrorCode(error) == kPasswordChangeRequired;
+
+/// Code the server sends (409) while prescription-medicine sales are paused
+/// (Sprint 38 emergency stop, C-08): adding or raising such a line in the cart,
+/// POST /orders, /payments/create-order and /payments/demo. The envelope's
+/// `message` is ready for the buyer and is shown as is.
+const kRxSalesPaused = 'RX_SALES_PAUSED';
+
+/// True when the server refused the call because prescription sales are paused.
+bool isRxSalesPaused(Object error) =>
+    error is DioException && error.response?.statusCode == 409 && apiErrorCode(error) == kRxSalesPaused;

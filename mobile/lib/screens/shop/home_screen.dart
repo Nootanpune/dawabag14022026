@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 import '../../providers/catalog_provider.dart';
 import '../../providers/delivery_offer_provider.dart';
+import '../../providers/sales_status_provider.dart';
+import '../../widgets/rx_sales_banner.dart';
 import '../../widgets/cart_action_button.dart';
 import '../../widgets/home/category_tiles.dart';
 import '../../widgets/home/consult_doctor_tile.dart';
@@ -50,6 +52,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         color: AppTheme.brandTeal,
         onRefresh: () async {
           ref.invalidate(categoriesProvider);
+          ref.invalidate(salesStatusProvider);
           ref.invalidate(freeDeliveryAboveProvider);
           return ref.refresh(productsProvider(queryKey).future);
         },
@@ -58,6 +61,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               sliver: SliverList.list(children: [
+                // Sprint 38: emergency stop on prescription medicines (C-08)
+                const RxSalesBanner(margin: EdgeInsets.only(bottom: 12)),
                 PinCodeBanner(
                   key: ValueKey('pin_$pincode'),
                   pincode: pincode,

@@ -158,8 +158,12 @@ class StepDetails extends StatelessWidget {
                 validator: (v) =>
                     v != c.passwordCtrl.text ? 'Passwords do not match' : null),
             const SizedBox(height: 14),
-            registerTextField(c.referralCtrl, 'Referral code (optional)', hint: 'e.g. RAJA20', caps: true),
-            const SizedBox(height: 20),
+            // Sprint 38 (C-20): no referral or reward scheme for prescribers
+            if (!c.isDoctor) ...[
+              registerTextField(c.referralCtrl, 'Referral code (optional)', hint: 'e.g. RAJA20', caps: true),
+              const SizedBox(height: 20),
+            ] else
+              const SizedBox(height: 6),
 
             ConsentCheckboxes(c: c, onMessage: onMessage),
             const SizedBox(height: 20),

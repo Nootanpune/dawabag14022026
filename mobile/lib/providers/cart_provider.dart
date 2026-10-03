@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/cart_view.dart';
 import '../services/api_service.dart';
+import '../services/api_utils.dart';
 import '../services/cart_api.dart';
 import 'auth_provider.dart';
 
@@ -73,6 +74,9 @@ class CartNotifier extends StateNotifier<CartState> {
       final message = ApiService.errorMessage(e, fallback: fallback);
       if (mounted && gen == _generation) {
         state = state.copyWith(isUpdating: false);
+        // Sprint 38: paused while the cart was open — fetch the server's lines
+        // again so the held ones show why (the refusal's text is returned as is).
+        if (isRxSalesPaused(e)) load();
       }
       return message;
     }

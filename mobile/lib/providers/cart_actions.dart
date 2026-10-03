@@ -46,7 +46,7 @@ Future<bool> addProductToCart(
       ? await notifier.setQuantity(productId, inCart + (quantity ?? (minQty < 1 ? 1 : minQty)))
       : await notifier.addOne(productId);
   if (error != null) {
-    messenger.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
+    messenger.showSnackBar(cartErrorSnackBar(error));
     return false;
   }
   messenger.showSnackBar(SnackBar(
@@ -63,6 +63,14 @@ Future<void> changeCartQuantity(BuildContext context, WidgetRef ref, String prod
   final messenger = ScaffoldMessenger.of(context);
   final error = await ref.read(cartProvider.notifier).setQuantity(productId, quantity);
   if (error != null) {
-    messenger.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
+    messenger.showSnackBar(cartErrorSnackBar(error));
   }
 }
+
+/// A cart refusal in the server's own words. Long ones (e.g. the Sprint 38
+/// emergency-stop message, C-08) stay up long enough to read.
+SnackBar cartErrorSnackBar(String message) => SnackBar(
+      content: Text(message),
+      backgroundColor: Colors.red,
+      duration: Duration(seconds: message.length > 90 ? 8 : 4),
+    );

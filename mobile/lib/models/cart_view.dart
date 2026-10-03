@@ -122,6 +122,9 @@ class CartView {
   final FreeDelivery? freeDelivery;
   final bool requiresPrescription;
   final int itemCount;
+  /// Sprint 38 emergency stop: the server's banner text while prescription
+  /// medicines are paused, else null (C-08).
+  final String? rxSalesPaused;
 
   const CartView({
     this.items = const [],
@@ -132,6 +135,7 @@ class CartView {
     this.freeDelivery,
     this.requiresPrescription = false,
     this.itemCount = 0,
+    this.rxSalesPaused,
   });
 
   static const CartView empty = CartView();
@@ -141,6 +145,20 @@ class CartView {
   /// Lines that can be ordered now (the server reports problems in `issue`).
   List<CartLine> get orderableItems =>
       items.where((l) => l.available && l.issue == null).toList();
+
+  /// Lines held by the emergency stop: prescription medicines for this buyer
+  /// (the server's `requires_prescription`) while sales are paused. They cannot
+  /// be raised, and the server refuses checkout while any is in the cart, so
+  /// checkout waits until they are removed (as on the website).
+  List<CartLine> get pausedItems =>
+      rxSalesPaused == null ? const [] : items.where((l) => l.requiresPrescription).toList();
+
+  bool get hasPausedItems => pausedItems.isNotEmpty;
+
+  /// What the buyer reads when checkout is blocked by paused lines.
+  String get pausedCheckoutMessage =>
+      '${rxSalesPaused ?? ''} Please remove ${pausedItems.map((l) => l.name).join(', ')} from your cart to order the rest.'
+          .trim();
 
   bool get hasIssues => items.any((l) => !l.available || l.issue != null);
 
@@ -170,6 +188,9 @@ class CartView {
       freeDelivery: FreeDelivery.fromJson(j['free_delivery']),
       requiresPrescription: j['requires_prescription'] == true,
       itemCount: _int(j['item_count']),
+      rxSalesPaused: (j['rx_sales_paused'] is String && (j['rx_sales_paused'] as String).trim().isNotEmpty)
+          ? (j['rx_sales_paused'] as String).trim()
+          : null,
     );
   }
 }

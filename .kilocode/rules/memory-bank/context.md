@@ -21,6 +21,7 @@ the lawyer/CA sign-off.
 - Extras: no referral codes for doctors; checkout/snapshot consistent lock order + retry on 40P01/40001 (fixes Sprint 37 known issue).
 - Follow-ups: nightly chain-verify job; note latest chain hash with monthly backup; API as dawabag_app login.
 - Tests: jest 539; smoke 1–38 1703 checks; Playwright 131 passed / 7 skipped.
+- App: sales-status banner (home, cart, checkout, Rx product pages; not for B2B/doctor), 409 RX_SALES_PAUSED shown plainly, paused cart lines block checkout, no referral field for doc_hospital. flutter 233 passed, analyze clean. App has no pharmacist verify screen.
 
 ## Sprint 37 — live stock feed from the partner's billing software (2026-10-03)
 
@@ -145,7 +146,7 @@ the lawyer/CA sign-off.
   check) and partner (partner pharmacist release) updated (not re-recorded). Full runs: smoke all green;
   Playwright 120 passed, 6 skipped (S3-upload / desktop-only skips); web tsc + lint + build pass.
   Before/after screenshots (home, product, login, checkout, admin × phone / desktop) were taken outside the repo.
-- App needs (mobile agent): see the Sprint 35 report — order fields above, "Pharmacist check" step, notification
+
   type order_on_hold, /auth/send-otp no longer 404s for unknown mobiles, brand assets in public/brand.
 - DLT: new SMS type `order_on_hold` needs a registered template (sms.dlt_templates) before SMS goes out.
 

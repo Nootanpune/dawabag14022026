@@ -9,6 +9,9 @@ import '../../../widgets/product_image.dart';
 class CartLineCard extends StatelessWidget {
   final CartLine line;
   final bool busy;
+  /// Sprint 38: a prescription medicine while sales are paused — it may be
+  /// lowered or removed, never raised (the server refuses, C-08).
+  final bool rxPaused;
   final void Function(int quantity) onQuantityChange;
   final VoidCallback onRemove;
 
@@ -16,6 +19,7 @@ class CartLineCard extends StatelessWidget {
     super.key,
     required this.line,
     required this.busy,
+    this.rxPaused = false,
     required this.onQuantityChange,
     required this.onRemove,
   });
@@ -121,7 +125,7 @@ class CartLineCard extends StatelessWidget {
             ),
             _QtyButton(
               icon: Icons.add,
-              enabled: !busy && line.canIncrease,
+              enabled: !busy && line.canIncrease && !rxPaused,
               onTap: () => onQuantityChange(line.quantity + 1),
             ),
             const Spacer(),
