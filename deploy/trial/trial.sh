@@ -42,6 +42,17 @@ if [ -z "$(val TOTP_ENC_KEY)" ]; then
   export TOTP_ENC_KEY
   unset owner_pw
 fi
+# Sprint 43: the key that seals health profiles at rest (HEALTH_ENC_KEY, RUNBOOK §6 "Health
+# data key"). A TRIAL_ENV without it gets one derived the same way (one-way, stable across
+# deploys, never stored or printed). Adding HEALTH_ENC_KEY later: put this derived value in
+# HEALTH_ENC_KEY_PREVIOUS for one deploy so the API can re-seal what it sealed before.
+if [ -z "$(val HEALTH_ENC_KEY)" ]; then
+  owner_pw="$(val DB_PASSWORD)"
+  [ -n "$owner_pw" ] || { echo "$ENV_FILE has no DB_PASSWORD" >&2; exit 1; }
+  HEALTH_ENC_KEY="$(printf 'dawabag-health-key:%s' "$owner_pw" | sha256sum | cut -c1-64)"
+  export HEALTH_ENC_KEY
+  unset owner_pw
+fi
 profile=()
 [ "$(val S3_ENDPOINT)" = "http://objectstore:9000" ] && profile=(--profile objectstore)
 dc() { docker compose "${profile[@]}" -f "$ROOT/deploy/staging/compose.yml" --env-file "$ENV_FILE" "$@"; }

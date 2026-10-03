@@ -230,6 +230,40 @@ starting unless `RUN_MIGRATIONS=false`. By hand: `npm run build && npm run db:mi
 - Statutory records are final in the database: the H1 register, credit notes, audit
   and consent logs, the prescription dispense ledger, verified prescriptions cannot be
   updated or deleted; invoice amounts cannot change.
+- **Health data key (Sprint 43, migration 38).** A buyer's allergies, conditions and current
+  medicines (`health_profiles.sealed`) and a family member's allergies and conditions
+  (`patients.health_sealed`) are kept only encrypted by the API (AES-256-GCM, the row's table
+  and id bound in; `services/healthProfile/sealing.ts`); the plain JSONB columns stay `[]` and a
+  check constraint refuses plain values next to a sealed one. Nothing searches these fields.
+  **Key:** `HEALTH_ENC_KEY` (≥ 32 random characters, `openssl rand -hex 32`) in the secret store,
+  **required with `APP_ENV=production`**; staging without it derives one from
+  `JWT_REFRESH_SECRET` (dashboard warning `HEALTH_KEY_NOT_SET`); development / CI use a fixed
+  development key; the trial derives a stable one from `DB_PASSWORD` in `deploy/trial/trial.sh`
+  (no change to an existing `TRIAL_ENV`). At every start-up the API seals rows still in plain
+  columns (rows written before Sprint 43) and re-seals values sealed with an older key; it logs
+  "Health details sealed at rest: n profile(s), m family member(s)" and writes the audit action
+  `health_data_sealed`. A value the server cannot open answers 500 `HEALTH_DATA_UNREADABLE`
+  (plain message, no details) and the start-up log says how many rows it could not open.
+  **Rotating the key:** (1) put the current key in `HEALTH_ENC_KEY_PREVIOUS` (comma-separated
+  if more than one) and the new one in `HEALTH_ENC_KEY`; (2) restart the API and wait for the
+  "sealed at rest" log line (every row re-sealed under the new key); (3) check
+  `SELECT COUNT(*) FROM health_profiles WHERE sealed NOT LIKE 'h1.<new key id>.%'` is 0 (the key
+  id is the 8 characters after `h1.` on a freshly saved row) and the same for
+  `patients.health_sealed`; (4) remove `HEALTH_ENC_KEY_PREVIOUS` and restart. On the trial, to
+  move from the derived key to your own: set `HEALTH_ENC_KEY_PREVIOUS` to the derived value
+  (`printf 'dawabag-health-key:%s' "$DB_PASSWORD" | sha256sum | cut -c1-64`) for one deploy.
+  Losing the key loses the health details (buyers re-enter them); backups hold only sealed values.
+- **Order changes before packing (Sprint 43, migration 38).** A buyer may lower quantities or
+  remove lines while none of the order's parcels is packed (`POST /orders/:id/edit`). The
+  invoice stays as issued; each seller gets a credit note (reason `order_edit`);
+  `order_items.removed_qty` grows (trigger: never back down) and what is packed, dispatched,
+  entered in the H1 register and returnable is `supply_qty`. The change is kept in
+  `order_edits` (final except its refund status) and the audit log (`order_edited`). Money:
+  refunds with source `order_edit` through the refund ledger — at once for a captured / wallet /
+  credit-bill order; for a prescription order whose payment is only authorised, right after the
+  capture (Razorpay captures the authorised amount in full; `order_edits.refund_status`
+  `after_capture` → `recorded`), or `not_needed` if the hold is released. Accounts see these in
+  Admin → Refunds like any other refund.
 - **Sale record per shipment (Sprint 42, migration 37).** At order placement each shipment
   keeps its sale identity: the seller's licences that day and the ones its lines were sold
   under (`sale_licences`; per line `order_items.sale_licence_form` / `_number`, `price_field`),
@@ -704,6 +738,7 @@ search works without typo matching; to add it later, as a superuser:
 9. `TOTP_ENC_KEY` set (section 2). Owner decision on two-step sign-in: recommended — every
    admin and super-admin switches it on, then Settings → "Two-step sign-in" → required
    (security review Sprints 35–40 #16: without it an SMS code alone resets an admin's password).
+10. `HEALTH_ENC_KEY` set and kept in the secret store (section 6 "Health data key").
 
 ## 9. Incidents
 

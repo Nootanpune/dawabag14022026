@@ -55,8 +55,8 @@ export default function AdminSettingsPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{m?.label ?? s.key}</p>
                   <p className="text-xs text-gray-400">
-                    <code>{s.key}</code>
-                    {s.description ? ` — ${s.description}` : ''}
+                    {/* Sprint 43 (QA): the plain-English hint first; the server's note otherwise */}
+                    {m?.hint ?? s.description ?? ''}
                   </p>
                   <p className="text-xs text-gray-400">Updated {formatDateTimeIST(s.updated_at)}</p>
                 </div>

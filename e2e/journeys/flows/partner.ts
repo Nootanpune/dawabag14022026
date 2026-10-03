@@ -34,7 +34,7 @@ export async function partnerOrder(browser: Browser, story: Story) {
   await buyer.page.getByRole('button', { name: /review order/i }).click();
   await buyer.page.waitForTimeout(1500);
   await buyer.page.getByRole('button', { name: /place order/i }).click();
-  await buyer.page.getByRole('button', { name: /pay .* securely/i }).click();
+  await buyer.page.getByRole('button', { name: /(pay|authorise) .* securely/i }).click();
   await buyer.page.waitForTimeout(2500);
   story.orders.partner = await orderNumberOnScreen(buyer.page);
   await buyerShot('Order paid', `The buyer orders and pays exactly as before; order ${story.orders.partner} is placed with the pharmacy nearest to the buyer that has the stock.`);
@@ -54,6 +54,9 @@ export async function partnerOrder(browser: Browser, story: Story) {
   const vendor = (await dbRow(`SELECT id FROM vendors WHERE name = $1`, [PARTNER.name]))!.id;
   const vp = (await dbRow(`SELECT id FROM vendor_pharmacists WHERE vendor_id = $1 AND is_active LIMIT 1`, [vendor]))?.id
     ?? (await dbRow(`INSERT INTO vendor_pharmacists (vendor_id, full_name, registration_no) VALUES ($1, 'E2E Meera Joshi', 'E2E-MSPC-0042') RETURNING id`, [vendor]))!.id;
+  // Sprint 39 (C-03): Dawabag's admin records and verifies the partner pharmacist's council registration
+  await apiAs('admin', 'PUT', `/pharmacist-registrations/partner/${vp}`, { state_council: 'Maharashtra State Pharmacy Council',
+    valid_till: new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10), verified: true });
   let note = await onScreenOr(async () => {
     await card.getByRole('button', { name: 'Pharmacist check' }).click();
     const d = dialog(part.page);

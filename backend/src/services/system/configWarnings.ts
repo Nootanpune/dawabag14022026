@@ -39,6 +39,11 @@ export async function configWarnings(): Promise<ConfigWarning[]> {
     out.push({ code: 'TOTP_KEY_NOT_SET', message: 'TOTP_ENC_KEY is not set: two-step sign-in secrets are encrypted with a key derived from '
       + 'JWT_REFRESH_SECRET, so changing that secret would switch everyone\'s authenticator off. Set TOTP_ENC_KEY (RUNBOOK §6).' });
   }
+  // Sprint 43: the key that seals health profiles at rest (services/healthProfile/sealing.ts)
+  if (!String(process.env.HEALTH_ENC_KEY ?? '').trim()) {
+    out.push({ code: 'HEALTH_KEY_NOT_SET', message: 'HEALTH_ENC_KEY is not set: health profiles (allergies, conditions, medicines) are encrypted '
+      + 'with a key that is not this server\'s own secret. Set HEALTH_ENC_KEY (RUNBOOK §6 "Health data key").' });
+  }
   const unenrolled = await (async () => {
     if ((await twoFactorPolicy()) === 'required') return 0;
     const r = await query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM users u WHERE u.role IN ('super_admin', 'admin') AND u.is_active

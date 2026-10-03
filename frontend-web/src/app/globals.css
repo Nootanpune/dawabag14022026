@@ -106,3 +106,7 @@ input[type='search']::-webkit-search-decoration {
   padding: 0.125rem 0.5rem;
   white-space: nowrap;
 }
+
+/* Sprint 43 (QA): a screen-reader-only label inside a scrolling table (position: absolute)
+   escaped the scroller and widened the whole page on phones; scrollers contain it now */
+.overflow-x-auto { position: relative; }

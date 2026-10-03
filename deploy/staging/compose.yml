@@ -95,6 +95,9 @@ services:
       REDIS_URL: redis://redis:6379
       # Sprint 42: two-step sign-in key — from staging.env, or derived by deploy/trial/trial.sh
       TOTP_ENC_KEY: ${TOTP_ENC_KEY:-}
+      # Sprint 43: health-profile sealing key (+ the previous one while rotating) — staging.env or trial.sh
+      HEALTH_ENC_KEY: ${HEALTH_ENC_KEY:-}
+      HEALTH_ENC_KEY_PREVIOUS: ${HEALTH_ENC_KEY_PREVIOUS:-}
       # One proxy (Caddy) in front: rate limits see the visitor's address
       TRUST_PROXY_HOPS: 1
       CORS_ORIGINS: https://${WEB_DOMAIN}

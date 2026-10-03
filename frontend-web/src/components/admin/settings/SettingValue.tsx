@@ -18,11 +18,26 @@ export default function SettingValue({ kind, value, unit, options }: { kind?: Se
       </>
     );
   }
-  if (value !== null && typeof value === 'object') return <code className="text-xs">{JSON.stringify(value)}</code>;
+  // Sprint 43 (QA): plain words instead of raw JSON, e.g. {"paused":false} → "Paused: No"
+  if (value !== null && typeof value === 'object') return <span className="text-xs font-normal">{plainWords(value)}</span>;
   return (
     <>
       {String(value ?? '—')}
       {unit && unit !== '₹' ? ` ${unit}` : ''}
     </>
   );
+}
+
+const label = (k: string) => k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+/** A setting held as a list or an object, in words. */
+export function plainWords(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value)) return value.length ? value.map(plainWords).join(', ') : 'None';
+  if (typeof value === 'object') {
+    const parts = Object.entries(value as Record<string, unknown>).map(([k, v]) => `${label(k)}: ${plainWords(v)}`);
+    return parts.length ? parts.join(' · ') : 'None';
+  }
+  return String(value);
 }

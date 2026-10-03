@@ -12,7 +12,7 @@ export async function moveOrderToFulfilment(client: PoolClient, orderId: string)
     [orderId])).rows[0];
   const type = effectiveCustomerType(buyer?.customer_type, buyer?.kyc_status);
   const lines = (await client.query(
-    `SELECT p.drug_schedule, oi.prescription_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
+    `SELECT p.drug_schedule, oi.prescription_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1 AND oi.supply_qty > 0`,
     [orderId])).rows;
   // A prescription line already covered by a verified prescription needs no second review
   const waitingForRx = lines.some((l: any) => requiresPrescription(type, l.drug_schedule) && !l.prescription_id);

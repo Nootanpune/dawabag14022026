@@ -4,7 +4,7 @@ const strong = 'k'.repeat(40);
 const prod = { NODE_ENV: 'production', TRUST_PROXY_HOPS: '1', JWT_ACCESS_SECRET: strong, JWT_REFRESH_SECRET: strong + 'x', DB_PASSWORD: 'S3cure-db-pass',
   CORS_ORIGINS: 'https://dawabag.in', RAZORPAY_KEY_ID: 'rzp_live_1', RAZORPAY_KEY_SECRET: 's', RAZORPAY_WEBHOOK_SECRET: 'w',
   AWS_S3_BUCKET: 'b', MSG91_AUTH_KEY: 'm', MSG91_TEMPLATE_OTP: 't', AWS_SES_FROM_EMAIL: 'noreply@dawabag.in',
-  TOTP_ENC_KEY: 't'.repeat(48) };
+  TOTP_ENC_KEY: 't'.repeat(48), HEALTH_ENC_KEY: 'h'.repeat(48) };
 
 describe('checkEnv', () => {
   it('accepts a complete production configuration', () => {
@@ -18,6 +18,16 @@ describe('checkEnv', () => {
     const dev = checkEnv({ NODE_ENV: 'development', JWT_ACCESS_SECRET: strong, JWT_REFRESH_SECRET: strong } as NodeJS.ProcessEnv);
     expect(dev.errors).toEqual([]);
     expect(dev.warnings.join(' ')).toMatch(/TOTP_ENC_KEY not set/);
+  });
+
+  it('Sprint 43: real production needs HEALTH_ENC_KEY (32+ characters); staging warns; development uses its own key silently', () => {
+    const { HEALTH_ENC_KEY, ...rest } = prod;
+    expect(checkEnv({ ...rest, APP_ENV: 'production' } as any).errors.join(' ')).toMatch(/HEALTH_ENC_KEY must be set/);
+    expect(checkEnv({ ...prod, HEALTH_ENC_KEY: 'short' } as any).errors.join(' ')).toMatch(/HEALTH_ENC_KEY must be at least 32/);
+    expect(checkEnv(rest as any).warnings.join(' ')).toMatch(/HEALTH_ENC_KEY not set/);
+    const dev = checkEnv({ NODE_ENV: 'development', JWT_ACCESS_SECRET: strong, JWT_REFRESH_SECRET: strong } as NodeJS.ProcessEnv);
+    expect(dev.errors).toEqual([]);
+    expect(dev.warnings.join(' ')).not.toMatch(/HEALTH_ENC_KEY/);
   });
 
   it('requires TRUST_PROXY_HOPS in production so rate limits see real addresses', () => {

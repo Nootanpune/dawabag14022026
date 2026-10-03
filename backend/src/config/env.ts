@@ -115,6 +115,15 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
   } else {
     warnings.push('TOTP_ENC_KEY not set: two-step sign-in secrets use a key derived from JWT_REFRESH_SECRET (set TOTP_ENC_KEY; RUNBOOK §6)');
   }
+  // Sprint 43: the key that seals health details at rest (services/healthProfile/sealing.ts)
+  const healthKey = String(env.HEALTH_ENC_KEY ?? '').trim();
+  if (healthKey) {
+    if (healthKey.length < 32 || PLACEHOLDER.test(healthKey)) (production ? errors : warnings).push('HEALTH_ENC_KEY must be at least 32 random characters (not the example value)');
+  } else if (realProduction) {
+    errors.push('HEALTH_ENC_KEY must be set when APP_ENV=production (it encrypts health profiles; RUNBOOK §6)');
+  } else if (production) {
+    warnings.push('HEALTH_ENC_KEY not set: health profiles are sealed with a key derived from JWT_REFRESH_SECRET (set HEALTH_ENC_KEY; RUNBOOK §6)');
+  }
   const missing = INTEGRATIONS.filter((k) => !env[k] || PLACEHOLDER.test(String(env[k])));
   if (missing.length) {
     const msg = `Not configured: ${missing.join(', ')}`;

@@ -34,7 +34,7 @@ export function isReusable(rx: MyPrescription): boolean {
 }
 
 /** Uploaded on its own (the /prescriptions page) and not yet checked: it can be picked at
- *  checkout, where it joins the order and our pharmacist checks it before dispatch (C-08). */
+ *  checkout, where it joins the order and our pharmacist checks it before packing (C-08). */
 export function isAttachable(rx: MyPrescription): boolean {
   return rx.status === 'pending' && !rx.order_id;
 }

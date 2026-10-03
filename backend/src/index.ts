@@ -12,6 +12,7 @@ import { logger } from './config/logger';
 import { connectDB, getDB } from './config/database';
 import { checkEnv } from './config/env';
 import { loginPosture } from './db/appLogin';
+import { sealHealthAtRest } from './services/healthProfile/reseal.service';
 import { installProcessGuards } from './config/processGuards';
 import { connectRedis, getRedis } from './config/redis';
 import { startScheduler, stopScheduler } from './jobs/scheduler';
@@ -263,6 +264,9 @@ async function bootstrap() {
 
     await connectRedis();
     logger.info('Redis connected');
+
+    // Sprint 43: health details still in plain columns (or under an older key) are sealed now (C-41)
+    await sealHealthAtRest().catch((e) => logger.error(`Sealing health details failed: ${e?.message || e}`));
 
     startScheduler();
 

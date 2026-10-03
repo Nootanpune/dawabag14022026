@@ -110,7 +110,7 @@ async function nextInvoiceNumber(client: PoolClient, alloc: Allocation): Promise
 // cancels its shipments. Call once, when the order is cancelled.
 export async function releaseOrderReservations(client: PoolClient, orderId: string): Promise<void> {
   await client.query(
-    `UPDATE inventory_batches b SET quantity_reserved = GREATEST(b.quantity_reserved - oi.quantity, 0)
+    `UPDATE inventory_batches b SET quantity_reserved = GREATEST(b.quantity_reserved - oi.supply_qty, 0)
      FROM order_items oi
      WHERE oi.order_id = $1 AND oi.batch_id = b.id`,
     [orderId]

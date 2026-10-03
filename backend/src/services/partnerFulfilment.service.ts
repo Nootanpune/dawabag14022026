@@ -26,9 +26,10 @@ export async function listPartnerShipments(vendorId: string, status?: string) {
             o.order_number, o.status AS order_status,
             a.full_name AS ship_to_name, a.mobile AS ship_to_mobile, a.address_line1, a.city, a.state, a.pincode,
             json_agg(json_build_object(
-              'product_name', oi.product_name, 'sku', oi.sku, 'quantity', oi.quantity,
+              'product_name', oi.product_name, 'sku', oi.sku, 'quantity', oi.supply_qty,
               'unit_price_paise', oi.unit_price_paise, 'gst_rate', oi.gst_rate,
-              'batch_number', pi.batch_number, 'expiry_date', pi.expiry_date) ORDER BY oi.product_name) AS lines
+              'batch_number', pi.batch_number, 'expiry_date', pi.expiry_date) ORDER BY oi.product_name)
+              FILTER (WHERE oi.supply_qty > 0) AS lines   -- Sprint 43: lines the buyer removed are not packed
      FROM order_shipments s
      JOIN orders o ON o.id = s.order_id
      JOIN addresses a ON a.id = o.address_id

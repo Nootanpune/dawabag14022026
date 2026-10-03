@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { REFUND_METHOD_LABELS, type OrderDetail } from '@/lib/orders/api';
+import { CREDIT_NOTE_REASON_LABELS, REFUND_METHOD_LABELS, REFUND_SOURCE_LABELS, type OrderDetail } from '@/lib/orders/api';
 import { returnReasonLabel } from '@/lib/returns/api';
 import { formatPrice } from '@/lib/utils';
 import StatusBadge from '@/components/admin/StatusBadge';
@@ -40,7 +40,7 @@ export default function RefundsCard({ order }: { order: OrderDetail }) {
                   {REFUND_METHOD_LABELS[r.method] ?? r.method}
                   <span className="text-xs text-gray-400">
                     {' '}
-                    · {r.source}
+                    · {REFUND_SOURCE_LABELS[r.source] ?? r.source.replace(/_/g, ' ')}
                     {r.processed_at ? ` · ${formatDateIST(r.processed_at)}` : ''}
                   </span>
                 </span>
@@ -60,7 +60,7 @@ export default function RefundsCard({ order }: { order: OrderDetail }) {
             {notes.map((c) => (
               <li key={c.id} className="py-2 flex items-center justify-between gap-2">
                 <span>
-                  {c.credit_note_number} <span className="text-xs text-gray-400">· {c.reason.replace(/_/g, ' ')}</span>
+                  {c.credit_note_number} <span className="text-xs text-gray-400">· {CREDIT_NOTE_REASON_LABELS[c.reason] ?? c.reason.replace(/^return_/, 'return: ').replace(/_/g, ' ')}</span>
                 </span>
                 <span className="flex items-center gap-2">
                   {formatPrice(c.total_paise)}

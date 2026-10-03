@@ -16,6 +16,7 @@ const CANCELLABLE = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pendi
 import { createOrderSchema, placeOrder } from '../services/orderPlacement.service';
 import { approvedImageKeySql, withImageUrls } from '../services/productImage.service';
 import { orderCheckState } from '../services/pharmacistCheck/rules';
+import { orderEditState } from '../services/orderEdit/edit.service';
 
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -119,10 +120,14 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     const needsRx = items.some((i: any) => requiresPrescription(buyerType, i.drug_schedule));
     // Buyers may cancel until packing starts (C-37)
     const canCancel = CANCELLABLE.includes(orderResult.status) && shipments.every((s: any) => ['pending', 'cancelled'].includes(s.status));
+    // Sprint 43: the buyer may lower quantities / remove lines until packing starts (URS-074)
+    const editState = await orderEditState(orderResult, shipments);
+    const mine = orderResult.user_id === userId;
 
     res.json({ success: true, data: {
       ...orderResult, items, shipments,
       requires_prescription: needsRx, can_cancel: canCancel,
+      can_edit: mine && editState.can_edit, edit_block_reason: mine ? editState.edit_block_reason : null, edits: editState.edits,
       pharmacist_check: orderCheckState(shipments),
       credit_notes: creditNotes, refunds, returns,
       payment: pay ? { status: pay.status, capture: pay.capture_mode === 'manual' ? 'after_pharmacist_check' : 'now',
@@ -161,13 +166,18 @@ async function listOrders(req: Request, res: Response, next: NextFunction, isAdm
       `SELECT o.id, o.order_number, o.invoice_number, o.status, o.payment_terms,
               o.total_paise, o.credit_due_date, o.created_at,
               up.full_name AS customer_name,
-              (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS item_count
+              -- Sprint 43 (QA): lines the buyer removed before packing are not counted
+              (SELECT COUNT(*) FROM order_items WHERE order_id = o.id AND supply_qty > 0) AS item_count,
+              -- Sprint 43 (QA): the list shows the same status as the order page ("Pharmacist check")
+              (SELECT json_agg(json_build_object('status', s.status, 'pharmacist_check', s.pharmacist_check))
+                 FROM order_shipments s WHERE s.order_id = o.id) AS shipment_checks
        FROM orders o
        LEFT JOIN user_profiles up ON up.user_id = o.user_id
        ${where} ORDER BY o.created_at DESC LIMIT $${pi} OFFSET $${pi+1}`,
       [...params, limit, offset]
     );
 
-    res.json({ success: true, data: { orders, page, limit } });
+    const out = orders.map(({ shipment_checks, ...o }: any) => ({ ...o, pharmacist_check: orderCheckState(shipment_checks ?? []) }));
+    res.json({ success: true, data: { orders: out, page, limit } });
   } catch (err) { next(err); }
 }

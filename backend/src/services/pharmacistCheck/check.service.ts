@@ -34,11 +34,11 @@ export async function dawabagPharmacist(client: PoolClient, userId: string): Pro
 
 // Lines of one shipment (or a whole order) with what the pharmacist should look at
 const LINES_SQL = `
-  SELECT oi.id AS order_item_id, oi.shipment_id, oi.product_id, oi.product_name, oi.quantity, p.drug_schedule,
+  SELECT oi.id AS order_item_id, oi.shipment_id, oi.product_id, oi.product_name, oi.supply_qty AS quantity, oi.removed_qty, p.drug_schedule,
          p.max_qty_per_order, oi.prescription_id,
          (SELECT (iv.content->'facts'->>'habit_forming')::boolean FROM product_info_versions iv
            WHERE iv.product_id = p.id AND iv.status = 'approved' LIMIT 1) AS habit_forming,
-         COALESCE((SELECT SUM(o2i.quantity) FROM order_items o2i JOIN orders o2 ON o2.id = o2i.order_id
+         COALESCE((SELECT SUM(o2i.supply_qty) FROM order_items o2i JOIN orders o2 ON o2.id = o2i.order_id
                     WHERE o2.user_id = o.user_id AND o2.id <> o.id AND o2i.product_id = oi.product_id
                       AND o2.created_at > NOW() - INTERVAL '30 days'
                       AND o2.status NOT IN ('cancelled', 'payment_failed', 'pending_payment')), 0)::int AS recent_units

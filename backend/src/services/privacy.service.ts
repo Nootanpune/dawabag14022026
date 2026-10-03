@@ -4,6 +4,7 @@
 // the caller — never written anywhere. Erasure anonymises the account but keeps
 // records the law requires (tax invoices, prescriptions, H1 register — C-44).
 import { PoolClient } from 'pg';
+import { memberHealth, profileHealth } from './healthProfile/sealing';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
@@ -43,6 +44,12 @@ export async function setConsent(userId: string, purpose: 'marketing' | 'whatsap
   return getConsents(userId);
 }
 
+async function exportHealthProfile(userId: string) {
+  const p = await queryOne<any>(`SELECT user_id, sealed, allergies, conditions, current_medicines, consent_version, consented_at, updated_at
+                                 FROM health_profiles WHERE user_id = $1`, [userId]);
+  return p ? { ...profileHealth(p), consent_version: p.consent_version, consented_at: p.consented_at, updated_at: p.updated_at } : null;
+}
+
 // Everything held about the user, assembled on the fly
 export async function exportUserData(userId: string) {
   const one = (sql: string) => queryOne(sql, [userId]);
@@ -68,10 +75,11 @@ export async function exportUserData(userId: string) {
                             WHERE user_id = $1 ORDER BY created_at`),
     refills: await many(`SELECT id, frequency_days, next_refill_date, is_active FROM refill_subscriptions WHERE user_id = $1`),
     // Sprint 33: health profile (held only with consent, C-41) and dose reminders
-    health_profile: await one(`SELECT allergies, conditions, current_medicines, consent_version, consented_at, updated_at
-                               FROM health_profiles WHERE user_id = $1`),
-    family_members: await many(`SELECT full_name, relationship, age_years, age_recorded_on, allergies, conditions FROM patients
-                                WHERE owner_user_id = $1 AND deleted_at IS NULL`),
+    // Sprint 43: health details are sealed at rest; the export opens them for the buyer
+    health_profile: await exportHealthProfile(userId),
+    family_members: (await many(`SELECT id, full_name, relationship, age_years, age_recorded_on, allergies, conditions, health_sealed FROM patients
+                                WHERE owner_user_id = $1 AND deleted_at IS NULL`))
+      .map((m: any) => ({ full_name: m.full_name, relationship: m.relationship, age_years: m.age_years, age_recorded_on: m.age_recorded_on, ...memberHealth(m) })),
     medicine_reminders: await many(`SELECT medicine_name, dose, times, start_date, end_date, is_active, created_at,
                                       (SELECT json_agg(json_build_object('scheduled_for', l.scheduled_for, 'status', l.status) ORDER BY l.scheduled_for)
                                        FROM reminder_dose_logs l WHERE l.reminder_id = r.id) AS answers
@@ -151,7 +159,7 @@ async function anonymiseUser(client: PoolClient, userId: string) {
   await client.query(`UPDATE addresses SET deleted_at = COALESCE(deleted_at, NOW()) WHERE user_id = $1`, [userId]);
   await client.query(`UPDATE patients SET deleted_at = COALESCE(deleted_at, NOW()) WHERE owner_user_id = $1`, [userId]);
   // Sprint 33: health profile and dose reminders are deleted outright (nothing statutory, C-44)
-  await client.query(`UPDATE patients SET age_years = NULL, age_recorded_on = NULL, allergies = '[]', conditions = '[]' WHERE owner_user_id = $1`, [userId]);
+  await client.query(`UPDATE patients SET age_years = NULL, age_recorded_on = NULL, allergies = '[]', conditions = '[]', health_sealed = NULL WHERE owner_user_id = $1`, [userId]);
   await client.query(`DELETE FROM health_profiles WHERE user_id = $1`, [userId]);
   await client.query(`DELETE FROM medicine_reminders WHERE user_id = $1`, [userId]);
   await client.query(`UPDATE refill_subscriptions SET is_active = FALSE WHERE user_id = $1`, [userId]);

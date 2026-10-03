@@ -36,6 +36,8 @@ export default function PolicyPage() {
     retry: false,
   });
 
+  const notPublished = (error as { response?: { status?: number } } | null)?.response?.status === 404;
+
   // The language lives in the URL only, so the page refetches from the server
   const changeLang = (next: PolicyLanguage) => {
     const params = new URLSearchParams(searchParams?.toString() ?? '');
@@ -59,7 +61,19 @@ export default function PolicyPage() {
           <p className="card mt-3 text-sm text-gray-500">This policy does not exist.</p>
         ) : (
           <>
-            <QueryState isLoading={isLoading} error={error} isEmpty={false} emptyText="" />
+            {/* Sprint 43 (QA): a policy not yet published is not an error for the visitor */}
+            {notPublished ? (
+              <div className="card mt-3 text-sm text-gray-600">
+                <h1 className="text-lg font-semibold text-gray-900 mb-1">{POLICY_LABELS[key]}</h1>
+                <p>This policy is being prepared and will appear here once it is published.</p>
+                <p className="mt-2">
+                  Questions in the meantime? See{' '}
+                  <Link href="/legal" className="text-brand-700 hover:underline">licences and grievance redressal</Link>.
+                </p>
+              </div>
+            ) : (
+              <QueryState isLoading={isLoading} error={error} isEmpty={false} emptyText="" />
+            )}
             {data && (
               <article className="card mt-3">
                 <TranslationNote doc={data} />

@@ -21,11 +21,11 @@ export default function PrescriptionNotice() {
         <p className="font-medium text-amber-900">Prescription required</p>
         {usable ? (
           <p className="text-amber-800 text-xs mt-0.5">
-            You have {usable} uploaded prescription{usable === 1 ? '' : 's'} — you’ll pick it at checkout. Our pharmacist checks it before dispatch.
+            You have {usable} uploaded prescription{usable === 1 ? '' : 's'} — you’ll pick it at checkout. Our pharmacist checks it before packing.
           </p>
         ) : (
           <p className="text-amber-800 text-xs mt-0.5">
-            One or more medicines need a valid doctor’s prescription. Upload it now or at checkout. Our pharmacist checks it before dispatch.
+            One or more medicines need a valid doctor’s prescription. Upload it now or at checkout. Our pharmacist checks it before packing.
           </p>
         )}
         <Link href="/prescriptions" className="inline-block mt-1.5 text-xs font-semibold text-brand-700 hover:underline">

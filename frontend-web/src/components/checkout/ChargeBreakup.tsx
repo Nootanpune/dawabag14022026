@@ -26,7 +26,17 @@ export default function ChargeBreakup({ charges, paymentTerms }: { charges: Chec
         <span>Total payable</span>
         <span className="text-brand-600">{formatPrice(charges.total_payable_paise)}</span>
       </div>
-      <p className="text-xs text-gray-400">Payment terms: {paymentTerms.replace(/_/g, ' ')}</p>
+      {/* Sprint 43 (QA): "prepaid" said nothing to a shopper; credit terms are spelt out for trade buyers */}
+      {paymentTerms !== 'prepaid' && <p className="text-xs text-gray-500">{termsWords(paymentTerms)}</p>}
     </div>
   );
+}
+
+/** Credit terms in words, e.g. net_30 → "Pay within 30 days (credit bill)". */
+export function termsWords(t: string): string {
+  const m = /^net_(\d+)$/.exec(t);
+  if (m) return `Pay within ${m[1]} days (credit bill)`;
+  if (t === 'cad') return 'Cash against delivery';
+  if (t === 'postpaid') return 'Pay later (credit bill)';
+  return t.replace(/_/g, ' ');
 }

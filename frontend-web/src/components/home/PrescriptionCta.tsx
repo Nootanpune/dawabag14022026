@@ -13,7 +13,7 @@ export default function PrescriptionCta() {
         <div className="flex-1">
           <h2 className="font-semibold text-gray-900">Have a prescription?</h2>
           <p className="text-sm text-gray-600 mt-0.5">
-            Upload a photo. Our pharmacist checks it before dispatch.
+            Upload a photo. Our pharmacist checks it before packing.
           </p>
           <p className="text-xs text-gray-500 mt-1">Then add the medicines to your cart and choose the prescription at checkout.</p>
         </div>

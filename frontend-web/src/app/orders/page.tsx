@@ -1,16 +1,15 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { Loader2, Package, RefreshCw, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
-import { formatPrice, ORDER_STATUS_LABELS } from '@/lib/utils';
+import Link from 'next/link';
+import { formatPrice } from '@/lib/utils';
+import { orderStatusInfo } from '@/lib/orders/statusLabel';
 import Header from '@/components/layout/Header';
 import { formatDateIST } from '@/lib/dates';
 import EmptyState from '@/components/ui/EmptyState';
 
 export default function OrdersPage() {
-  const router = useRouter();
-
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['my-orders'],
     queryFn: async () => {
@@ -44,12 +43,13 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-3">
             {data.orders.map((order: any) => {
-              const statusInfo = ORDER_STATUS_LABELS[order.status] || { label: order.status, color: 'text-gray-600 bg-gray-100' };
+              const statusInfo = orderStatusInfo(order);
               return (
-                <div
+                // Sprint 43 (QA): a real link (keyboard, open in a new tab), not a clickable box
+                <Link
                   key={order.id}
-                  onClick={() => router.push(`/orders/${order.id}`)}
-                  className="card hover:shadow-md transition-shadow cursor-pointer"
+                  href={`/orders/${order.id}`}
+                  className="card block hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -72,7 +72,7 @@ export default function OrdersPage() {
                       Tracking: {order.courier_partner} · {order.awb_number}
                     </p>
                   )}
-                </div>
+                </Link>
               );
             })}
           </div>

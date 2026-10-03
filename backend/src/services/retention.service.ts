@@ -61,7 +61,7 @@ const PURGES: Record<string, string> = {
           AND COALESCE(u.last_login_at, u.created_at) < NOW() - make_interval(days => $1)
         LIMIT ${BATCH}),
       wiped AS (
-        UPDATE patients SET allergies = '[]', conditions = '[]', age_years = NULL, age_recorded_on = NULL
+        UPDATE patients SET allergies = '[]', conditions = '[]', health_sealed = NULL, age_years = NULL, age_recorded_on = NULL
         WHERE owner_user_id IN (SELECT user_id FROM stale) RETURNING 1)
       DELETE FROM health_profiles WHERE user_id IN (SELECT user_id FROM stale) RETURNING 1`,
 };

@@ -20,7 +20,7 @@ import { licenceList } from '../services/licences/input';
 import { LicenceIn, licenceProblems } from '../services/licences/forms';
 import { assertNumbersFree, submitLicencesTx } from '../services/licences/register.service';
 import { todayIST } from '../utils/ist';
-import { clearSession, issueSession, readRefreshToken } from '../utils/sessionCookie';
+import { clearSession, isWebClient, issueSession, readRefreshToken } from '../utils/sessionCookie';
 import { CHALLENGE_MESSAGE, isChallenge, sessionOrChallenge } from '../services/twoFactor/signIn.service';
 import { appliesToRole, sessionMayContinue } from '../services/twoFactor/policy';
 import { isEnrolled, twoFactorPolicy } from '../services/twoFactor/enrolment.service';
@@ -401,6 +401,9 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 export async function refreshToken(req: Request, res: Response, next: NextFunction) {
   try {
     const refresh_token = readRefreshToken(req);
+    // Sprint 43 (QA): a website visitor who never signed in has no cookie — that is not an
+    // error, so the page's session check answers "signed out" without a 401 in the console
+    if (!refresh_token && isWebClient(req)) { res.json({ success: true, data: null }); return; }
     if (!refresh_token) throw new AppError('Not signed in', 401);
 
     const payload = await verifyRefreshToken(refresh_token);

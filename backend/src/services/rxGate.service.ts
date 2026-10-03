@@ -25,9 +25,11 @@ export async function rxRequiredLines(client: PoolClient, orderId: string): Prom
   if (!buyer) throw new AppError('Order not found', 404);
   const type = effectiveCustomerType(buyer.customer_type, buyer.kyc_status);
   const lines = (await client.query(
-    `SELECT oi.id AS order_item_id, oi.product_id, oi.product_name, p.drug_schedule, oi.quantity,
+    `SELECT oi.id AS order_item_id, oi.product_id, oi.product_name, p.drug_schedule, oi.supply_qty AS quantity,
             oi.prescription_id, oi.shipment_id
-     FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
+     FROM order_items oi JOIN products p ON p.id = oi.product_id
+     -- Sprint 43: a line the buyer removed before packing needs no prescription
+     WHERE oi.order_id = $1 AND oi.supply_qty > 0`,
     [orderId])).rows as RxLine[];
   return lines.filter((l) => requiresPrescription(type, l.drug_schedule));
 }

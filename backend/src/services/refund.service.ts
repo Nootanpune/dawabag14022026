@@ -15,7 +15,7 @@ import { logger } from '../config/logger';
 import { getRazorpay, razorpayConfigured } from './razorpay.client';
 import { DEMO_PAYMENT_PREFIX } from './payments/paymentMode';
 
-export type RefundSource = 'cancellation' | 'return' | 'admin';
+export type RefundSource = 'cancellation' | 'return' | 'admin' | 'order_edit';
 
 interface Leg { method: 'credit_adjustment' | 'gateway' | 'wallet' | 'manual'; amount: number; paymentId?: string }
 

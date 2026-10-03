@@ -16,7 +16,9 @@ export async function pharmacist(browser: Browser, story: Story) {
   await signIn(page, 'pharmacist');
   await page.goto('/staff/fulfilment');
   await shot('Pharmacist check', 'The pharmacist lands on "Pharmacist check": prescription orders first, then every other order waiting to be checked before packing (Sprint 35, C-08).');
-  await page.getByRole('button', { name: 'Review', exact: true }).first().click();
+  // This journey's own order (a shared database may hold others waiting too)
+  await page.locator('div').filter({ hasText: story.orders.rx! }).filter({ has: page.getByRole('button', { name: 'Review', exact: true }) })
+    .last().getByRole('button', { name: 'Review', exact: true }).click();
   await page.waitForTimeout(1200);
   await shot('Prescription and form', 'The uploaded prescription beside the form: doctor, registration number and address, date, patient and prescribed quantity (C-08, C-09).', { fullPage: true });
   const note = await onScreenOr(async () => {

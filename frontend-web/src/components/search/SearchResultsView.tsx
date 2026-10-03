@@ -98,7 +98,7 @@ export default function SearchResultsView() {
                 </div>
               )}
               <p className="mt-6 text-center text-xs text-gray-500">
-                Showing {products.length} of {total}. Medicines marked Sch H / H1 need a prescription; our pharmacist checks it before dispatch.
+                Showing {products.length} of {total}. Medicines marked Sch H / H1 need a prescription; our pharmacist checks it before packing.
               </p>
             </>
           )}

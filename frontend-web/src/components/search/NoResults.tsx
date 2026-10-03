@@ -69,7 +69,7 @@ export default function NoResults({ query, category, onClearCategory, headingLev
         <Link href="/prescriptions" className="btn-outline mt-5 inline-flex items-center gap-2">
           <FileUp className="w-4 h-4" aria-hidden="true" /> Upload a prescription instead
         </Link>
-        <p className="mt-2 text-xs text-gray-500 max-w-sm">Keep it ready: you add the medicines on it to your cart, and our pharmacist checks it before dispatch.</p>
+        <p className="mt-2 text-xs text-gray-500 max-w-sm">Keep it ready: you add the medicines on it to your cart, and our pharmacist checks it before packing.</p>
       </div>
 
       {!!popular?.products.length && (

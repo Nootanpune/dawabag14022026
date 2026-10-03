@@ -16,7 +16,10 @@ export default function OrderItemsCard({ order }: { order: OrderDetail }) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium line-clamp-1">{item.product_name}</p>
               <p className="text-xs text-gray-400">
-                {item.sku} · Qty: {item.quantity}
+                {item.sku} · Qty: {item.supply_qty ?? item.quantity}
+                {(item.removed_qty ?? 0) > 0 && (
+                  <span className="text-amber-700">{(item.supply_qty ?? 0) === 0 ? ' (removed by you)' : ` (was ${item.quantity})`}</span>
+                )}
                 {order.status !== 'pending_payment' && (
                   <>
                     {' · '}

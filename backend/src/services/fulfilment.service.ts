@@ -48,12 +48,13 @@ export async function fulfilmentQueue(stage: QueueStage) {
             -- Sprint 35: packers see what is still waiting for the pharmacist, with Pack refused (C-08)
             s.pharmacist_check, s.pharmacist_check_note, s.pharmacist_name, s.pharmacist_reg_no, s.pharmacist_checked_at,
             a.full_name AS ship_to_name, a.city, a.pincode,
-            json_agg(json_build_object('product_name', oi.product_name, 'quantity', oi.quantity,
+            json_agg(json_build_object('product_name', oi.product_name, 'quantity', oi.supply_qty,
               'batch_number', ib.batch_number, 'expiry_date', ib.expiry_date, 'rx_cleared',
               -- cleared: verified prescription, or none needed (not Schedule H/H1, or a
               -- KYC-approved trade buyer) — the rule moveOrderToFulfilment applies (C-08)
               oi.prescription_id IS NOT NULL OR p.drug_schedule NOT IN ('Schedule H', 'Schedule H1')
-                OR (u.customer_type <> 'customer' AND u.kyc_status = 'approved')) ORDER BY oi.product_name) AS lines
+                OR (u.customer_type <> 'customer' AND u.kyc_status = 'approved')) ORDER BY oi.product_name)
+              FILTER (WHERE oi.supply_qty > 0) AS lines   -- Sprint 43: lines the buyer removed are not packed
      FROM order_shipments s
      JOIN orders o ON o.id = s.order_id
      JOIN addresses a ON a.id = o.address_id
@@ -123,8 +124,8 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
     // Reserved → shipped
     await client.query(
       `UPDATE inventory_batches b
-       SET quantity_available = b.quantity_available - oi.quantity,
-           quantity_reserved = GREATEST(b.quantity_reserved - oi.quantity, 0)
+       SET quantity_available = b.quantity_available - oi.supply_qty,
+           quantity_reserved = GREATEST(b.quantity_reserved - oi.supply_qty, 0)
        FROM order_items oi WHERE oi.shipment_id = $1 AND oi.batch_id = b.id`, [shipmentId]);
     const h1 = await recordH1Dispensing(client, shipmentId);
     await client.query(

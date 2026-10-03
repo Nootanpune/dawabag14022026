@@ -1,16 +1,18 @@
 'use client';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { RefreshCw } from 'lucide-react';
 import { fetchOrder, orderKeys } from '@/lib/orders/api';
-import { ORDER_STATUS_LABELS, PHARMACIST_CHECK_LABELS } from '@/lib/utils';
+import { orderStatusInfo } from '@/lib/orders/statusLabel';
 import Header from '@/components/layout/Header';
 import QueryState from '@/components/admin/QueryState';
 import OrderTimeline from '@/components/orders/OrderTimeline';
 import OrderItemsCard from '@/components/orders/OrderItemsCard';
 import OrderShipmentsCard from '@/components/orders/OrderShipmentsCard';
 import CancelOrderCard from '@/components/orders/CancelOrderCard';
+import EditOrderCard from '@/components/orders/edit/EditOrderCard';
+import OrderEditsCard from '@/components/orders/edit/OrderEditsCard';
 import RefundsCard from '@/components/orders/RefundsCard';
 import PaymentHoldCard from '@/components/orders/PaymentHoldCard';
 import OrderBillCard from '@/components/orders/OrderBillCard';
@@ -21,18 +23,13 @@ import { formatDateIST } from '@/lib/dates';
 
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
-  const router = useRouter();
   const { data: order, isLoading, error, refetch } = useQuery({
     queryKey: orderKeys.one(orderId),
     queryFn: () => fetchOrder(orderId),
     refetchInterval: 30000, // status, delivery code and refunds come from the server
   });
 
-  const checking = order && ['confirmed', 'packing', 'rx_verified'].includes(order.status)
-    && (order.pharmacist_check === 'pending' || order.pharmacist_check === 'held') ? order.pharmacist_check : null;
-  const statusInfo = order
-    ? (checking ? PHARMACIST_CHECK_LABELS[checking] : null) ?? ORDER_STATUS_LABELS[order.status] ?? { label: order.status, color: 'text-gray-600 bg-gray-100' }
-    : null;
+  const statusInfo = order ? orderStatusInfo(order) : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -42,9 +39,7 @@ export default function OrderDetailPage() {
         {order && statusInfo && (
           <>
             <div className="flex items-center gap-3 mb-6">
-              <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Back">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
+              {/* Sprint 43 (QA): one Back only — the header's (a second arrow here was a duplicate) */}
               <div className="flex-1">
                 <h1 className="text-lg font-semibold">{order.order_number}</h1>
                 <p className="text-xs text-gray-400">
@@ -62,6 +57,8 @@ export default function OrderDetailPage() {
             <OrderTimeline order={order} />
             <OrderShipmentsCard order={order} />
             <OrderItemsCard order={order} />
+            <EditOrderCard order={order} />
+            <OrderEditsCard order={order} />
             {order.can_cancel && <CancelOrderCard orderId={order.id} />}
             <PaymentHoldCard order={order} />
             <RefundsCard order={order} />

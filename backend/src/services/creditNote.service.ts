@@ -73,7 +73,11 @@ export async function issueCreditNote(
 // Credit notes for every open line of a shipment (cancellation)
 export async function creditWholeShipment(client: PoolClient, shipmentId: string, reason: string, userId: string | null) {
   const lines = (await client.query(
-    `SELECT id AS order_item_id, quantity FROM order_items WHERE shipment_id = $1`, [shipmentId])).rows;
+    `SELECT oi.id AS order_item_id,
+            oi.quantity - COALESCE((SELECT SUM(ci.quantity) FROM credit_note_items ci WHERE ci.order_item_id = oi.id), 0)::int AS quantity
+     FROM order_items oi WHERE oi.shipment_id = $1`, [shipmentId])).rows
+    // Sprint 43: lines already credited by an order change (or earlier note) are not credited twice
+    .filter((l: any) => Number(l.quantity) > 0);
   if (!lines.length) return null;
   return issueCreditNote(client, { shipmentId, reason, lines, userId });
 }

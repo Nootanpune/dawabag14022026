@@ -6,6 +6,7 @@
 //   • an order payment (checkout or a refill charged on a mandate)
 // Money for an order that was cancelled meanwhile goes straight back (C-37).
 import { PoolClient } from 'pg';
+import { refundEditsAfterCaptureTx } from '../orderEdit/editRefunds';
 import { withTransaction } from '../../config/database';
 import { logger } from '../../config/logger';
 import { writeAuditTx } from '../../utils/audit';
@@ -65,7 +66,10 @@ async function captureOrder(client: PoolClient, p: GatewayPayment, actor: string
     await writeAuditTx(client, { userId: order.user_id, action: 'payment_captured', performedBy: actor,
       newValue: { order_id: pay.order_id, gateway_order_id: p.order_id, gateway_payment_id: p.id, order_status: order.status,
         after_pharmacist_check: true, ...(String(p.id).startsWith('demo_') ? { demo: true } : {}) } });
-    return { kind: 'order', outcome: 'held payment captured after the pharmacist check', orderId: pay.order_id,
+    // Sprint 43: the authorised amount is captured in full; what the buyer took off the order
+    // while it was held goes back now (order changes before packing, C-37)
+    const editRefunds = await refundEditsAfterCaptureTx(client, pay.order_id);
+    return { kind: 'order', outcome: 'held payment captured after the pharmacist check', orderId: pay.order_id, refundIds: editRefunds,
       notify: { userId: order.user_id, type: 'payment_confirmed', orderId: pay.order_id, orderNumber: order.order_number, status: order.status } };
   }
   if (!['pending_payment', 'payment_failed'].includes(order.status)) {

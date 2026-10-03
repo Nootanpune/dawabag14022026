@@ -60,7 +60,7 @@ export default function EmptyCart({ signedIn }: { signedIn: boolean }) {
         <FileUp className="w-6 h-6 text-brand-600 shrink-0" aria-hidden="true" />
         <span className="flex-1">
           <span className="block text-sm font-medium text-gray-900">Have a prescription?</span>
-          <span className="block text-xs text-gray-500">Upload it now and choose it at checkout. Our pharmacist checks it before dispatch.</span>
+          <span className="block text-xs text-gray-500">Upload it now and choose it at checkout. Our pharmacist checks it before packing.</span>
         </span>
       </Link>
     </div>

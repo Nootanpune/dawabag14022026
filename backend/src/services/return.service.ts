@@ -53,7 +53,7 @@ export async function createReturn(userId: string, input: ReturnInput) {
 
     for (const it of input.items) {
       const line = (await client.query(
-        `SELECT oi.quantity, oi.product_id, COALESCE(ib.batch_number, pi.batch_number) AS batch_number,
+        `SELECT oi.supply_qty AS quantity, oi.product_id, COALESCE(ib.batch_number, pi.batch_number) AS batch_number,
                 COALESCE((SELECT SUM(ri.quantity) FROM return_items ri JOIN return_requests rr ON rr.id = ri.return_id
                           WHERE ri.order_item_id = oi.id AND rr.status IN ('requested', 'approved', 'closed')), 0)::int AS returned
          FROM order_items oi
@@ -115,7 +115,7 @@ export async function getReturn(id: string, scope: { userId?: string; partnerId?
   const r = await queryOne<any>(`${LIST_SQL} WHERE r.id = $1${extra}`, params);
   if (!r) throw new AppError('Return not found', 404);
   const items = await query(
-    `SELECT ri.order_item_id, ri.quantity, oi.product_name, oi.quantity AS delivered_qty, oi.line_total_paise,
+    `SELECT ri.order_item_id, ri.quantity, oi.product_name, oi.supply_qty AS delivered_qty, oi.line_total_paise,
             COALESCE(ib.batch_number, pi.batch_number) AS batch_number, COALESCE(ib.expiry_date, pi.expiry_date) AS expiry_date
      FROM return_items ri JOIN order_items oi ON oi.id = ri.order_item_id
      LEFT JOIN inventory_batches ib ON ib.id = oi.batch_id
@@ -176,7 +176,7 @@ export async function decideReturn(staffId: string, id: string, approve: boolean
 async function markFullyReturned(client: any, shipmentId: string, orderId: string) {
   const open = (await client.query(
     `SELECT COUNT(*)::int AS n FROM order_items oi
-     WHERE oi.shipment_id = $1 AND oi.quantity > COALESCE((SELECT SUM(ri.quantity) FROM return_items ri
+     WHERE oi.shipment_id = $1 AND oi.supply_qty > COALESCE((SELECT SUM(ri.quantity) FROM return_items ri
        JOIN return_requests rr ON rr.id = ri.return_id WHERE ri.order_item_id = oi.id AND rr.status IN ('approved', 'closed')), 0)`,
     [shipmentId])).rows[0].n;
   if (open > 0) return;

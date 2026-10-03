@@ -11,6 +11,7 @@ import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
 import { todayIST } from '../../utils/ist';
+import { healthAad, memberHealth, profileHealth, sealHealth, sealMember } from './sealing';
 import {
   HEALTH_CONSENT_PURPOSE, HEALTH_CONSENT_VERSION, ageNow, cleanList, consentProblem, memberSchema, profileSchema,
 } from './rules';
@@ -25,24 +26,26 @@ async function currentConsent(db: { query: PoolClient['query'] } | null, userId:
 }
 
 const memberCols = `id, full_name, relationship, age_years, to_char(age_recorded_on, 'YYYY-MM-DD') AS age_recorded_on,
-  allergies, conditions, created_at`;
+  allergies, conditions, health_sealed, created_at`;
 
+// Sprint 43: allergies / conditions are sealed at rest (sealing.ts); opened only here
 const memberOut = (m: any, today: string) => ({
   id: m.id, full_name: m.full_name, relationship: m.relationship, age: ageNow(m.age_years, m.age_recorded_on, today),
-  allergies: m.allergies ?? [], conditions: m.conditions ?? [],
+  ...memberHealth(m),
 });
 
 export async function getHealthProfile(userId: string) {
   const consent = await currentConsent(null, userId);
-  const p = await queryOne<any>(`SELECT allergies, conditions, current_medicines, consented_at, updated_at FROM health_profiles WHERE user_id = $1`, [userId]);
+  const p = await queryOne<any>(`SELECT user_id, sealed, allergies, conditions, current_medicines, consented_at, updated_at FROM health_profiles WHERE user_id = $1`, [userId]);
+  const h = profileHealth(p);
   const members = await query<any>(
     `SELECT ${memberCols} FROM patients WHERE owner_user_id = $1 AND deleted_at IS NULL ORDER BY created_at`, [userId]);
   const today = todayIST();
   return {
     consent: { given: consent.granted, recorded_at: consent.recorded_at, version: HEALTH_CONSENT_VERSION, purpose: HEALTH_CONSENT_PURPOSE },
-    allergies: p?.allergies ?? [],
-    conditions: p?.conditions ?? [],
-    current_medicines: p?.current_medicines ?? [],
+    allergies: h.allergies,
+    conditions: h.conditions,
+    current_medicines: h.current_medicines,
     updated_at: p?.updated_at ?? null,
     family_members: members.map((m) => memberOut(m, today)),
   };
@@ -74,13 +77,15 @@ async function withConsent<T>(userId: string, ticked: boolean | undefined, ctx: 
 export async function saveHealthProfile(userId: string, body: unknown, ctx: Ctx = {}) {
   const d = profileSchema.parse(body);
   await withConsent(userId, d.consent, ctx, async (client) => {
+    // Sealed at rest (Sprint 43): the plain columns stay empty
+    const sealed = sealHealth(healthAad('health_profiles', userId), {
+      allergies: cleanList(d.allergies), conditions: cleanList(d.conditions), current_medicines: cleanList(d.current_medicines) });
     await client.query(
-      `INSERT INTO health_profiles (user_id, allergies, conditions, current_medicines, consent_version, consented_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
-       ON CONFLICT (user_id) DO UPDATE SET allergies = EXCLUDED.allergies, conditions = EXCLUDED.conditions,
-         current_medicines = EXCLUDED.current_medicines, updated_at = NOW()`,
-      [userId, JSON.stringify(cleanList(d.allergies)), JSON.stringify(cleanList(d.conditions)),
-        JSON.stringify(cleanList(d.current_medicines)), HEALTH_CONSENT_VERSION]);
+      `INSERT INTO health_profiles (user_id, allergies, conditions, current_medicines, sealed, consent_version, consented_at)
+       VALUES ($1, '[]', '[]', '[]', $2, $3, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET allergies = '[]', conditions = '[]', current_medicines = '[]',
+         sealed = EXCLUDED.sealed, updated_at = NOW()`,
+      [userId, sealed, HEALTH_CONSENT_VERSION]);
     // what changed is the buyer's health data: the audit names the fields only (C-41)
     await writeAuditTx(client, { userId, action: 'health_profile_saved', performedBy: userId,
       newValue: { allergies: d.allergies.length, conditions: d.conditions.length, current_medicines: d.current_medicines.length } });
@@ -95,9 +100,12 @@ export async function addFamilyMember(userId: string, body: unknown & { consent?
     const n = Number((await client.query(`SELECT COUNT(*) FROM patients WHERE owner_user_id = $1 AND deleted_at IS NULL`, [userId])).rows[0].count);
     if (n >= 15) throw new AppError('You can add up to 15 family members', 400);
     const id = (await client.query(
-      `INSERT INTO patients (owner_user_id, full_name, relationship, age_years, age_recorded_on, allergies, conditions)
-       VALUES ($1, $2, $3, $4::smallint, CASE WHEN $4::smallint IS NULL THEN NULL ELSE CURRENT_DATE END, $5, $6) RETURNING id`,
-      [userId, d.full_name, d.relationship, d.age_years ?? null, JSON.stringify(cleanList(d.allergies)), JSON.stringify(cleanList(d.conditions))])).rows[0].id;
+      `INSERT INTO patients (owner_user_id, full_name, relationship, age_years, age_recorded_on)
+       VALUES ($1, $2, $3, $4::smallint, CASE WHEN $4::smallint IS NULL THEN NULL ELSE CURRENT_DATE END) RETURNING id`,
+      [userId, d.full_name, d.relationship, d.age_years ?? null])).rows[0].id;
+    // Sealed with the new row's id bound in (Sprint 43)
+    await client.query(`UPDATE patients SET health_sealed = $2 WHERE id = $1`,
+      [id, sealMember(id, { allergies: cleanList(d.allergies), conditions: cleanList(d.conditions) })]);
     await writeAuditTx(client, { userId, action: 'health_profile_member_added', performedBy: userId, newValue: { member_id: id } });
   });
   return getHealthProfile(userId);
@@ -107,11 +115,12 @@ export async function updateFamilyMember(userId: string, memberId: string, body:
   const d = memberSchema.parse(body);
   await withConsent(userId, undefined, ctx, async (client) => {
     const r = await client.query(
-      `UPDATE patients SET full_name = $3, relationship = $4, allergies = $6, conditions = $7,
+      `UPDATE patients SET full_name = $3, relationship = $4, allergies = '[]', conditions = '[]', health_sealed = $6,
               age_recorded_on = CASE WHEN $5::smallint IS NULL THEN NULL WHEN age_years IS DISTINCT FROM $5::smallint THEN CURRENT_DATE ELSE age_recorded_on END,
               age_years = $5::smallint
        WHERE id = $1 AND owner_user_id = $2 AND deleted_at IS NULL`,
-      [memberId, userId, d.full_name, d.relationship, d.age_years ?? null, JSON.stringify(cleanList(d.allergies)), JSON.stringify(cleanList(d.conditions))]);
+      [memberId, userId, d.full_name, d.relationship, d.age_years ?? null,
+        sealMember(memberId, { allergies: cleanList(d.allergies), conditions: cleanList(d.conditions) })]);
     if (!r.rowCount) throw new AppError('Family member not found', 404);
     await writeAuditTx(client, { userId, action: 'health_profile_member_updated', performedBy: userId, newValue: { member_id: memberId } });
   });
@@ -131,7 +140,7 @@ async function removeMembersTx(client: PoolClient, userId: string, memberId?: st
     OR EXISTS (SELECT 1 FROM consultations c WHERE c.patient_id = patients.id)
     OR EXISTS (SELECT 1 FROM digital_prescriptions d WHERE d.patient_id = patients.id)`;
   const kept = await client.query(
-    `UPDATE patients SET deleted_at = NOW(), age_years = NULL, age_recorded_on = NULL, allergies = '[]', conditions = '[]'
+    `UPDATE patients SET deleted_at = NOW(), age_years = NULL, age_recorded_on = NULL, allergies = '[]', conditions = '[]', health_sealed = NULL
      WHERE ${which} AND (${used})`, args);
   const gone = await client.query(`DELETE FROM patients WHERE ${which} AND NOT (${used})`, args);
   return (kept.rowCount ?? 0) + (gone.rowCount ?? 0);
@@ -187,8 +196,8 @@ export async function healthNoteForOrder(staffId: string, orderId: string) {
     out = m ? { for: 'family_member', ...memberOut(m, today), current_medicines: [] } : null;
   }
   if (!out) {
-    const p = await queryOne<any>(`SELECT allergies, conditions, current_medicines FROM health_profiles WHERE user_id = $1`, [o.user_id]);
-    out = { for: 'buyer', allergies: p?.allergies ?? [], conditions: p?.conditions ?? [], current_medicines: p?.current_medicines ?? [] };
+    const p = await queryOne<any>(`SELECT user_id, sealed, allergies, conditions, current_medicines FROM health_profiles WHERE user_id = $1`, [o.user_id]);
+    out = { for: 'buyer', ...profileHealth(p) };
   }
   await withTransaction((client) => writeAuditTx(client, { userId: o.user_id, action: 'health_profile_viewed', performedBy: staffId,
     newValue: { order_id: orderId, order_number: o.order_number, for: out.for } }));

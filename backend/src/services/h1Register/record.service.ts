@@ -26,7 +26,7 @@ export async function recordH1Dispensing(client: PoolClient, shipmentId: string)
   const rows = (await client.query(
     `SELECT s.seller_type, s.partner_id, s.seller_drug_licences, o.id AS order_id, oi.id AS order_item_id, oi.product_id,
             oi.sale_licence_form, oi.sale_licence_number,
-            oi.product_name, oi.quantity,
+            oi.product_name, oi.supply_qty AS quantity,
             COALESCE(ib.batch_number, pi.batch_number) AS batch_number,
             rx.id AS prescription_id, rx.patient_name, rx.prescriber_name, rx.prescriber_address, rx.prescriber_reg_no,
             COALESCE(s.pharmacist_name, pp.h1_pharmacist_name, vp.full_name) AS pharmacist_name,
@@ -43,7 +43,7 @@ export async function recordH1Dispensing(client: PoolClient, shipmentId: string)
      LEFT JOIN partner_inventory pi ON pi.id = poi.partner_inv_id
      LEFT JOIN partner_products pp ON pp.id = poi.partner_product_id
      LEFT JOIN user_profiles vp ON vp.user_id = rx.verified_by
-     WHERE s.id = $1
+     WHERE s.id = $1 AND oi.supply_qty > 0   -- Sprint 43: lines removed before packing were not supplied
        AND NOT EXISTS (SELECT 1 FROM h1_register h WHERE h.order_item_id = oi.id)
      ORDER BY oi.id`, [shipmentId])).rows;
   // Retail supply on prescription is what the register records (as before Sprint 38): a

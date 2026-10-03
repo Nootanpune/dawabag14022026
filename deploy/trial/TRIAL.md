@@ -112,6 +112,16 @@ itself, the same on every deploy. Do not add or change `TOTP_ENC_KEY` later whil
 use two-step sign-in — their apps would stop being accepted (they would sign in with a
 recovery code, or the super-admin resets them under Admin → Two-step sign-in).
 
+### Health data key (new in Sprint 43 — nothing to do for an existing trial)
+
+Allergies, conditions and medicines that buyers keep in their health profile are now stored
+encrypted with `HEALTH_ENC_KEY`. A `TRIAL_ENV` made from now on contains that line. **If your
+`TRIAL_ENV` was made earlier, change nothing**: the server works it out from your
+`DB_PASSWORD` by itself, the same on every deploy, and encrypts the existing profiles the next
+time it starts. If you later want a key of your own, follow RUNBOOK §6 "Health data key"
+(the old key is kept alongside for one deploy) — otherwise the saved health details could no
+longer be read.
+
 ### Razorpay test keys (so checkout and consultation fees can be paid with test money)
 
 *Optional.* Until these keys are added, the trial shows a **demo payment** instead:

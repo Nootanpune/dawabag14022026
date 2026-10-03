@@ -62,7 +62,8 @@ export default function AdminDashboard() {
         onRefresh={() => refetch()}
       />
       <div>
-        {isLoading ? (
+        {/* Sprint 43 (QA): reviewers are redirected; nothing admin-only is asked for meanwhile */}
+        {!isManager ? null : isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-gray-300" /></div>
         ) : (
           <>

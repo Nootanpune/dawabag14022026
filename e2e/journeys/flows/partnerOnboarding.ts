@@ -28,6 +28,10 @@ async function partnerSetup() {
     mrp_paise: 2500, offer_price_paise: 2200, max_qty_per_order: 10, net_quantity: '21.8 g sachet',
     manufacturer_name: 'E2E Pharma Ltd', manufacturer_address: 'Plot 19, MIDC Satpur, Nashik 422007', country_of_origin: 'India',
   });
+  // Sprint 39 (C-10): a new product starts "not allowed online" until a pharmacist allows it (dated reference)
+  const ors = (await dbRow(`SELECT id FROM products WHERE sku = $1`, [ORS.sku]))!.id;
+  await apiAs('pharmacist', 'POST', '/online-sale/products/bulk', { product_ids: [ors], status: 'permitted',
+    notification_ref: 'Journey test approval', notification_date: todayIST() });
   // No Dawabag stock: only the partner holds it, and partner stock counts (owner decision 1 Oct 2026)
   await dbRow(`INSERT INTO vendors (name, drug_license_no, gst_number, contact_name, contact_mobile, address_line1, city, state, pincode,
                  latitude, longitude, vendor_type, approval_status)
@@ -47,8 +51,11 @@ export async function partnerOnboarding(browser: Browser) {
   let note = await onScreenOr(async () => {
     await row.getByRole('button', { name: 'Approve' }).click();
     const d = dialog(admin.page);
-    await d.getByLabel('Drug licence type').selectOption('dl20');
-    await d.getByLabel('Licence expiry').fill(later(3 * 365));
+    // Sprint 30: a partner whose licences are already on file is not asked for them again
+    if (await d.getByLabel('Drug licence form').count()) {
+      await d.getByLabel('Drug licence form').selectOption('dl20');
+      await d.getByLabel('Licence valid till').fill(later(3 * 365));
+    }
     await d.getByLabel('Vendor type').selectOption('marketplace_partner');
     await d.getByLabel('Invoice prefix').fill(PARTNER.prefix);
     await adminShot('Approve the licence', 'Approval records the licence type and expiry; the partner gets its own invoice series, because the partner, not Dawabag, is the seller of record (C-05, C-13).');

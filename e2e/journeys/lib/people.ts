@@ -34,6 +34,8 @@ export async function setUpStaff() {
     const ph = (await c.query('SELECT id FROM users WHERE mobile = $1', [people.pharmacist.mobile])).rows[0].id;
     const res = await call('PATCH', `/admin/users/${ph}/pharmacist`, { pharmacist_reg_no: 'MSPC-2019-0419' }, await token('admin'));
     if (res.status >= 300) throw new Error(`Pharmacist registration: ${JSON.stringify(res.json)}`);
+    // Sprint 39 (C-03): the council registration on record follows the number, verified as an admin does
+    await c.query(`UPDATE pharmacist_registrations SET registration_no = 'MSPC-2019-0419', verified_at = NOW() WHERE user_id = $1`, [ph]);
   } finally { await c.end(); r.disconnect(); }
 }
 

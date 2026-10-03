@@ -11,6 +11,9 @@ export interface OrderItem {
   line_total_paise: number;
   drug_schedule: string | null;
   shipment_id: string | null;
+  /** Sprint 43: taken off by the buyer before packing (credit note issued); supply_qty = quantity - removed_qty */
+  removed_qty?: number;
+  supply_qty?: number;
 }
 
 export interface OrderShipmentDetail {
@@ -94,6 +97,8 @@ export interface OrderDetail {
   subtotal_paise: number;
   shipping_paise: number;
   discount_paise: number;
+  gst_paise?: number;
+  wallet_used_paise?: number;
   total_paise: number;
   payment_method?: string | null;
   gateway_payment_id?: string | null;
@@ -118,9 +123,38 @@ export interface OrderDetail {
   credit_notes: OrderCreditNote[];
   refunds: OrderRefund[];
   returns: OrderReturn[];
+  /** Sprint 43: the buyer may lower quantities / remove lines until packing starts (URS-074) */
+  can_edit?: boolean;
+  edit_block_reason?: string | null;
+  edits?: OrderEdit[];
   /** Sprint 39: a prescription order's payment is authorised until the pharmacist's check, then captured (or released) */
   payment?: { status: string; capture: 'now' | 'after_pharmacist_check'; authorised_at: string | null; captured_at: string | null;
     released_at: string | null; note?: string } | null;
+}
+
+/** Sprint 43: one change the buyer made before packing */
+export interface OrderEdit {
+  id: string;
+  edited_at: string;
+  lines: { order_item_id: string; product_name: string; from_qty: number; to_qty: number }[];
+  credit_notes: { credit_note_number: string; shipment_id: string; total_paise: number }[];
+  refund_paise: number;
+  /** none · recorded (refund on its way) · after_capture (refunded right after the held payment is taken) · not_needed */
+  refund_status: 'none' | 'recorded' | 'after_capture' | 'not_needed';
+}
+
+export interface EditResult {
+  id: string;
+  refund_paise: number;
+  refund_status: OrderEdit['refund_status'];
+  credit_notes: string[];
+  message: string;
+}
+
+/** POST /orders/:id/edit — lower quantities (0 removes the line); the server issues credit notes and refunds. */
+export async function editOrder(id: string, lines: { order_item_id: string; quantity: number }[]): Promise<EditResult> {
+  const { data } = await api.post(`/orders/${id}/edit`, { lines });
+  return data.data;
 }
 
 export interface CancelResult {
@@ -148,6 +182,18 @@ export async function cancelOrder(id: string, reason: string): Promise<CancelRes
   const { data } = await api.post(`/orders/${id}/cancel`, { reason });
   return data.data;
 }
+
+/** Sprint 43 (QA): why a refund or credit note was made, in words */
+export const REFUND_SOURCE_LABELS: Record<string, string> = {
+  cancellation: 'order cancelled',
+  return: 'return',
+  admin: 'from Dawabag',
+  order_edit: 'order changed',
+};
+export const CREDIT_NOTE_REASON_LABELS: Record<string, string> = {
+  cancellation: 'order cancelled',
+  order_edit: 'order changed before packing',
+};
 
 export const REFUND_METHOD_LABELS: Record<string, string> = {
   gateway: 'To original payment method',

@@ -45,7 +45,7 @@ export default function ProductSummary({ p }: { p: ProductDetail }) {
             )}
           </div>
           {/* Schedule H / H1 needs a prescription the pharmacist checks before dispatch (C-08) */}
-          {p.requires_prescription && <p className="text-xs text-amber-800 mt-1">Needs a doctor’s prescription. Our pharmacist checks it before dispatch.</p>}
+          {p.requires_prescription && <p className="text-xs text-amber-800 mt-1">Needs a doctor’s prescription. Our pharmacist checks it before packing.</p>}
           {/* Quantity first, then Add; afterwards − qty + (Sprint 26) */}
           <ProductBuyBox p={p} />
         </div>

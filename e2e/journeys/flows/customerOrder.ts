@@ -40,9 +40,9 @@ export async function customerEveryday(browser: Browser, story: Story) {
     await page.waitForTimeout(1500);
     await shot('Checkout — review', 'Step 2: full price break-up, return and cancellation terms and policy links before paying (C-35).', { fullPage: true });
     await page.getByRole('button', { name: /place order/i }).click();
-    await page.getByRole('button', { name: /pay .* securely/i }).waitFor();
+    await page.getByRole('button', { name: /(pay|authorise) .* securely/i }).waitFor();
     await shot('Payment', 'Step 3: the order is placed and waits for payment. No cash on delivery; Razorpay handles UPI, cards and net banking.');
-    await page.getByRole('button', { name: /pay .* securely/i }).click();
+    await page.getByRole('button', { name: /(pay|authorise) .* securely/i }).click();
     await page.waitForTimeout(2500);
     const num = await orderNumberOnScreen(page);
     if (device === 'laptop') story.orders.otc = num;
@@ -79,8 +79,8 @@ export async function customerPrescription(browser: Browser, story: Story) {
   await page.waitForTimeout(1500);
   await shot('Review with prescription', 'The review names the prescription sent with the order and what happens if the pharmacist cannot accept it.', { fullPage: true });
   await page.getByRole('button', { name: /place order/i }).click();
-  await page.getByRole('button', { name: /pay .* securely/i }).waitFor();
-  await page.getByRole('button', { name: /pay .* securely/i }).click();
+  await page.getByRole('button', { name: /(pay|authorise) .* securely/i }).waitFor();
+  await page.getByRole('button', { name: /(pay|authorise) .* securely/i }).click();
   await page.waitForTimeout(2500);
   story.orders.rx = await orderNumberOnScreen(page);
   await shot('Order confirmed', `Paid. Order ${story.orders.rx} now waits for the pharmacist to check the prescription before anything is packed.`);
