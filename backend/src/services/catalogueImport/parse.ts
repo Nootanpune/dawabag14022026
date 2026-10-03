@@ -23,6 +23,8 @@ const MASTER_COLUMNS: [string, string][] = [
   ['country of origin', 'country_of_origin'], ['nppa ceiling', 'nppa_ceiling_price'],
   // Sprint 34: Drugs Rules Schedule C / C1 (yes / no), set by the pharmacist (C-07, C-33)
   ['schedule c', 'schedule_c_c1'],
+  // Sprint 40 (D6): optional product class (drug / device / cosmetic / ayush / general) and new drug (yes / no)
+  ['product class', 'product_class'], ['new drug', 'is_new_drug'],
 ];
 
 const STOCK_COLUMNS: [string, string][] = [

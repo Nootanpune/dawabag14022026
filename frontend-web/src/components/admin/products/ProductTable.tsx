@@ -4,6 +4,7 @@ import { formatPrice } from '@/lib/utils';
 import { scheduleBadge } from '@/lib/drugSchedule';
 import { teleListShort } from '@/lib/telemedicine/labels';
 import OnlineSaleBadge from '@/components/staff/onlineSale/OnlineSaleBadge';
+import { PRODUCT_CLASS_LABELS } from '@/lib/productClass';
 
 export default function ProductTable({ products }: { products: AdminProductRow[] }) {
   return (
@@ -28,6 +29,9 @@ export default function ProductTable({ products }: { products: AdminProductRow[]
               <td className="px-4 py-2.5">
                 <p className="font-medium">
                   {p.name} {p.cold_chain && <span className="badge-cold ml-1">Cold chain</span>}
+                  {/* Sprint 40 (D6) */}
+                  {p.product_class && p.product_class !== 'drug' && <span className="ml-1 text-xs rounded-full px-2 py-0.5 bg-gray-100 text-gray-700">{PRODUCT_CLASS_LABELS[p.product_class]}</span>}
+                  {p.is_new_drug && <span className="ml-1 text-xs rounded-full px-2 py-0.5 bg-purple-100 text-purple-800">New drug</span>}
                 </p>
                 <p className="text-xs text-gray-400">
                   {p.sku}

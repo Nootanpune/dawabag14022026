@@ -6,6 +6,8 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
 import { assertNoRecalledLines } from './recall.service';
+import { assertNoGdpHeldLines } from './gdp/guard';
+import { logDispatchExcursion } from './gdp/record.service';
 import { assertDispatchAllowed } from './emergencyStop/state.service';
 import { DispatchRecord, HandoverInput, checkHandover, handoverCode, prepareHandover, recordHandover } from './handover.service';
 import { queueNotification } from './notification.service';
@@ -42,6 +44,8 @@ export async function listPartnerShipments(vendorId: string, status?: string) {
 
 export async function dispatchShipment(vendorId: string, shipmentId: string, courier: string | undefined, awb: string | undefined, userId: string, dispatch: DispatchRecord) {
   if (!courier || !awb) throw new AppError('Enter the courier and AWB number', 400);
+  // Sprint 40: an out-of-range cold-chain reading is logged as an excursion first (C-25)
+  await logDispatchExcursion(shipmentId, { partnerId: vendorId }, dispatch.cold_chain_temp_c, dispatch.cold_chain_logger_id, userId);
   return withTransaction(async (client) => {
     const s = (await client.query(
       `SELECT s.id, s.status, s.created_at, s.pharmacist_check, s.pharmacist_check_note, o.status AS order_status, o.id AS order_id
@@ -56,6 +60,7 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
     if (!mayDispatch(s.pharmacist_check)) throw new AppError(notReleasedMessage(s.pharmacist_check, s.pharmacist_check_note, 'partner'), 409);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
+    await assertNoGdpHeldLines(client, shipmentId);    // Sprint 40 (C-25)
     await assertDispatchAllowed(client, shipmentId);   // emergency stop holds Rx parcels (Sprint 38, C-08)
     await assertPaymentTaken(client, s.order_id);      // Sprint 39: held prescription payment captured first (C-37)
     // Reserved → shipped: take the units out of the partner's batch

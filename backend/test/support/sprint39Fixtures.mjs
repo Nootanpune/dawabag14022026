@@ -10,6 +10,9 @@
 import crypto from 'crypto';
 
 const NEVER = `('Schedule X', 'NDPS')`;
+// Sprint 40 (D6): devices and new drugs are never stood in for — the database refuses
+// 'permitted' for a device, and for a new drug without a pharmacist's confirmation
+const CLASS_OK = `product_class <> 'device' AND NOT is_new_drug`;
 
 /** Mark products (by id) as allowed for online sale, as a pharmacist would. Schedule X / NDPS stay as they are. */
 export async function permitProducts(db, ids) {
@@ -18,7 +21,7 @@ export async function permitProducts(db, ids) {
   await db.query(
     `UPDATE products SET online_sale_status = 'permitted', online_sale_ref = 'Smoke test fixture', online_sale_ref_date = CURRENT_DATE,
        online_sale_reason = 'Smoke test fixture', online_sale_set_at = NOW()
-     WHERE id = ANY($1::uuid[]) AND drug_schedule NOT IN ${NEVER} AND online_sale_status <> 'permitted'`, [list]);
+     WHERE id = ANY($1::uuid[]) AND drug_schedule NOT IN ${NEVER} AND ${CLASS_OK} AND online_sale_status <> 'permitted'`, [list]);
 }
 
 /** Same, by SKU pattern (LIKE). */
@@ -26,7 +29,7 @@ export async function permitProductsLike(db, skuLike) {
   await db.query(
     `UPDATE products SET online_sale_status = 'permitted', online_sale_ref = 'Smoke test fixture', online_sale_ref_date = CURRENT_DATE,
        online_sale_reason = 'Smoke test fixture', online_sale_set_at = NOW()
-     WHERE sku LIKE $1 AND drug_schedule NOT IN ${NEVER} AND online_sale_status <> 'permitted' AND deleted_at IS NULL`, [skuLike]);
+     WHERE sku LIKE $1 AND drug_schedule NOT IN ${NEVER} AND ${CLASS_OK} AND online_sale_status <> 'permitted' AND deleted_at IS NULL`, [skuLike]);
 }
 
 const userIdOf = (token) => {
@@ -85,7 +88,7 @@ export async function applySprint39Defaults(db) {
   await db.query(
     `UPDATE products SET online_sale_status = 'permitted', online_sale_ref = 'Smoke test fixture', online_sale_ref_date = CURRENT_DATE,
        online_sale_reason = 'Smoke test fixture', online_sale_set_at = NOW()
-     WHERE online_sale_status = 'restricted' AND online_sale_set_by IS NULL AND drug_schedule NOT IN ${NEVER}
+     WHERE online_sale_status = 'restricted' AND online_sale_set_by IS NULL AND drug_schedule NOT IN ${NEVER} AND ${CLASS_OK}
        AND deleted_at IS NULL AND COALESCE(online_sale_reason, '') NOT LIKE 'Set when online-sale status was introduced%'`);
   await verifyPharmacists(db);
   await verifyPartnerPharmacists(db);

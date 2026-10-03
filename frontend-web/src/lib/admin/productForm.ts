@@ -4,6 +4,7 @@
 import type { ProductDetail } from '../products/api';
 import { rupeesToPaise } from './format';
 import type { ProductBody } from './products';
+import type { ProductClass } from '@/lib/productClass';
 
 export type FieldKind = 'text' | 'textarea' | 'rupees' | 'int';
 
@@ -68,6 +69,9 @@ export interface ProductFormValues {
   cold_chain: boolean;
   /** Drugs Rules Schedule C / C1 — sold only under Form 21 / 21B (Sprint 34, C-07, C-33) */
   schedule_c_c1: boolean;
+  /** Sprint 40 (D6): product class and the NDCT Rules new-drug flag */
+  product_class: ProductClass;
+  is_new_drug: boolean;
   is_active: boolean;
   text: Record<string, string>;
 }
@@ -83,7 +87,7 @@ const NEW_DEFAULTS: Record<string, string> = {
 
 export function blankForm(): ProductFormValues {
   const text = Object.fromEntries(ALL_FIELDS.map((f) => [f.key, NEW_DEFAULTS[f.key] ?? '']));
-  return { sku: '', drug_schedule: 'OTC', cold_chain: false, schedule_c_c1: false, is_active: true, text };
+  return { sku: '', drug_schedule: 'OTC', cold_chain: false, schedule_c_c1: false, product_class: 'drug', is_new_drug: false, is_active: true, text };
 }
 
 const rupees = (paise: number | null | undefined) => (paise == null ? '' : (Number(paise) / 100).toFixed(2));
@@ -100,6 +104,7 @@ export function formFromDetail(p: ProductDetail): ProductFormValues {
     else text[f.key] = src[f.key] == null ? '' : String(src[f.key]);
   }
   return { sku: p.sku, drug_schedule: p.drug_schedule ?? 'OTC', cold_chain: !!p.cold_chain, schedule_c_c1: src.schedule_c_c1 === true,
+    product_class: ((src.product_class as ProductClass) ?? 'drug'), is_new_drug: src.is_new_drug === true,
     is_active: full ? src.is_active !== false : true, text };
 }
 
@@ -137,7 +142,7 @@ export type BuildResult = { body: ProductBody; error?: undefined } | { body?: un
 export function buildCreateBody(v: ProductFormValues): BuildResult {
   if (v.sku.trim().length < 3) return { error: 'SKU needs at least 3 characters' };
   const body: ProductBody = { sku: v.sku.trim(), drug_schedule: v.drug_schedule, cold_chain: v.cold_chain,
-    schedule_c_c1: v.schedule_c_c1, is_active: v.is_active };
+    schedule_c_c1: v.schedule_c_c1, product_class: v.product_class, is_new_drug: v.is_new_drug, is_active: v.is_active };
   for (const f of ALL_FIELDS) {
     const r = convert(f, v.text[f.key] ?? '');
     if (r.error) return { error: r.error };
@@ -153,6 +158,8 @@ export function buildPatchBody(v: ProductFormValues, initial: ProductFormValues)
   if (v.drug_schedule !== initial.drug_schedule) body.drug_schedule = v.drug_schedule;
   if (v.cold_chain !== initial.cold_chain) body.cold_chain = v.cold_chain;
   if (v.schedule_c_c1 !== initial.schedule_c_c1) body.schedule_c_c1 = v.schedule_c_c1;
+  if (v.product_class !== initial.product_class) body.product_class = v.product_class;
+  if (v.is_new_drug !== initial.is_new_drug) body.is_new_drug = v.is_new_drug;
   if (v.is_active !== initial.is_active) body.is_active = v.is_active;
   const known: Record<string, number | null> = {};
   for (const f of ALL_FIELDS) {

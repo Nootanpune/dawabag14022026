@@ -2,6 +2,7 @@
 // partner requests (admin) and the pharmacist's "New products to complete" queue.
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { PRODUCT_CLASSES } from '../services/productClass/rules';
 import { createDraftsFromRequests, MAX_DRAFT_BATCH } from '../services/catalogueDrafts/create.service';
 import { bulkSetDrafts, draftOptions, getDraft, listDrafts, saveDraft, saveDraftDescription } from '../services/catalogueDrafts/queue.service';
 import { approveDraft, rejectDraft } from '../services/catalogueDrafts/decide.service';
@@ -63,6 +64,8 @@ const saveSchema = z.object({
   drug_schedule: z.enum(SCHEDULES).nullable(),
   cold_chain: z.boolean(),
   schedule_c_c1: z.boolean(),   // Sprint 34: Drugs Rules Schedule C / C1, set by the pharmacist
+  product_class: z.enum(PRODUCT_CLASSES),   // Sprint 40 (D6): drug / device / cosmetic / ayush / general
+  is_new_drug: z.boolean(),                 // Sprint 40: NDCT Rules 2019 new drug
   hsn_code: hsn,
   gst_rate: gst,
   category: text(100),
@@ -115,6 +118,7 @@ export async function postApproveDraft(req: Request, res: Response, next: NextFu
         notification_ref: z.string().trim().max(200).nullable().optional(),
         notification_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
         reason: z.string().trim().max(1000).nullable().optional(),
+        new_drug_confirmation: z.string().trim().max(1000).nullable().optional(),   // Sprint 40
       }).optional(),
     }).parse(req.body ?? {});
     res.json({ success: true, data: await approveDraft(uuid.parse(req.params.productId), req.user!.id, notes, online_sale) });

@@ -35,9 +35,11 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
   const neverOnline = !!draft.drug_schedule && NEVER_ONLINE.includes(draft.drug_schedule);
   // Sprint 39: the approved product's online-sale status is set here too, or it would not be sold (C-10)
   const [online, setOnline] = useState<OnlineSaleChange>({ status: 'permitted', notification_ref: '', notification_date: '', reason: '' });
-  const onlineProblem = neverOnline ? null : changeProblems(online, canApprove, toISTDateString(Date.now()));
+  const onlineProblem = neverOnline ? null : changeProblems(online, canApprove, toISTDateString(Date.now()),
+    { anyDevice: draft.product_class === 'device', anyNewDrug: !!draft.is_new_drug });
   const onlineSale = neverOnline ? undefined : { status: online.status, notification_ref: online.notification_ref?.trim() || null,
-    notification_date: online.notification_date || null, reason: online.reason?.trim() || null };
+    notification_date: online.notification_date || null, reason: online.reason?.trim() || null,
+    ...(draft.is_new_drug && online.status === 'permitted' ? { new_drug_confirmation: online.new_drug_confirmation?.trim() || null } : {}) };
   const onApprove = () => (hasClaimWarning(draft) ? setNotesFor(true) : approve.mutate({ onlineSale }));
 
   return (
@@ -92,7 +94,7 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
             {draft.warnings.map((w) => <p key={w} className="text-red-700">{w}</p>)}
             {!neverOnline && canApprove && (
               <div className="mt-2 p-2 rounded-lg border border-gray-200 bg-gray-50" data-testid="draft-online-sale">
-                <OnlineSaleFields value={online} onChange={setOnline} canAllow={canApprove} idPrefix={`d-${draft.id}-os`} statuses={['permitted', 'restricted']} />
+                <OnlineSaleFields value={online} onChange={setOnline} canAllow={canApprove} idPrefix={`d-${draft.id}-os`} statuses={['permitted', 'restricted']} newDrug={!!draft.is_new_drug} />
                 {onlineProblem && <p className="text-amber-800 mt-1">{onlineProblem}</p>}
               </div>
             )}

@@ -88,6 +88,9 @@ export function errorHandler(
   // Business rules enforced by the database (e.g. price ≤ MRP, C-16)
   if ((err as any).code === '23514') {
     const constraint = (err as any).constraint as string | undefined;
+    // Raised by our own triggers (RAISE … ERRCODE check_violation, no constraint name): the
+    // message is ours and plain (e.g. GDP records are append-only, Sprint 40)
+    if (!constraint && err.message) return fail(409, err.message);
     const known: Record<string, string> = {
       products_price_le_mrp: 'Selling prices cannot exceed the MRP',
       products_mrp_le_ceiling: 'MRP cannot exceed the NPPA ceiling price',
@@ -98,6 +101,11 @@ export function errorHandler(
       products_category_switched_off: 'This category is switched off in Admin → Catalogue lists. Choose another category, or ask an admin to switch it back on',
       // Sprint 38: an H1 register entry is complete or it is not written (C-09)
       h1_register_complete: 'The Schedule H1 register entry is incomplete; the parcel was not dispatched',
+      // Sprint 40 (D6, C-10): devices and unconfirmed new drugs are never permitted online
+      products_device_not_permitted: 'A medical device cannot be allowed for online sale until Dawabag has a device track',
+      products_new_drug_confirmed: 'A new drug needs the pharmacist\'s confirmation note before it is allowed for online sale',
+      gdp_records_disposition_check: 'A disposition needs the pharmacist, the excursion and a justification (at least 10 characters)',
+      gdp_records_excursion_note: 'Describe the excursion (at least 5 characters)',
       products_hsn_switched_off: 'This HSN code is switched off in Admin → Catalogue lists. Choose another code, or ask an admin to switch it back on',
     };
     return fail(400, (constraint && known[constraint]) || 'This change breaks a business rule');

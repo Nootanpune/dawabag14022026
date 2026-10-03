@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { API, call, check, q } from '../sprint5/lib.mjs';
 import { PIN, markPaid } from './fixtures.mjs';
 import { releaseForPacking } from '../support/pharmacistCheck.mjs';
+import { releaseShipmentGdpHolds } from '../support/gdpHolds.mjs';
 
 const require = createRequire(import.meta.url);
 const ExcelJS = require('exceljs');
@@ -147,6 +148,7 @@ export async function runOperations({ t, P, addr, ids }) {
   check('cold-chain dispatch needs temperature and logger', r.status === 400, r.json);
   r = await disp({ cold_chain_temp_c: 12, cold_chain_logger_id: 'LOG-1' });
   check('a pack above 8 °C cannot leave', r.status === 409, r.json);
+  await releaseShipmentGdpHolds(call, q, t.pharmacist, cs);   // Sprint 40: the excursion's pharmacist decision (C-25)
   r = await disp({ cold_chain_temp_c: 5, cold_chain_logger_id: 'LOG-1' });
   const rec = (await q(`SELECT cold_chain_temp_c, cold_chain_logger_id FROM order_shipments WHERE id = $1`, [cs]))[0];
   check('dispatched at 5 °C with the logger recorded', r.status === 200 && Number(rec.cold_chain_temp_c) === 5 && rec.cold_chain_logger_id === 'LOG-1', rec);

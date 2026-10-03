@@ -64,6 +64,9 @@ import salesStatusRoutes from './routes/salesStatus.routes';
 import onlineSaleRoutes from './routes/onlineSale.routes';
 import pharmacistRegistrationRoutes from './routes/pharmacistRegistration.routes';
 import provenanceRoutes from './routes/provenance.routes';
+import gdpRoutes from './routes/gdp.routes';
+import recallDrillRoutes from './routes/recallDrill.routes';
+import selfInspectionRoutes from './routes/selfInspection.routes';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
@@ -223,6 +226,9 @@ app.use(`${api}/sales-status`, salesStatusRoutes);      // Sprint 38: emergency 
 app.use(`${api}/online-sale`, onlineSaleRoutes);        // Sprint 39: online-sale status per product (C-10)
 app.use(`${api}/pharmacist-registrations`, pharmacistRegistrationRoutes);   // Sprint 39: registration validity (C-03)
 app.use(`${api}/partner-provenance`, provenanceRoutes);  // Sprint 39: who supplied a partner batch (C-02)
+app.use(`${api}/gdp`, gdpRoutes);                        // Sprint 40: GDP records per batch, excursion holds (C-25)
+app.use(`${api}/recall-drills`, recallDrillRoutes);      // Sprint 40: mock recall drills (C-28)
+app.use(`${api}/self-inspections`, selfInspectionRoutes); // Sprint 40: self-inspection register (C-34)
 
 // ─── Error Handling ─────────────────────────────────────────────────────────
 app.use(notFound);

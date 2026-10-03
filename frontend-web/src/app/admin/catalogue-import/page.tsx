@@ -55,6 +55,9 @@ export default function CatalogueImportPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Catalogue import" subtitle="Add or update products and opening stock from the Excel template" />
+      {/* Sprint 40 (D6): optional columns; blank keeps what is set (a new product: drug, not a new drug) */}
+      <p className="text-xs text-gray-600 mb-3">Optional columns: <strong>Product class</strong> (drug, device, cosmetic, ayush, general) and <strong>New drug</strong> (yes / no).
+        A medical device or a new drug is never allowed for online sale by an import — a pharmacist decides in Online-sale status.</p>
       <ImportFilePicker file={file} onFile={chooseFile} onPreview={runPreview} pending={preview.isPending} />
       {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
       {done && (

@@ -119,7 +119,7 @@ async function ownCandidate(
   if (line.cold_chain && !coldChainOk) return [];
   const batch = (await client.query(
     `SELECT id, expiry_date FROM inventory_batches
-     WHERE product_id = $1 AND is_recalled = FALSE
+     WHERE product_id = $1 AND is_recalled = FALSE AND gdp_status = 'ok'   -- Sprint 40: GDP hold (C-25)
        AND quantity_available - quantity_reserved >= $2
        AND expiry_date > CURRENT_DATE + ${MIN_SHELF_DAYS}
      ORDER BY expiry_date ASC LIMIT 1 FOR UPDATE`,
@@ -144,7 +144,7 @@ async function partnerCandidates(client: PoolClient, line: AllocationLine, buyer
      JOIN partner_products pp ON pp.partner_id = v.id
        AND pp.product_id = $1 AND pp.approval_status = 'approved' AND pp.listing_status = 'live'
      JOIN partner_inventory pi ON pi.partner_product_id = pp.id
-       AND ${PARTNER_SELLABLE} >= $2 AND pi.is_recalled = FALSE
+       AND ${PARTNER_SELLABLE} >= $2 AND pi.is_recalled = FALSE AND pi.gdp_status = 'ok'
        AND pi.expiry_date > CURRENT_DATE + ${MIN_SHELF_DAYS}
        AND ($3::boolean = FALSE OR pi.cold_chain_confirmed = TRUE)
      LEFT JOIN pincode_serviceability ps ON ps.pincode = v.pincode
@@ -159,7 +159,7 @@ async function partnerCandidates(client: PoolClient, line: AllocationLine, buyer
   for (const r of rows) {
     // Lock the batch row (waiting for any order holding it) and re-check the quantity
     const locked = (await client.query(
-      `SELECT id FROM partner_inventory WHERE id = $1 AND dawabag_partner_sellable(partner_id, qty_available, qty_reserved) >= $2 FOR UPDATE`,
+      `SELECT id FROM partner_inventory WHERE id = $1 AND gdp_status = 'ok' AND dawabag_partner_sellable(partner_id, qty_available, qty_reserved) >= $2 FOR UPDATE`,
       [r.inventory_id, line.quantity])).rows[0];
     if (!locked) continue;
     candidates.push({

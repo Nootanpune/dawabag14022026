@@ -58,3 +58,18 @@ describe('partner stock import — column suggestions', () => {
     expect(mappingFromNames(['Item Name', 'Batch No', 'MRP', 'Qty'], names)).toBeNull();
   });
 });
+
+// Sprint 40: templates/03_Partner_Inventory_Submission.xlsx sheet 4 carries the Sprint 39 supplier columns
+describe('partner stock template — supplier columns (Sprint 40, C-02)', () => {
+  it('maps supplier_name, supplier_licence_no, supplier_invoice_no and supplier_invoice_date', () => {
+    const headers = ['* SKU Code', '* Medicine Name', '* Batch Number', '* Qty Available', '* Expiry Date MM/YYYY', 'Mfg Date MM/YYYY',
+      '* Purchase Price per unit Rs', 'supplier_name', 'supplier_invoice_no', 'Date Received DD/MM/YYYY', 'Storage Location Rack',
+      'Cold Chain Batch YES NO', 'Remarks', 'supplier_licence_no', 'supplier_invoice_date'];
+    const m = suggestMapping(headers);
+    expect(m.supplier_name).toBe(7);
+    expect(m.supplier_invoice_no).toBe(8);
+    expect(m.supplier_licence).toBe(13);
+    expect(m.supplier_invoice_date).toBe(14);
+    expect(m.batch_number).toBe(2);
+  });
+});

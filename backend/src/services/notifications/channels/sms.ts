@@ -7,6 +7,21 @@ import { ChannelResult } from './result';
 
 interface DltTemplate { template_id: string; vars?: Record<string, string> }
 
+/**
+ * Whether sign-in / forgot-password codes can go out by SMS at all (owner's trial testing,
+ * Sprint 40): MSG91 is configured (MSG91_AUTH_KEY). Without it the code would be skipped
+ * silently, so /auth/send-otp answers SMS_NOT_CONFIGURED instead. A key without a
+ * registered OTP template is shown to admins as a configuration warning (otpTemplateMissing).
+ */
+export const smsConfigured = (): boolean => !!process.env.MSG91_AUTH_KEY;
+
+/** MSG91 is set up but no DLT template for the OTP is registered (env MSG91_TEMPLATE_OTP or setting sms.dlt_templates.otp). */
+export async function otpTemplateMissing(): Promise<boolean> {
+  if (process.env.MSG91_TEMPLATE_OTP) return false;
+  const templates = await getSetting<Record<string, DltTemplate>>('sms.dlt_templates', {});
+  return !templates?.otp?.template_id;
+}
+
 export async function sendDltSms(mobile: string, type: string, values: Record<string, string>): Promise<ChannelResult> {
   if (!process.env.MSG91_AUTH_KEY) return { status: 'skipped', detail: 'MSG91 not configured' };
   const templates = await getSetting<Record<string, DltTemplate>>('sms.dlt_templates', {});

@@ -49,6 +49,10 @@ import {
   Globe,
   IdCard,
   Waypoints,
+  Thermometer,
+  Snowflake,
+  SearchCheck,
+  ClipboardCheck as ChecklistIcon,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
@@ -139,6 +143,11 @@ export const NAV_SECTIONS: NavSection[] = [
       // Sprint 38 — emergency stop for prescription-medicine sales (super-admin acts) and the chain checks (C-08, C-09, C-46)
       { href: '/admin/emergency-stop', label: 'Emergency stop', icon: OctagonPause, roles: MANAGER_ROLES },
       { href: '/admin/integrity', label: 'Record integrity', icon: Link2, roles: MANAGER_ROLES },
+      // Sprint 40 — GDP records per batch and excursion holds (C-25), mock recall drills (C-28), self-inspections (C-34)
+      { href: '/staff/gdp', label: 'GDP records', icon: Thermometer, roles: STORE_ROLES },
+      { href: '/staff/gdp/excursions', label: 'GDP excursions', icon: Snowflake, roles: STORE_ROLES },
+      { href: '/admin/recall-drills', label: 'Recall drills', icon: SearchCheck, roles: MANAGER_ROLES },
+      { href: '/staff/self-inspections', label: 'Self-inspections', icon: ChecklistIcon, roles: STORE_ROLES },
       { href: '/admin/policies', label: 'Policies', icon: FileText, roles: MANAGER_ROLES },
       // Sprint 33 — "Genuine medicines", "Expired, damaged and recalled", "Every order is checked by a pharmacist"
       { href: '/admin/info-pages', label: 'Trust pages', icon: BookOpenCheck, roles: MANAGER_ROLES },

@@ -13,6 +13,7 @@ import { todayIST } from '../../utils/ist';
 import { queueNotification } from '../notification.service';
 import { assertStaffRegistrationValid } from '../pharmacistRegistration/gate.service';
 import { OnlineSaleStatus, StatusInput, scheduleProblem, statusInputProblems } from './rules';
+import { classOnlineProblem } from '../productClass/rules';
 
 export const MAX_BULK = 500;
 
@@ -30,21 +31,29 @@ export async function setOnlineStatusTx(c: PoolClient, actor: Actor, productIds:
     await assertStaffRegistrationValid(c, actor.id, u.pharmacist_reg_no);
   }
   const rows = (await c.query(
-    `SELECT id, name, sku, drug_schedule, online_sale_status, catalogue_state FROM products
+    `SELECT id, name, sku, drug_schedule, online_sale_status, catalogue_state, product_class, is_new_drug FROM products
      WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE`, [productIds])).rows;
   if (rows.length !== new Set(productIds).size) throw new AppError('Some products were not found', 404);
-  const bad = rows.map((r: any) => scheduleProblem(input.status, r.drug_schedule, r.name)).filter(Boolean) as string[];
+  // Sprint 40: devices never; a new drug only with the pharmacist's confirmation (C-10)
+  const bad = rows.map((r: any) => scheduleProblem(input.status, r.drug_schedule, r.name)
+    ?? classOnlineProblem(r, input.status, input.new_drug_confirmation)).filter(Boolean) as string[];
   if (bad.length) throw new AppError(bad.slice(0, 10).join('; '), 400);
   const ref = input.notification_ref?.trim() || null;
   const reason = input.reason?.trim() || null;
+  const confirmation = input.status === 'permitted' ? input.new_drug_confirmation?.trim() || null : null;
   await c.query(
     `UPDATE products SET online_sale_status = $2, online_sale_ref = $3, online_sale_ref_date = $4, online_sale_reason = $5,
-       online_sale_set_by = $6, online_sale_set_at = NOW(), updated_at = NOW() WHERE id = ANY($1::uuid[])`,
-    [productIds, input.status, ref, input.notification_date || null, reason, actor.id]);
+       online_sale_set_by = $6, online_sale_set_at = NOW(), updated_at = NOW(),
+       new_drug_confirmation = CASE WHEN is_new_drug AND $7::text IS NOT NULL THEN $7 ELSE new_drug_confirmation END,
+       new_drug_confirmed_by = CASE WHEN is_new_drug AND $7::text IS NOT NULL THEN $6 ELSE new_drug_confirmed_by END,
+       new_drug_confirmed_at = CASE WHEN is_new_drug AND $7::text IS NOT NULL THEN NOW() ELSE new_drug_confirmed_at END
+     WHERE id = ANY($1::uuid[])`,
+    [productIds, input.status, ref, input.notification_date || null, reason, actor.id, confirmation]);
   const switchedOff = rows.filter((r: any) => r.online_sale_status === 'permitted' && input.status !== 'permitted');
   await writeAuditTx(c, { userId: null, action: 'product_online_status_set', performedBy: actor.id,
     oldValue: { statuses: rows.map((r: any) => [r.sku, r.online_sale_status]) },
-    newValue: { product_ids: productIds, status: input.status, notification_ref: ref, notification_date: input.notification_date || null, reason } });
+    newValue: { product_ids: productIds, status: input.status, notification_ref: ref, notification_date: input.notification_date || null, reason,
+      new_drug_confirmation: rows.some((r: any) => r.is_new_drug) ? confirmation : undefined } });
   return { updated: rows.length, status: input.status, switched_off: switchedOff.map((r: any) => ({ id: r.id, name: r.name })) };
 }
 
@@ -79,6 +88,7 @@ export async function listOnlineStatus(f: ListFilter) {
   params.push(Math.min(Math.max(f.limit ?? 200, 1), 500));
   return query<any>(
     `SELECT p.id, p.name, p.sku, p.drug_schedule, p.is_active, p.catalogue_state, p.online_sale_status, p.online_sale_ref,
+            p.product_class, p.is_new_drug, p.new_drug_confirmation,
             to_char(p.online_sale_ref_date, 'YYYY-MM-DD') AS online_sale_ref_date, p.online_sale_reason, p.online_sale_set_at,
             up.full_name AS online_sale_set_by_name
      FROM products p LEFT JOIN user_profiles up ON up.user_id = p.online_sale_set_by
@@ -95,7 +105,7 @@ export async function onlineStatusCounts() {
 export async function onlineStatusLog(productId: string) {
   return query<any>(
     `SELECT l.old_status, l.new_status, l.notification_ref, to_char(l.notification_date, 'YYYY-MM-DD') AS notification_date, l.reason,
-            l.set_at, l.drug_schedule, up.full_name AS set_by_name
+            l.set_at, l.drug_schedule, l.new_drug_confirmation, up.full_name AS set_by_name
      FROM product_online_status_log l LEFT JOIN user_profiles up ON up.user_id = l.set_by
      WHERE l.product_id = $1 ORDER BY l.set_at DESC LIMIT 100`, [productId]);
 }

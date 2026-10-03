@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2, KeyRound, Loader2, Lock, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/api';
-import { homeForRole, resetPassword, sendOtp } from '@/lib/auth/otp';
+import { homeForRole, resetPassword, sendOtp, smsNotConfiguredMessage } from '@/lib/auth/otp';
+import SmsUnavailableNotice from './SmsUnavailableNotice';
 import { staffHome } from '@/lib/fulfilment/roles';
 import { useAuthStore } from '@/store/authStore';
 import IconField from './IconField';
@@ -31,6 +32,7 @@ export default function ForgotPasswordForm() {
   const [mobile, setMobile] = useState('');
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [smsOff, setSmsOff] = useState<string | null>(null);   // Sprint 40: no SMS provider on this server
   const mobileForm = useForm<{ mobile: string }>({ resolver: zodResolver(mobileSchema) });
   const resetForm = useForm<z.infer<typeof resetSchema>>({ resolver: zodResolver(resetSchema) });
 
@@ -40,7 +42,9 @@ export default function ForgotPasswordForm() {
       await sendOtp(m);
       setMobile(m);
     } catch (err) {
-      toast.error(getApiErrorMessage(err, 'Could not send the code'));
+      const off = smsNotConfiguredMessage(err);
+      if (off) setSmsOff(off);
+      else toast.error(getApiErrorMessage(err, 'Could not send the code'));
     } finally { setBusy(false); }
   };
 
@@ -65,6 +69,8 @@ export default function ForgotPasswordForm() {
       </div>
     );
   }
+
+  if (smsOff) return <SmsUnavailableNotice message={smsOff} showPasswordLink />;
 
   if (!mobile) {
     return (

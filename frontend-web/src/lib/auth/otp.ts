@@ -26,3 +26,13 @@ export function homeForRole(role: string | undefined, staffHome: (r: string) => 
   if (role === 'partner') return '/partner';
   return next ?? '/';
 }
+
+/**
+ * Sprint 40: the server has no SMS provider (e.g. the trial) and says so — 503 with code
+ * SMS_NOT_CONFIGURED and a plain message, the same for every number. The screens show that
+ * message instead of a "code sent" step.
+ */
+export function smsNotConfiguredMessage(err: any): string | null {
+  const body = err?.response?.data;
+  return body?.code === 'SMS_NOT_CONFIGURED' ? String(body.message || 'Text-message codes are not switched on yet.') : null;
+}

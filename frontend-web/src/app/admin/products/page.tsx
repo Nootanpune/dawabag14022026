@@ -7,11 +7,15 @@ import { adminProductKeys, fetchAdminProducts } from '@/lib/admin/products';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import ProductTable from '@/components/admin/products/ProductTable';
+import { PRODUCT_CLASSES, PRODUCT_CLASS_LABELS, type ProductClass } from '@/lib/productClass';
 
 export default function AdminProductsPage() {
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
+  // Sprint 40 (D6): filter by product class / new drugs
+  const [productClass, setProductClass] = useState<ProductClass | ''>('');
+  const [newDrugOnly, setNewDrugOnly] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => {
       setQ(text.trim());
@@ -21,8 +25,8 @@ export default function AdminProductsPage() {
   }, [text]);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: adminProductKeys.list(q, page),
-    queryFn: () => fetchAdminProducts(q, page),
+    queryKey: adminProductKeys.list(q, page, { productClass, newDrugOnly }),
+    queryFn: () => fetchAdminProducts(q, page, 20, { productClass, newDrugOnly }),
     placeholderData: keepPreviousData,
   });
   const pages = data?.pagination.pages ?? 0;
@@ -48,7 +52,19 @@ export default function AdminProductsPage() {
           </>
         }
       />
-      <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Search by name, generic or SKU" className="input mb-4 max-w-md" />
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Search by name, generic or SKU" aria-label="Search products" className="input max-w-md" />
+        <label className="text-sm flex items-center gap-1.5">
+          <span className="text-gray-600">Class</span>
+          <select className="input py-1 w-auto" value={productClass} onChange={(e) => { setProductClass(e.target.value as ProductClass | ''); setPage(1); }}>
+            <option value="">Any</option>
+            {PRODUCT_CLASSES.map((c) => <option key={c} value={c}>{PRODUCT_CLASS_LABELS[c]}</option>)}
+          </select>
+        </label>
+        <label className="text-sm flex items-center gap-1.5">
+          <input type="checkbox" checked={newDrugOnly} onChange={(e) => { setNewDrugOnly(e.target.checked); setPage(1); }} /> New drugs only
+        </label>
+      </div>
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.products.length} emptyText="No products found" />
       {!!data?.products.length && <ProductTable products={data.products} />}
       {pages > 1 && (

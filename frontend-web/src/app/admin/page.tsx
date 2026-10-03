@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { Loader2, Package, IndianRupee, ClipboardCheck, AlertTriangle, Users, UserCheck } from 'lucide-react';
 import PageHeader from '@/components/admin/PageHeader';
 import SellingRightsWarnings from '@/components/admin/SellingRightsWarnings';
+import ConfigWarnings from '@/components/admin/ConfigWarnings';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES } from '@/lib/admin/roles';
 import api from '@/lib/api';
@@ -67,6 +68,8 @@ export default function AdminDashboard() {
           <>
             {/* Sprint 32: stock not offered to some buyers because of a drug licence (C-07, C-33) */}
             <SellingRightsWarnings />
+            {/* Sprint 40: e.g. no SMS provider — sign-in codes cannot be sent */}
+            <ConfigWarnings />
 
             {/* Metric cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">

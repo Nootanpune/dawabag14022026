@@ -11,6 +11,8 @@
 // Sprint 37: a partner on the live stock feed sells only while its last snapshot is
 // fresh (SQL dawabag_partner_sellable, migration 32): stale → nothing, or only what is
 // above the safety margin, per the partner's setting.
+// Sprint 40: a batch on GDP hold (cold-chain excursion waiting for a pharmacist,
+// quarantined or to be destroyed) never counts (gdp_status = 'ok', C-25).
 import { SaleKind, dawabagMaySupplySql, partnerMaySupplySql, sqlRef } from './sellingRights';
 
 export const PARTNER_MIN_SHELF_DAYS = 30;
@@ -26,7 +28,7 @@ const eligible = (productExpr: string, kind: SaleKind) => `
   JOIN partner_inventory pi ON pi.partner_product_id = pp.id
   JOIN products px ON px.id = pp.product_id
   WHERE pp.product_id = ${sqlRef(productExpr)} AND pp.approval_status = 'approved' AND pp.listing_status = 'live'
-    AND pi.is_recalled = FALSE AND ${PARTNER_SELLABLE} > 0
+    AND pi.is_recalled = FALSE AND pi.gdp_status = 'ok' AND ${PARTNER_SELLABLE} > 0
     AND pi.expiry_date > CURRENT_DATE + ${PARTNER_MIN_SHELF_DAYS}
     AND (COALESCE(px.cold_chain, FALSE) = FALSE OR pi.cold_chain_confirmed = TRUE)
     AND v.approval_status = 'approved' AND v.is_active = TRUE
@@ -50,13 +52,13 @@ export const partnerNearestExpirySql = (productExpr: string, kind: SaleKind) =>
 export const ownStockSql = (productExpr: string, kind: SaleKind) =>
   `(CASE WHEN ${dawabagMaySupplySql(kind, productExpr)} THEN (SELECT COALESCE(SUM(ob.quantity_available - ob.quantity_reserved), 0)
      FROM inventory_batches ob WHERE ob.product_id = ${sqlRef(productExpr)} AND ob.expiry_date > CURRENT_DATE + ${OWN_MIN_SHELF_DAYS}
-       AND ob.is_recalled = FALSE AND ob.quantity_available > ob.quantity_reserved) ELSE 0 END)`;
+       AND ob.is_recalled = FALSE AND ob.gdp_status = 'ok' AND ob.quantity_available > ob.quantity_reserved) ELSE 0 END)`;
 
 /** Earliest expiry of Dawabag's own sellable batches for this kind of buyer (NULL when it may not sell). */
 export const ownNearestExpirySql = (productExpr: string, kind: SaleKind) =>
   `(CASE WHEN ${dawabagMaySupplySql(kind, productExpr)} THEN (SELECT MIN(ob.expiry_date)
      FROM inventory_batches ob WHERE ob.product_id = ${sqlRef(productExpr)} AND ob.expiry_date > CURRENT_DATE + ${OWN_MIN_SHELF_DAYS}
-       AND ob.is_recalled = FALSE AND ob.quantity_available > ob.quantity_reserved) END)`;
+       AND ob.is_recalled = FALSE AND ob.gdp_status = 'ok' AND ob.quantity_available > ob.quantity_reserved) END)`;
 
 /** The most ONE seller can supply to this kind of buyer: Dawabag's batches or one partner's ledger. */
 export const sellableStockSql = (productExpr: string, kind: SaleKind) =>

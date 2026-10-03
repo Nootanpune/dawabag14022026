@@ -14,6 +14,8 @@ import { runRecallAlertWatch } from '../services/recallAlerts/alert.service';
 import { runLiveFeedWatch } from '../services/partnerLiveFeed/alerts.service';
 import { runRxHoldWatch } from '../services/payments/rxHold/hold.service';
 import { runPharmacistRegistrationAlerts } from '../services/pharmacistRegistration/alerts.service';
+import { runChainVerify } from '../services/chainVerify/heads.service';
+import { runSelfInspectionWatch } from '../services/selfInspection/alerts.service';
 
 export interface JobDefinition {
   name: string;
@@ -23,6 +25,21 @@ export interface JobDefinition {
 }
 
 export const JOBS: JobDefinition[] = [
+  {
+    name: 'chain_verify',
+    description: 'Recompute the Schedule H1 register and audit-log hash chains, compare each with its recorded head, record the new heads and alert admins on any break or truncation (Sprint 40, C-09, C-46)',
+    cron: '20 2 * * *',                      // daily 02:20
+    run: async () => {
+      const r = await runChainVerify({ source: 'job' });
+      return { ok: r.ok, chains: r.chains, broken: r.broken };
+    },
+  },
+  {
+    name: 'self_inspection_watch',
+    description: 'Alert admins (and the owner) once when a self-inspection corrective action passes its due date, and when a checklist is overdue (Sprint 40, C-34)',
+    cron: '10 8 * * *',                      // daily 08:10
+    run: runSelfInspectionWatch,
+  },
   {
     name: 'payment_hold_watch',
     description: 'Prescription orders paid by authorisation (Sprint 39): capture the ones the pharmacist passed, alert staff before the hold ends, cancel and release (never charge) the ones still unchecked at the deadline (C-08, C-37)',

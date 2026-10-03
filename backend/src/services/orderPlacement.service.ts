@@ -402,7 +402,7 @@ async function recordLowStock(client: PoolClient, lines: any[], allocations: All
     if (allocations[i].seller_type !== 'dawabag' || !(lines[i].reorder_level_qty > 0)) continue;
     const left = (await client.query(
       `SELECT COALESCE(SUM(quantity_available - quantity_reserved), 0)::int AS qty
-       FROM inventory_batches WHERE product_id = $1 AND expiry_date > CURRENT_DATE + 30 AND is_recalled = FALSE`,
+       FROM inventory_batches WHERE product_id = $1 AND expiry_date > CURRENT_DATE + 30 AND is_recalled = FALSE AND gdp_status = 'ok'`,
       [lines[i].product_id])).rows[0].qty;
     if (left <= lines[i].reorder_level_qty) {
       await client.query(

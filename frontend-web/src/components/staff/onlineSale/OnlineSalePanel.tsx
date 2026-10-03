@@ -72,7 +72,8 @@ export default function OnlineSalePanel() {
                 return (
                   <tr key={r.id} className="border-b border-gray-100 align-top" data-testid="online-sale-row">
                     <td className="py-2 pr-2"><input type="checkbox" checked={chosen.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Choose ${r.name}`} /></td>
-                    <td className="py-2 pr-2"><p className="font-medium">{r.name}</p><p className="text-xs text-gray-500">{r.sku}{r.is_active ? '' : ' · inactive'}</p></td>
+                    <td className="py-2 pr-2"><p className="font-medium">{r.name}</p><p className="text-xs text-gray-500">{r.sku}{r.is_active ? '' : ' · inactive'}
+                      {r.product_class === 'device' ? ' · medical device' : ''}{r.is_new_drug ? ' · new drug' : ''}</p></td>
                     <td className="py-2 pr-2 text-xs">{r.drug_schedule}</td>
                     <td className="py-2 pr-2"><OnlineSaleBadge status={r.online_sale_status} /></td>
                     <td className="py-2 pr-2 text-xs text-gray-700 max-w-xs">

@@ -3,6 +3,7 @@
 // declarations (C-17), Schedule X / NDPS never sold online, no expired stock.
 import { Row } from './parse';
 import { todayIST } from '../../utils/ist';
+import { ProductClass, parseProductClass } from '../productClass/rules';
 
 export interface ProductRecord {
   sku: string; name: string; generic_name: string | null; category: string; drug_schedule: string;
@@ -16,6 +17,9 @@ export interface ProductRecord {
   /** Drugs Rules Schedule C / C1 (Sprint 34). Absent = the column was blank or missing: a new
    *  product is not marked, an existing one keeps what the pharmacist set. */
   schedule_c_c1?: boolean;
+  /** Sprint 40 (D6): absent = blank or no column (new product: 'drug' / not new; existing: kept). */
+  product_class?: ProductClass;
+  is_new_drug?: boolean;
 }
 
 export interface BatchRecord {
@@ -65,6 +69,15 @@ export function scheduleCValue(v: unknown): boolean | undefined | 'invalid' {
   return 'invalid';
 }
 
+/** yes / no cell (Sprint 40 new-drug column); undefined = blank. */
+export function yesNoValue(v: unknown): boolean | undefined | 'invalid' {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s || s === '—') return undefined;
+  if (/^(y|yes|true|1)$/.test(s)) return true;
+  if (/^(n|no|false|0)$/.test(s)) return false;
+  return 'invalid';
+}
+
 export function checkProduct(r: Row): Checked<ProductRecord> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -110,6 +123,13 @@ export function checkProduct(r: Row): Checked<ProductRecord> {
   // Schedule C / C1: yes or no from the pharmacist, never guessed from the name (C-07, C-33)
   const schedC = scheduleCValue(r.schedule_c_c1);
   if (schedC === 'invalid') errors.push('Schedule C/C1 must be yes or no (or left blank)');
+  // Product class / new drug (Sprint 40): optional columns; a device or new drug is never made
+  // sellable by an import — online sale is a pharmacist's decision (C-10)
+  const pClass = parseProductClass(r.product_class);
+  if (pClass === 'invalid') errors.push('Product class must be drug, device, cosmetic, ayush or general (or left blank)');
+  const newDrug = yesNoValue(r.is_new_drug);
+  if (newDrug === 'invalid') errors.push('New drug must be yes or no (or left blank)');
+  if (pClass === 'device') warnings.push('Medical device: not sold online until Dawabag has a device track');
 
   const storage = [text(r.storage_instructions), text(r.storage_condition)].filter(Boolean).join(' — ') || null;
   const cold = yes(r.cold_chain) || /refrigerat|2\s*[–-]\s*8|frozen/i.test(String(r.storage_condition ?? ''));
@@ -126,6 +146,8 @@ export function checkProduct(r: Row): Checked<ProductRecord> {
       reorder_level_qty: qty.reorder, net_quantity: net, manufacturer_name: maker, manufacturer_address: makerAddress,
       country_of_origin: text(r.country_of_origin) ?? 'India', is_active: active,
       ...(typeof schedC === 'boolean' ? { schedule_c_c1: schedC } : {}),
+      ...(pClass && pClass !== 'invalid' ? { product_class: pClass } : {}),
+      ...(typeof newDrug === 'boolean' ? { is_new_drug: newDrug } : {}),
     },
   };
 }

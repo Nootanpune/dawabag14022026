@@ -53,6 +53,9 @@ export async function removeDemoData() {
     // Anyone's cart lines for demo products, then the demo stock and products
     await q('DELETE FROM cart_items WHERE product_id = ANY($1)', [products]);
     await q('DELETE FROM low_stock_alerts WHERE product_id = ANY($1)', [products]);
+    // Sprint 40: drills of demo products (trace records) and GDP records go with the demo stock
+    await q('DELETE FROM recall_drills WHERE product_id = ANY($1)', [products]);
+    await q('DELETE FROM gdp_records WHERE product_id = ANY($1)', [products]);
     await q('DELETE FROM inventory_batches WHERE product_id = ANY($1)', [products]);
     await q(`DELETE FROM audit_logs WHERE new_value->>'product_id' = ANY($1::text[]) OR old_value->>'product_id' = ANY($1::text[])`, [products]);
     await q('DELETE FROM products WHERE id = ANY($1)', [products]);
@@ -63,9 +66,17 @@ export async function removeDemoData() {
       ['party_licences', 'created_by'], ['business_licences', 'created_by'],
       // Sprint 39
       ['products', 'online_sale_set_by'], ['product_online_status_log', 'set_by'], ['pharmacist_registrations', 'verified_by'],
-      ['pharmacist_registrations', 'updated_by'], ['vendor_pharmacists', 'verified_by'], ['partner_batch_provenance', 'recorded_by']] as const) {
+      ['pharmacist_registrations', 'updated_by'], ['vendor_pharmacists', 'verified_by'], ['partner_batch_provenance', 'recorded_by'],
+      // Sprint 40
+      ['products', 'new_drug_confirmed_by'], ['gdp_records', 'recorded_by'], ['gdp_records', 'pharmacist_user_id'],
+      ['self_inspection_templates', 'created_by'], ['self_inspection_templates', 'updated_by'], ['corrective_action_events', 'changed_by'],
+      ['chain_heads', 'recorded_by']] as const) {
       await q(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ANY($1)`, [users]);
     }
+    // Sprint 40: drills a demo admin ran on other products, and self-inspections by demo staff (with their actions)
+    await q('DELETE FROM recall_drills WHERE started_by = ANY($1) OR closed_by = ANY($1)', [users]);
+    await q('DELETE FROM corrective_actions WHERE owner_user_id = ANY($1) OR created_by = ANY($1) OR closed_by = ANY($1)', [users]);
+    await q('DELETE FROM self_inspections WHERE inspected_by = ANY($1)', [users]);
     for (const t of ['cart_items', 'carts', 'notification_deliveries', 'user_devices', 'notifications', 'addresses', 'consent_records',
       'audit_logs', 'pharmacist_registrations', 'user_profiles']) {
       await q(`DELETE FROM ${t} WHERE user_id = ANY($1)`, [users]);

@@ -74,3 +74,30 @@ export async function verifyPartnerH1(): Promise<{ ok: boolean; registers: H1Reg
   const { data } = await api.get('/partner/h1-register/verify');
   return data.data;
 }
+
+// ── Sprint 40: recorded chain heads and the nightly check ────────────────────
+export interface ChainHead {
+  chain: string;
+  last_no: number | null;
+  head_hash: string | null;
+  checked: number;
+  ok: boolean;
+  problem: string | null;
+  source: 'job' | 'manual';
+  recorded_at: string;
+}
+export interface ChainHeads {
+  heads: ChainHead[];
+  last_job_run: { status: string; started_at: string; finished_at: string | null; error: string | null } | null;
+  chain_start: Record<string, number>;
+}
+export const chainHeadKeys = { heads: ['registers', 'chain-heads'] as const };
+
+export async function fetchChainHeads(): Promise<ChainHeads> {
+  const { data } = await api.get('/admin/chain-heads');
+  return data.data;
+}
+export async function runChainCheck(): Promise<{ ok: boolean; chains: number; broken: number }> {
+  const { data } = await api.post('/admin/chain-heads/verify');
+  return data.data;
+}

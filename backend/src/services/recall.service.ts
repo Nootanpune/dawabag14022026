@@ -4,25 +4,14 @@
 // dispatch of lines already reserved from it, and notifies every buyer who
 // received or is waiting for it.
 import { PoolClient } from 'pg';
-import { query, queryOne, withTransaction } from '../config/database';
+import { getDB, query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { queueNotification } from './notification.service';
+import { affectedLines } from './recall/trace';
 
-// Order lines supplied (or reserved) from a recalled batch
-const AFFECTED_SQL = `
-  SELECT DISTINCT o.id AS order_id, o.order_number, o.user_id, o.status AS order_status,
-         oi.id AS order_item_id, oi.quantity, s.status AS shipment_status, s.seller_type,
-         up.full_name AS buyer_name
-  FROM order_items oi
-  JOIN orders o ON o.id = oi.order_id
-  LEFT JOIN order_shipments s ON s.id = oi.shipment_id
-  LEFT JOIN user_profiles up ON up.user_id = o.user_id
-  LEFT JOIN inventory_batches ib ON ib.id = oi.batch_id
-  LEFT JOIN partner_order_items poi ON poi.order_item_id = oi.id
-  LEFT JOIN partner_inventory pi ON pi.id = poi.partner_inv_id
-  WHERE oi.product_id = $1 AND o.status <> 'cancelled'
-    AND (ib.batch_number = $2 OR pi.batch_number = $2)`;
+// Order lines supplied (or reserved) from a recalled batch: the shared trace (Sprint 40
+// moved it to recall/trace.ts so the mock recall drill runs exactly the same query)
 
 export interface RecallInput { product_id: string; batch_number: string; reason: string; source?: string }
 
@@ -49,7 +38,7 @@ export async function recallBatchTx(client: PoolClient, staffId: string, input: 
        WHERE pp.id = pi.partner_product_id AND pp.product_id = $1 AND pi.batch_number = $2`,
       [input.product_id, input.batch_number]);
 
-    const affected = (await client.query(AFFECTED_SQL, [input.product_id, input.batch_number])).rows;
+    const affected = await affectedLines(client, input.product_id, input.batch_number);
     const orders = new Map<string, any>();
     for (const a of affected) orders.set(a.order_id, a);
     for (const o of orders.values()) {
@@ -82,7 +71,7 @@ export async function getRecall(id: string) {
     `SELECT r.*, p.name AS product_name, up.full_name AS recalled_by_name FROM batch_recalls r
      JOIN products p ON p.id = r.product_id LEFT JOIN user_profiles up ON up.user_id = r.recalled_by WHERE r.id = $1`, [id]);
   if (!r) throw new AppError('Recall not found', 404);
-  const affected = await query(AFFECTED_SQL, [r.product_id, r.batch_number]);
+  const affected = await affectedLines(getDB(), r.product_id, r.batch_number);
   return { ...r, affected };
 }
 

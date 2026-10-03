@@ -180,6 +180,19 @@ export function buildMessage(payload: NotificationPayload) {
       email: { subject: `${payload.productName}: not allowed for online sale`, body: payload.text || '' },
       push: { title: 'Product switched off for online sale', body: payload.text || '' },
     },
+    // ── Sprint 40 (staff and partners only; no SMS: no DLT template) ──
+    gdp_excursion: {
+      email: { subject: `${payload.productName} batch ${payload.batchNumber}: cold-chain excursion, batch on hold`, body: payload.text || '' },
+      push: { title: 'Batch on hold: cold-chain excursion', body: payload.text || '' },
+    },
+    self_inspection_overdue: {
+      email: { subject: 'Self-inspection overdue', body: payload.text || '' },
+      push: { title: 'Self-inspection overdue', body: payload.text || '' },
+    },
+    chain_break: {
+      email: { subject: 'URGENT: record integrity check found a break', body: payload.text || '' },
+      push: { title: 'Record integrity break', body: payload.text || '' },
+    },
     return_update: {
       sms: payload.status === 'approved'
         ? `Dawabag: Return ${payload.returnNo} approved. Refund of ${`₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')}`} started.`

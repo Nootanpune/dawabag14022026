@@ -13,6 +13,7 @@ import { assertSupplierCanSupply } from './supplierCheck';
 import { assertOpenPeriod } from '../accountsLock';
 import { assertBatchReceivable } from '../recallAlerts/receiptGate';
 import { todayIST } from '../../utils/ist';
+import { recordReceivedTx } from '../gdp/record.service';
 
 export interface GrnLineInput {
   po_item_id?: string; product_id: string; batch_number: string; expiry_date: string; manufactured_date?: string;
@@ -51,7 +52,7 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
       poItems = new Map((await client.query(`SELECT * FROM po_items WHERE po_id = $1 FOR UPDATE`, [input.po_id])).rows.map((r: any) => [r.id, r]));
     }
     const products = new Map((await client.query(
-      `SELECT id, name, drug_schedule, gst_rate, ${PRICE_COLS.join(', ')} FROM products WHERE id = ANY($1::uuid[])`,
+      `SELECT id, name, drug_schedule, gst_rate, cold_chain, storage_instructions, ${PRICE_COLS.join(', ')} FROM products WHERE id = ANY($1::uuid[])`,
       [input.lines.map((l) => l.product_id)])).rows.map((p: any) => [p.id, p]));
     const interState = !sameState(await dawabagState(client), supplier.state);
     const today = new Date(todayIST());
@@ -134,6 +135,9 @@ export async function receiveGoods(userId: string, role: string, input: GrnInput
         [grn.id, l!.po_item_id ?? null, l!.product_id, batchId, l!.batch_number, l!.expiry_date, l!.manufactured_date ?? null,
          l!.quantity, l!.free_quantity ?? 0, l!.unit_cost_paise, l!.printed_mrp_paise, l!.product.gst_rate, l!.taxable, l!.gst])).rows[0];
       await client.query(`UPDATE inventory_batches SET grn_line_id = COALESCE(grn_line_id, $2) WHERE id = $1`, [batchId, line.id]);
+      // Sprint 40: the batch's GDP log starts here — "received", with its storage condition (C-25)
+      await recordReceivedTx(client, { batchId, grnLineId: line.id, grnNumber, coldChain: !!l!.product.cold_chain,
+        storageInstructions: l!.product.storage_instructions ?? null, userId });
     }
 
     if (input.po_id) {

@@ -9,14 +9,19 @@ import { changeProblems, onlineSaleKeys, setOnlineSale, type OnlineSaleChange } 
 import OnlineSaleFields from './OnlineSaleFields';
 
 /** Set the online-sale status of one or many products (Sprint 39, C-10). */
-export default function ChangeDialog({ products, canAllow, onClose }: { products: { id: string; name: string }[]; canAllow: boolean; onClose: () => void }) {
+export default function ChangeDialog({ products, canAllow, onClose }: {
+  products: { id: string; name: string; product_class?: string; is_new_drug?: boolean }[]; canAllow: boolean; onClose: () => void;
+}) {
+  const anyDevice = products.some((p) => p.product_class === 'device');
+  const anyNewDrug = products.some((p) => p.is_new_drug);
   const queryClient = useQueryClient();
   const [value, setValue] = useState<OnlineSaleChange>({ status: canAllow ? 'permitted' : 'restricted', notification_ref: '', notification_date: '', reason: '' });
-  const problem = changeProblems(value, canAllow, toISTDateString(Date.now()));
+  const problem = changeProblems(value, canAllow, toISTDateString(Date.now()), { anyDevice, anyNewDrug });
   const save = useMutation({
     mutationFn: () => setOnlineSale(products.map((p) => p.id), {
       status: value.status, notification_ref: value.notification_ref?.trim() || null,
       notification_date: value.notification_date || null, reason: value.reason?.trim() || null,
+      ...(anyNewDrug && value.status === 'permitted' ? { new_drug_confirmation: value.new_drug_confirmation?.trim() || null } : {}),
     }),
     onSuccess: (r) => {
       toast.success(`Online-sale status set for ${r.updated} product${r.updated === 1 ? '' : 's'}`);
@@ -28,7 +33,7 @@ export default function ChangeDialog({ products, canAllow, onClose }: { products
   });
   return (
     <Modal title={products.length === 1 ? `Online sale: ${products[0].name}` : `Online sale: ${products.length} products`} onClose={onClose} size="lg">
-      <OnlineSaleFields value={value} onChange={setValue} canAllow={canAllow} idPrefix="osc" />
+      <OnlineSaleFields value={value} onChange={setValue} canAllow={canAllow} idPrefix="osc" newDrug={anyNewDrug} />
       <p className="text-xs text-gray-600 mt-2">
         A product that is not allowed stops selling at once — from Dawabag&apos;s stock and every partner&apos;s. Partners listing it are told.
         Schedule X and NDPS can never be allowed. Every change is recorded with who made it.

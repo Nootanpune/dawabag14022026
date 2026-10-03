@@ -25,6 +25,8 @@ import { LICENCE_FILE_MAX_BYTES } from '../services/licences/register.service';
 import { sellingRightsStatus } from '../services/stock/sellingRightsStatus';
 import { getEmergencyStop, postPause, postResume } from '../controllers/emergencyStop.controller';
 import { getAuditChainVerify } from '../controllers/h1Register.controller';
+import { latestHeads, runChainVerify } from '../services/chainVerify/heads.service';
+import { configWarnings } from '../services/system/configWarnings';
 
 const licenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LICENCE_FILE_MAX_BYTES, files: 1 } });
 
@@ -164,6 +166,17 @@ router.get('/emergency-stop', authenticate, authorize('admin', 'super_admin'), g
 router.post('/emergency-stop/pause', authenticate, authorize('super_admin'), postPause);
 router.post('/emergency-stop/resume', authenticate, authorize('super_admin'), postResume);
 router.get('/audit-chain/verify', authenticate, authorize('admin', 'super_admin'), getAuditChainVerify);
+// Sprint 40: recorded chain heads (truncation check) and a manual run of the nightly chain check (C-09, C-46)
+router.get('/chain-heads', authenticate, authorize('admin', 'super_admin'), async (_req, res, next) => {
+  try { res.json({ success: true, data: await latestHeads() }); } catch (err) { next(err); }
+});
+router.post('/chain-heads/verify', authenticate, authorize('admin', 'super_admin'), async (req, res, next) => {
+  try { res.json({ success: true, data: await runChainVerify({ source: 'manual', userId: req.user!.id }) }); } catch (err) { next(err); }
+});
+// Sprint 40: integrations missing on this server (e.g. SMS for sign-in codes), for the dashboard
+router.get('/config-warnings', authenticate, authorize('admin', 'super_admin'), async (_req, res, next) => {
+  try { res.json({ success: true, data: { warnings: await configWarnings() } }); } catch (err) { next(err); }
+});
 router.patch('/users/:userId/pharmacist', authenticate, authorize('admin', 'super_admin'), setPharmacistRegistration);
 
 export default router;

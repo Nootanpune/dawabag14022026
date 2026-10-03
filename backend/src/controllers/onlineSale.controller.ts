@@ -10,6 +10,7 @@ const change = z.object({
   notification_ref: z.string().trim().max(200).nullable().optional(),
   notification_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the date as YYYY-MM-DD').nullable().optional(),
   reason: z.string().trim().max(1000).nullable().optional(),
+  new_drug_confirmation: z.string().trim().max(1000).nullable().optional(),   // Sprint 40: new drugs (NDCT Rules 2019)
 });
 
 export async function getOnlineStatusList(req: Request, res: Response, next: NextFunction) {

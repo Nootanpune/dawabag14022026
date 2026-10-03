@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { PRODUCT_CLASSES } from '../services/productClass/rules';
 import { query, queryOne, withTransaction } from '../config/database';
 import { cacheGet, cacheSet } from '../config/redis';
 import { AppError } from '../utils/AppError';
@@ -131,6 +132,10 @@ const productFields = {
   cold_chain: z.boolean(),
   // Sprint 34: Drugs Rules Schedule C / C1 — sold only under Form 21 / 21B (stock/sellingRights.ts, C-07, C-33)
   schedule_c_c1: z.boolean(),
+  // Sprint 40 (D6): product class and the NDCT Rules new-drug flag; a device or an unconfirmed new
+  // drug is switched off for online sale by the database (productClass/rules.ts, C-10)
+  product_class: z.enum(PRODUCT_CLASSES),
+  is_new_drug: z.boolean(),
   mrp_paise: priceField,
   offer_price_paise: priceField,
   ptr_price_paise: priceField.nullable().optional(),
@@ -154,6 +159,8 @@ const createSchema = z.object({
   sku: z.string().min(3).max(100),
   cold_chain: productFields.cold_chain.default(false),
   schedule_c_c1: productFields.schedule_c_c1.default(false),
+  product_class: productFields.product_class.default('drug'),
+  is_new_drug: productFields.is_new_drug.default(false),
   max_qty_per_order: productFields.max_qty_per_order.default(3),
   min_order_qty_retailer: productFields.min_order_qty_retailer.default(1),
   min_order_qty_wholesaler: productFields.min_order_qty_wholesaler.default(10),
@@ -269,8 +276,10 @@ export async function getAdminProducts(req: Request, res: Response, next: NextFu
     const d = z.object({
       q: z.string().trim().max(100).optional(), page: z.coerce.number().int().min(1).default(1),
       limit: z.coerce.number().int().min(1).max(100).default(20), status: z.enum(['active', 'inactive']).optional(),
+      product_class: z.enum(PRODUCT_CLASSES).optional(), new_drug: z.enum(['1', 'true']).optional(),   // Sprint 40 filter
     }).parse(req.query);
-    res.json({ success: true, data: await adminListProducts(d.q || undefined, d.page, d.limit, d.status) });
+    res.json({ success: true, data: await adminListProducts(d.q || undefined, d.page, d.limit, d.status,
+      { productClass: d.product_class, newDrugOnly: !!d.new_drug }) });
   } catch (error) { next(error); }
 }
 

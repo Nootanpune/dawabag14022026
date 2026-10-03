@@ -1,4 +1,5 @@
 import type { OnlineSaleStatus } from '@/lib/onlineSale/api';
+import type { ProductClass } from '@/lib/productClass';
 // Admin catalogue: list, create and edit products. Every price rule (C-16:
 // prices ≤ MRP ≤ NPPA ceiling) and the pharmacist copy review (C-19) are
 // enforced on the server; the form only mirrors them for quick feedback.
@@ -32,6 +33,9 @@ export interface AdminProductRow {
   online_sale_status?: OnlineSaleStatus;
   online_sale_ref?: string | null;
   online_sale_reason?: string | null;
+  /** Sprint 40 (D6) */
+  product_class?: ProductClass;
+  is_new_drug?: boolean;
 }
 
 export interface ProductPage {
@@ -43,13 +47,17 @@ export interface ProductPage {
 export type ProductBody = Record<string, string | number | boolean | null>;
 
 export const adminProductKeys = {
-  list: (q: string, page: number) => ['admin', 'products', q, page] as const,
+  list: (q: string, page: number, f: ProductListFilter = {}) => ['admin', 'products', q, page, f.productClass ?? '', !!f.newDrugOnly] as const,
   one: (id: string) => ['admin', 'products', 'one', id] as const,
 };
 
 /** GET /products/admin/list — every product, active or not, for admins. */
-export async function fetchAdminProducts(q: string, page: number, limit = 20): Promise<ProductPage> {
-  const { data } = await api.get('/products/admin/list', { params: { q: q || undefined, page, limit } });
+/** Sprint 40: list filters by product class / new drugs (D6). */
+export interface ProductListFilter { productClass?: ProductClass | ''; newDrugOnly?: boolean }
+
+export async function fetchAdminProducts(q: string, page: number, limit = 20, f: ProductListFilter = {}): Promise<ProductPage> {
+  const { data } = await api.get('/products/admin/list', { params: { q: q || undefined, page, limit,
+    product_class: f.productClass || undefined, new_drug: f.newDrugOnly ? '1' : undefined } });
   return {
     products: data.data?.products ?? [],
     pagination: data.data?.pagination ?? { page, limit, total: 0, pages: 0 },

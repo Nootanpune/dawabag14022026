@@ -4,6 +4,7 @@
 // file only calls the API. Nothing is kept in the browser.
 import api from '../api';
 import type { OnlineSaleChange } from '../onlineSale/api';
+import type { ProductClass } from '../productClass';
 
 export interface FromFileEntry {
   request_id: string;
@@ -30,6 +31,9 @@ export interface Draft {
   cold_chain_decided: boolean;
   /** Drugs Rules Schedule C / C1 (Sprint 34): sold only under Form 21 / 21B */
   schedule_c_c1: boolean;
+  /** Sprint 40 (D6): product class and the NDCT Rules new-drug flag */
+  product_class: ProductClass;
+  is_new_drug: boolean;
   hsn_code: string | null;
   gst_rate: number | null;
   category: string | null;
@@ -81,7 +85,7 @@ export interface DraftOptions {
 }
 
 export type DraftPatch = Partial<Pick<Draft, 'name' | 'generic_name' | 'composition' | 'strength' | 'dosage_form' | 'drug_schedule'
-  | 'cold_chain' | 'schedule_c_c1' | 'hsn_code' | 'gst_rate' | 'category' | 'description' | 'storage_instructions' | 'net_quantity' | 'marketed_by'
+  | 'cold_chain' | 'schedule_c_c1' | 'product_class' | 'is_new_drug' | 'hsn_code' | 'gst_rate' | 'category' | 'description' | 'storage_instructions' | 'net_quantity' | 'marketed_by'
   | 'manufacturer_name' | 'manufacturer_address' | 'country_of_origin'>>;
 
 /** Fields "set for all selected" may change — never the schedule or anything clinical (server enforces the same). */

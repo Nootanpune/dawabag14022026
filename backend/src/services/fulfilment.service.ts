@@ -9,6 +9,8 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
 import { assertNoRecalledLines } from './recall.service';
+import { assertNoGdpHeldLines } from './gdp/guard';
+import { logDispatchExcursion } from './gdp/record.service';
 import { assertDispatchAllowed } from './emergencyStop/state.service';
 import { DispatchRecord, handoverCode, prepareHandover } from './handover.service';
 import { queueNotification } from './notification.service';
@@ -83,6 +85,7 @@ export async function packShipment(shipmentId: string, userId: string) {
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertPaymentTaken(client, s.order_id);   // Sprint 39: a held prescription payment is captured first (C-37)
     await assertNoRecalledLines(client, shipmentId);
+    await assertNoGdpHeldLines(client, shipmentId);   // Sprint 40: no batch on GDP hold (C-25)
     await client.query(`UPDATE order_shipments SET status = 'packed' WHERE id = $1`, [shipmentId]);
     await client.query(`UPDATE orders SET status = 'packed', pharmacist_pack_id = $2, packed_at = NOW(), updated_at = NOW()
                         WHERE id = $1 AND status IN ('packing', 'rx_verified', 'confirmed')`, [s.order_id, userId]);
@@ -95,6 +98,9 @@ export async function packShipment(shipmentId: string, userId: string) {
 
 export async function dispatchOwnShipment(shipmentId: string, courierIn: string | undefined, awbIn: string | undefined, userId: string, dispatch: DispatchRecord, riderId?: string) {
   await prepareDispatchEinvoice(shipmentId);
+  // Sprint 40: a cold-chain pack read outside 2–8 °C is logged as an excursion (batches on
+  // hold) before the dispatch below refuses it — the record outlives the refusal (C-25)
+  await logDispatchExcursion(shipmentId, { partnerId: null }, dispatch.cold_chain_temp_c, dispatch.cold_chain_logger_id, userId);
   const { result, notice } = await withTransaction(async (client) => {
     const s = await lockOwnShipment(client, shipmentId);
     if (s.status !== 'packed') throw new AppError('Pack the shipment before dispatch', 409);
@@ -108,6 +114,7 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
     if (!mayDispatch(s.pharmacist_check)) throw new AppError(notReleasedMessage(s.pharmacist_check, s.pharmacist_check_note, 'dawabag'), 409);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
+    await assertNoGdpHeldLines(client, shipmentId);    // Sprint 40 (C-25)
     await assertDispatchAllowed(client, shipmentId);   // emergency stop holds Rx parcels (Sprint 38, C-08)
     await assertPaymentTaken(client, s.order_id);      // Sprint 39 (C-37)
     await assertEinvoiceReady(client, shipmentId);

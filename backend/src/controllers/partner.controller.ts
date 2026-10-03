@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { query, queryOne } from '../config/database';
 import { listPartnerProducts, submitListing, upsertInventory } from '../services/partnerListing.service';
 import { normaliseProvenance } from '../services/partnerProvenance/rules';
-import { listProvenance } from '../services/partnerProvenance/provenance.service';
+import { addPortalProvenance, listProvenance } from '../services/partnerProvenance/provenance.service';
 import { todayIST } from '../utils/ist';
 import { AppError } from '../utils/AppError';
 import { dispatchShipment, listPartnerShipments, markShipmentDelivered } from '../services/partnerFulfilment.service';
@@ -188,5 +188,21 @@ export async function getMyBatchProvenance(req: Request, res: Response, next: Ne
   try {
     const f = z.object({ q: z.string().max(100).optional(), batch: z.string().max(100).optional(), missing: z.enum(['1', 'true']).optional() }).parse(req.query);
     res.json({ success: true, data: { batches: await listProvenance({ partnerId: req.partner!.vendorId, q: f.q, batch: f.batch, missingOnly: !!f.missing }) } });
+  } catch (err) { next(err); }
+}
+
+// Sprint 40: add supplier details to one of the partner's batches that has none (then read-only, C-02, C-34)
+export async function postMyBatchProvenance(req: Request, res: Response, next: NextFunction) {
+  try {
+    const raw = z.object({
+      supplier_name: z.string().trim().max(255).nullable().optional(),
+      supplier_licence_no: z.string().trim().max(100).nullable().optional(),
+      supplier_invoice_no: z.string().trim().max(100).nullable().optional(),
+      supplier_invoice_date: z.string().trim().max(30).nullable().optional(),
+    }).strict().parse(req.body ?? {});
+    const n = normaliseProvenance(raw, todayIST());
+    if (n.warnings.length) throw new AppError(n.warnings[0], 400);
+    if (!n.provenance) throw new AppError('Enter at least the supplier name or the purchase invoice number', 400);
+    res.status(201).json({ success: true, data: await addPortalProvenance(req.partner!.vendorId, uuid.parse(req.params.inventoryId), n.provenance, req.user!.id) });
   } catch (err) { next(err); }
 }

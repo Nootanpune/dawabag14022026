@@ -13,11 +13,14 @@ import { getMyReturn, getMyReturns } from '../controllers/partner.controller';
 import stockImportRoutes from './partnerStockImport.routes';
 import { getPartnerH1Register, getPartnerH1Verify } from '../controllers/h1Register.controller';
 import {
+  getPartnerGdpBatchLog, getPartnerGdpBatches, getPartnerPendingExcursions, postPartnerDisposition, postPartnerGdpRecord,
+} from '../controllers/gdp.controller';
+import {
   getPartnerChecks, getPartnerFeed, getPartnerFeedAlerts, postAcceptCheck, postDismissCheck, postLinkCheck, postRequestCheck,
 } from '../controllers/stockFeed.controller';
 import {
   createListing, getInventory, getListings, getMe, getPharmacists, postCheck, getMySettlement, getMySettlements, getShipments,
-  postDelivered, postDispatch, putInventory, searchCatalogue, getMyBatchProvenance,
+  postDelivered, postDispatch, putInventory, searchCatalogue, getMyBatchProvenance, postMyBatchProvenance,
 } from '../controllers/partner.controller';
 
 // Partner portal — /api/v1/partner/*
@@ -36,6 +39,13 @@ router.post('/products', createListing);
 router.get('/products/:id/inventory', getInventory);
 router.put('/products/:id/inventory', putInventory);
 router.get('/batch-provenance', getMyBatchProvenance);   // Sprint 39 (C-02)
+router.post('/batch-provenance/:inventoryId', postMyBatchProvenance);   // Sprint 40: add where none is recorded yet
+// Sprint 40: GDP records for the partner's own batches; its own pharmacist decides excursions (C-25)
+router.get('/gdp/batches', getPartnerGdpBatches);
+router.get('/gdp/batches/:id', getPartnerGdpBatchLog);
+router.post('/gdp/batches/:id/records', postPartnerGdpRecord);
+router.get('/gdp/excursions/pending', getPartnerPendingExcursions);
+router.post('/gdp/excursions/:id/disposition', postPartnerDisposition);
 router.get('/shipments', getShipments);
 router.get('/pharmacists', getPharmacists);
 router.post('/shipments/:id/check', postCheck);          // Sprint 35: release / hold / refuse (C-08)

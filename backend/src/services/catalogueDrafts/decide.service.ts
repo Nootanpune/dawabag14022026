@@ -22,7 +22,7 @@ import type { StatusInput } from '../onlineSale/rules';
 
 const DEFAULT_NOTE = 'New product completed from a partner request and approved in "New products to complete"';
 
-const DECIDED = ['name', 'generic_name', 'composition', 'strength', 'dosage_form', 'drug_schedule', 'cold_chain', 'hsn_code',
+const DECIDED = ['name', 'generic_name', 'composition', 'strength', 'dosage_form', 'drug_schedule', 'cold_chain', 'product_class', 'is_new_drug', 'hsn_code',
   'gst_rate', 'category', 'description', 'storage_instructions', 'net_quantity', 'manufacturer_name', 'manufacturer_address',
   'country_of_origin', 'mrp_paise'] as const;
 

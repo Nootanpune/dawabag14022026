@@ -11,7 +11,8 @@ import api, { getApiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { staffHome } from '@/lib/fulfilment/roles';
 import { safeNextPath } from '@/lib/auth/nextPath';
-import { homeForRole, sendOtp, signInWithOtp } from '@/lib/auth/otp';
+import { homeForRole, sendOtp, signInWithOtp, smsNotConfiguredMessage } from '@/lib/auth/otp';
+import SmsUnavailableNotice from '@/components/auth/SmsUnavailableNotice';
 import type { AuthResponseData } from '@/lib/session';
 import AuthShell from '@/components/auth/AuthShell';
 import IconField from '@/components/auth/IconField';
@@ -39,6 +40,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>('password');
   const [showPassword, setShowPassword] = useState(false);
   const [codeSentTo, setCodeSentTo] = useState('');
+  const [smsOff, setSmsOff] = useState<string | null>(null);   // Sprint 40: no SMS provider on this server
   const [isLoading, setIsLoading] = useState(false);
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
@@ -80,7 +82,9 @@ export default function LoginPage() {
       setCodeSentTo(mobile);
       toast.info('If this mobile number has an account, we have sent it a code.');
     } catch (err) {
-      toast.error(getApiErrorMessage(err, 'Could not send the code'));
+      const off = smsNotConfiguredMessage(err);
+      if (off) setSmsOff(off);
+      else toast.error(getApiErrorMessage(err, 'Could not send the code'));
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +104,7 @@ export default function LoginPage() {
     }
   };
 
-  const switchMode = (m: Mode) => { setMode(m); setCodeSentTo(''); otpForm.reset(); };
+  const switchMode = (m: Mode) => { setMode(m); setCodeSentTo(''); setSmsOff(null); otpForm.reset(); };
 
   return (
     <AuthShell title="Sign in" subtitle="Licensed online pharmacy">
@@ -135,6 +139,8 @@ export default function LoginPage() {
             Sign in
           </button>
         </form>
+      ) : smsOff ? (
+        <SmsUnavailableNotice message={smsOff} />
       ) : !codeSentTo ? (
         <form onSubmit={otpMobileForm.handleSubmit(onSendCode)} className="space-y-4" noValidate>
           <IconField label="Mobile number" icon={Smartphone} prefix="+91" type="tel" inputMode="numeric" maxLength={10}

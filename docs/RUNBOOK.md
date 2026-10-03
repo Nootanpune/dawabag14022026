@@ -59,6 +59,12 @@ Razorpay test mode.
 Settings → SMS templates (message type → template id → variables). A message type
 with no template is not sent by SMS; it is logged as *skipped* in Admin → Notification
 deliveries, which also shows every failed SMS, email and push with the reason.
+*Without MSG91 (Sprint 40)* — e.g. the trial — `POST /auth/send-otp` (sign-in by code and
+"Forgot password") answers **503 `SMS_NOT_CONFIGURED`** with "Text-message codes are not
+switched on yet. Please sign in with your password, or ask the admin to reset it." — the
+same answer for every number. The admin dashboard shows the warning (also when
+`MSG91_AUTH_KEY` is set but no OTP template is registered: set `MSG91_TEMPLATE_OTP` or the
+`otp` entry of the SMS templates setting).
 
 **Push (FCM HTTP v1).** Firebase console → Project settings → Service accounts →
 Generate new private key; put the JSON (or its base64) in `FCM_SERVICE_ACCOUNT_JSON`.
@@ -215,8 +221,20 @@ skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
   1, 2, 3 …) and the audit log (one chain) are sealed when each transaction commits.
   Admin → Record integrity (or `GET /fulfilment/h1-register/verify`,
   `GET /admin/audit-chain/verify`) recomputes every hash and names the first broken
-  entry. Note the latest hash it shows (for example monthly, with the backup): removing
-  the newest entries cannot be seen without it.
+  entry. **Sprint 40:** the nightly job `chain_verify` (02:20 IST) does the same for every
+  chain and records each chain's head (last number + hash) in the append-only table
+  `chain_heads`; the next run checks that the old head is still there unchanged, so
+  removing the newest entries is caught too. Admin → Record integrity shows the latest
+  heads and can run the check now. Still note the latest audit head with the monthly
+  backup (a copy outside the database).
+- **Chain break (alert `chain_break`).** Every admin is told at once. Do not "fix" rows:
+  keep the database as it is, take a snapshot, open an incident (Admin → Security
+  incidents, C-43), compare with the last backup and the recorded heads to find what was
+  changed or removed, and restore from backup if needed. The setting
+  `integrity.chain_start` (e.g. `{"audit": 2823}`) makes the check start part-way along a
+  chain; use it only after a documented restore that legitimately restarted a chain (and
+  in test databases whose clean-ups delete rows) — it is a super-admin settings change,
+  audited, and shown on the integrity page.
 - **Prescription retention (Sprint 38).** Each prescription has `retain_until` = its last
   dispense + `retention.prescription_years` (owner confirmed 3). Purging is OFF until
   the owner switches `retention.prescription_purge` on; then the retention job deletes
@@ -233,6 +251,64 @@ told again until it has succeeded once.
 
 Sprint 39 jobs: **payment_hold_watch** (every 15 min) and **pharmacist_registration_alerts**
 (daily 01:50) — see section 7f.
+
+Sprint 40 jobs: **chain_verify** (daily 02:20; section 6) and **self_inspection_watch**
+(daily 08:10; section 7g).
+
+## 7g. GDP, recall drills and self-inspections (Sprint 40)
+
+**GDP records per batch (C-25).** Staff → *GDP records* lists Dawabag's and partners'
+batches with their standing; each batch has an append-only log (received — written by the
+goods receipt with the storage condition — storage checks, temperature readings,
+excursions, pharmacist decisions, transfers, dispatch). Store staff record on Dawabag's
+batches; partners record on theirs (Partner portal → *GDP records*).
+- A cold-chain reading outside 2–8 °C is stored as an **excursion** and puts the batch
+  **on hold**: it is not offered, allocated, packed or dispatched (Dawabag's and partners'
+  stock alike; reserved lines wait at pack / dispatch with `GDP_HOLD`). Pharmacists and
+  admins (or the partner's owner and Dawabag's admins) are alerted (`gdp_excursion`).
+- A cold-chain **pack read outside 2–8 °C at dispatch** is still refused (409
+  `COLD_CHAIN_EXCURSION`), and is logged as an excursion on the shipment's batches first.
+- Staff → *GDP excursions*: a Dawabag pharmacist with a valid registration decides on
+  Dawabag's batches — **release** (justification, e.g. the data logger and the maker's
+  stability data), **quarantine** (still held, decide later) or **destroy** (held for good;
+  the free stock is raised as a write-off, reason *damaged*, for a second person to approve,
+  then the destruction register is completed). A partner's batch is decided by the
+  partner's own registered pharmacist (it is the licensee); a partner's destroyed batch is
+  destroyed under the partner's licence and never supplied through Dawabag again.
+- Nobody can lift a hold by editing the batch: the standing changes only through a GDP
+  record (database trigger), and GDP records cannot be changed or deleted.
+
+**Mock recall drill (O15, C-28).** Admin → *Recall drills*: choose a batch (Dawabag's or a
+partner's) and a scenario; the server runs the real recall trace (orders, shipments,
+buyers, partners, H1 entries, stock on hand by location, where the batch came from) and
+records the start, the time to trace and the findings — **nobody is contacted and nothing
+is blocked**. The report is printable and downloadable as a PDF built on demand from the
+record (never stored). Close each drill with a conclusion; the traced record cannot be
+changed. Suggested: one drill a quarter, alternating Dawabag and partner batches.
+
+**Self-inspection register (O15, C-34).** Staff → *Self-inspections*. Admins keep the
+checklists (*Checklists*; a monthly one is provided: storage temperatures, expiry
+segregation, licence display, pharmacist presence, H1 register, cold-chain equipment, pest
+control, records). A pharmacist or admin records an inspection: every item ok /
+observation / non-conformity (with a note); a non-conformity needs a corrective action with
+an owner and a due date. Results are append-only; an action moves open → in progress →
+closed (close-out note), each step kept. The daily job alerts admins and the owner once
+when an action passes its due date, and admins once when a checklist is overdue.
+
+**Product class and new drugs (D6, C-10).** Each product has a class (drug, device,
+cosmetic, ayush, general; existing products became *drug*, or *ayush* / *cosmetic* /
+*general* where the category clearly said so) and a *new drug* flag (NDCT Rules 2019). A
+**medical device can never be allowed for online sale** until a device track exists; a
+**new drug** is allowed only by a pharmacist with a confirmation note (kept on the product
+and in the status log). Reclassifying a product on sale as a device, or flagging it as a
+new drug, switches it off at once. Set them in the product form, the new-product form or
+the catalogue file (optional columns *Product class*, *New drug*).
+
+**Partner batch suppliers.** Partner portal → *Batch suppliers* lists the partner's batches
+with their supplier details (from the stock file, the live feed or the portal); missing
+ones can be added once and are read-only afterwards. The stock-file template
+`templates/03_Partner_Inventory_Submission.xlsx` (sheet 4) carries the optional columns
+`supplier_name`, `supplier_licence_no`, `supplier_invoice_no`, `supplier_invoice_date`.
 
 ## 7f. Prescription orders: authorise-then-capture (Sprint 39)
 

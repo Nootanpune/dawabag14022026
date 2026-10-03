@@ -15,6 +15,7 @@ import {
 } from '@/lib/admin/productForm';
 import ProductFieldGrid from './ProductFieldGrid';
 import ScheduleCField from '@/components/catalogue/ScheduleCField';
+import ProductClassFields from '@/components/catalogue/ProductClassFields';
 
 interface Props {
   initial: ProductFormValues;
@@ -74,6 +75,9 @@ export default function ProductForm({ initial, editing, pending, error, fieldErr
           Cold chain (2–8 °C)
         </label>
         <ScheduleCField checked={v.schedule_c_c1} onChange={(c) => setV({ ...v, schedule_c_c1: c })} />
+        {/* Sprint 40 (D6): devices are never sold online yet; a new drug needs a pharmacist's confirmation (C-10) */}
+        <ProductClassFields idPrefix="product" productClass={v.product_class} isNewDrug={v.is_new_drug}
+          onChange={(c) => setV({ ...v, ...c })} />
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={v.is_active} onChange={(e) => setV({ ...v, is_active: e.target.checked })} />
           Active (listed for sale)

@@ -33,3 +33,27 @@ export async function fetchProvenance(f: ProvenanceFilter) {
 }
 
 export const SOURCE_LABELS: Record<NonNullable<BatchProvenance['provenance_source']>, string> = { file: 'Stock file', feed: 'Live feed', portal: 'Portal' };
+
+// ── Partner portal: its own batches (Sprint 40) ──────────────────────────────
+export const partnerProvenanceKeys = { mine: (q: string, missing: boolean) => ['partner', 'batch-provenance', q, missing] as const };
+
+export async function fetchMyBatchProvenance(q: string, missing: boolean): Promise<BatchProvenance[]> {
+  const { data } = await api.get('/partner/batch-provenance', { params: { ...(q ? { q } : {}), ...(missing ? { missing: '1' } : {}) } });
+  return data.data?.batches ?? [];
+}
+
+export interface ProvenanceInput {
+  supplier_name: string;
+  supplier_licence_no: string;
+  supplier_invoice_no: string;
+  supplier_invoice_date: string;
+}
+
+/** Records the supplier details of a batch that has none yet; read-only afterwards (409). */
+export async function addMyBatchProvenance(inventoryId: string, p: ProvenanceInput) {
+  const clean = (v: string) => v.trim() || null;
+  const { data } = await api.post(`/partner/batch-provenance/${inventoryId}`, {
+    supplier_name: clean(p.supplier_name), supplier_licence_no: clean(p.supplier_licence_no),
+    supplier_invoice_no: clean(p.supplier_invoice_no), supplier_invoice_date: clean(p.supplier_invoice_date) });
+  return data.data;
+}

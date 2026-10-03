@@ -9,6 +9,8 @@ interface Props {
   idPrefix: string;
   /** e.g. the draft form offers "allowed" and "not yet" only */
   statuses?: OnlineSaleStatus[];
+  /** Sprint 40: a chosen product is a new drug — allowing it needs a confirmation note */
+  newDrug?: boolean;
 }
 
 /**
@@ -16,7 +18,7 @@ interface Props {
  * (pharmacist only); stopping needs a reason. Shared by the staff screen and the
  * pharmacist's new-product form (Sprint 39, C-10).
  */
-export default function OnlineSaleFields({ value, onChange, canAllow, idPrefix, statuses = ['permitted', 'restricted', 'prohibited'] }: Props) {
+export default function OnlineSaleFields({ value, onChange, canAllow, idPrefix, statuses = ['permitted', 'restricted', 'prohibited'], newDrug = false }: Props) {
   const set = (patch: Partial<OnlineSaleChange>) => onChange({ ...value, ...patch });
   return (
     <fieldset className="space-y-2">
@@ -42,6 +44,14 @@ export default function OnlineSaleFields({ value, onChange, canAllow, idPrefix, 
             <label htmlFor={`${idPrefix}-date`} className="block text-xs font-medium text-gray-700">Date of the notification</label>
             <input id={`${idPrefix}-date`} type="date" className="input" value={value.notification_date ?? ''} onChange={(e) => set({ notification_date: e.target.value })} />
           </div>
+          {newDrug && (
+            <div className="sm:col-span-2">
+              <label htmlFor={`${idPrefix}-newdrug`} className="block text-xs font-medium text-gray-700">New drug: pharmacist&apos;s confirmation (NDCT Rules 2019)</label>
+              <textarea id={`${idPrefix}-newdrug`} className="input" rows={2} maxLength={1000} value={value.new_drug_confirmation ?? ''}
+                placeholder="e.g. CDSCO approval seen; sold on prescription only; pharmacist checks every order"
+                onChange={(e) => set({ new_drug_confirmation: e.target.value })} />
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid gap-2">

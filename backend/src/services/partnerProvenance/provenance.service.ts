@@ -2,7 +2,9 @@
 // never changed (database trigger), shown to Dawabag's admin ("who supplied this
 // batch?", recall tracing C-28) and to the partner for its own batches.
 import { PoolClient } from 'pg';
-import { query } from '../../config/database';
+import { query, withTransaction } from '../../config/database';
+import { AppError } from '../../utils/AppError';
+import { writeAuditTx } from '../../utils/audit';
 import { getSetting } from '../settings.service';
 import { Provenance, sameProvenance } from './rules';
 
@@ -71,4 +73,21 @@ export async function listProvenance(f: ProvenanceFilter) {
      LEFT JOIN partner_batch_provenance pb ON pb.partner_inventory_id = pi.id
      WHERE ${where.join(' AND ')}
      ORDER BY v.name, p.name NULLS LAST, pi.expiry_date LIMIT ${add(Math.min(Math.max(f.limit ?? 200, 1), 1000))}`, params);
+}
+
+/**
+ * Sprint 40: the partner adds the supplier details of one of ITS batches that has none yet
+ * (the "Batch suppliers" page). Recorded once, then read-only (C-02, C-34); a batch that
+ * already has a record is refused (409) — the first record stands.
+ */
+export async function addPortalProvenance(partnerId: string, inventoryId: string, provenance: Provenance, userId: string) {
+  return withTransaction(async (c) => {
+    const pi = (await c.query(`SELECT id FROM partner_inventory WHERE id = $1 AND partner_id = $2 FOR UPDATE`, [inventoryId, partnerId])).rows[0];
+    if (!pi) throw new AppError('Batch not found', 404);
+    const outcome = await recordProvenanceTx(c, { partnerId, inventoryId, provenance, source: 'portal', userId });
+    if (outcome !== 'recorded') throw new AppError('Supplier details for this batch are already recorded and cannot be changed (C-34)', 409, true, 'PROVENANCE_ALREADY_RECORDED');
+    await writeAuditTx(c, { userId: null, action: 'partner_batch_provenance_added', performedBy: userId,
+      newValue: { partner_id: partnerId, partner_inventory_id: inventoryId, ...provenance } });
+    return { partner_inventory_id: inventoryId, recorded: true, ...provenance };
+  });
 }

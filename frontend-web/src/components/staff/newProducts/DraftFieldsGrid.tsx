@@ -4,6 +4,7 @@ import CategoryPicker from '@/components/catalogueLists/CategoryPicker';
 import HsnPicker from '@/components/catalogueLists/HsnPicker';
 import { DraftSelect, DraftText } from './DraftInputs';
 import ScheduleCField from '@/components/catalogue/ScheduleCField';
+import ProductClassFields from '@/components/catalogue/ProductClassFields';
 
 const RX_TEXT: Record<string, string> = {
   needed: 'Prescription needed for patients (C-08)',
@@ -51,6 +52,11 @@ export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
               onSave={(v) => onSave({ storage_instructions: v })} />
             <ScheduleCField id={id('schedc')} checked={!!draft.schedule_c_c1} disabled={disabled} className="sm:col-span-2"
               onChange={(c) => onSave({ schedule_c_c1: c })} />
+            {/* Sprint 40 (D6): devices are not sold online yet; a new drug needs a confirmation when allowed (C-10) */}
+            <div className="sm:col-span-2">
+              <ProductClassFields idPrefix={id('class')} productClass={draft.product_class ?? 'drug'} isNewDrug={!!draft.is_new_drug} disabled={disabled}
+                onChange={(c) => onSave(c)} />
+            </div>
           </>
         )}
       </fieldset>

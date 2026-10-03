@@ -2,13 +2,26 @@
 
 ## Current state (2026-10-03)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–35 are done (Sprint 14 video calls wired on web and mobile; Sprints 34–35 uncommitted) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–40 are done (Sprint 14 video calls wired on web and mobile; Sprint 40 uncommitted) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Sprint 40 — GDP records + excursion holds, product class / new drugs, mock recall drills, self-inspections, chain heads (2026-10-03, uncommitted)
+
+- DECISIONS rows 2026-10-03 "GDP records per batch…", "Product class and new-drug flag…", "Mock recall drill…", "Self-inspection register…", "Nightly chain check with recorded heads…", "Sign-in codes when SMS is not configured…". Migration 35 (`35_sprint40_gdp_product_class_drills_inspections.sql`).
+- GDP: append-only `gdp_records` (own batch or partner batch; received/storage_check/temperature_reading/excursion/excursion_disposition/transfer/dispatch) + `gdp_status` (ok/on_hold/quarantined/destroyed) on inventory_batches and partner_inventory, set only by trigger (guard refuses direct UPDATE). Cold-chain reading outside 2–8 °C → excursion → on_hold. Held batches out of sellable stock (partnerStock.ts, allocation, orderPlacement low-stock, productAdmin, coupon route); pack/dispatch guard `services/gdp/guard.ts` 409 GDP_HOLD. Dispatch at bad temp: excursion logged first (own tx) then 409 COLD_CHAIN_EXCURSION (handover.service hard refusal kept as backstop). GRN writes "received" with storage condition. Disposition: Dawabag pharmacist_rx with valid registration (own batches only); partner's own vendor pharmacist (partner batches); release (≥20 chars) / quarantine (still held) / destroy (Dawabag: damaged write-off for second person → destruction register). API /gdp/* and /partner/gdp/*; alert gdp_excursion. Web Staff → GDP records, GDP excursions; Partner → GDP records.
+- Product class: products.product_class drug|device|cosmetic|ayush|general (backfill: drug unless OTC/non-scheduled category clearly cosmetic/general, or AYUSH-type), is_new_drug + new_drug_confirmation/by/at. DB CHECKs products_device_not_permitted, products_new_drug_confirmed; guard trigger restricts on reclassify to device / newly flagged new drug; status log keeps new_drug_confirmation. Online-sale input new_drug_confirmation (≥20). Forms: admin product, new-product draft, catalogue file columns "Product class"/"New drug", admin list filter ?product_class=&new_drug=1. Sprint 39 stand-ins skip devices/new drugs.
+- Mock recall drill: shared trace `services/recall/trace.ts` (recall.service uses it); `recall_drills` final after trace, one close-out; PDF on demand (pdfkit, never stored); API /recall-drills (admins); web Admin → Recall drills (+ printable report).
+- Self-inspection: templates (seeded monthly checklist), inspections + results append-only, corrective_actions (status only; closed final) + corrective_action_events history (trigger); job self_inspection_watch (08:10) alerts once (self_inspection_overdue). API /self-inspections; web Staff → Self-inspections (+ Checklists for admins).
+- Chain heads: job chain_verify (02:20) walks H1 + audit chains, checks previous recorded head still there (truncation), appends `chain_heads`, alerts chain_break; setting integrity.chain_start (documented restore / test DB only). API GET /admin/chain-heads, POST /admin/chain-heads/verify; Admin → Record integrity panel. errorHandler: our own trigger check_violation messages now returned as 409 with the message.
+- Leftovers: templates/03 sheet 4 supplier_name / supplier_licence_no / supplier_invoice_no / supplier_invoice_date (mapping test); partner page Batch suppliers (POST /partner/batch-provenance/:inventoryId, once, 409 PROVENANCE_ALREADY_RECORDED).
+- SMS add-on: no MSG91_AUTH_KEY → POST /auth/send-otp 503 SMS_NOT_CONFIGURED, same message for every number; web sign-in/forgot-password show it; GET /admin/config-warnings + dashboard banner (also SMS_OTP_TEMPLATE_MISSING).
+- Tests: jest 590 (gdp, productClass, selfInspection, trace rules; template supplier mapping); smoke 1–40 1955 checks (sprint40 123; sprint6 uses test/support/gdpHolds.mjs to release the excursion its >8 °C dispatch now logs); Playwright 139 passed / 4 skipped (with the S3 fake) incl. e2e/tests/sprint40.spec.ts (excursion queue, drill page, self-inspection, SMS notice).
+- App (mobile, NOT done): handle 503 SMS_NOT_CONFIGURED on send-otp (login by code + forgot password) by showing the server message instead of the code step; staff-only notification types gdp_excursion, self_inspection_overdue, chain_break (fall back gracefully); partner app none.
 
 ## Sprint 39 — Rx before payment + authorise-then-capture, online-sale status, pharmacist registrations, partner provenance (2026-10-03, uncommitted)
 

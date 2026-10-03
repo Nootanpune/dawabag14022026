@@ -23,6 +23,8 @@ export interface StatusInput {
   notification_ref?: string | null;
   notification_date?: string | null;      // YYYY-MM-DD
   reason?: string | null;
+  /** Sprint 40: required to permit a product flagged as a new drug (productClass/rules.ts) */
+  new_drug_confirmation?: string | null;
 }
 
 export function mayAllow(role: string): boolean { return role === 'pharmacist_rx'; }

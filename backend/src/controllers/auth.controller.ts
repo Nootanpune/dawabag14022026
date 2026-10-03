@@ -8,6 +8,10 @@ import { query, queryOne, withTransaction } from '../config/database';
 import { storeOTP, verifyOTP, blacklistToken } from '../config/redis';
 import { generateTokens, issuedBeforePasswordChange, verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
 import { sendOTP } from '../services/sms.service';
+import { smsConfigured } from '../services/notifications/channels/sms';
+
+/** Sprint 40: shown on the sign-in / forgot-password screens when SMS codes cannot be sent. */
+export const SMS_NOT_CONFIGURED_MESSAGE = 'Text-message codes are not switched on yet. Please sign in with your password, or ask the admin to reset it.';
 import { sendWelcomeEmail } from '../services/email.service';
 import { AppError } from '../utils/AppError';
 import { logger } from '../config/logger';
@@ -473,6 +477,10 @@ export async function sendLoginOTP(req: Request, res: Response, next: NextFuncti
     const { mobile } = z.object({
       mobile: z.string().regex(/^[6-9]\d{9}$/),
     }).parse(req.body);
+
+    // Sprint 40: no SMS provider (e.g. the trial) → say so plainly instead of "code sent".
+    // The same answer for every number, so it reveals nothing about who has an account.
+    if (!smsConfigured()) throw new AppError(SMS_NOT_CONFIGURED_MESSAGE, 503, true, 'SMS_NOT_CONFIGURED');
 
     // Same answer, at the same speed, whether or not the mobile is registered (Sprint 35:
     // sign-in by OTP and "Forgot password" use this; it must not tell anyone which
