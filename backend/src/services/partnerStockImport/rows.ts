@@ -6,6 +6,8 @@
 import { FieldKey, Mapping } from './fields';
 import { itemKey } from './normalise';
 import { parseExpiry, parsePercent, parseQuantity, parseRupeesToPaise } from './values';
+import { normaliseProvenance } from '../partnerProvenance/rules';
+import { todayIST } from '../../utils/ist';
 
 export interface ParsedRow {
   item_code: string | null;
@@ -27,6 +29,11 @@ export interface ParsedRow {
   gst_rate: number | null;
   /** Name, pack and company came from the row above (same product, next batch) */
   filled_down: boolean;
+  /** Sprint 39: batch provenance, when the file / feed has it (C-02) */
+  supplier_name?: string | null;
+  supplier_licence_no?: string | null;
+  supplier_invoice_no?: string | null;
+  supplier_invoice_date?: string | null;
 }
 
 export interface PreparedRow {
@@ -110,6 +117,11 @@ export function prepareRows(rows: { rowNumber: number; cells: string[] }[], mapp
     const gst = parsePercent(v('gst_rate'));
     if (gst !== null && Number.isNaN(gst)) warnings.push(`GST "${v('gst_rate')}" is not a percentage; ignored`);
     base.gst_rate = gst === null || Number.isNaN(gst) ? null : gst;
+    // Provenance is optional: an unreadable date is a warning, never a problem with the stock line
+    const prov = normaliseProvenance({ supplier_name: v('supplier_name'), supplier_licence_no: v('supplier_licence'),
+      supplier_invoice_no: v('supplier_invoice_no'), supplier_invoice_date: v('supplier_invoice_date') }, todayIST());
+    warnings.push(...prov.warnings);
+    if (prov.provenance) Object.assign(base, prov.provenance);
 
     out.push({ rowNumber, parsed: base, itemKey: itemKey(base), skip: null, problems, warnings });
   }

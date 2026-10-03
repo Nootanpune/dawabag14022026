@@ -17,6 +17,8 @@ import { writeAuditTx } from '../../utils/audit';
 import { copyFlags, reviewContentTx } from '../productContent.service';
 import { lockOpenDraft } from './queue.service';
 import { approvalProblems, NEVER_ONLINE } from './rules';
+import { setOnlineStatusTx } from '../onlineSale/status.service';
+import type { StatusInput } from '../onlineSale/rules';
 
 const DEFAULT_NOTE = 'New product completed from a partner request and approved in "New products to complete"';
 
@@ -24,7 +26,9 @@ const DECIDED = ['name', 'generic_name', 'composition', 'strength', 'dosage_form
   'gst_rate', 'category', 'description', 'storage_instructions', 'net_quantity', 'manufacturer_name', 'manufacturer_address',
   'country_of_origin', 'mrp_paise'] as const;
 
-export async function approveDraft(productId: string, pharmacistId: string, notes?: string) {
+// Sprint 39: the approved product is 'restricted' (not sold online) until a pharmacist sets its
+// online-sale status — done in the same form (onlineSale) so approval is not a dead end (C-10)
+export async function approveDraft(productId: string, pharmacistId: string, notes?: string, onlineSale?: StatusInput) {
   const result = await withTransaction(async (c) => {
     const p = await lockOpenDraft(c, productId);
     const problems = approvalProblems(p, p.cold_chain_decided);
@@ -33,7 +37,9 @@ export async function approveDraft(productId: string, pharmacistId: string, note
     const note = notes?.trim() || null;
 
     if (NEVER_ONLINE.includes(p.drug_schedule)) {
-      await c.query(`UPDATE products SET catalogue_state = 'not_listed', is_active = FALSE, updated_at = NOW() WHERE id = $1`, [productId]);
+      await c.query(`UPDATE products SET catalogue_state = 'not_listed', is_active = FALSE, online_sale_status = 'prohibited',
+                       online_sale_reason = $2, online_sale_set_by = $3, online_sale_set_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        [productId, `${p.drug_schedule}: never sold online (C-10)`, pharmacistId]);
       await c.query(
         `UPDATE catalogue_drafts SET status = 'not_listed', decided_by = $2, decided_at = NOW(), decision_note = $3 WHERE product_id = $1`,
         [productId, pharmacistId, note]);
@@ -65,7 +71,9 @@ export async function approveDraft(productId: string, pharmacistId: string, note
        WHERE product_id = $1 AND status = 'drafted'`, [productId, pharmacistId]);
     await writeAuditTx(c, { userId: null, action: 'catalogue_draft_approved', performedBy: pharmacistId,
       newValue: { product_id: productId, ...decided, requests_linked: linked.rowCount }, notes: note });
-    return { id: productId, status: 'approved' as const, sellable: true, requests: linked.rowCount ?? 0 };
+    if (onlineSale) await setOnlineStatusTx(c, { id: pharmacistId, role: 'pharmacist_rx' }, [productId], onlineSale);
+    const online = (await c.query(`SELECT online_sale_status FROM products WHERE id = $1`, [productId])).rows[0].online_sale_status as string;
+    return { id: productId, status: 'approved' as const, sellable: online === 'permitted', online_sale_status: online, requests: linked.rowCount ?? 0 };
   });
   await cacheDel(`product:${productId}`);
   await cacheDel('categories');

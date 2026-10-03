@@ -182,8 +182,12 @@ test('the pharmacist completes and approves one new product and closes another',
   // No description: saved and ready all the same (it is optional)
   await expect(card.getByRole('button', { name: 'No description yet — add one' })).toBeVisible();
   await expect(card.getByText('Ready to approve')).toBeVisible();
+  // Sprint 39 (C-10): the same form allows it for online sale, with a dated reference
+  await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeDisabled();
+  await card.getByLabel('Notification / approval reference').fill('E2E approval ref 39');
+  await card.getByLabel('Date of the notification').fill(new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10));
   await card.getByRole('button', { name: 'Approve', exact: true }).click();
-  await expect(page.getByText('Approved: now in the catalogue')).toBeVisible();
+  await expect(page.getByText('Approved: in the catalogue and allowed online')).toBeVisible();
   await expect(cards.getByRole('listitem', { name: 'E2E ZYLOPRIN 5MG TAB' })).toHaveCount(0);
 
   const other = cards.getByRole('listitem', { name: 'E2E GLIMMER CREAM 20GM' });

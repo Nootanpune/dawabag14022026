@@ -47,9 +47,27 @@ async function captureOrder(client: PoolClient, p: GatewayPayment, actor: string
     logger.error(`Captured amount mismatch for gateway order ${p.order_id}`);
     return { kind: 'order', outcome: 'amount mismatch; left for accounts', orderId: pay.order_id };
   }
-  await client.query(`UPDATE payments SET status = 'captured', gateway_payment_id = $2, method = $3, paid_at = NOW() WHERE gateway_order_id = $1`,
+  // Sprint 39: a prescription order's authorisation, captured after the pharmacist check
+  const held = pay.status === 'authorized' || pay.status === 'released';
+  await client.query(`UPDATE payments SET status = 'captured', gateway_payment_id = $2, method = COALESCE($3, method), paid_at = NOW(), captured_at = NOW(),
+                        capture_failure = NULL WHERE gateway_order_id = $1`,
     [p.order_id, p.id, p.method ?? null]);
   const order = (await client.query('SELECT status, user_id, order_number FROM orders WHERE id = $1 FOR UPDATE', [pay.order_id])).rows[0];
+  if (held) {
+    // Captured although the hold had been released or the order closed (a capture that
+    // crossed a cancellation): the money goes straight back (C-37)
+    if (pay.status === 'released' || order.status === 'cancelled') {
+      const back = await recordRefund(client, { orderId: pay.order_id, amountPaise: Number(p.amount), source: 'cancellation', userId: null });
+      await writeAuditTx(client, { userId: order.user_id, action: 'payment_after_close_refunded', performedBy: actor,
+        newValue: { order_id: pay.order_id, order_status: order.status, gateway_payment_id: p.id, held_payment: true } });
+      return { kind: 'order', outcome: 'held payment captured after release: refunded', orderId: pay.order_id, refundIds: back.gatewayRefundIds };
+    }
+    await writeAuditTx(client, { userId: order.user_id, action: 'payment_captured', performedBy: actor,
+      newValue: { order_id: pay.order_id, gateway_order_id: p.order_id, gateway_payment_id: p.id, order_status: order.status,
+        after_pharmacist_check: true, ...(String(p.id).startsWith('demo_') ? { demo: true } : {}) } });
+    return { kind: 'order', outcome: 'held payment captured after the pharmacist check', orderId: pay.order_id,
+      notify: { userId: order.user_id, type: 'payment_confirmed', orderId: pay.order_id, orderNumber: order.order_number, status: order.status } };
+  }
   if (!['pending_payment', 'payment_failed'].includes(order.status)) {
     const back = await recordRefund(client, { orderId: pay.order_id, amountPaise: Number(p.amount), source: 'cancellation', userId: null });
     await writeAuditTx(client, { userId: order.user_id, action: 'payment_after_close_refunded', performedBy: actor,

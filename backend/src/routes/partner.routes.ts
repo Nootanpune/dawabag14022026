@@ -17,7 +17,7 @@ import {
 } from '../controllers/stockFeed.controller';
 import {
   createListing, getInventory, getListings, getMe, getPharmacists, postCheck, getMySettlement, getMySettlements, getShipments,
-  postDelivered, postDispatch, putInventory, searchCatalogue,
+  postDelivered, postDispatch, putInventory, searchCatalogue, getMyBatchProvenance,
 } from '../controllers/partner.controller';
 
 // Partner portal — /api/v1/partner/*
@@ -35,6 +35,7 @@ router.get('/products', getListings);
 router.post('/products', createListing);
 router.get('/products/:id/inventory', getInventory);
 router.put('/products/:id/inventory', putInventory);
+router.get('/batch-provenance', getMyBatchProvenance);   // Sprint 39 (C-02)
 router.get('/shipments', getShipments);
 router.get('/pharmacists', getPharmacists);
 router.post('/shipments/:id/check', postCheck);          // Sprint 35: release / hold / refuse (C-08)

@@ -61,6 +61,9 @@ import infoPageRoutes from './routes/infoPages.routes';
 import reminderRoutes from './routes/reminders.routes';
 import healthProfileRoutes from './routes/healthProfile.routes';
 import salesStatusRoutes from './routes/salesStatus.routes';
+import onlineSaleRoutes from './routes/onlineSale.routes';
+import pharmacistRegistrationRoutes from './routes/pharmacistRegistration.routes';
+import provenanceRoutes from './routes/provenance.routes';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
@@ -217,6 +220,9 @@ app.use(`${api}/info-pages`, infoPageRoutes);           // Sprint 33: trust page
 app.use(`${api}/reminders`, reminderRoutes);            // Sprint 33: "My medicines" dose reminders
 app.use(`${api}/health-profile`, healthProfileRoutes);  // Sprint 33: health profile (consent, C-41)
 app.use(`${api}/sales-status`, salesStatusRoutes);      // Sprint 38: emergency stop state (public)
+app.use(`${api}/online-sale`, onlineSaleRoutes);        // Sprint 39: online-sale status per product (C-10)
+app.use(`${api}/pharmacist-registrations`, pharmacistRegistrationRoutes);   // Sprint 39: registration validity (C-03)
+app.use(`${api}/partner-provenance`, provenanceRoutes);  // Sprint 39: who supplied a partner batch (C-02)
 
 // ─── Error Handling ─────────────────────────────────────────────────────────
 app.use(notFound);

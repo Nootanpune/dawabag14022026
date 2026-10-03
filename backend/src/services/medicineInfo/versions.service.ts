@@ -15,6 +15,7 @@
 import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
+import { assertStaffRegistrationValid } from '../pharmacistRegistration/gate.service';
 import { writeAuditTx } from '../../utils/audit';
 import { DISCLAIMER, InfoContent, infoFlags, parseInfoContent, publicSections, submitProblems } from './content';
 
@@ -132,6 +133,8 @@ export async function reviewInfo(pharmacistId: string, productId: string, approv
     // Four eyes (Sprint 36): nobody approves words they wrote or sent (C-19, C-46). An
     // author may still reject (withdraw) their own version.
     if (approve && (open.author_ids ?? []).includes(pharmacistId)) throw new AppError(SELF_REVIEW_MESSAGE, 403);
+    // Sprint 39: approving needs an active, in-date, verified registration (C-03, C-19)
+    if (approve) await assertStaffRegistrationValid(client, pharmacistId, reviewer.pharmacist_reg_no);
     const flags = Array.isArray(open.flags) ? open.flags : [];
     if (approve && flags.length && notes.length < 20) {
       throw new AppError('This text has flagged claims; explain why it is acceptable (at least 20 characters) or reject it', 400);

@@ -43,6 +43,15 @@ async function upsertProduct(m: DemoMedicine): Promise<{ id: string; copyChanged
     [m.name, m.generic, sku, m.category, m.schedule, m.hsn, m.gst, m.description, m.composition, storage,
      paise(m.mrp), offer, Math.round(offer * 0.8), Math.round(offer * 0.72), Math.round(offer * 0.85), maxPerOrder(m),
      m.net, DEMO_MANUFACTURER, DEMO_MANUFACTURER_ADDRESS, m.tele ?? null]))[0];
+  // Sprint 39: new products start 'restricted'. The demo catalogue (trial only, labelled DEMO) is allowed for
+  // online sale by the seed so the trial can be shopped; Schedule X / NDPS never (C-10). Production products
+  // are allowed only by a pharmacist with a dated reference (Staff → Online-sale status).
+  await query(
+    `UPDATE products SET online_sale_status = CASE WHEN drug_schedule IN ('Schedule X', 'NDPS') THEN 'prohibited' ELSE 'permitted' END,
+       online_sale_ref = CASE WHEN drug_schedule IN ('Schedule X', 'NDPS') THEN NULL ELSE 'DEMO trial catalogue (not a real approval)' END,
+       online_sale_ref_date = CASE WHEN drug_schedule IN ('Schedule X', 'NDPS') THEN NULL ELSE CURRENT_DATE END,
+       online_sale_reason = 'Demo seed (trial only)', online_sale_set_at = NOW()
+     WHERE id = $1 AND online_sale_status = 'restricted'`, [row.id]);
   const copyChanged = !before || before.description !== m.description || before.composition !== m.composition
     || before.storage_instructions !== storage || before.content_status !== 'approved';
   return { id: row.id, copyChanged, hasImage: !!before?.s3_image_key };

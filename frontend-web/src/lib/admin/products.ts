@@ -1,3 +1,4 @@
+import type { OnlineSaleStatus } from '@/lib/onlineSale/api';
 // Admin catalogue: list, create and edit products. Every price rule (C-16:
 // prices ≤ MRP ≤ NPPA ceiling) and the pharmacist copy review (C-19) are
 // enforced on the server; the form only mirrors them for quick feedback.
@@ -27,6 +28,10 @@ export interface AdminProductRow {
   telemedicine_list?: 'O' | 'A' | 'B' | 'prohibited' | null;
   /** signed link to the current pack photo (any review state), or null */
   image_url?: string | null;
+  /** Sprint 39: online-sale status (C-10) */
+  online_sale_status?: OnlineSaleStatus;
+  online_sale_ref?: string | null;
+  online_sale_reason?: string | null;
 }
 
 export interface ProductPage {

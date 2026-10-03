@@ -35,7 +35,15 @@ async function attachUnchecked(client: PoolClient, userId: string, prescriptionI
 }
 
 export async function requestPrescriptionReuse(userId: string, prescriptionId: string, orderId: string) {
-  return withTransaction(async (client) => {
+  return withTransaction((client) => attachPrescriptionTx(client, userId, prescriptionId, orderId));
+}
+
+/**
+ * The same, inside the caller's transaction — also used by order placement, where the
+ * prescription is chosen BEFORE payment (Sprint 39, owner decision 2026-10-03, C-08).
+ */
+export async function attachPrescriptionTx(client: PoolClient, userId: string, prescriptionId: string, orderId: string) {
+  {
     const rx = (await client.query(
       `SELECT id, status, valid_until, order_id FROM prescriptions WHERE id = $1 AND user_id = $2 FOR UPDATE`, [prescriptionId, userId])).rows[0];
     if (!rx) throw new AppError('Prescription not found', 404);
@@ -60,6 +68,6 @@ export async function requestPrescriptionReuse(userId: string, prescriptionId: s
        WHERE id = $1`, [orderId, prescriptionId]);
     await writeAuditTx(client, { userId, action: 'prescription_reuse_requested', performedBy: userId,
       newValue: { order_id: orderId, prescription_id: prescriptionId } });
-    return { order_id: orderId, prescription_id: prescriptionId, status: 'awaiting_pharmacist' };
-  });
+    return { order_id: orderId, prescription_id: prescriptionId, status: 'awaiting_pharmacist' as const };
+  }
 }

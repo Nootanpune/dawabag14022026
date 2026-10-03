@@ -23,7 +23,7 @@ export async function createSubscription(userId: string, orderId: string, freque
     const items = (await client.query(
       `SELECT oi.product_id, SUM(oi.quantity)::int AS quantity FROM order_items oi
        JOIN products p ON p.id = oi.product_id
-       WHERE oi.order_id = $1 AND p.is_active = TRUE AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')
+       WHERE oi.order_id = $1 AND p.is_active = TRUE AND p.online_sale_status = 'permitted' AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')
        GROUP BY oi.product_id`, [orderId])).rows;
     if (!items.length) throw new AppError('Nothing in this order can be refilled', 400);
     const sub = (await client.query(

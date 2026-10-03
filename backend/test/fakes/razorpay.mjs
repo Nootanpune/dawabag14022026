@@ -19,6 +19,13 @@ export function checkoutPayment(orderId, { status = 'captured', method = 'upi', 
   return { razorpay_order_id: orderId, razorpay_payment_id: id, razorpay_signature: signature };
 }
 
+// Sprint 39: the manual-capture window ended at the gateway — the authorisation went back to the buyer
+export function expireAuthorisation(paymentId) {
+  const p = razorpay.payments.get(paymentId);
+  if (p && p.status === 'authorized') { p.status = 'refunded'; p.captured = false; }
+  return p;
+}
+
 // Razorpay calling the API's webhook, signed over the exact bytes sent
 export async function sendWebhook(event, payload, eventId = rid('evt'), createdAt = Math.floor(Date.now() / 1000)) {
   const raw = JSON.stringify({ entity: 'event', event, payload, created_at: createdAt });
@@ -53,7 +60,9 @@ export function razorpayRoute(req, body) {
   const notFound = [400, { error: { code: 'BAD_REQUEST_ERROR', description: 'The id provided does not exist' } }];
   if (req.method === 'POST' && path === '/v1/orders') {
     if (!Number.isInteger(b.amount) || b.amount < 100) return [400, { error: { code: 'BAD_REQUEST_ERROR', description: 'Order amount less than minimum amount allowed' } }];
-    const o = { id: rid('order'), entity: 'order', amount: b.amount, currency: b.currency, receipt: b.receipt, notes: b.notes, status: 'created' };
+    // Sprint 39: the capture options asked for (payment.capture 'manual' for prescription orders) are kept for the tests
+    const o = { id: rid('order'), entity: 'order', amount: b.amount, currency: b.currency, receipt: b.receipt, notes: b.notes, status: 'created',
+      payment_capture: b.payment_capture, payment: b.payment };
     razorpay.orders.set(o.id, o);
     return [200, o];
   }

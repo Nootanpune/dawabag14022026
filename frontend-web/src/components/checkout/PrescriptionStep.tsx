@@ -49,7 +49,7 @@ export default function PrescriptionStep({ rxItems, selectedId, onSelect, onBack
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <FileText className="w-5 h-5 text-brand-600" aria-hidden="true" /> Prescription needed
         </h2>
-        <p className="text-sm text-gray-700 mt-1">These medicines need a doctor’s prescription:</p>
+        <p className="text-sm text-gray-700 mt-1">These medicines need a doctor’s prescription. Add it now, before payment:</p>
         <ul className="mt-1 text-sm font-medium text-gray-900 list-disc pl-5">
           {rxItems.map((i) => <li key={i.name}>{i.name} × {i.quantity}</li>)}
         </ul>

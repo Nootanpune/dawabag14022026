@@ -9,6 +9,7 @@ import { sellableStockSql } from '../stock/partnerStock';
 import { saleKindFor } from '../stock/sellingRights';
 import { approvedImageKeySql, withImageUrls } from '../productImage.service';
 import { buyerColumns } from '../search/productSearch.service';
+import { onlineSellableSql } from '../onlineSale/rules';   // Sprint 39 (C-10)
 
 export interface ProductCard {
   id: string;
@@ -28,7 +29,7 @@ export interface ProductCard {
 
 /** Conditions every card must meet (alias p). */
 export const SELLABLE_SQL =
-  `p.is_active = TRUE AND p.deleted_at IS NULL AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')`;
+  `p.is_active = TRUE AND p.deleted_at IS NULL AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS') AND ${onlineSellableSql('p')}`;
 
 /** Stock one seller may supply to this buyer right now (alias p). Same rule as search, cart and allocation (Sprint 32). */
 export const stockQtySql = (pricingType: string) => sellableStockSql('p.id', saleKindFor(pricingType));

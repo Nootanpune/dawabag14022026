@@ -13,6 +13,7 @@ export default function SavedBatchesTable({ batches }: { batches: SavedBatch[] }
             <th className="font-medium py-1.5 text-right">Reserved</th>
             <th className="font-medium py-1.5">Expiry</th>
             <th className="font-medium py-1.5">Cold chain</th>
+            <th className="font-medium py-1.5">Supplier</th>
           </tr>
         </thead>
         <tbody>
@@ -23,6 +24,7 @@ export default function SavedBatchesTable({ batches }: { batches: SavedBatch[] }
               <td className="py-1.5 text-right">{b.qty_reserved}</td>
               <td className="py-1.5">{formatDateIST(b.expiry_date)}</td>
               <td className="py-1.5">{b.cold_chain_confirmed ? 'Confirmed' : '—'}</td>
+              <td className="py-1.5">{b.supplier_name ? `${b.supplier_name}${b.supplier_invoice_no ? ` · ${b.supplier_invoice_no}` : ''}` : '—'}</td>
             </tr>
           ))}
         </tbody>

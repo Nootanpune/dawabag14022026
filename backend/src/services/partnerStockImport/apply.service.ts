@@ -23,6 +23,17 @@ import { evaluateImport } from './evaluate';
 import { assertDraft, DRAFT_VALID_HOURS } from './import.service';
 import { assertManualStock } from '../partnerLiveFeed/settings.service';
 import type { ParsedRow } from './rows';
+import { Provenance, missingForRequired, provenanceOf, provenanceRequiredFor } from '../partnerProvenance/rules';
+import { provenanceRequired } from '../partnerProvenance/provenance.service';
+
+/** Provenance already recorded for a listing's batches, by batch key. */
+async function recordedForListing(c: PoolClient, ppId: string): Promise<Map<string, Provenance>> {
+  const rows = (await c.query(
+    `SELECT pi.batch_number, pb.supplier_name, pb.supplier_licence_no, pb.supplier_invoice_no,
+            to_char(pb.supplier_invoice_date, 'YYYY-MM-DD') AS supplier_invoice_date
+     FROM partner_batch_provenance pb JOIN partner_inventory pi ON pi.id = pb.partner_inventory_id WHERE pi.partner_product_id = $1`, [ppId])).rows;
+  return new Map(rows.map((r: any) => [batchKey(r.batch_number), r as Provenance]));
+}
 
 export interface ApplyInput {
   /** Required when the import creates new listings (partners sell at Dawabag's catalogue price) */
@@ -85,6 +96,7 @@ export async function applyImport(id: string, partnerId: string, userId: string,
     const listings = new Map((await c.query(
       'SELECT id, product_id FROM partner_products WHERE partner_id = $1 AND product_id = ANY($2)', [partnerId, productIds])).rows
       .map((r) => [r.product_id, r.id as string]));
+    const provRequired = await provenanceRequired(c);
     let cannotList: string | null = null;
     try { await assertPartnerCanSell(partnerId, c); } catch (e) { cannotList = (e as Error).message; }
 
@@ -139,12 +151,28 @@ export async function applyImport(id: string, partnerId: string, userId: string,
           purchase_price_paise: l.parsed.purchase_rate_paise ?? null,
         });
       }
+      // Sprint 39: the batch's supplier details, from the first of its lines that has them (C-02)
+      for (const l of own) {
+        const b = batches.get(batchKey(l.parsed.batch_number!))!;
+        if (!b.provenance) b.provenance = provenanceOf(l.parsed);
+      }
+      // Required mode (setting): H1 / cold-chain batches without supplier details are left out, the rest applies
+      if (provRequired && provenanceRequiredFor(product)) {
+        const had = await recordedForListing(c, ppId);
+        for (const [key, b] of batches) {
+          const missing = missingForRequired(had.get(key) ?? b.provenance ?? null);
+          if (!missing.length) continue;
+          batches.delete(key);
+          skip(`Supplier details missing (${missing.join(', ')}) — required for Schedule H1 and refrigerated batches`, product, 1);
+        }
+        if (!batches.size) continue;
+      }
       for (const [key, b] of batches) {
         const reserved = Number(existing.get(key)?.qty_reserved ?? 0);
         if (b.qty_available < reserved) b.qty_available = reserved;   // never below open orders
         result.packs += b.qty_available;
       }
-      await upsertInventoryTx(c, partnerId, ppId, [...batches.values()], userId, { audit: false });
+      await upsertInventoryTx(c, partnerId, ppId, [...batches.values()], userId, { audit: false, source: 'file', importId: id });
       const zeroed = await c.query(
         `UPDATE partner_inventory SET qty_available = qty_reserved, last_updated_at = NOW()
          WHERE partner_product_id = $1 AND qty_available <> qty_reserved AND NOT (${batchKeySql('batch_number')} = ANY($2))`,

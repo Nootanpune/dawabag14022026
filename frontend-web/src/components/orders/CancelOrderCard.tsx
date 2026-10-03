@@ -16,7 +16,8 @@ export default function CancelOrderCard({ orderId }: { orderId: string }) {
   const cancel = useMutation({
     mutationFn: (reason: string) => cancelOrder(orderId, reason),
     onSuccess: (r) => {
-      toast.success(r.refund_paise > 0 ? `Order cancelled · ${formatPrice(r.refund_paise)} will be refunded` : 'Order cancelled');
+      toast.success(r.refund_paise > 0 ? `Order cancelled · ${formatPrice(r.refund_paise)} will be refunded`
+        : (r.released_paise ?? 0) > 0 ? 'Order cancelled · you have not been charged (the hold on your card or UPI is released)' : 'Order cancelled');
       setOpen(false);
     },
     onError: (err) => toast.error(getApiErrorMessage(err, 'Could not cancel the order')),

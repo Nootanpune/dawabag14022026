@@ -13,6 +13,9 @@ import { writeAudit } from '../../utils/audit';
 import { applyCapture } from './capture.service';
 import { paymentFailed } from './webhook.service';
 import { DEMO_ORDER_PREFIX, DEMO_PAYMENT_PREFIX, demoPaymentsEnabled, type PaymentMethod } from './paymentMode';
+import { assertPrescriptionProvided } from '../prescriptions/requirement.service';
+import { needsManualCapture, recordAuthorisation } from './rxHold/hold.service';
+import { HOLD_WORDING } from './rxHold/rules';
 
 /** provider: the bank (netbanking) or wallet chosen in the demo checkout — audit only (Sprint 27) */
 export interface DemoPaymentInput { method: PaymentMethod; outcome: 'success' | 'failure'; provider?: string }
@@ -37,10 +40,16 @@ export async function payOrderDemo(userId: string, orderId: string, input: DemoP
   if (!['pending_payment', 'payment_failed'].includes(order.status)) throw new AppError('This order is already paid or closed', 409);
   if (order.total_paise <= 0) throw new AppError('Nothing to pay on this order', 400);
   await assertOrderPayable(pool, order.id);   // emergency stop (Sprint 38, C-08)
+  // Sprint 39: prescription before payment, and a prescription order is only authorised
+  // (simulated) until the pharmacist check passes — exactly as with Razorpay (C-08, C-37)
+  const manual = await withTransaction(async (c) => {
+    await assertPrescriptionProvided(c, order.id);
+    return needsManualCapture(c, order.id);
+  });
 
   const id = ids();
-  await query(`INSERT INTO payments (order_id, gateway, gateway_order_id, status, amount_paise, method)
-               VALUES ($1, 'demo', $2, 'created', $3, $4)`, [order.id, id.order, order.total_paise, input.method]);
+  await query(`INSERT INTO payments (order_id, gateway, gateway_order_id, status, amount_paise, method, capture_mode)
+               VALUES ($1, 'demo', $2, 'created', $3, $4, $5)`, [order.id, id.order, order.total_paise, input.method, manual ? 'manual' : 'automatic']);
   if (input.outcome === 'failure') {
     // As Razorpay's payment.failed webhook does: the payment fails, the order waits for another try
     await paymentFailed({ order_id: id.order });
@@ -49,12 +58,21 @@ export async function payOrderDemo(userId: string, orderId: string, input: DemoP
     const o = await queryOne<{ status: string }>('SELECT status FROM orders WHERE id = $1', [order.id]);
     return { order_id: order.id, paid: false, demo: true, status: o?.status };
   }
+  if (manual) {
+    const a = await recordAuthorisation({ id: id.payment, order_id: id.order, amount: order.total_paise, method: input.method, status: 'authorized' }, userId);
+    await writeAudit({ userId, action: 'demo_payment_authorised', performedBy: userId,
+      newValue: { demo: true, order_id: order.id, gateway_order_id: id.order, gateway_payment_id: id.payment, method: input.method,
+        ...via(input), amount_paise: order.total_paise, outcome: a?.outcome } });
+    const o = await queryOne<{ status: string }>('SELECT status FROM orders WHERE id = $1', [order.id]);
+    return { order_id: order.id, paid: true, demo: true, payment_id: id.payment, status: o?.status,
+      payment_status: 'authorized' as const, charge_note: HOLD_WORDING.checkout };
+  }
   const r = await applyCapture({ id: id.payment, order_id: id.order, amount: order.total_paise, method: input.method, status: 'captured' }, userId);
   await writeAudit({ userId, action: 'demo_payment_captured', performedBy: userId,
     newValue: { demo: true, order_id: order.id, gateway_order_id: id.order, gateway_payment_id: id.payment, method: input.method,
       ...via(input), amount_paise: order.total_paise, outcome: r.outcome } });
   const o = await queryOne<{ status: string }>('SELECT status FROM orders WHERE id = $1', [order.id]);
-  return { order_id: order.id, paid: true, demo: true, payment_id: id.payment, status: o?.status };
+  return { order_id: order.id, paid: true, demo: true, payment_id: id.payment, status: o?.status, payment_status: 'captured' as const };
 }
 
 export async function payConsultationDemo(userId: string, consultationId: string, input: DemoPaymentInput) {

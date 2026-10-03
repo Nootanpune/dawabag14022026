@@ -9,6 +9,7 @@
 // with mobile numbers 90000000xx and SKU prefix SMOKE-; it deletes them first,
 // so it can be re-run. NEVER point it at a production database.
 import { createRequire } from 'module';
+import { applySprint39Defaults, withPrescription } from './support/sprint39Fixtures.mjs';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const Redis = require('ioredis');
@@ -23,7 +24,15 @@ function check(name, cond, detail) {
   else { failures++; console.log(`  FAIL ${name}${detail ? ' — ' + JSON.stringify(detail) : ''}`); }
 }
 
-async function call(method, path, { body, token, form } = {}) {
+// Sprint 39 stand-ins (support/sprint39Fixtures.mjs): fixture products allowed for online sale, fixture
+// pharmacists verified, a prescription added when checkout asks for one
+async function call(method, path, opts = {}) {
+  if (db._connected) await applySprint39Defaults(db);
+  if (method === 'POST' && path === '/orders' && opts.body) return withPrescription(db, (body) => rawCall(method, path, { ...opts, body }), opts.body, opts.token);
+  return rawCall(method, path, opts);
+}
+
+async function rawCall(method, path, { body, token, form } = {}) {
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body) headers['Content-Type'] = 'application/json';
@@ -69,7 +78,7 @@ async function cleanup() {
     for (const t of ['order_items']) {
       await db.query(`DELETE FROM ${t} WHERE order_id IN (SELECT id FROM orders WHERE user_id = ANY($1))`, [ids]);
     }
-    for (const t of ['cart_items', 'carts', 'notifications', 'orders', 'addresses', 'kyc_documents', 'consent_records', 'audit_logs', 'user_profiles']) {
+    for (const t of ['cart_items', 'carts', 'notifications', 'prescriptions', 'orders', 'addresses', 'kyc_documents', 'consent_records', 'audit_logs', 'user_profiles']) {
       await db.query(`DELETE FROM ${t} WHERE user_id = ANY($1)`, [ids]);
     }
     await db.query('DELETE FROM users WHERE id = ANY($1)', [ids]);

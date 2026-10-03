@@ -11,6 +11,7 @@ import { DispatchRecord, HandoverInput, checkHandover, handoverCode, prepareHand
 import { queueNotification } from './notification.service';
 import { syncOrderStatus } from './fulfilment.service';
 import { mayDispatch, notReleasedMessage } from './pharmacistCheck/rules';
+import { assertPaymentTaken } from './payments/rxHold/hold.service';
 
 export async function listPartnerShipments(vendorId: string, status?: string) {
   return query(
@@ -56,6 +57,7 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
     await assertDispatchAllowed(client, shipmentId);   // emergency stop holds Rx parcels (Sprint 38, C-08)
+    await assertPaymentTaken(client, s.order_id);      // Sprint 39: held prescription payment captured first (C-37)
     // Reserved → shipped: take the units out of the partner's batch
     await client.query(
       `UPDATE partner_inventory pi

@@ -2,6 +2,7 @@
 // The server-side cart is the only cart (docs/DECISIONS.md: server is the single
 // source of truth). It stores product + quantity; everything shown to the buyer
 // (price for their type, stock, limits, Rx flag, coupon) is computed here live.
+import { notOnlineMessage } from './onlineSale/rules';
 import { pool, query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { BuyerType, priceField, requiresPrescription } from '../utils/customerType';
@@ -47,7 +48,7 @@ async function productRows(productIds: string[], pricingType: BuyerType) {
   return query<any>(
     `SELECT p.id, p.name, p.sku, p.drug_schedule, p.cold_chain, p.s3_image_key,
             ${approvedImageKeySql()} AS approved_image_key,
-            p.is_active, p.deleted_at, p.mrp_paise, p.offer_price_paise,
+            p.is_active, p.deleted_at, p.online_sale_status, p.mrp_paise, p.offer_price_paise,
             COALESCE(p.ptr_price_paise, p.offer_price_paise) AS ptr_price_paise,
             COALESCE(p.pts_price_paise, p.offer_price_paise) AS pts_price_paise,
             COALESCE(p.institutional_price_paise, p.offer_price_paise) AS institutional_price_paise,
@@ -79,6 +80,7 @@ export async function getCart(userId: string, pricingType: BuyerType) {
     const unit = p[column] ?? p.offer_price_paise;
     let issue: string | null = null;
     if (!p.is_active || p.deleted_at || BLOCKED_SCHEDULES.includes(p.drug_schedule)) issue = 'No longer available';
+    else if (p.online_sale_status !== 'permitted') issue = 'Not available for online sale';   // Sprint 39 (C-10)
     else if (p.stock_qty < r.quantity) issue = p.stock_qty > 0 ? `Only ${p.stock_qty} in stock` : 'Out of stock';
     else if (r.quantity < min) issue = `Minimum order is ${min}`;
     else if (r.quantity > max) issue = `Maximum per order is ${max}`;
@@ -133,6 +135,8 @@ export async function setCartItem(userId: string, productId: string, quantity: n
   const [p] = await productRows([productId], 'customer');
   if (!p || !p.is_active || p.deleted_at) throw new AppError('Product not found', 404);
   if (BLOCKED_SCHEDULES.includes(p.drug_schedule)) throw new AppError(`${p.name} cannot be ordered online`, 403);
+  // Sprint 39: only products allowed for online sale (C-10)
+  if (p.online_sale_status !== 'permitted') throw new AppError(notOnlineMessage(p.name, p.online_sale_status), 403, true, 'NOT_FOR_ONLINE_SALE');
   // Emergency stop (Sprint 38): no new or larger prescription-medicine lines; lowering or removing is fine
   const rxPause = await getRxPause();
   if (isPausedLine(rxPause, pricingType, p.drug_schedule)) {

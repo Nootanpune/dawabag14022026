@@ -41,7 +41,7 @@ export async function didYouMean(raw: unknown): Promise<string[]> {
          SELECT DISTINCT btrim(t.term) AS term
          FROM products p
          CROSS JOIN LATERAL (VALUES (p.generic_name), (split_part(btrim(p.name), ' ', 1))) AS t(term)
-         WHERE p.is_active = TRUE AND p.deleted_at IS NULL
+         WHERE p.is_active = TRUE AND p.deleted_at IS NULL AND p.online_sale_status = 'permitted'
            AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')
            AND t.term IS NOT NULL AND length(btrim(t.term)) >= 3
        )

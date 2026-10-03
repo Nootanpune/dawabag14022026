@@ -72,6 +72,11 @@ export interface BatchInput {
   expiry_date: string;
   manufactured_date?: string;
   cold_chain_confirmed?: boolean;
+  /** Sprint 39: who supplied the batch (optional; recorded once, never changed — C-02) */
+  supplier_name?: string;
+  supplier_licence_no?: string;
+  supplier_invoice_no?: string;
+  supplier_invoice_date?: string;
 }
 
 export interface SavedBatch {
@@ -80,6 +85,10 @@ export interface SavedBatch {
   qty_reserved: number;
   expiry_date: string;
   cold_chain_confirmed: boolean;
+  supplier_name?: string | null;
+  supplier_licence_no?: string | null;
+  supplier_invoice_no?: string | null;
+  supplier_invoice_date?: string | null;
 }
 
 export type ShipmentStatus = 'pending' | 'dispatched' | 'delivered' | 'cancelled';
@@ -128,7 +137,12 @@ export interface PartnerShipment {
 }
 
 /** One of the partner's registered pharmacists (Sprint 28, recorded by Dawabag's admin) */
-export interface PartnerPharmacist { id: string; full_name: string; registration_no: string }
+export interface PartnerPharmacist {
+  id: string; full_name: string; registration_no: string;
+  /** Sprint 39 (C-03): an unverified, lapsed, expired or suspended registration cannot release shipments */
+  valid_till?: string | null;
+  registration?: { ok: boolean; state: string; message: string | null };
+}
 
 /** Drug schedule helpers — the server enforces the same rules. */
 // DB values are 'Schedule H1' etc.; the old check compared against 'H1' and never matched.

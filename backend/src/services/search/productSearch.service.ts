@@ -3,6 +3,7 @@
 // and NDPS are never listed (C-10); price and quantity limits follow the buyer
 // type; stock is the most one seller can supply (own batches or one partner);
 // the pack photo only once the pharmacist approved it (C-19, by the caller).
+import { onlineSellableSql } from '../onlineSale/rules';
 import crypto from 'crypto';
 import { pool } from '../../config/database';
 import { sellableStockSql } from '../stock/partnerStock';
@@ -72,6 +73,7 @@ async function run(db: Db, s: CatalogueSearch, text: SearchText | null, fuzzy: b
   const conditions = [
     'p.is_active = TRUE', 'p.deleted_at IS NULL',
     "COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')",
+    onlineSellableSql('p'),   // Sprint 39: only products allowed for online sale (C-10)
   ];
   // Filter parameters first: the count query takes exactly these
   const params: unknown[] = [];

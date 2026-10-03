@@ -7,9 +7,15 @@ export interface BatchDraft {
   expiry: string;
   mfg: string;
   coldConfirmed: boolean;
+  /** Sprint 39: optional supplier details (C-02) */
+  supplier: string;
+  supplierLicence: string;
+  invoiceNo: string;
+  invoiceDate: string;
 }
 
-export const emptyBatch = (): BatchDraft => ({ batch_number: '', qty: '', expiry: '', mfg: '', coldConfirmed: false });
+export const emptyBatch = (): BatchDraft => ({ batch_number: '', qty: '', expiry: '', mfg: '', coldConfirmed: false,
+  supplier: '', supplierLicence: '', invoiceNo: '', invoiceDate: '' });
 
 interface Props {
   row: BatchDraft;
@@ -48,6 +54,22 @@ export default function BatchRowFields({ row, coldChain, onChange, onRemove }: P
         </span>
         <input type="date" value={row.mfg} onChange={(e) => set({ mfg: e.target.value })} className="input" />
       </label>
+      <details className="col-span-2 sm:col-span-4" open={!!(row.supplier || row.invoiceNo)}>
+        <summary className="cursor-pointer text-gray-700 font-medium">
+          Supplier details <span className="text-gray-500 font-normal">(optional; needed for Schedule H1 and cold-chain batches when Dawabag asks)</span>
+        </summary>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+          <label className="block col-span-2 sm:col-span-1"><span className="block font-medium text-gray-600 mb-1">Supplier name</span>
+            <input value={row.supplier} maxLength={255} onChange={(e) => set({ supplier: e.target.value })} className="input" /></label>
+          <label className="block"><span className="block font-medium text-gray-600 mb-1">Supplier licence no.</span>
+            <input value={row.supplierLicence} maxLength={100} onChange={(e) => set({ supplierLicence: e.target.value })} className="input" /></label>
+          <label className="block"><span className="block font-medium text-gray-600 mb-1">Purchase invoice no.</span>
+            <input value={row.invoiceNo} maxLength={100} onChange={(e) => set({ invoiceNo: e.target.value })} className="input" /></label>
+          <label className="block"><span className="block font-medium text-gray-600 mb-1">Invoice date</span>
+            <input type="date" value={row.invoiceDate} onChange={(e) => set({ invoiceDate: e.target.value })} className="input" /></label>
+        </div>
+        <p className="text-gray-500 mt-1">Recorded once for the batch and cannot be changed later.</p>
+      </details>
       <div className="col-span-2 sm:col-span-4 flex items-center justify-between gap-2">
         {coldChain ? (
           <label className="flex items-center gap-2 text-gray-700">

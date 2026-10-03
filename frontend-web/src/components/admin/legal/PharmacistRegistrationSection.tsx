@@ -29,6 +29,8 @@ export default function PharmacistRegistrationSection() {
       <div className="card">
         <p className="text-xs text-gray-500 mb-3">
           Pharmacists must have their pharmacy council registration number on file before reviewing prescriptions.
+          Record the council, valid-till date and verification in{' '}
+          <a href="/admin/pharmacist-registrations" className="text-brand-700 underline">Pharmacist registrations</a> (Sprint 39): a changed number must be verified again.
         </p>
         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] items-end">
           <label className="block text-sm">

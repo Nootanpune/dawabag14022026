@@ -9,10 +9,12 @@ import { creditWholeShipment } from './creditNote.service';
 import { queueNotification } from './notification.service';
 import { recordRefund, refundableAmount, sendGatewayRefunds } from './refund.service';
 import { releaseOrderReservations } from './shipment.service';
+import { releaseHeldPaymentTx } from './payments/rxHold/hold.service';
 
 const OPEN = ['pending_payment', 'payment_failed', 'confirmed', 'rx_pending', 'rx_verified', 'rx_rejected', 'packing', 'packed'];
 
-export async function cancelOrder(orderId: string, actor: { id: string; staff: boolean }, reason: string) {
+// actor.id null = the server itself (Sprint 39: a prescription order the pharmacist could not check in time)
+export async function cancelOrder(orderId: string, actor: { id: string | null; staff: boolean }, reason: string) {
   const result = await withTransaction(async (client) => {
     const o = (await client.query(
       `SELECT id, user_id, order_number, status, total_paise, wallet_used_paise, payment_terms
@@ -51,17 +53,21 @@ export async function cancelOrder(orderId: string, actor: { id: string; staff: b
       `UPDATE orders SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $2, cancellation_reason = $3, updated_at = NOW()
        WHERE id = $1`, [orderId, actor.id, reason]);
     const refund = await recordRefund(client, { orderId, amountPaise: refundable, source: 'cancellation', userId: actor.id });
+    // Sprint 39: a payment only authorised (prescription order before the pharmacist's check)
+    // is released, never captured — the buyer is not charged at all (C-37)
+    const released = await releaseHeldPaymentTx(client, orderId, reason, actor.id);
     await writeAuditTx(client, { userId: o.user_id, action: 'order_cancelled', performedBy: actor.id,
-      newValue: { order_id: orderId, by_staff: actor.staff, refund_paise: refundable,
+      newValue: { order_id: orderId, by_staff: actor.staff, refund_paise: refundable, released_paise: released, by_system: actor.id === null,
         credit_notes: creditNotes.filter(Boolean).map((c: any) => c.credit_note_number) }, notes: reason });
-    return { o, refundable, refund, creditNotes };
+    return { o, refundable, refund, creditNotes, released };
   });
 
   await sendGatewayRefunds(result.refund.gatewayRefundIds);
   await queueNotification({ userId: result.o.user_id, type: 'order_cancelled', orderId, orderNumber: result.o.order_number,
-    amountPaise: result.refundable, reason });
+    amountPaise: result.refundable, reason, notCharged: result.released > 0 });
   return {
     id: orderId, status: 'cancelled', refund_paise: result.refundable, refunds: result.refund.legs,
+    released_paise: result.released,
     credit_notes: result.creditNotes.filter(Boolean).map((c: any) => c.credit_note_number),
   };
 }

@@ -4,6 +4,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
+import { HOLD_WORDING } from '../services/payments/rxHold/rules';
 import { queueNotification } from '../services/notification.service';
 import { logger } from '../config/logger';
 import { cancelOrder } from '../services/cancellation.service';
@@ -106,6 +107,9 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
     const tracking = await trackingFor(shipments.map((s: any) => s.id));
     for (const s of shipments) s.tracking = tracking.filter((t: any) => t.shipment_id === s.id);
 
+    // Sprint 39: how the order is paid — a prescription order is only authorised until the pharmacist's check (C-37)
+    const pay = await queryOne<any>(
+      `SELECT status, capture_mode, authorised_at, captured_at, released_at FROM payments WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`, [id]);
     const [creditNotes, refunds, returns] = await Promise.all([
       query(`SELECT id, credit_note_number, shipment_id, reason, total_paise, created_at FROM credit_notes WHERE order_id = $1 ORDER BY created_at`, [id]),
       query(`SELECT id, source, method, amount_paise, status, processed_at, created_at FROM refunds WHERE order_id = $1 ORDER BY created_at`, [id]),
@@ -121,6 +125,9 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
       requires_prescription: needsRx, can_cancel: canCancel,
       pharmacist_check: orderCheckState(shipments),
       credit_notes: creditNotes, refunds, returns,
+      payment: pay ? { status: pay.status, capture: pay.capture_mode === 'manual' ? 'after_pharmacist_check' : 'now',
+        authorised_at: pay.authorised_at, captured_at: pay.captured_at, released_at: pay.released_at,
+        ...(pay.status === 'authorized' ? { note: HOLD_WORDING.checkout } : pay.status === 'released' ? { note: HOLD_WORDING.released } : {}) } : null,
     } });
   } catch (err) { next(err); }
 }

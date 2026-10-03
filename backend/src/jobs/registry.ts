@@ -12,6 +12,8 @@ import { runPaymentSweep } from '../services/payments/reconcile.service';
 import { runRetentionPurge } from '../services/retention.service';
 import { runRecallAlertWatch } from '../services/recallAlerts/alert.service';
 import { runLiveFeedWatch } from '../services/partnerLiveFeed/alerts.service';
+import { runRxHoldWatch } from '../services/payments/rxHold/hold.service';
+import { runPharmacistRegistrationAlerts } from '../services/pharmacistRegistration/alerts.service';
 
 export interface JobDefinition {
   name: string;
@@ -21,6 +23,18 @@ export interface JobDefinition {
 }
 
 export const JOBS: JobDefinition[] = [
+  {
+    name: 'payment_hold_watch',
+    description: 'Prescription orders paid by authorisation (Sprint 39): capture the ones the pharmacist passed, alert staff before the hold ends, cancel and release (never charge) the ones still unchecked at the deadline (C-08, C-37)',
+    cron: '*/15 * * * *',                    // every 15 minutes
+    run: () => runRxHoldWatch(),
+  },
+  {
+    name: 'pharmacist_registration_alerts',
+    description: 'Tell admins (and a partner\'s owner) 30 days before and on the day a pharmacist\'s council registration lapses (Sprint 39, C-03)',
+    cron: '50 1 * * *',                      // daily 01:50
+    run: runPharmacistRegistrationAlerts,
+  },
   {
     name: 'live_stock_feed_watch',
     description: 'Alert admins once when a partner\'s live stock feed sends no snapshot within its window; its stock is then held back (Sprint 37)',

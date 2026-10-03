@@ -21,6 +21,7 @@ import { CHECK_NOTIFY_QUIET_MINUTES, notifyNewChecks } from './alerts.service';
 import { checkIdentity, LedgerBatch, Listing, planSnapshot, PlanRow, SnapshotPlan } from './plan';
 import { decideSequence, effectiveTakenAt } from './sequence';
 import { FeedRow } from './settings.service';
+import { holdBatchesWithoutProvenance, recordFeedProvenance } from '../partnerProvenance/feed.service';
 
 /** Lines of live snapshots are kept this long (the import record and its result stay longer). */
 export const LIVE_ROWS_KEEP_HOURS = 48;
@@ -36,6 +37,7 @@ export interface SnapshotResult {
   applied: {
     lines: number; batches_set: number; batches_new: number; batches_zeroed: number; packs_offered: number;
     held_for_orders: number; dispatched_after_snapshot: number;
+    held_without_supplier_details: number; provenance_recorded: number;
   };
   waiting_for_check: { new: number; open: number; by_kind: Record<string, number> };
   summary: Record<string, unknown> | null;
@@ -174,7 +176,10 @@ export async function receiveSnapshot(caller: FeedCaller, input: SnapshotInput):
     const openBefore = Number((await c.query<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM partner_feed_checks WHERE partner_id = $1 AND status = 'open'`, [partnerId])).rows[0].n);
     const plan = planSnapshot(await loadPlanInput(c, partnerId, importId, takenAt, feed.billing_grace_minutes));
+    // Sprint 39: supplier details per batch (C-02) — held back when required and missing, recorded once
+    const heldForProvenance = await holdBatchesWithoutProvenance(c, plan);
     const zeroed = await writeLedger(c, partnerId, plan);
+    const provenanceRecorded = await recordFeedProvenance(c, partnerId, plan, importId);
     const checks = await syncChecks(c, partnerId, importId, plan);
     const byKind = Object.fromEntries((await c.query<{ kind: string; n: number }>(
       `SELECT kind, COUNT(*)::int AS n FROM partner_feed_checks WHERE partner_id = $1 AND status = 'open' GROUP BY kind`, [partnerId])).rows
@@ -192,6 +197,8 @@ export async function receiveSnapshot(caller: FeedCaller, input: SnapshotInput):
         packs_offered: plan.writes.reduce((a, w) => a + Math.max(0, w.qty_available), 0),
         held_for_orders: plan.held_for_orders,
         dispatched_after_snapshot: plan.dispatched_after_snapshot,
+        held_without_supplier_details: heldForProvenance,
+        provenance_recorded: provenanceRecorded,
       },
       waiting_for_check: { new: checks.created, open, by_kind: byKind },
       summary,

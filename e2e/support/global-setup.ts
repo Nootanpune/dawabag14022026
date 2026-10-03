@@ -28,7 +28,11 @@ export default async function globalSetup(config: FullConfig) {
       if (v.status >= 300) throw new Error(`Could not register ${p.mobile}: ${JSON.stringify(v.json)}`);
     }
     await c.query(`UPDATE users SET role = 'super_admin' WHERE mobile = $1`, [people.admin.mobile]);
-    await c.query(`UPDATE users SET role = 'pharmacist_rx' WHERE mobile = $1`, [people.pharmacist.mobile]);
+    await c.query(`UPDATE users SET role = 'pharmacist_rx', pharmacist_reg_no = 'E2E-MSPC-33' WHERE mobile = $1`, [people.pharmacist.mobile]);
+    // Sprint 39 (C-03): the pharmacist's council registration, recorded and verified as an admin does
+    await c.query(`INSERT INTO pharmacist_registrations (user_id, state_council, registration_no, valid_till, status, verified_at, status_note)
+                   SELECT id, 'E2E State Pharmacy Council', 'E2E-MSPC-33', CURRENT_DATE + 365, 'active', NOW(), 'E2E fixture'
+                   FROM users WHERE mobile = $1 ON CONFLICT (user_id) DO NOTHING`, [people.pharmacist.mobile]);
     await c.query(`INSERT INTO addresses (user_id, full_name, mobile, address_line1, city, state, pincode, is_default)
                    SELECT id, 'E2E Buyer', '9000001999', '19 Lake Road', 'Nashik', 'Maharashtra', $2, TRUE FROM users WHERE mobile = $1`,
                    [people.buyer.mobile, PIN]);
@@ -51,5 +55,10 @@ export default async function globalSetup(config: FullConfig) {
     await c.query(`INSERT INTO inventory_batches (product_id, batch_number, quantity_available, purchase_price_paise, expiry_date)
                    VALUES ($1, 'E2E-B2', 100, 5000, CURRENT_DATE + 500)`, [rx.json.data.id]);
     process.env.E2E_RX_PRODUCT_ID = rx.json.data.id;
+    // Sprint 39 (C-10): new products start "not allowed online"; a pharmacist allows these two (dated reference)
+    const ph = (await call('POST', '/auth/login', { mobile: people.pharmacist.mobile, password: people.pharmacist.password })).json.data?.access_token;
+    const allow = await call('POST', '/online-sale/products/bulk', { product_ids: [product.json.data.id, rx.json.data.id], status: 'permitted',
+      notification_ref: 'E2E test approval', notification_date: new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10) }, ph);
+    if (allow.status !== 200) throw new Error(`Could not allow the test products online: ${JSON.stringify(allow.json)}`);
   } finally { await c.end(); r.disconnect(); }
 }

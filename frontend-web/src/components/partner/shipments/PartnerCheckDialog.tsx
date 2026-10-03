@@ -49,8 +49,16 @@ export default function PartnerCheckDialog({ shipment: s, onClose }: { shipment:
       <label htmlFor="pc-who" className="block text-sm font-medium text-gray-700 mt-4 mb-1">Registered pharmacist who checked it</label>
       <select id="pc-who" className="input" value={who} onChange={(e) => setWho(e.target.value)}>
         <option value="">Choose…</option>
-        {list.map((p) => <option key={p.id} value={p.id}>{p.full_name} — Reg. no. {p.registration_no}</option>)}
+        {list.map((p) => (
+          <option key={p.id} value={p.id} disabled={p.registration?.ok === false}>
+            {p.full_name} — Reg. no. {p.registration_no}{p.registration?.ok === false ? ' (registration not valid)' : ''}
+          </option>
+        ))}
       </select>
+      {/* Sprint 39 (C-03): why a pharmacist cannot release, and what to do */}
+      {list.filter((p) => p.registration?.message).map((p) => (
+        <p key={p.id} className={`text-xs mt-1 ${p.registration?.ok ? 'text-amber-800' : 'text-red-700'}`} data-testid="partner-registration-note">{p.registration?.message}</p>
+      ))}
       {pharmacists.isSuccess && !list.length && (
         <p className="text-xs text-red-700 mt-1">No registered pharmacist is recorded for your pharmacy. Ask Dawabag to add one.</p>
       )}

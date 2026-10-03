@@ -18,6 +18,9 @@ import { moveOrderToFulfilment } from './paymentCapture.service';
 import { freeDeliveryAbovePaise, qualifiesForFreeDelivery } from './delivery/freeDelivery';
 import { dawabagDrugLicences, listLicences, partyEligibility, snapshot } from './licences/register.service';
 import { assertRxSalesOpen } from './emergencyStop/state.service';
+import { attachPrescriptionTx } from './rxReuse.service';
+import { notOnlineMessage } from './onlineSale/rules';
+import { prescriptionRequiredError } from './prescriptions/requirement.service';
 
 /** The seller of record's licences on each shipment, as on the day of sale — printed on its invoice (C-13). */
 async function snapshotSellerLicences(client: PoolClient, orderId: string) {
@@ -47,6 +50,9 @@ export const createOrderSchema = z.object({
                          .optional().default('prepaid'),
   // Doctors/hospitals confirm on every order: own patients only, not for resale (C-15)
   practitioner_declaration: z.boolean().optional(),
+  // Sprint 39: the prescription for the order's prescription lines, chosen BEFORE payment —
+  // an upload not yet attached to an order, or a saved verified one still valid (C-08)
+  prescription_id: z.string().uuid().optional(),
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
@@ -124,7 +130,7 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
                 COALESCE(p.min_order_qty_wholesaler, 10) AS min_order_qty_wholesaler,
                 COALESCE(p.max_qty_per_order_retailer, 9999) AS max_qty_per_order_retailer,
                 COALESCE(p.max_qty_per_order_wholesaler, 9999) AS max_qty_per_order_wholesaler,
-                p.is_active, p.cold_chain,
+                p.is_active, p.cold_chain, p.online_sale_status,
                 COALESCE(p.reorder_level_qty, 10) AS reorder_level_qty
          FROM products p
          WHERE p.id = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL`,
@@ -136,6 +142,11 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
       // Hard block NDPS/Schedule X
       if (['NDPS', 'Schedule X'].includes(prod.drug_schedule)) {
         throw new AppError(`${prod.name} cannot be ordered online`, 403);
+      }
+      // Sprint 39: only products a pharmacist allowed for online sale (C-10) — also stops
+      // every partner's sale of a product switched off by a notification
+      if (prod.online_sale_status !== 'permitted') {
+        throw new AppError(notOnlineMessage(prod.name, prod.online_sale_status), 403, true, 'NOT_FOR_ONLINE_SALE');
       }
 
       if (['Schedule H', 'Schedule H1'].includes(prod.drug_schedule)) {
@@ -321,6 +332,16 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
     if (registeredType === 'doc_hospital') {
       await client.query('UPDATE orders SET practitioner_declared_at = NOW() WHERE id = $1', [orderId]);
     }
+    // Prescription before payment (Sprint 39, C-08): attached here, in the same transaction,
+    // or the order is not placed. A refill order is created by the server; its buyer adds
+    // the prescription before paying (payment creation checks it again).
+    let prescription: Awaited<ReturnType<typeof attachPrescriptionTx>> | null = null;
+    if (hasScheduleH && !opts.preview) {
+      if (data.prescription_id) prescription = await attachPrescriptionTx(client, userId, data.prescription_id, orderId);
+      else if (!opts.refill) {
+        throw prescriptionRequiredError(lineItems.filter((li) => requiresPrescription(customerType, li.drug_schedule)).map((li) => li.product_name));
+      }
+    }
     if (couponId) {
       await client.query('INSERT INTO coupon_redemptions (coupon_id, user_id, order_id) VALUES ($1, $2, $3)', [couponId, userId, orderId]);
     }
@@ -329,7 +350,9 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
       orderStatus = await moveOrderToFulfilment(client, orderId);
     }
     if (opts.preview) {
-      throw new OrderPreview(await buildCheckoutSummary(client, orderId, data.pincode, isB2B));
+      const summary = await buildCheckoutSummary(client, orderId, data.pincode, isB2B);
+      // Sprint 39: the checkout asks for the prescription first; payment is captured after the pharmacist check
+      throw new OrderPreview({ ...summary, prescription_required: hasScheduleH, capture: hasScheduleH ? 'after_pharmacist_check' : 'now' } as any);
     }
 
     // Audit log
@@ -359,6 +382,9 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
       credit_due_date: creditDueDate, total_paise: totalPaise,
       has_schedule_h: hasScheduleH,
       requires_prescription: hasScheduleH && customerType === 'customer',
+      // Sprint 39: attached prescription and how the payment is taken
+      prescription: prescription ? { id: prescription.prescription_id, status: prescription.status } : null,
+      capture: hasScheduleH ? 'after_pharmacist_check' : 'now',
     };
   });
 

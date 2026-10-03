@@ -34,7 +34,7 @@ export async function deliveryEstimateFor(productId: string, pricingType: BuyerT
             (${ownStockSql('p.id', kind)})::int AS own_qty,
             (${partnerStockSql('p.id', kind)})::int AS partner_qty
      FROM products p
-     WHERE p.id = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL
+     WHERE p.id = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL AND p.online_sale_status = 'permitted'
        AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')`, [productId]);
   if (!p) throw new AppError('Product not found', 404);
   const pin = await queryOne<any>(

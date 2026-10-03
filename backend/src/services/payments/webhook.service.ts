@@ -8,13 +8,15 @@ import { logger } from '../../config/logger';
 import { applyTokenEvent } from '../mandate.service';
 import { settleGatewayLeg } from '../refund.service';
 import { applyCapture } from './capture.service';
+import { recordAuthorisation } from './rxHold/hold.service';
 import { consultationRefundEvent } from '../telemedicine/consultationFee.service';
 
 // Also a declined demo payment (demoPayment.service)
 export async function paymentFailed(p: any): Promise<string> {
   if (!p?.order_id) return 'no order id';
   // A late or replayed failure never overrides a payment that went through
-  const r = await query(`UPDATE payments SET status = 'failed' WHERE gateway_order_id = $1 AND status NOT IN ('captured', 'partially_refunded', 'refunded') RETURNING order_id`, [p.order_id]);
+  const r = await query(`UPDATE payments SET status = 'failed' WHERE gateway_order_id = $1
+                         AND status NOT IN ('captured', 'partially_refunded', 'refunded', 'authorized', 'released') RETURNING order_id`, [p.order_id]);
   if (!r.length) return 'no open payment';
   await query(`UPDATE orders SET status = 'payment_failed' WHERE id = $1 AND status = 'pending_payment'`, [(r[0] as any).order_id]);
   return 'order payment failed';
@@ -58,6 +60,8 @@ export async function handleWebhookEvent(_eventId: string | undefined, rawBody: 
   try {
     let outcome: string;
     switch (event) {
+      // Sprint 39: a prescription order's payment is held (manual capture); others are captured by Razorpay next
+      case 'payment.authorized': outcome = (await recordAuthorisation(entity))?.outcome ?? 'authorisation noted; captured automatically'; break;
       case 'payment.captured': outcome = (await applyCapture(entity)).outcome; break;
       case 'payment.failed': outcome = await paymentFailed(entity); break;
       case 'refund.processed': case 'refund.failed': case 'refund.created': outcome = await refundEvent(event, entity); break;

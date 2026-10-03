@@ -47,9 +47,10 @@ test.beforeAll(async ({}, info) => {
     await c.query('INSERT INTO vendor_users (vendor_id, user_id) SELECT $1, id FROM users WHERE mobile = $2', [vendor, mobile]);
     await c.query(
       `INSERT INTO products (name, generic_name, sku, category, drug_schedule, gst_rate, hsn_code, mrp_paise, offer_price_paise, max_qty_per_order,
-                             net_quantity, manufacturer_name, manufacturer_address, country_of_origin, is_active)
+                             net_quantity, manufacturer_name, manufacturer_address, country_of_origin, is_active,
+                             online_sale_status, online_sale_ref, online_sale_ref_date)
        VALUES ('E2E Alphamolix 500 mg Tablet', 'Alphamolix', 'E2E-S27-ALPHA', 'Pain relief', 'OTC', 5, '30049099', 3000, 2600, 10,
-               '10 tablets', 'E2E Pharma Ltd', 'Plot 19, MIDC Satpur, Nashik 422007', 'India', TRUE)
+               '10 tablets', 'E2E Pharma Ltd', 'Plot 19, MIDC Satpur, Nashik 422007', 'India', TRUE, 'permitted', 'E2E test approval', CURRENT_DATE)
        ON CONFLICT (sku) DO NOTHING`);
   } finally { await c.end(); r.disconnect(); }
   const { buildMediVisionWorkbook } = await esm(resolve(__dirname, '../../backend/test/fixtures/partnerStockFile.mjs'));

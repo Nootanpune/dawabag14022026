@@ -4,7 +4,9 @@
 
 export type FieldKey =
   | 'item_name' | 'pack' | 'manufacturer' | 'hsn' | 'batch_number' | 'expiry' | 'mrp'
-  | 'ptr' | 'sale_rate' | 'purchase_rate' | 'quantity' | 'free_quantity' | 'gst_rate' | 'item_code';
+  | 'ptr' | 'sale_rate' | 'purchase_rate' | 'quantity' | 'free_quantity' | 'gst_rate' | 'item_code'
+  // Sprint 39: where the partner bought the batch (optional; required for H1 / cold chain when the setting is on)
+  | 'supplier_name' | 'supplier_licence' | 'supplier_invoice_no' | 'supplier_invoice_date';
 
 export interface FieldDef {
   key: FieldKey;
@@ -46,6 +48,16 @@ export const FIELDS: FieldDef[] = [
     synonyms: ['tax%', 'gst%', 'gst', 'gst %', 'gst rate', 'tax', 'tax %', 'igst', 'igst%', 'gst per', 'tax rate'] },
   { key: 'item_code', label: 'Your item code', required: false, hint: 'Optional; helps us remember your items',
     synonyms: ['item code', 'code', 'item cd', 'product code', 'icode', 'item id', 'prod code', 'sku'] },
+  // Sprint 39 (C-02, C-28): batch provenance — kept once, shown to Dawabag's admin
+  { key: 'supplier_name', label: 'Supplier name', required: false, hint: 'Optional; who you bought this batch from',
+    synonyms: ['supplier', 'supplier name', 'party', 'party name', 'distributor', 'distributor name', 'vendor', 'vendor name', 'purchased from'] },
+  { key: 'supplier_licence', label: 'Supplier licence no.', required: false, hint: "Optional; the supplier's drug licence number",
+    synonyms: ['supplier dl', 'supplier dl no', 'supplier licence', 'supplier license', 'supplier licence no', 'supplier license no',
+      'party dl', 'party dl no', 'dl no', 'drug licence no', 'drug license no'] },
+  { key: 'supplier_invoice_no', label: 'Purchase invoice no.', required: false, hint: 'Optional; your purchase bill number',
+    synonyms: ['invoice no', 'purchase invoice', 'purchase invoice no', 'bill no', 'purchase bill no', 'pur bill no', 'inv no', 'supplier invoice no'] },
+  { key: 'supplier_invoice_date', label: 'Purchase invoice date', required: false, hint: 'Optional; DD/MM/YYYY',
+    synonyms: ['invoice date', 'purchase invoice date', 'bill date', 'purchase bill date', 'pur bill date', 'inv date', 'supplier invoice date', 'purchase date'] },
 ];
 
 export const REQUIRED_FIELDS = FIELDS.filter((f) => f.required).map((f) => f.key);

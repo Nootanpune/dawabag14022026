@@ -46,6 +46,9 @@ import {
   Radio,
   OctagonPause,
   Link2,
+  Globe,
+  IdCard,
+  Waypoints,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
@@ -90,6 +93,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/staff/medicine-info-approvals', label: 'Medicine information to approve', icon: BookOpenCheck, roles: PHARMACIST_ROLES },
       // Sprint 29 — draft products from partner requests, completed and approved by the pharmacist
       { href: '/staff/new-products', label: 'New products to complete', icon: ListPlus, roles: PHARMACIST_ROLES },
+      // Sprint 39 — online-sale status per product: a pharmacist allows (dated reference); pharmacists / admins stop (C-10)
+      { href: '/staff/online-sale', label: 'Online-sale status', icon: Globe, roles: PHARMACIST_ROLES },
       // Sprint 32 — rename / correct / switch off categories and HSN codes (admins; pharmacists read-only)
       { href: '/admin/catalogue-lists', label: 'Catalogue lists', icon: ListTree, roles: PHARMACIST_ROLES },
       // Sprint 28 — Dawabag's admin adds partner pharmacies directly (licences, pharmacists, logins)
@@ -128,6 +133,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/staff/destruction-register', label: 'Destruction register', icon: Flame, roles: STORE_ROLES },
       { href: '/staff/telemedicine-lists', label: 'Telemedicine lists', icon: ListTree, roles: TELE_LIST_ROLES },
       { href: '/admin/licences', label: 'Licences', icon: BadgeCheck, roles: MANAGER_ROLES },
+      // Sprint 39 — pharmacist registration validity (C-03) and who supplied each partner batch (C-02, C-28)
+      { href: '/admin/pharmacist-registrations', label: 'Pharmacist registrations', icon: IdCard, roles: MANAGER_ROLES },
+      { href: '/admin/partner-provenance', label: 'Partner batch suppliers', icon: Waypoints, roles: MANAGER_ROLES },
       // Sprint 38 — emergency stop for prescription-medicine sales (super-admin acts) and the chain checks (C-08, C-09, C-46)
       { href: '/admin/emergency-stop', label: 'Emergency stop', icon: OctagonPause, roles: MANAGER_ROLES },
       { href: '/admin/integrity', label: 'Record integrity', icon: Link2, roles: MANAGER_ROLES },

@@ -101,7 +101,7 @@ export async function getCategories(req: Request, res: Response, next: NextFunct
 
     const categories = await query(
       `SELECT category, COUNT(*) as product_count
-       FROM products WHERE is_active = TRUE AND deleted_at IS NULL
+       FROM products WHERE is_active = TRUE AND deleted_at IS NULL AND online_sale_status = 'permitted'
        GROUP BY category ORDER BY category`,
       []
     );
@@ -189,8 +189,9 @@ export async function createProduct(req: Request, res: Response, next: NextFunct
     // New copy waits for the pharmacist (C-19); likely forbidden claims are flagged for them
     const row: Record<string, unknown> = { ...data, content_status: 'pending_review', content_flags: JSON.stringify(copyFlags(data)) };
     const cols = Object.keys(row);
-    const product = await queryOne<{ id: string }>(
-      `INSERT INTO products (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING id`,
+    const product = await queryOne<{ id: string; online_sale_status: string }>(
+      // Sprint 39: a new product starts 'restricted' (database default) until a pharmacist allows online sale (C-10)
+      `INSERT INTO products (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING id, online_sale_status`,
       Object.values(row));
     await writeAudit({ userId: null, action: 'product_created', performedBy: req.user!.id,
       newValue: { product_id: product!.id, sku: data.sku, ...Object.fromEntries(PRICE_KEYS.map((k) => [k, (data as any)[k] ?? null])) } });

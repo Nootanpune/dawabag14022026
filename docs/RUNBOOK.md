@@ -231,6 +231,53 @@ happen once even with several API instances. Admin → Jobs shows runs and can t
 one. When a job fails after working, admins get one alert (email and push); they are not
 told again until it has succeeded once.
 
+Sprint 39 jobs: **payment_hold_watch** (every 15 min) and **pharmacist_registration_alerts**
+(daily 01:50) — see section 7f.
+
+## 7f. Prescription orders: authorise-then-capture (Sprint 39)
+
+Owner decision 2026-10-03 (C-08, C-37): an order with prescription medicines is paid by
+**authorisation only**; the money is captured when the pharmacist's check passes (the
+prescription is verified and every shipment holding a prescription line is released — a
+partner's part by the partner's own pharmacist). A refused, cancelled or timed-out order is
+**never charged**: the authorisation is simply not captured.
+
+- **Razorpay dashboard.** Nothing to switch for normal orders: each prescription order is
+  created with `payment.capture = "manual"` and `capture_options.manual_expiry_period`
+  (default 7200 minutes = 5 days, Razorpay's maximum); OTC orders keep `payment_capture`
+  (automatic). The per-order options override the dashboard's capture setting — check this
+  once in **test mode** (Account & Settings → Payment capture): place an Rx order, pay with a
+  test card, and confirm the payment shows **Authorized** until the pharmacist verifies it,
+  then **Captured**. Subscribe the webhook to `payment.authorized`, `payment.captured`,
+  `payment.failed`, `refund.processed`, `refund.failed` (deduplicated by the signed body).
+- **No void call.** Razorpay cannot refund or void an authorised payment; an uncaptured one
+  is returned to the buyer automatically when its capture window ends (the bank may show the
+  hold a few more days). Dawabag marks it `released` (payments.status) at once and tells the
+  buyer they were not charged.
+- **Expiry safety.** Setting `payments.rx_authorisation` (Admin → Settings → *Prescription
+  orders: payment hold*): staff (admins and pharmacists) are alerted after
+  `alert_after_hours` (48); after `release_after_hours` (72) an order still unchecked is
+  cancelled and its hold released — always at least 2 hours before the gateway window
+  (`gateway_expiry_minutes`, 7200). The job retries captures that failed for a network
+  reason; if the gateway says the hold has already ended, the order is cancelled and the
+  buyer told they were not charged.
+- **Packing waits for the money.** Pack and dispatch (Dawabag and partner) refuse with
+  `PAYMENT_NOT_CAPTURED` while a payment is only authorised.
+- **Mixed carts** (OTC + prescription lines) are one authorisation, captured in full after the
+  check (Razorpay captures the authorised amount; no partial capture).
+- **Demo payments** (trial) simulate the same steps: authorise at checkout, capture on the
+  pharmacist's check, release on refusal / cancellation / timeout — no gateway, flagged demo.
+- **If Razorpay captured automatically anyway** (dashboard set to auto-capture and the order
+  option ignored), the payment is recorded as captured at checkout as before Sprint 39, and a
+  refusal is refunded (C-37). Fix the dashboard setting.
+
+Pharmacist registrations (Sprint 39, C-03): Admin → *Pharmacist registrations* records each
+Dawabag and partner pharmacist's council, number, valid-till and status and marks it
+verified. Unverified / lapsed / expired / suspended registrations block prescription
+verification, the order check, partner releases and medicine-information approval.
+Pharmacists working before Sprint 39 were carried over as "not yet recorded" (allowed,
+with a warning) — complete their records before go-live.
+
 ## 7a. Development and CI
 
 - One command brings a fresh machine to a running, migrated API against the fake
@@ -464,9 +511,13 @@ search works without typo matching; to add it later, as a superuser:
 3. Catalogue imported (Admin → Catalogue import, template `templates/01_…xlsx`) —
    add a "Manufacturer Address" column (C-17); expired sample batches are refused.
    Pharmacist approves product copy (Staff → Product copy, C-19).
-4. Pharmacist logins with council registration numbers (Admin → users).
-5. Razorpay live keys, webhook, test payment and refund; MSG91 DLT template; SES out
-   of sandbox.
+4. Pharmacist logins with council registration numbers (Admin → users), then each one's
+   council, valid-till and verification in Admin → Pharmacist registrations (Sprint 39);
+   partners' pharmacists too. Products allowed for online sale by a pharmacist (Staff →
+   Online-sale status; new products start "not allowed online yet").
+5. Razorpay live keys, webhook (incl. `payment.authorized`), test payment and refund, and a
+   test **prescription** order showing Authorized → Captured after the pharmacist's check
+   (section 7f); MSG91 DLT template; SES out of sandbox.
 6. Confirm the Sprint 5 defaults in `DECISIONS.md` (return windows, delivery code).
 7. DLT templates registered and mapped for at least otp, dispatched, out_for_delivery,
    delivered, order_cancelled and return_update; Firebase service account; Shiprocket

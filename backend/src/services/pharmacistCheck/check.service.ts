@@ -13,6 +13,8 @@ import { writeAuditTx } from '../../utils/audit';
 import { assertRxCleared } from '../rxGate.service';
 import { cancelOrder } from '../cancellation.service';
 import { queueNotification } from '../notification.service';
+import { captureHeldPaymentQuietly } from '../payments/rxHold/hold.service';
+import { assertStaffRegistrationValid } from '../pharmacistRegistration/gate.service';
 import { CHECKABLE_ORDER_STATES, CheckDecision, SignalLine, abuseSignals, canDecide, reasonProblem } from './rules';
 
 export interface Checker { userId: string; name: string; regNo: string; vendorPharmacistId?: string | null }
@@ -24,6 +26,8 @@ export async function dawabagPharmacist(client: PoolClient, userId: string): Pro
      LEFT JOIN user_profiles up ON up.user_id = u.id WHERE u.id = $1`, [userId])).rows[0];
   if (p?.role !== 'pharmacist_rx') throw new AppError('Only a registered pharmacist can check and release orders', 403);
   if (!p.pharmacist_reg_no) throw new AppError('Add your pharmacy council registration number before checking orders', 403);
+  // Sprint 39: only an active, in-date, verified registration may release (C-03, C-08)
+  await assertStaffRegistrationValid(client, userId, p.pharmacist_reg_no);
   return { userId, name: p.full_name || 'Pharmacist', regNo: p.pharmacist_reg_no };
 }
 
@@ -165,8 +169,10 @@ export async function decide(
   });
   if (decision === 'hold') {
     await queueNotification({ userId: out.s.user_id, type: 'order_on_hold', orderId: out.s.order_id, orderNumber: out.s.order_number });
+    return out.result;
   }
-  return out.result;
+  // Sprint 39: the last prescription part released → the held payment is captured (C-37)
+  return { ...out.result, payment: await captureHeldPaymentQuietly(out.s.order_id, actorId) };
 }
 
 /** Dawabag's own shipment, checked by a Dawabag pharmacist. */

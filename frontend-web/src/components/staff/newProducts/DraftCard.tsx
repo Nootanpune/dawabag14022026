@@ -10,6 +10,9 @@ import FromFilePanel from './FromFilePanel';
 import DraftFieldsGrid from './DraftFieldsGrid';
 import { useDraftActions } from './useDraftActions';
 import BuyerDescription from './BuyerDescription';
+import OnlineSaleFields from '@/components/staff/onlineSale/OnlineSaleFields';
+import { changeProblems, type OnlineSaleChange } from '@/lib/onlineSale/api';
+import { toISTDateString } from '@/lib/dates';
 
 const DONE_LABEL: Record<Draft['status'], string> = {
   open: 'To complete', approved: 'Approved — in the catalogue', not_listed: 'Approved — never sold online (C-10)', rejected: 'Not listed',
@@ -30,7 +33,12 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
   const open = draft.status === 'open';
   const ready = open && draft.problems.length === 0;
   const neverOnline = !!draft.drug_schedule && NEVER_ONLINE.includes(draft.drug_schedule);
-  const onApprove = () => (hasClaimWarning(draft) ? setNotesFor(true) : approve.mutate(undefined));
+  // Sprint 39: the approved product's online-sale status is set here too, or it would not be sold (C-10)
+  const [online, setOnline] = useState<OnlineSaleChange>({ status: 'permitted', notification_ref: '', notification_date: '', reason: '' });
+  const onlineProblem = neverOnline ? null : changeProblems(online, canApprove, toISTDateString(Date.now()));
+  const onlineSale = neverOnline ? undefined : { status: online.status, notification_ref: online.notification_ref?.trim() || null,
+    notification_date: online.notification_date || null, reason: online.reason?.trim() || null };
+  const onApprove = () => (hasClaimWarning(draft) ? setNotesFor(true) : approve.mutate({ onlineSale }));
 
   return (
     <li className="card p-3 sm:p-4" aria-label={draft.name} data-testid="draft-card">
@@ -82,11 +90,17 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
               <p className="text-green-700 font-medium">Ready to approve</p>
             )}
             {draft.warnings.map((w) => <p key={w} className="text-red-700">{w}</p>)}
+            {!neverOnline && canApprove && (
+              <div className="mt-2 p-2 rounded-lg border border-gray-200 bg-gray-50" data-testid="draft-online-sale">
+                <OnlineSaleFields value={online} onChange={setOnline} canAllow={canApprove} idPrefix={`d-${draft.id}-os`} statuses={['permitted', 'restricted']} />
+                {onlineProblem && <p className="text-amber-800 mt-1">{onlineProblem}</p>}
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => setRejecting(true)} className="btn-outline text-xs py-1.5 px-3">Not a medicine we list</button>
             {canApprove ? (
-              <button type="button" disabled={!ready || approve.isPending} onClick={onApprove}
+              <button type="button" disabled={!ready || !!onlineProblem || approve.isPending} onClick={onApprove}
                 className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50 inline-flex items-center gap-1">
                 {approve.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
                 {neverOnline ? 'Approve as never sold online' : 'Approve'}
@@ -110,7 +124,7 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
           <div className="flex justify-end gap-2 mt-3">
             <button type="button" onClick={() => setNotesFor(false)} className="btn-outline text-sm">Cancel</button>
             <button type="button" disabled={notes.trim().length < 20 || approve.isPending} className="btn-primary text-sm disabled:opacity-50"
-              onClick={() => approve.mutate(notes.trim(), { onSuccess: () => setNotesFor(false) })}>Approve</button>
+              onClick={() => approve.mutate({ notes: notes.trim(), onlineSale }, { onSuccess: () => setNotesFor(false) })}>Approve</button>
           </div>
         </Modal>
       )}

@@ -38,6 +38,15 @@ export const SETTING_KINDS: Record<string, SettingMeta> = {
   'marketplace.tds_pct': { kind: 'number', label: 'TDS on partner sales', unit: '%' },
   'marketplace.fee_gst_pct': { kind: 'number', label: 'GST on marketplace fees', unit: '%' },
   'refill.reminder_days_before': { kind: 'int', label: 'Refill reminder lead time', unit: 'days' },
+  // Sprint 39 — partner batch provenance (owner: optional first, then required for H1 / cold chain; C-02)
+  'partner_stock.provenance_required': {
+    kind: 'boolean',
+    label: 'Supplier details required for Schedule H1 and cold-chain partner batches',
+    confirm: {
+      on: 'From now on, a partner batch of a Schedule H1 or refrigerated product is offered only with its supplier name, supplier licence number and purchase invoice number and date (stock file, portal or live feed). Give partners notice first.',
+      off: 'Supplier details become optional again for every partner batch.',
+    },
+  },
   // Sprint 7 — purchasing and stock (C-16, C-28)
   'purchasing.min_shelf_life_days': { kind: 'int', label: 'Minimum shelf life on receipt', unit: 'days', hint: '30–730 days' },
   'stock.near_expiry_days': { kind: 'int', label: 'Near-expiry warning', unit: 'days', hint: '15–365 days' },

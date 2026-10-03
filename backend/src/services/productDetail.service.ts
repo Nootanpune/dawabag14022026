@@ -21,7 +21,9 @@ export async function productDetail(productId: string, pricingType: BuyerType) {
   const key = `product:${productId}`;
   let row: any = await cacheGet(key);
   if (!row) {
-    row = await queryOne(`SELECT p.* FROM products p WHERE p.id = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL`, [productId]);
+    // Sprint 39: a product not allowed for online sale is not offered (C-10)
+    row = await queryOne(`SELECT p.* FROM products p WHERE p.id = $1 AND p.is_active = TRUE AND p.deleted_at IS NULL
+                          AND p.online_sale_status = 'permitted'`, [productId]);
     if (!row) throw new AppError('Product not found', 404);
     await cacheSet(key, row, 300);
   }

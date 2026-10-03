@@ -6,6 +6,10 @@ import { assertManualStock } from '../services/partnerLiveFeed/settings.service'
 import { z } from 'zod';
 import { query, queryOne } from '../config/database';
 import { listPartnerProducts, submitListing, upsertInventory } from '../services/partnerListing.service';
+import { normaliseProvenance } from '../services/partnerProvenance/rules';
+import { listProvenance } from '../services/partnerProvenance/provenance.service';
+import { todayIST } from '../utils/ist';
+import { AppError } from '../utils/AppError';
 import { dispatchShipment, listPartnerShipments, markShipmentDelivered } from '../services/partnerFulfilment.service';
 import { decidePartnerShipment, partnerPharmacists } from '../services/pharmacistCheck/partner.service';
 import { getSettlement, listSettlements } from '../services/settlement.service';
@@ -19,8 +23,12 @@ export async function getInventory(req: Request, res: Response, next: NextFuncti
   try {
     const rows = await query(
       `SELECT pi.batch_number, pi.qty_available, pi.qty_reserved, pi.expiry_date, pi.manufactured_date,
-              pi.cold_chain_confirmed, pi.is_recalled
+              pi.cold_chain_confirmed, pi.is_recalled,
+              -- Sprint 39: the batch's supplier details, read-only once recorded (C-02)
+              pb.supplier_name, pb.supplier_licence_no, pb.supplier_invoice_no,
+              to_char(pb.supplier_invoice_date, 'YYYY-MM-DD') AS supplier_invoice_date, (pb.id IS NOT NULL) AS provenance_recorded
        FROM partner_inventory pi JOIN partner_products pp ON pp.id = pi.partner_product_id
+       LEFT JOIN partner_batch_provenance pb ON pb.partner_inventory_id = pi.id
        WHERE pp.id = $1 AND pp.partner_id = $2 ORDER BY pi.expiry_date`, [uuid.parse(req.params.id), req.partner!.vendorId]);
     res.json({ success: true, data: { batches: rows } });
   } catch (err) { next(err); }
@@ -53,6 +61,7 @@ export async function searchCatalogue(req: Request, res: Response, next: NextFun
       `SELECT p.id, p.name, p.generic_name, p.sku, p.drug_schedule, p.mrp_paise, p.offer_price_paise,
               p.ptr_price_paise, p.pts_price_paise, p.institutional_price_paise, p.cold_chain,
               ${approvedImageKeySql()} AS approved_image_key,
+              p.online_sale_status,   -- Sprint 39: listing is allowed, sale only once a pharmacist permits it (C-10)
               EXISTS (SELECT 1 FROM partner_products pp WHERE pp.partner_id = $2 AND pp.product_id = p.id) AS already_listed
        FROM products p
        WHERE p.is_active = TRUE AND p.deleted_at IS NULL
@@ -95,6 +104,11 @@ const batchesSchema = z.object({
     expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     manufactured_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     cold_chain_confirmed: z.boolean().optional(),
+    // Sprint 39: optional supplier details of the batch (required for H1 / cold chain when the setting is on)
+    supplier_name: z.string().trim().max(255).nullable().optional(),
+    supplier_licence_no: z.string().trim().max(100).nullable().optional(),
+    supplier_invoice_no: z.string().trim().max(100).nullable().optional(),
+    supplier_invoice_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the purchase invoice date as YYYY-MM-DD').nullable().optional(),
   })).min(1).max(100),
 });
 
@@ -102,7 +116,13 @@ export async function putInventory(req: Request, res: Response, next: NextFuncti
   try {
     const { batches } = batchesSchema.parse(req.body);
     await assertManualStock(req.partner!.vendorId);   // Sprint 37: live feed = the software is the only authority
-    const rows = await upsertInventory(req.partner!.vendorId, uuid.parse(req.params.id), batches, req.user!.id);
+    const today = todayIST();
+    const withProvenance = batches.map(({ supplier_name, supplier_licence_no, supplier_invoice_no, supplier_invoice_date, ...b }) => {
+      const n = normaliseProvenance({ supplier_name, supplier_licence_no, supplier_invoice_no, supplier_invoice_date }, today);
+      if (n.warnings.length) throw new AppError(`Batch ${b.batch_number}: ${n.warnings[0]}`, 400);
+      return { ...b, provenance: n.provenance };
+    });
+    const rows = await upsertInventory(req.partner!.vendorId, uuid.parse(req.params.id), withProvenance, req.user!.id);
     res.json({ success: true, data: { batches: rows } });
   } catch (err) { next(err); }
 }
@@ -161,4 +181,12 @@ export async function getMyReturns(req: Request, res: Response, next: NextFuncti
 }
 export async function getMyReturn(req: Request, res: Response, next: NextFunction) {
   try { res.json({ success: true, data: await getReturn(uuid.parse(req.params.id), { partnerId: req.partner!.vendorId }) }); } catch (err) { next(err); }
+}
+
+// GET /partner/batch-provenance — the partner's own batches and who supplied them (Sprint 39, C-02)
+export async function getMyBatchProvenance(req: Request, res: Response, next: NextFunction) {
+  try {
+    const f = z.object({ q: z.string().max(100).optional(), batch: z.string().max(100).optional(), missing: z.enum(['1', 'true']).optional() }).parse(req.query);
+    res.json({ success: true, data: { batches: await listProvenance({ partnerId: req.partner!.vendorId, q: f.q, batch: f.batch, missingOnly: !!f.missing }) } });
+  } catch (err) { next(err); }
 }

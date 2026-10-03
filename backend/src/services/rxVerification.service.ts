@@ -11,6 +11,8 @@ import { writeAuditTx } from '../utils/audit';
 import { queueNotification } from './notification.service';
 import { rxRequiredLines } from './rxGate.service';
 import { releaseOwnAfterPrescription } from './pharmacistCheck/check.service';
+import { captureHeldPaymentQuietly } from './payments/rxHold/hold.service';
+import { assertStaffRegistrationValid } from './pharmacistRegistration/gate.service';
 
 export interface VerifyInput {
   prescriber_name: string;
@@ -31,6 +33,8 @@ async function pharmacist(client: PoolClient, userId: string) {
      LEFT JOIN user_profiles up ON up.user_id = u.id WHERE u.id = $1`, [userId])).rows[0];
   if (p?.role !== 'pharmacist_rx') throw new AppError('Only a registered pharmacist can review prescriptions', 403);
   if (!p.pharmacist_reg_no) throw new AppError('Add your pharmacy council registration number before reviewing prescriptions', 403);
+  // Sprint 39: a lapsed, expired, suspended or unverified registration blocks the review (C-03, C-08)
+  await assertStaffRegistrationValid(client, userId, p.pharmacist_reg_no);
   return p;
 }
 
@@ -63,6 +67,12 @@ async function dispenseAgainst(client: PoolClient, prescriptionId: string, order
 }
 
 export async function verifyPrescription(pharmacistId: string, prescriptionId: string, input: VerifyInput) {
+  const r = await verifyPrescriptionTx(pharmacistId, prescriptionId, input);
+  // Sprint 39: a prescription order's held payment is captured once the check has passed (C-37)
+  return { ...r, payment: await captureHeldPaymentQuietly(r.order_id, pharmacistId) };
+}
+
+function verifyPrescriptionTx(pharmacistId: string, prescriptionId: string, input: VerifyInput) {
   return withTransaction(async (client) => {
     const ph = await pharmacist(client, pharmacistId);
     const rx = (await client.query(`SELECT * FROM prescriptions WHERE id = $1 FOR UPDATE`, [prescriptionId])).rows[0];
@@ -136,6 +146,11 @@ export async function rejectPrescription(pharmacistId: string, prescriptionId: s
 // Reuse a verified, unexpired prescription of the same buyer for another order
 // (e.g. a refill), within the quantity it still allows.
 export async function applyPrescriptionToOrder(pharmacistId: string, prescriptionId: string, orderId: string) {
+  const r = await applyPrescriptionTx(pharmacistId, prescriptionId, orderId);
+  return { ...r, payment: await captureHeldPaymentQuietly(orderId, pharmacistId) };   // Sprint 39 (C-37)
+}
+
+function applyPrescriptionTx(pharmacistId: string, prescriptionId: string, orderId: string) {
   return withTransaction(async (client) => {
     await pharmacist(client, pharmacistId);
     const rx = (await client.query(

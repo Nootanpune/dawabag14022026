@@ -4,6 +4,8 @@
 import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
+import { Provenance, missingForRequired, provenanceRequiredFor, requiredMessage } from './partnerProvenance/rules';
+import { provenanceRequired, recordProvenanceTx } from './partnerProvenance/provenance.service';
 import { eligibility } from './licences/forms';
 import { listLicences } from './licences/register.service';
 import { todayIST } from '../utils/ist';
@@ -114,6 +116,8 @@ export interface BatchInput {
   cold_chain_confirmed?: boolean;
   /** Partner's own cost, kept in its ledger, never shown to buyers (stock import only) */
   purchase_price_paise?: number | null;
+  /** Sprint 39: who supplied the batch (C-02); recorded once, never changed */
+  provenance?: Provenance | null;
 }
 
 // Absolute stock per batch; never below what is already reserved for orders
@@ -129,11 +133,24 @@ export async function upsertInventory(vendorId: string, partnerProductId: string
  * batches refused (C-28), never below what is reserved for orders.
  */
 export async function upsertInventoryTx(client: PoolClient, vendorId: string, partnerProductId: string, batches: BatchInput[], userId: string,
-  opts: { audit?: boolean } = {}) {
+  opts: { audit?: boolean; source?: 'file' | 'feed' | 'portal'; importId?: string | null } = {}) {
   const pp = (await client.query(
-    'SELECT id, product_id, cold_chain FROM partner_products WHERE id = $1 AND partner_id = $2', [partnerProductId, vendorId])).rows[0];
+    `SELECT pp.id, pp.product_id, pp.cold_chain, p.drug_schedule, COALESCE(p.cold_chain, pp.cold_chain, FALSE) AS product_cold_chain
+     FROM partner_products pp LEFT JOIN products p ON p.id = pp.product_id WHERE pp.id = $1 AND pp.partner_id = $2`,
+    [partnerProductId, vendorId])).rows[0];
   if (!pp) throw new AppError('Listing not found', 404);
+  // Sprint 39: supplier details required for Schedule H1 / cold-chain batches when the setting is on (C-02)
+  const needProvenance = provenanceRequiredFor({ drug_schedule: pp.drug_schedule, cold_chain: pp.product_cold_chain })
+    && await provenanceRequired(client);
   for (const b of batches) {
+    if (needProvenance) {
+      const had = (await client.query(
+        `SELECT pb.supplier_name, pb.supplier_licence_no, pb.supplier_invoice_no, to_char(pb.supplier_invoice_date, 'YYYY-MM-DD') AS supplier_invoice_date
+         FROM partner_batch_provenance pb JOIN partner_inventory pi ON pi.id = pb.partner_inventory_id
+         WHERE pi.partner_product_id = $1 AND pi.batch_number = $2`, [partnerProductId, b.batch_number])).rows[0] ?? null;
+      const missing = missingForRequired(had ?? b.provenance ?? null);
+      if (missing.length) throw new AppError(requiredMessage(b.batch_number, missing), 400, true, 'PROVENANCE_REQUIRED');
+    }
     if (pp.cold_chain && !b.cold_chain_confirmed) {
       throw new AppError(`Batch ${b.batch_number}: confirm cold storage (2–8 °C) for this refrigerated product`, 400);
     }
@@ -158,14 +175,26 @@ export async function upsertInventoryTx(client: PoolClient, vendorId: string, pa
       [partnerProductId, vendorId, b.batch_number, b.qty_available, b.expiry_date,
        b.manufactured_date || null, !!b.cold_chain_confirmed, b.purchase_price_paise ?? null]
     );
+    if (b.provenance) {
+      const inv = (await client.query(`SELECT id FROM partner_inventory WHERE partner_product_id = $1 AND batch_number = $2`,
+        [partnerProductId, b.batch_number])).rows[0];
+      const outcome = await recordProvenanceTx(client, { partnerId: vendorId, inventoryId: inv.id, provenance: b.provenance,
+        source: opts.source ?? 'portal', importId: opts.importId ?? null, userId });
+      // Immutable once recorded (C-34): the editor is told; files and the feed keep the first record silently
+      if (outcome === 'kept' && (opts.source ?? 'portal') === 'portal') {
+        throw new AppError(`Batch ${b.batch_number}: the supplier details are already recorded and cannot be changed`, 409, true, 'PROVENANCE_FINAL');
+      }
+    }
   }
   if (opts.audit !== false) {
     await writeAuditTx(client, { userId, action: 'partner_inventory_updated', performedBy: userId,
       newValue: { vendor_id: vendorId, partner_product_id: partnerProductId, batches: batches.map((b) => [b.batch_number, b.qty_available]) } });
   }
   return (await client.query(
-    `SELECT batch_number, qty_available, qty_reserved, expiry_date, cold_chain_confirmed
-     FROM partner_inventory WHERE partner_product_id = $1 ORDER BY expiry_date`, [partnerProductId])).rows;
+    `SELECT pi.batch_number, pi.qty_available, pi.qty_reserved, pi.expiry_date, pi.cold_chain_confirmed,
+            pb.supplier_name, pb.supplier_licence_no, pb.supplier_invoice_no, to_char(pb.supplier_invoice_date, 'YYYY-MM-DD') AS supplier_invoice_date
+     FROM partner_inventory pi LEFT JOIN partner_batch_provenance pb ON pb.partner_inventory_id = pi.id
+     WHERE pi.partner_product_id = $1 ORDER BY pi.expiry_date`, [partnerProductId])).rows;
 }
 
 // ── Dawabag review ───────────────────────────────────────────────────────────

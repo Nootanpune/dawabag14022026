@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { ADDRESSES_QUERY_KEY, fetchAddresses } from '@/lib/addresses';
 import { CART_QUERY_KEY } from '@/lib/cart';
-import { buildOrderBody, placeOrder } from '@/lib/checkout';
-import { offerSavedPrescription, prescriptionKeys, type MyPrescription } from '@/lib/prescriptions/api';
+import { buildOrderBody, isPrescriptionProblem, placeOrder } from '@/lib/checkout';
+import { prescriptionKeys, type MyPrescription } from '@/lib/prescriptions/api';
 import { prescriptionKind } from '@/lib/prescriptions/describe';
 import { useCart } from '@/hooks/useCart';
 import TradePriceBanner from '@/components/shop/TradePriceBanner';
@@ -25,8 +25,9 @@ import type { ChosenRx } from '@/components/checkout/rx/RxAttachedLine';
 import type { CheckoutStep, PlacedOrder } from '@/components/checkout/types';
 
 // Address → prescription (if needed, C-08) → review (C-35 disclosure) → place order → payment.
-// The prescription is chosen before the order is placed so review and payment can show it;
-// it is sent with the order right after placing (the pharmacist checks it before dispatch).
+// Sprint 39 (owner decision 2026-10-03): the prescription is sent WITH the order — the server
+// refuses a prescription order without one, and payment for it is only authorised until our
+// pharmacist's check passes ("You'll only be charged after our pharmacist checks your prescription").
 export default function CheckoutPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -41,8 +42,7 @@ export default function CheckoutPage() {
   const [rx, setRx] = useState<ChosenRx | null>(null);
   const [rxError, setRxError] = useState('');
   const [paidDemo, setPaidDemo] = useState<{ paidBy?: string } | null>(null); // in memory only: how the trial's demo payment was made
-  // The prescription lines of the placed order (the cart no longer has them)
-  const [orderedRxItems, setOrderedRxItems] = useState<{ name: string; quantity: number }[]>([]);
+  const [authorised, setAuthorised] = useState(false); // the payment is held until the pharmacist's check (Sprint 39)
 
   const { data: addresses, isLoading: addressLoading } = useQuery({
     queryKey: ADDRESSES_QUERY_KEY,
@@ -68,59 +68,44 @@ export default function CheckoutPage() {
   const needsRx = order ? order.requires_prescription : rxItems.length > 0;
   const chooseRx = useCallback((p: MyPrescription) => { setRx({ id: p.id, created_at: p.created_at, kind: prescriptionKind(p) }); setRxError(''); }, []);
 
-  // Sends the chosen prescription with the placed order; false = the buyer must choose again
-  const attachRx = async (placed: PlacedOrder): Promise<boolean> => {
-    if (!placed.requires_prescription || !rx) return true;
-    try {
-      await offerSavedPrescription(rx.id, placed.id);
-      queryClient.invalidateQueries({ queryKey: prescriptionKeys.mine });
-      return true;
-    } catch (err) {
-      setRxError(`${getApiErrorMessage(err, 'This prescription could not be used.')} Please choose or upload another one for order ${placed.order_number}.`);
-      return false;
-    }
-  };
-
   const submitOrder = async (declaration: boolean) => {
     if (!address || !cart) {
       toast.error('Please choose a delivery address');
       return;
     }
+    if (needsRx && !rx) {
+      setRxError('Choose or upload your prescription first.');
+      setStep('prescription');
+      return;
+    }
     setPlacing(true);
-    setOrderedRxItems(rxItems);
     try {
-      const placed: PlacedOrder = await placeOrder(buildOrderBody(address, cart, declaration));
+      const placed: PlacedOrder = await placeOrder(buildOrderBody(address, cart, declaration, needsRx ? rx?.id : null));
       setOrder(placed);
-      // Ordered lines were removed from the server cart.
+      // Ordered lines were removed from the server cart; the prescription is now with the order
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY });
-      setStep((await attachRx(placed)) ? 'payment' : 'rx-fix');
+      if (placed.requires_prescription) queryClient.invalidateQueries({ queryKey: prescriptionKeys.mine });
+      setStep('payment');
     } catch (err) {
-      toast.error(getApiErrorMessage(err, 'We could not place your order. Please try again.'));
+      const message = getApiErrorMessage(err, 'We could not place your order. Please try again.');
+      if (needsRx && isPrescriptionProblem(err)) {
+        // The order was not placed: choose or upload another prescription, then place it again
+        setRxError(`${message} Please choose or upload another one.`);
+        setStep('prescription');
+      } else toast.error(message);
     } finally {
       setPlacing(false);
     }
   };
 
-  const retryAttach = async () => {
-    if (!order) return;
-    setPlacing(true);
-    if (await attachRx(order)) setStep('payment');
-    setPlacing(false);
-  };
-
   const content = () => {
     if (step === 'confirmed' && order) {
-      return <OrderConfirmed orderNumber={order.order_number} totalPaise={order.total_paise} shipments={order.shipments} demo={!!paidDemo} paidBy={paidDemo?.paidBy} rx={order.requires_prescription ? rx : null} />;
+      return <OrderConfirmed orderNumber={order.order_number} totalPaise={order.total_paise} shipments={order.shipments} demo={!!paidDemo}
+        paidBy={paidDemo?.paidBy} rx={order.requires_prescription ? rx : null} authorised={authorised} />;
     }
     if (step === 'payment' && order) {
-      return <PaymentStep order={order} rx={order.requires_prescription ? rx : null} onPaid={({ demo, paidBy }) => { setPaidDemo(demo ? { paidBy } : null); setStep('confirmed'); }} />;
-    }
-    if (step === 'rx-fix' && order) {
-      return (
-        <PrescriptionStep rxItems={orderedRxItems}
-          selectedId={rx?.id ?? null} onSelect={chooseRx} error={rxError} busy={placing}
-          continueLabel="Continue to payment" onBack={() => router.push('/orders')} onContinue={retryAttach} />
-      );
+      return <PaymentStep order={order} rx={order.requires_prescription ? rx : null}
+        onPaid={({ demo, paidBy, authorised: held }) => { setPaidDemo(demo ? { paidBy } : null); setAuthorised(!!held); setStep('confirmed'); }} />;
     }
 
     if (cartLoading || !cart) {
@@ -152,8 +137,8 @@ export default function CheckoutPage() {
     }
     if (step === 'prescription') {
       return (
-        <PrescriptionStep rxItems={rxItems} selectedId={rx?.id ?? null} onSelect={chooseRx}
-          onBack={() => setStep('address')} onContinue={() => setStep('review')} />
+        <PrescriptionStep rxItems={rxItems} selectedId={rx?.id ?? null} onSelect={chooseRx} error={rxError}
+          onBack={() => setStep('address')} onContinue={() => { setRxError(''); setStep('review'); }} />
       );
     }
     if (step === 'review' && previewBody) {

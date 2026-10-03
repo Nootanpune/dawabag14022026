@@ -68,6 +68,9 @@ test.beforeAll(async ({}, info) => {
     }, admin);
     if (p.status !== 201) throw new Error(`Could not create the product: ${JSON.stringify(p.json)}`);
     d.productId = p.json.data.id;
+    // Sprint 39 (C-10): new products start "not allowed online"; allowed here as a pharmacist would (dated reference)
+    await c.query(`UPDATE products SET online_sale_status = 'permitted', online_sale_ref = 'E2E test approval', online_sale_ref_date = CURRENT_DATE
+                   WHERE id = $1`, [d.productId]);
     await c.query(`INSERT INTO inventory_batches (product_id, batch_number, quantity_available, purchase_price_paise, expiry_date)
                    VALUES ($1, 'E2E-S32-B', 100, 2000, CURRENT_DATE + 500)`, [d.productId]);
   } finally { await c.end(); r.disconnect(); }

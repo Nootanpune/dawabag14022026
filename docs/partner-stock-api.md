@@ -203,8 +203,23 @@ Each item (unknown fields are refused, so typos are caught):
 | `quantity` | number or text | yes | Closing stock in **selling packs** (loose units after a decimal point are dropped). A negative stock makes that line a problem: the batch is offered as 0. |
 | `free_quantity` | number or text | no | Added to `quantity`. |
 | `gst_rate` | number or text | no | Percent, e.g. `12`. |
+| `supplier_name` | text ≤ 255 | no (Sprint 39) | Who the partner bought this batch from. |
+| `supplier_licence` | text ≤ 100 | no (Sprint 39) | The supplier's drug licence number. |
+| `supplier_invoice_no` | text ≤ 100 | no (Sprint 39) | The partner's purchase invoice (bill) number. |
+| `supplier_invoice_date` | text | no (Sprint 39) | `YYYY-MM-DD`, `DD/MM/YYYY`, `DD-MM-YY` or `DD.MM.YYYY`; not in the future. |
 
 The same batch may appear on several lines: quantities are added (the earliest expiry is kept).
+
+**Batch supplier details (Sprint 39, C-02, C-28).** The four `supplier_*` fields are kept the
+first time they arrive for a batch and are never changed afterwards (later values are
+ignored; the answer counts `applied.provenance_recorded`). They are optional today. When
+Dawabag switches on *Supplier details required for Schedule H1 and cold-chain partner
+batches* (with notice), a batch of such a product without all four (sent now or recorded
+earlier) is **not offered**: an existing batch goes to 0 sellable, a new one is not added
+(`applied.held_without_supplier_details`). The same columns are recognised in a stock
+file (§2 / §6.1) under headings such as *Supplier*, *Supplier DL No*, *Bill No* / *Invoice
+No* and *Bill Date* / *Invoice Date*; an unreadable date is reported as a warning and not
+kept. A snapshot without these fields keeps the same fingerprint as before Sprint 39.
 
 Example (placeholder values — never paste a real key into a document, chat or ticket):
 
@@ -241,7 +256,8 @@ Answer (200):
   "status": "applied",
   "import_id": "…", "sequence": 1024, "taken_at": "2026-10-03T10:00:00.000Z",
   "applied": { "lines": 2, "batches_set": 1, "batches_new": 1, "batches_zeroed": 3, "packs_offered": 52,
-               "held_for_orders": 2, "dispatched_after_snapshot": 0 },
+               "held_for_orders": 2, "dispatched_after_snapshot": 0,
+               "held_without_supplier_details": 0, "provenance_recorded": 0 },
   "waiting_for_check": { "new": 1, "open": 4, "by_kind": { "new_product": 1, "price_change": 3 } },
   "summary": { "lines": 2, "matched": 1, "needs_review": 1, "problem": 0, "…": "…" } } }
 ```

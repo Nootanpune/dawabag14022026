@@ -3,6 +3,7 @@
 // is still missing (problems), the prescription rule and the suggested copy; this
 // file only calls the API. Nothing is kept in the browser.
 import api from '../api';
+import type { OnlineSaleChange } from '../onlineSale/api';
 
 export interface FromFileEntry {
   request_id: string;
@@ -134,9 +135,10 @@ export async function bulkSetDrafts(productIds: string[], set: Partial<Record<Bu
   return data.data;
 }
 
-export async function approveDraft(id: string, notes?: string) {
-  const { data } = await api.post(`/catalogue-drafts/${id}/approve`, notes ? { notes } : {});
-  return data.data as { id: string; status: 'approved' | 'not_listed'; sellable: boolean; requests: number };
+/** Sprint 39: online_sale = the status step of the form (without it the approved product is not sold online yet) */
+export async function approveDraft(id: string, notes?: string, onlineSale?: OnlineSaleChange) {
+  const { data } = await api.post(`/catalogue-drafts/${id}/approve`, { ...(notes ? { notes } : {}), ...(onlineSale ? { online_sale: onlineSale } : {}) });
+  return data.data as { id: string; status: 'approved' | 'not_listed'; sellable: boolean; online_sale_status?: string; requests: number };
 }
 
 export async function rejectDraft(id: string, reason: string) {

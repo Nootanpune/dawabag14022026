@@ -8,6 +8,7 @@
 // NEVER point it at a production database. KYC document files need S3; without
 // AWS_S3_BUCKET on the API the test seeds kyc_documents rows directly.
 import { createRequire } from 'module';
+import { applySprint39Defaults, withPrescription } from './support/sprint39Fixtures.mjs';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const Redis = require('ioredis');
@@ -22,7 +23,15 @@ function check(name, cond, detail) {
   else { failures++; console.log(`  FAIL ${name}${detail !== undefined ? ' — ' + JSON.stringify(detail).slice(0, 400) : ''}`); }
 }
 
-async function call(method, path, { body, token, headers = {}, cookie } = {}) {
+// Sprint 39 stand-ins (support/sprint39Fixtures.mjs): fixture products allowed for online sale, fixture
+// pharmacists verified, a prescription added when checkout asks for one
+async function call(method, path, opts = {}) {
+  if (db._connected) await applySprint39Defaults(db);
+  if (method === 'POST' && path === '/orders' && opts.body) return withPrescription(db, (body) => rawCall(method, path, { ...opts, body }), opts.body, opts.token);
+  return rawCall(method, path, opts);
+}
+
+async function rawCall(method, path, { body, token, headers = {}, cookie } = {}) {
   const h = { ...headers };
   if (token) h.Authorization = `Bearer ${token}`;
   if (body) h['Content-Type'] = 'application/json';

@@ -19,9 +19,12 @@ import WhatsAppTemplatesSection from '@/components/admin/settings/WhatsAppTempla
 import { ACCOUNTS_LOCK_KEY } from '@/lib/admin/accountsLock';
 import { WHATSAPP_TEMPLATES_KEY } from '@/lib/admin/whatsappTemplates';
 import { formatDateTimeIST } from '@/lib/dates';
+import RxHoldSection, { RX_HOLD_KEY } from '@/components/admin/settings/RxHoldSection';
 
 // Edited in their own sections below, not the generic list
-const OWN_SECTION_KEYS = [DLT_TEMPLATES_KEY, RETENTION_KEY, ACCOUNTS_LOCK_KEY, WHATSAPP_TEMPLATES_KEY];
+const OWN_SECTION_KEYS = [DLT_TEMPLATES_KEY, RETENTION_KEY, ACCOUNTS_LOCK_KEY, WHATSAPP_TEMPLATES_KEY, RX_HOLD_KEY,
+  // Sprint 39 one-time migration markers (nothing to edit)
+  'pharmacist_registration.backfilled', 'pharmacist_registration.partner_backfilled'];
 
 export default function AdminSettingsPage() {
   const isSuperAdmin = useAuthStore((s) => s.user?.role === 'super_admin');
@@ -78,6 +81,7 @@ export default function AdminSettingsPage() {
       {!!data?.length && <DltTemplatesSection setting={data.find((s) => s.key === DLT_TEMPLATES_KEY)} canEdit={isSuperAdmin} />}
       {!!data?.length && <WhatsAppTemplatesSection setting={data.find((s) => s.key === WHATSAPP_TEMPLATES_KEY)} canEdit={isSuperAdmin} />}
       {!!data?.length && <RetentionSection setting={data.find((s) => s.key === RETENTION_KEY)} canEdit={isSuperAdmin} />}
+      {!!data?.length && <RxHoldSection setting={data.find((s) => s.key === RX_HOLD_KEY)} canEdit={isSuperAdmin} />}
       {!!data?.length && <LegalSettingsSection settings={data} canEdit={isSuperAdmin} />}
       <PharmacistRegistrationSection />
       {editing && meta && (

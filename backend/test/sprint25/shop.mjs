@@ -94,7 +94,11 @@ export async function runSearchExtras() {
   await q(`UPDATE products SET drug_schedule = 'Schedule X' WHERE id = $1`, [P.rx]);
   r = await call('GET', '/products/search/suggest?q=zentacilin');
   check('Schedule X names are never suggested (C-10)', r.status === 200 && !r.json.data?.suggestions?.includes('Zentacillin'), r.json);
-  await q(`UPDATE products SET drug_schedule = 'Schedule H' WHERE id = $1`, [P.rx]);
+  // Sprint 39: moving to Schedule X switched online sale off (fail closed); it stays off until a pharmacist allows it again
+  const [off] = await q(`SELECT online_sale_status FROM products WHERE id = $1`, [P.rx]);
+  check('… and moving it to Schedule X made it prohibited for online sale', off?.online_sale_status === 'prohibited', off);
+  await q(`UPDATE products SET drug_schedule = 'Schedule H', online_sale_status = 'permitted', online_sale_ref = 'Smoke test fixture',
+             online_sale_ref_date = CURRENT_DATE WHERE id = $1`, [P.rx]);
   r = await call('GET', '/products/search/suggest?q=zentacilin');
   check('… and are suggested once sellable again', r.json.data?.suggestions?.includes('Zentacillin'), r.json);
 }
@@ -173,20 +177,22 @@ export async function runStandalonePrescription(t) {
   r = await call('GET', `/prescriptions/${rxId}/url`, { token: t.other });
   check('another buyer cannot open it', r.status === 403, r.status);
 
-  r = await call('POST', '/orders', { token: t.buyer, body: { address_id: t.address, pincode: PIN, items: [{ product_id: P.rx, quantity: 1 }] } });
+  // Sprint 39: the prescription goes WITH the order — without one the order is refused (C-08)
+  const rxBody = { address_id: t.address, pincode: PIN, items: [{ product_id: P.rx, quantity: 1 }] };
+  r = await call('POST', '/orders', { token: t.buyer, body: rxBody, noAutoRx: true });
+  check('a prescription order without a prescription is refused (422 PRESCRIPTION_REQUIRED)', r.status === 422 && r.json.code === 'PRESCRIPTION_REQUIRED', r.json);
+  r = await call('POST', '/orders', { token: t.buyer, body: { ...rxBody, prescription_id: rxId } });
   const orderId = r.json.data?.order?.id;
-  check('order with a prescription medicine placed', !!orderId, r.json);
+  check('order with a prescription medicine placed, the saved upload chosen at checkout', !!orderId
+    && r.json.data?.order?.prescription?.status === 'awaiting_pharmacist', r.json);
   r = await call('POST', `/prescriptions/${rxId}/use-for-order`, { token: t.other, body: { order_id: orderId } });
   check('someone else cannot use it', r.status === 404, r.json);
-  r = await call('POST', `/prescriptions/${rxId}/use-for-order`, { token: t.buyer, body: { order_id: orderId } });
-  check('the unchecked upload is attached to the order for the pharmacist', r.status === 200
-    && r.json.data?.status === 'awaiting_pharmacist', r.json);
   const [row] = await q('SELECT order_id, status FROM prescriptions WHERE id = $1', [rxId]);
-  check('… exactly as an upload at checkout (order set, still pending)', row.order_id === orderId && row.status === 'pending', row);
-  r = await call('POST', '/orders', { token: t.buyer, body: { address_id: t.address, pincode: PIN, items: [{ product_id: P.rx, quantity: 1 }] } });
+  check('the unchecked upload is attached to the order for the pharmacist (order set, still pending)', row.order_id === orderId && row.status === 'pending', row);
+  r = await call('POST', '/orders', { token: t.buyer, body: { ...rxBody, prescription_id: rxId } });
+  check('an unchecked prescription already with an order cannot be sent with another (order not placed)', r.status === 409, r.json);
+  r = await call('POST', '/orders', { token: t.buyer, body: rxBody });
   const order2 = r.json.data?.order?.id;
-  r = await call('POST', `/prescriptions/${rxId}/use-for-order`, { token: t.buyer, body: { order_id: order2 } });
-  check('an unchecked prescription already with an order cannot be sent with another', r.status === 409, r.json);
   await q(`UPDATE prescriptions SET status = 'rejected' WHERE id = $1`, [rxId]);
   r = await call('POST', `/prescriptions/${rxId}/use-for-order`, { token: t.buyer, body: { order_id: order2 } });
   check('a rejected prescription cannot be reused', r.status === 400, r.json);

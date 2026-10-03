@@ -12,6 +12,7 @@ import OrderItemsCard from '@/components/orders/OrderItemsCard';
 import OrderShipmentsCard from '@/components/orders/OrderShipmentsCard';
 import CancelOrderCard from '@/components/orders/CancelOrderCard';
 import RefundsCard from '@/components/orders/RefundsCard';
+import PaymentHoldCard from '@/components/orders/PaymentHoldCard';
 import OrderBillCard from '@/components/orders/OrderBillCard';
 import DeliveryAddressCard from '@/components/orders/DeliveryAddressCard';
 import RefillSetupButton from '@/components/orders/RefillSetupButton';
@@ -62,6 +63,7 @@ export default function OrderDetailPage() {
             <OrderShipmentsCard order={order} />
             <OrderItemsCard order={order} />
             {order.can_cancel && <CancelOrderCard orderId={order.id} />}
+            <PaymentHoldCard order={order} />
             <RefundsCard order={order} />
             {order.status === 'delivered' && <RefillSetupButton orderId={order.id} />}
 

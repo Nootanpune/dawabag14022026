@@ -8,12 +8,12 @@ const STEPS = [
   { key: 'payment', label: 'Payment', icon: CreditCard },
 ] as const;
 
-const ORDER: Record<CheckoutStep, number> = { address: 0, prescription: 1, review: 2, 'rx-fix': 2.5, payment: 3, confirmed: 4 };
+const ORDER: Record<CheckoutStep, number> = { address: 0, prescription: 1, review: 2, payment: 3, confirmed: 4 };
 
 /** Where the buyer is in checkout; labels show on phones too. */
 export default function CheckoutStepIndicator({ step, showPrescription }: { step: CheckoutStep; showPrescription: boolean }) {
   const steps = STEPS.filter((s) => s.key !== 'prescription' || showPrescription);
-  const current = step === 'rx-fix' ? 'prescription' : step;
+  const current = step;
   return (
     <ol className="flex items-start mb-6" aria-label="Checkout steps">
       {steps.map((s, i) => {

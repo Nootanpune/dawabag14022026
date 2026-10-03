@@ -74,6 +74,13 @@ export async function upsertPeople(c: PoolClient, password: string): Promise<Rec
      WHERE id = $1`, [ids.retailer]);
   // Registered pharmacist for prescription checks and the H1 register (C-13, C-09)
   await c.query(`UPDATE users SET pharmacist_reg_no = 'DEMO-MSPC-0001' WHERE id = $1`, [ids.pharmacist_rx]);
+  // Sprint 39: an active, recorded registration so the demo pharmacist can work (labelled DEMO; not a real council record)
+  await c.query(
+    `INSERT INTO pharmacist_registrations (user_id, state_council, registration_no, valid_till, status, status_note, verified_at)
+     VALUES ($1, 'DEMO State Pharmacy Council', 'DEMO-MSPC-0001', CURRENT_DATE + 700, 'active', 'Trial demo seed (not a real council record)', NOW())
+     ON CONFLICT (user_id) DO UPDATE SET registration_no = EXCLUDED.registration_no, valid_till = GREATEST(pharmacist_registrations.valid_till, EXCLUDED.valid_till),
+       status = 'active', state_council = EXCLUDED.state_council, verified_at = COALESCE(pharmacist_registrations.verified_at, NOW()), updated_at = NOW()`,
+    [ids.pharmacist_rx]);
   return ids;
 }
 

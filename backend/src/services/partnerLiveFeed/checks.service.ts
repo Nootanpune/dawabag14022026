@@ -18,6 +18,7 @@ import { writeAuditTx } from '../../utils/audit';
 import { assertPartnerCanSell, h1Problems, insertListingTx, upsertInventoryTx } from '../partnerListing.service';
 import { linkItemTx, requestProductTx } from '../partnerStockImport/import.service';
 import { NEVER_ONLINE } from '../partnerStockImport/validate';
+import type { Provenance } from '../partnerProvenance/rules';
 
 export const CHECK_STATUSES = ['open', 'accepted', 'dismissed', 'resolved'] as const;
 export type CheckStatus = typeof CHECK_STATUSES[number];
@@ -69,13 +70,15 @@ export interface AcceptInput {
 
 /** Batches from the feed written through the listing editor's own rules (cold chain, recall gate, never below reserved). */
 async function addBatches(c: PoolClient, partnerId: string, ppId: string, userId: string, coldChain: boolean,
-  batches: { batch_number: string; expiry_date: string; quantity: number; mrp_paise?: number | null; sale_rate_paise?: number | null; purchase_price_paise?: number | null }[]) {
+  batches: { batch_number: string; expiry_date: string; quantity: number; mrp_paise?: number | null; sale_rate_paise?: number | null; purchase_price_paise?: number | null;
+    provenance?: Provenance | null }[]) {
   const usable = batches.filter((b) => b.batch_number && b.expiry_date);
   if (!usable.length) return 0;
   await upsertInventoryTx(c, partnerId, ppId, usable.map((b) => ({
     batch_number: b.batch_number, qty_available: Math.max(0, Number(b.quantity) || 0), expiry_date: b.expiry_date,
     cold_chain_confirmed: coldChain, purchase_price_paise: b.purchase_price_paise ?? null,
-  })), userId, { audit: false });
+    provenance: b.provenance ?? null,   // Sprint 39: what the feed said about the batch's supplier (C-02)
+  })), userId, { audit: false, source: 'feed' });
   for (const b of usable) {
     await c.query(
       `UPDATE partner_inventory SET mrp_paise = $3, sale_rate_paise = $4, feed_quantity = $5, feed_updated_at = NOW()
@@ -108,7 +111,7 @@ export async function acceptCheck(partnerId: string, id: string, userId: string,
         const pp = (await c.query<{ id: string }>('SELECT id FROM partner_products WHERE partner_id = $1 AND product_id = $2', [partnerId, row.product_id])).rows[0];
         if (!pp) throw new AppError('You no longer list this product', 409);
         await addBatches(c, partnerId, pp.id, userId, true, [{ batch_number: row.batch_number, expiry_date: d.expiry_date, quantity: d.quantity,
-          mrp_paise: d.mrp_paise, sale_rate_paise: d.sale_rate_paise, purchase_price_paise: d.purchase_price_paise }]);
+          mrp_paise: d.mrp_paise, sale_rate_paise: d.sale_rate_paise, purchase_price_paise: d.purchase_price_paise, provenance: d.provenance ?? null }]);
         await close(c, row, 'accepted', userId, 'Cold storage (2–8 °C) confirmed; batch added', { cold_chain_confirmed: true });
         break;
       }

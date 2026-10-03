@@ -60,11 +60,14 @@ export async function removeDemoData() {
     for (const [table, col] of [['audit_logs', 'performed_by'], ['app_settings', 'updated_by'], ['products', 'content_reviewed_by'],
       ['doctor_profiles', 'verified_by'], ['vendors', 'approved_by'], ['partner_products', 'reviewed_by'], ['partner_products', 'posted_by'],
       ['partner_products', 'submitted_by'], ['vendor_users', 'created_by'], ['party_licences', 'verified_by'],
-      ['party_licences', 'created_by'], ['business_licences', 'created_by']] as const) {
+      ['party_licences', 'created_by'], ['business_licences', 'created_by'],
+      // Sprint 39
+      ['products', 'online_sale_set_by'], ['product_online_status_log', 'set_by'], ['pharmacist_registrations', 'verified_by'],
+      ['pharmacist_registrations', 'updated_by'], ['vendor_pharmacists', 'verified_by'], ['partner_batch_provenance', 'recorded_by']] as const) {
       await q(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ANY($1)`, [users]);
     }
     for (const t of ['cart_items', 'carts', 'notification_deliveries', 'user_devices', 'notifications', 'addresses', 'consent_records',
-      'audit_logs', 'user_profiles']) {
+      'audit_logs', 'pharmacist_registrations', 'user_profiles']) {
       await q(`DELETE FROM ${t} WHERE user_id = ANY($1)`, [users]);
     }
     await q('DELETE FROM users WHERE id = ANY($1)', [users]);

@@ -312,7 +312,7 @@ test('the chosen prescription is named on review and payment, with what happens 
   await expect(page.getByText('Chosen')).toBeVisible();
   await page.getByRole('button', { name: /Continue to review/ }).click();
   await expect(page.getByTestId('rx-attached')).toContainText(/Prescription \(photo\) uploaded .* ✓/);
-  await expect(page.getByText(/cancel the order and get a full refund/)).toBeVisible();
+  await expect(page.getByText(/If the order cannot be supplied, the hold is released and you are not charged/)).toBeVisible();
   await page.getByRole('button', { name: /Place order/ }).click();
   await expect(page.getByRole('heading', { name: 'Payment' })).toBeVisible();
   await expect(page.getByTestId('rx-attached')).toContainText('our pharmacist checks it before dispatch');

@@ -28,6 +28,11 @@ export const snapshotItemSchema = z.object({
   quantity: amount,
   free_quantity: amount.nullish(),
   gst_rate: amount.nullish(),
+  // Sprint 39: where the partner bought the batch (optional; docs/partner-stock-api.md §6)
+  supplier_name: text(255).nullish(),
+  supplier_licence: text(100).nullish(),
+  supplier_invoice_no: text(100).nullish(),
+  supplier_invoice_date: text(20).nullish(),
 }).strict();
 
 export const snapshotSchema = z.object({
@@ -61,7 +66,14 @@ export const SNAPSHOT_COLUMNS: { json: keyof SnapshotItem; field: FieldKey; head
   { json: 'quantity', field: 'quantity', header: 'Qty' },
   { json: 'free_quantity', field: 'free_quantity', header: 'Free qty' },
   { json: 'gst_rate', field: 'gst_rate', header: 'GST%' },
+  { json: 'supplier_name', field: 'supplier_name', header: 'Supplier name' },
+  { json: 'supplier_licence', field: 'supplier_licence', header: 'Supplier licence no' },
+  { json: 'supplier_invoice_no', field: 'supplier_invoice_no', header: 'Purchase invoice no' },
+  { json: 'supplier_invoice_date', field: 'supplier_invoice_date', header: 'Purchase invoice date' },
 ];
+
+/** Columns before Sprint 39's optional provenance columns. */
+const BASE_COLUMNS = SNAPSHOT_COLUMNS.findIndex((c) => c.json === 'supplier_name');
 
 export const SNAPSHOT_MAPPING: Mapping = Object.fromEntries(FIELD_KEYS.map((f) => {
   const i = SNAPSHOT_COLUMNS.findIndex((c) => c.field === f);
@@ -83,7 +95,12 @@ export function parseSnapshot(body: unknown): Snapshot {
 
 /** Fingerprint of the stock lines (not the sequence or time): the same stock gives the same value. */
 export function snapshotSha256(items: SnapshotItem[]): string {
-  const canonical = items.map((it) => SNAPSHOT_COLUMNS.map((c) => (it[c.json] ?? null)));
+  // Sprint 39: the provenance columns count only when sent, so a snapshot without them keeps its earlier fingerprint
+  const canonical = items.map((it) => {
+    const cells = SNAPSHOT_COLUMNS.map((c) => (it[c.json] ?? null));
+    while (cells.length > BASE_COLUMNS && cells[cells.length - 1] === null) cells.pop();
+    return cells;
+  });
   return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 

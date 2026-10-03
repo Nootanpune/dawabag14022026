@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createDraftsFromRequests, MAX_DRAFT_BATCH } from '../services/catalogueDrafts/create.service';
 import { bulkSetDrafts, draftOptions, getDraft, listDrafts, saveDraft, saveDraftDescription } from '../services/catalogueDrafts/queue.service';
 import { approveDraft, rejectDraft } from '../services/catalogueDrafts/decide.service';
+import { ONLINE_SALE_STATUSES } from '../services/onlineSale/rules';
 import { DOSAGE_FORMS, GST_RATES, HSN_RE, SCHEDULES } from '../services/catalogueDrafts/rules';
 
 const uuid = z.string().uuid();
@@ -106,8 +107,17 @@ export async function postBulkSet(req: Request, res: Response, next: NextFunctio
 
 export async function postApproveDraft(req: Request, res: Response, next: NextFunction) {
   try {
-    const { notes } = z.object({ notes: z.string().trim().max(1000).optional() }).parse(req.body ?? {});
-    res.json({ success: true, data: await approveDraft(uuid.parse(req.params.productId), req.user!.id, notes) });
+    const { notes, online_sale } = z.object({
+      notes: z.string().trim().max(1000).optional(),
+      // Sprint 39: the online-sale status step of the completion form (without it the product stays 'restricted')
+      online_sale: z.object({
+        status: z.enum(ONLINE_SALE_STATUSES),
+        notification_ref: z.string().trim().max(200).nullable().optional(),
+        notification_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+        reason: z.string().trim().max(1000).nullable().optional(),
+      }).optional(),
+    }).parse(req.body ?? {});
+    res.json({ success: true, data: await approveDraft(uuid.parse(req.params.productId), req.user!.id, notes, online_sale) });
   } catch (err) { next(err); }
 }
 

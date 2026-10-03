@@ -118,12 +118,17 @@ export interface OrderDetail {
   credit_notes: OrderCreditNote[];
   refunds: OrderRefund[];
   returns: OrderReturn[];
+  /** Sprint 39: a prescription order's payment is authorised until the pharmacist's check, then captured (or released) */
+  payment?: { status: string; capture: 'now' | 'after_pharmacist_check'; authorised_at: string | null; captured_at: string | null;
+    released_at: string | null; note?: string } | null;
 }
 
 export interface CancelResult {
   id: string;
   status: string;
   refund_paise: number;
+  /** Sprint 39: an authorised payment released instead of refunded (never charged) */
+  released_paise?: number;
   refunds: unknown[];
   credit_notes: string[];
 }

@@ -22,8 +22,10 @@ test.beforeAll(async () => {
       if (old) { P[key] = old.id; return; }
       P[key] = (await c.query(
         `INSERT INTO products (name, generic_name, sku, category, drug_schedule, gst_rate, hsn_code, mrp_paise, offer_price_paise, max_qty_per_order,
-                               net_quantity, manufacturer_name, manufacturer_address, country_of_origin, is_active, cold_chain)
-         VALUES ($1, $2, $3, 'Pain relief', $4, 12, '30049099', $5, $5, 10, $6, 'E2E Remedies Ltd', 'Plot 33, MIDC Satpur, Nashik', 'India', TRUE, $7)
+                               net_quantity, manufacturer_name, manufacturer_address, country_of_origin, is_active, cold_chain,
+                               online_sale_status, online_sale_ref, online_sale_ref_date)
+         VALUES ($1, $2, $3, 'Pain relief', $4, 12, '30049099', $5, $5, 10, $6, 'E2E Remedies Ltd', 'Plot 33, MIDC Satpur, Nashik', 'India', TRUE, $7,
+                 'permitted', 'E2E test approval', CURRENT_DATE)
          RETURNING id`, [name, extra.cold ? 'E2E Zorinsulin' : 'E2E Zorvaquin', sku, extra.schedule ?? 'OTC', price, pack, !!extra.cold])).rows[0].id;
       await c.query(`INSERT INTO inventory_batches (product_id, batch_number, quantity_available, purchase_price_paise, expiry_date)
                      VALUES ($1, 'E2E-S33-B', 100, 300, DATE '2028-03-15')`, [P[key]]);
@@ -200,15 +202,17 @@ test('the pharmacist sees the buyer’s allergies when checking the prescription
   // the buyer's health profile with consent (the previous test may have run on another project)
   await call('PUT', '/health-profile', { consent: true, allergies: ['Penicillin'], conditions: ['Asthma'], current_medicines: [] }, t);
   const addr = (await call('GET', '/users/me/addresses', undefined, t)).json.data[0];
-  const order = await call('POST', '/orders', { address_id: addr.id, pincode: PIN, items: [{ product_id: P.main, quantity: 1 }] }, t);
-  const o = order.json.data?.order;
-  expect(o?.id, JSON.stringify(order.json)).toBeTruthy();
+  // Sprint 39: the prescription goes with the order (uploaded first, as at checkout)
   const c = db();
   await c.connect();
+  let o: { id: string; order_number: string };
   try {
+    const rx = (await c.query(`INSERT INTO prescriptions (user_id, s3_key, file_type, status)
+                               SELECT id, 'prescriptions/e2e-s33.jpg', 'jpg', 'pending' FROM users WHERE mobile = $1 RETURNING id`, [people.buyer.mobile])).rows[0].id;
+    const order = await call('POST', '/orders', { address_id: addr.id, pincode: PIN, items: [{ product_id: P.main, quantity: 1 }], prescription_id: rx }, t);
+    o = order.json.data?.order;
+    expect(o?.id, JSON.stringify(order.json)).toBeTruthy();
     await c.query(`UPDATE orders SET status = 'rx_pending' WHERE id = $1`, [o.id]);
-    await c.query(`INSERT INTO prescriptions (user_id, order_id, s3_key, file_type, status)
-                   SELECT user_id, id, 'prescriptions/e2e-s33.jpg', 'jpg', 'pending' FROM orders WHERE id = $1`, [o.id]);
   } finally { await c.end(); }
   await signIn(page, 'pharmacist');
   await page.goto('/staff/fulfilment');

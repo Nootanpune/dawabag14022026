@@ -6,7 +6,8 @@
 // in-date licences: retail (20/21) → patients; wholesale (20B/21B) → licensed trade buyers.
 import { licenceRights } from '../licences/forms';
 
-export interface PharmacistIn { full_name: string; registration_no: string }
+/** Sprint 39: with the council and valid-till, the admin entering a pharmacist verifies it (as for licences, C-03) */
+export interface PharmacistIn { full_name: string; registration_no: string; state_council?: string | null; valid_till?: string | null }
 
 export function sellingRights(licences: { form: string; valid_upto: string | null; status?: string }[], today: string) {
   const r = licenceRights(licences, today);

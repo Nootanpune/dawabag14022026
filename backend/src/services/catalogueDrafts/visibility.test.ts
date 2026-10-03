@@ -30,6 +30,8 @@ const ALLOWED: { file: string; contains: string; why: string }[] = [
   { file: 'services/checkoutSummary.service.ts', contains: 'FROM order_items oi JOIN products', why: 'lines of an order already placed' },
   { file: 'services/rxGate.service.ts', contains: 'order_items oi', why: 'lines of an order already placed (and its H1 register)' },
   { file: 'services/paymentCapture.service.ts', contains: 'FROM order_items oi JOIN products', why: 'lines of an order already placed' },
+  { file: 'services/partnerListing.service.ts', contains: 'FROM partner_products pp LEFT JOIN products p ON p.id = pp.product_id WHERE pp.id = $1',
+    why: 'Sprint 39: reads the schedule / cold chain of a listing the partner already has, to require batch provenance' },
 ];
 
 describe('draft products stay invisible to buyers (Sprint 29)', () => {

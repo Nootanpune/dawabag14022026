@@ -25,6 +25,11 @@ function toInput(rows: BatchDraft[], coldChain: boolean): BatchInput[] | string 
       expiry_date: r.expiry,
       manufactured_date: r.mfg || undefined,
       ...(coldChain && { cold_chain_confirmed: true }),
+      // Sprint 39: supplier details, sent only when given (C-02)
+      ...(r.supplier.trim() && { supplier_name: r.supplier.trim() }),
+      ...(r.supplierLicence.trim() && { supplier_licence_no: r.supplierLicence.trim() }),
+      ...(r.invoiceNo.trim() && { supplier_invoice_no: r.invoiceNo.trim() }),
+      ...(r.invoiceDate && { supplier_invoice_date: r.invoiceDate }),
     });
   }
   return out;

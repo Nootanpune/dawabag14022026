@@ -9,6 +9,7 @@
 // Test data: mobiles 90000004xx, SKU prefix S4-, pincode 499941. Cleaned up
 // before and after. NEVER point it at a production database.
 import { createRequire } from 'module';
+import { applySprint39Defaults, withPrescription } from './support/sprint39Fixtures.mjs';
 import { cleanup, people, PIN } from './sprint4.fixtures.mjs';
 import { releaseForPacking } from './support/pharmacistCheck.mjs';
 const require = createRequire(import.meta.url);
@@ -26,7 +27,15 @@ function check(name, cond, detail) {
   else { failures++; console.log(`  FAIL ${name}${detail !== undefined ? ' — ' + JSON.stringify(detail).slice(0, 500) : ''}`); }
 }
 
-async function call(method, path, { body, token, raw = false } = {}) {
+// Sprint 39 stand-ins (support/sprint39Fixtures.mjs): fixture products allowed for online sale, fixture
+// pharmacists verified, a prescription added when checkout asks for one
+async function call(method, path, opts = {}) {
+  if (db._connected) await applySprint39Defaults(db);
+  if (method === 'POST' && path === '/orders' && opts.body) return withPrescription(db, (body) => rawCall(method, path, { ...opts, body }), opts.body, opts.token);
+  return rawCall(method, path, opts);
+}
+
+async function rawCall(method, path, { body, token, raw = false } = {}) {
   const h = {};
   if (token) h.Authorization = `Bearer ${token}`;
   if (body !== undefined) h['Content-Type'] = 'application/json';
@@ -240,7 +249,7 @@ async function main() {
   check('marketing opt-in appended', mkt?.granted === true && r.json.data?.history?.length === 4, r.json);
   r = await call('GET', '/privacy/export', { token: t.buyer });
   check('data export includes orders, prescriptions and complaints', r.status === 200 && r.json.orders?.length >= 2
-    && r.json.prescriptions?.length === 1 && r.json.complaints?.length === 2, Object.keys(r.json));
+    && r.json.prescriptions?.length >= 1 && r.json.complaints?.length === 2, Object.keys(r.json));   // Sprint 39: each prescription order carries its own upload
   r = await call('POST', '/privacy/requests', { token: t.buyer2, body: { request_type: 'erasure', details: 'Close my account' } });
   const dr = r.json.data;
   check('buyer requests erasure', r.status === 201, r.json);

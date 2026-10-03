@@ -115,6 +115,14 @@ export async function postSettlementPaid(req: Request, res: Response, next: Next
 
 // ── Settings (server-held business rules) ──
 const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
+  // Sprint 39: prescription-order payment hold (release before the gateway's own window) and partner provenance
+  'payments.rx_authorisation': z.object({
+    alert_after_hours: z.number().min(1).max(110),
+    release_after_hours: z.number().min(2).max(118),
+    gateway_expiry_minutes: z.number().int().min(1440).max(7200),
+  }).refine((v) => v.alert_after_hours < v.release_after_hours, 'Alert before the release')
+    .refine((v) => v.release_after_hours * 60 <= v.gateway_expiry_minutes - 120, 'Release at least 2 hours before the gateway window ends'),
+  'partner_stock.provenance_required': z.boolean(),
   'allocation.own_first_min_order_paise': z.number().int().min(0),
   'allocation.own_first_max_delivery_hours': z.number().int().min(1).max(240),
   'dawabag.premises': z.object({ pincode: z.string().regex(/^\d{6}$/), latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }),

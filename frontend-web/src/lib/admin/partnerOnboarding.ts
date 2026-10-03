@@ -11,7 +11,8 @@ import {
 export type { LicenceForm } from '../licences/forms';
 export const licenceLabel = (t: string) => formLabel(t);
 
-export interface PharmacistRow { full_name: string; registration_no: string }
+/** Sprint 39: council + valid-till entered by the admin = verified by that admin (C-03); without them the pharmacist cannot release orders */
+export interface PharmacistRow { full_name: string; registration_no: string; state_council?: string | null; valid_till?: string | null }
 export interface LoginRow { mobile: string; full_name: string; temporary_password: string }
 
 export interface PartnerFormValues {
@@ -96,7 +97,8 @@ export function formFromDetail(d: PartnerDetail): PartnerFormValues {
     contact_name: d.contact_name ?? '', contact_mobile: d.contact_mobile ?? '', contact_email: d.contact_email ?? '',
     address_line1: d.address_line1 ?? '', address_line2: d.address_line2 ?? '', city: d.city ?? '', state: d.state ?? '',
     pincode: d.pincode ?? '', invoice_prefix: d.invoice_prefix ?? '',
-    pharmacists: d.pharmacists.length ? d.pharmacists.map((p) => ({ ...p })) : f.pharmacists,
+    pharmacists: d.pharmacists.length ? d.pharmacists.map((p) => ({ full_name: p.full_name, registration_no: p.registration_no,
+      state_council: p.state_council ?? '', valid_till: p.valid_till ?? '' })) : f.pharmacists,
   };
 }
 
@@ -109,7 +111,8 @@ function detailsBody(v: PartnerFormValues) {
     pincode: t(v.pincode), invoice_prefix: t(v.invoice_prefix).toUpperCase(),
     licences: licenceBodies(v.licences),
     pharmacists: v.pharmacists.filter((p) => t(p.full_name) || t(p.registration_no))
-      .map((p) => ({ full_name: t(p.full_name), registration_no: t(p.registration_no).toUpperCase() })),
+      .map((p) => ({ full_name: t(p.full_name), registration_no: t(p.registration_no).toUpperCase(),
+        ...(t(p.state_council ?? '') && p.valid_till ? { state_council: t(p.state_council ?? ''), valid_till: p.valid_till } : {}) })),
   };
 }
 

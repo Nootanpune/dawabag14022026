@@ -3,6 +3,7 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 const Redis = require('ioredis');
+import { applySprint39Defaults, withPrescription } from '../support/sprint39Fixtures.mjs';
 
 export const API = (process.env.API_URL || 'http://localhost:4000') + '/api/v1';
 export const ORIGIN = process.env.API_URL || 'http://localhost:4000';
@@ -16,7 +17,20 @@ export function check(name, cond, detail) {
   else { state.failures++; console.log(`  FAIL ${name}${detail !== undefined ? ' — ' + JSON.stringify(detail).slice(0, 500) : ''}`); }
 }
 
-export async function call(method, path, { body, token, raw = false, absolute = false } = {}) {
+// Sprint 39 stand-ins for the earlier suites (support/sprint39Fixtures.mjs): fixture products
+// allowed for online sale, fixture pharmacists verified, a prescription added when checkout
+// asks for one. The Sprint 39 suite turns this off (state.sprint39Defaults = false) to test them.
+state.sprint39Defaults = true;
+
+export async function call(method, path, opts = {}) {
+  if (state.sprint39Defaults && !opts.absolute && db._connected) await applySprint39Defaults(db);
+  if (state.sprint39Defaults && method === 'POST' && path === '/orders' && opts.body && !opts.noAutoRx) {
+    return withPrescription(db, (body) => rawCall(method, path, { ...opts, body }), opts.body, opts.token);
+  }
+  return rawCall(method, path, opts);
+}
+
+async function rawCall(method, path, { body, token, raw = false, absolute = false } = {}) {
   const h = {};
   if (token) h.Authorization = `Bearer ${token}`;
   if (body !== undefined) h['Content-Type'] = 'application/json';

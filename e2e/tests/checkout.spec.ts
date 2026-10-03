@@ -3,7 +3,7 @@
 // step. Razorpay's own checkout is not opened here (it is an external page).
 import { expect, Page, test } from '@playwright/test';
 import { addToCart, signIn } from '../support/helpers';
-import { call, people } from '../support/data';
+import { call, db, people } from '../support/data';
 
 async function emptyCart(page: Page) {
   // Through the API as the buyer, so each test starts from an empty server cart
@@ -40,9 +40,33 @@ test('a prescription medicine cannot reach payment without a prescription (C-08)
   await page.getByRole('button', { name: /Continue to prescription/ }).click();
   await expect(page.getByRole('heading', { name: 'Prescription needed' })).toBeVisible();
   await expect(page.getByText('E2E Amoxicillin 500 × 1')).toBeVisible();
-  await expect(page.getByText(/pharmacist checks your prescription before anything is dispatched/i)).toBeVisible();
+  await expect(page.getByText(/pharmacist checks your prescription before anything is packed/i)).toBeVisible();
+  // Sprint 39: the payment for a prescription order is only taken after the pharmacist's check (C-37)
+  await expect(page.getByText("You'll only be charged after our pharmacist checks your prescription.")).toBeVisible();
   await expect(page.getByRole('button', { name: /Choose or upload a prescription/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Place order/ })).toHaveCount(0);
+});
+
+test('with a saved prescription the order is placed and the payment is only authorised until the pharmacist checks it (C-08, C-37)', async ({ page }) => {
+  await signIn(page, 'buyer');
+  await emptyCart(page);
+  // An uploaded prescription not yet checked (as on /prescriptions)
+  const c = db();
+  await c.connect();
+  try {
+    await c.query(`INSERT INTO prescriptions (user_id, s3_key, original_filename, file_type, status)
+                   SELECT id, 'prescriptions/e2e-s39.jpg', 'rx.jpg', 'jpg', 'pending' FROM users WHERE mobile = $1`, [people.buyer.mobile]);
+  } finally { await c.end(); }
+  await page.goto(`/shop/${process.env.E2E_RX_PRODUCT_ID}`);
+  await addToCart(page);
+  await page.goto('/checkout');
+  await page.getByRole('button', { name: /Continue to prescription/ }).click();
+  await page.getByRole('radio', { name: /Prescription photo/ }).first().click();
+  await page.getByRole('button', { name: /Continue to review/ }).click();
+  await page.getByRole('button', { name: /Place order/ }).click();
+  await expect(page.getByRole('heading', { name: 'Payment' })).toBeVisible();
+  await expect(page.getByTestId('charge-after-check')).toHaveText("You'll only be charged after our pharmacist checks your prescription.");
+  await expect(page.getByRole('button', { name: /Authorise .* securely/ })).toBeVisible();
 });
 
 test('every page carries the licence and grievance details (C-04, C-36)', async ({ page }) => {

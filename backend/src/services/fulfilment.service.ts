@@ -14,6 +14,7 @@ import { DispatchRecord, handoverCode, prepareHandover } from './handover.servic
 import { queueNotification } from './notification.service';
 import { assignAtDispatch } from './delivery/rider.service';
 import { mayDispatch, mayPack, notReleasedMessage } from './pharmacistCheck/rules';
+import { assertPaymentTaken } from './payments/rxHold/hold.service';
 import { assertEinvoiceReady, ensureInvoiceEinvoice, prepareDispatchEinvoice } from './einvoice/einvoice.service';
 
 // Orders ready for fulfilment: paid (packing), prescription-verified, or on credit (confirmed)
@@ -80,6 +81,7 @@ export async function packShipment(shipmentId: string, userId: string) {
     // Every order is checked and released by a registered pharmacist first (Sprint 35, C-08)
     if (!mayPack(s.pharmacist_check)) throw new AppError(notReleasedMessage(s.pharmacist_check, s.pharmacist_check_note, 'dawabag'), 409);
     await assertRxCleared(client, s.order_id, shipmentId);
+    await assertPaymentTaken(client, s.order_id);   // Sprint 39: a held prescription payment is captured first (C-37)
     await assertNoRecalledLines(client, shipmentId);
     await client.query(`UPDATE order_shipments SET status = 'packed' WHERE id = $1`, [shipmentId]);
     await client.query(`UPDATE orders SET status = 'packed', pharmacist_pack_id = $2, packed_at = NOW(), updated_at = NOW()
@@ -107,6 +109,7 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
     await assertDispatchAllowed(client, shipmentId);   // emergency stop holds Rx parcels (Sprint 38, C-08)
+    await assertPaymentTaken(client, s.order_id);      // Sprint 39 (C-37)
     await assertEinvoiceReady(client, shipmentId);
     // Reserved → shipped
     await client.query(

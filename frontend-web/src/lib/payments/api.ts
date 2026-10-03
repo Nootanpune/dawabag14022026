@@ -29,7 +29,8 @@ export async function fetchPaymentOptions(): Promise<PaymentOptions> {
   return data.data;
 }
 
-export interface DemoResult { paid: boolean; demo: true; status?: string; payment_status?: string }
+/** payment_status 'authorized' (Sprint 39): a prescription order's demo payment is held until the pharmacist's check */
+export interface DemoResult { paid: boolean; demo: true; status?: string; payment_status?: string; charge_note?: string }
 
 export async function payOrderDemo(orderId: string, choice: DemoChoice, outcome: 'success' | 'failure'): Promise<DemoResult> {
   const { data } = await api.post('/payments/demo', { order_id: orderId, ...choice, outcome });

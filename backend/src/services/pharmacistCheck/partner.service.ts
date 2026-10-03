@@ -9,10 +9,23 @@ import { query } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { CheckDecision } from './rules';
 import { Checker, assertCheckable, decide } from './check.service';
+import { assertPartnerRegistrationValid } from '../pharmacistRegistration/gate.service';
+import { registrationStanding } from '../pharmacistRegistration/rules';
+import { todayIST } from '../../utils/ist';
 
-export function partnerPharmacists(vendorId: string) {
-  return query<any>(
-    `SELECT id, full_name, registration_no FROM vendor_pharmacists WHERE vendor_id = $1 AND is_active ORDER BY full_name`, [vendorId]);
+/** The partner's active pharmacists, each with where its registration stands (Sprint 39). */
+export async function partnerPharmacists(vendorId: string) {
+  const rows = await query<any>(
+    `SELECT id, full_name, registration_no, state_council, to_char(valid_till, 'YYYY-MM-DD') AS valid_till, registration_status,
+            verified_at, recorded_before_sprint39
+     FROM vendor_pharmacists WHERE vendor_id = $1 AND is_active ORDER BY full_name`, [vendorId]);
+  const today = todayIST();
+  return rows.map((r) => {
+    const st = registrationStanding({ ...r, status: r.registration_status }, null, today, `${r.full_name}'s`);
+    return { id: r.id, full_name: r.full_name, registration_no: r.registration_no, state_council: r.state_council, valid_till: r.valid_till,
+      registration_status: r.registration_status, verified: !!r.verified_at,
+      registration: { ok: st.ok, state: st.state, message: st.message } };
+  });
 }
 
 async function partnerChecker(client: PoolClient, vendorId: string, vendorPharmacistId: string, userId: string): Promise<Checker> {
@@ -20,6 +33,8 @@ async function partnerChecker(client: PoolClient, vendorId: string, vendorPharma
     `SELECT id, full_name, registration_no FROM vendor_pharmacists WHERE id = $1 AND vendor_id = $2 AND is_active`,
     [vendorPharmacistId, vendorId])).rows[0];
   if (!p) throw new AppError('Choose one of your registered pharmacists (ask Dawabag to add a pharmacist to your account)', 400);
+  // Sprint 39: lapsed, expired, suspended or unverified registrations cannot release (C-03, C-08)
+  await assertPartnerRegistrationValid(client, p.id);
   return { userId, name: p.full_name, regNo: p.registration_no, vendorPharmacistId: p.id };
 }
 

@@ -157,9 +157,28 @@ export function buildMessage(payload: NotificationPayload) {
       sms: `Dawabag: Order ${on} is cancelled.${payload.amountPaise ? ` Refund of ${`₹${Math.round(payload.amountPaise / 100).toLocaleString('en-IN')}`} started.` : ''}`,
       email: {
         subject: `Order ${on} cancelled`,
-        body: `Your order ${on} has been cancelled (${payload.reason || 'on request'}).${payload.amountPaise ? ` A refund of ${`₹${Math.round(payload.amountPaise / 100).toLocaleString('en-IN')}`} has been started to your original payment method.` : ''}`,
+        body: `Your order ${on} has been cancelled (${payload.reason || 'on request'}).${payload.amountPaise ? ` A refund of ${`₹${Math.round(payload.amountPaise / 100).toLocaleString('en-IN')}`} has been started to your original payment method.` : ''}${payload.notCharged ? ' Your card or UPI payment was only authorised and has not been charged.' : ''}`,
       },
-      push: { title: 'Order cancelled', body: `Order ${on}` },
+      push: { title: 'Order cancelled', body: payload.notCharged ? `Order ${on} — you have not been charged` : `Order ${on}` },
+    },
+    // ── Sprint 39: prescription orders are authorised at checkout, charged after the pharmacist check (no SMS: no DLT template) ──
+    payment_authorised: {
+      email: { subject: `Order ${on} — payment authorised`,
+        body: `We have reserved ₹${Math.round((payload.amountPaise || 0) / 100).toLocaleString('en-IN')} on your card or UPI for order ${on}. You'll only be charged after our pharmacist checks your prescription. If the order cannot be supplied, the hold is released and you are not charged.` },
+      push: { title: 'Payment authorised', body: `Order ${on}: you'll only be charged after our pharmacist checks your prescription.` },
+    },
+    payment_hold_expiring: {
+      email: { subject: `Prescription order ${on} waiting for the pharmacist`,
+        body: `Order ${on} is paid by an authorisation that Dawabag releases at ${payload.dueAt} if the pharmacist check is not complete by then (the order is then cancelled and the buyer is not charged). Check the prescription and the order in Staff → Pharmacist check.` },
+      push: { title: 'Prescription order waiting', body: `Order ${on}: check it before the payment hold is released` },
+    },
+    pharmacist_registration_expiring: {
+      email: { subject: 'Pharmacist registration renewal due', body: payload.text || '' },
+      push: { title: 'Pharmacist registration renewal due', body: payload.text || '' },
+    },
+    online_sale_status_changed: {
+      email: { subject: `${payload.productName}: not allowed for online sale`, body: payload.text || '' },
+      push: { title: 'Product switched off for online sale', body: payload.text || '' },
     },
     return_update: {
       sms: payload.status === 'approved'

@@ -16,6 +16,8 @@ export interface OrderBody {
   coupon_code?: string;
   /** doctors / hospitals confirm on every order (C-15) */
   practitioner_declaration?: boolean;
+  /** Sprint 39: the prescription for the order's prescription lines, chosen before payment (C-08) */
+  prescription_id?: string;
 }
 
 export interface PreviewLine {
@@ -63,14 +65,21 @@ export interface CheckoutPreview {
   policies: { doc_key: PolicyKey; version: number; title: string; effective_from: string }[];
 }
 
-export function buildOrderBody(address: Address, cart: CartView, declaration?: boolean): OrderBody {
+export function buildOrderBody(address: Address, cart: CartView, declaration?: boolean, prescriptionId?: string | null): OrderBody {
   return {
     address_id: address.id,
     pincode: address.pincode,
     items: cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
     coupon_code: cart.coupon?.valid ? cart.coupon.code : undefined,
     ...(declaration ? { practitioner_declaration: true } : {}),
+    ...(prescriptionId ? { prescription_id: prescriptionId } : {}),
   };
+}
+
+/** The server refused the order or payment because the prescription is missing or unusable (Sprint 39). */
+export function isPrescriptionProblem(err: unknown): boolean {
+  const data = (err as { response?: { data?: { code?: string; message?: string } } })?.response?.data;
+  return data?.code === 'PRESCRIPTION_REQUIRED' || /prescription/i.test(data?.message ?? '');
 }
 
 export const checkoutKeys = {

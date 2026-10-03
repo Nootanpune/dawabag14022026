@@ -9,6 +9,7 @@ import { logger } from '../../config/logger';
 import { AppError } from '../../utils/AppError';
 import { getRazorpay, razorpayConfigured } from '../razorpay.client';
 import { applyCapture } from './capture.service';
+import { recordAuthorisation } from './rxHold/hold.service';
 import { retryPendingConsultationRefunds } from '../telemedicine/consultationFee.service';
 
 export async function runPaymentSweep(): Promise<Record<string, unknown>> {
@@ -25,7 +26,12 @@ export async function runPaymentSweep(): Promise<Record<string, unknown>> {
       const list: any = await getRazorpay().orders.fetchPayments(o.gateway_order_id);
       let p = (list.items ?? []).find((x: any) => x.status === 'captured') ?? (list.items ?? []).find((x: any) => x.status === 'authorized');
       if (!p) continue;
-      if (p.status === 'authorized') p = await getRazorpay().payments.capture(p.id, Number(p.amount), 'INR');
+      // Sprint 39: a prescription order's authorisation is recorded, not captured (that waits for the pharmacist)
+      if (p.status === 'authorized') {
+        const held = await recordAuthorisation(p);
+        if (held) { if (!/already/.test(held.outcome)) recorded++; continue; }
+        p = await getRazorpay().payments.capture(p.id, Number(p.amount), 'INR');
+      }
       const r = await applyCapture(p);
       if (!/already/.test(r.outcome)) recorded++;
     } catch (e: any) {

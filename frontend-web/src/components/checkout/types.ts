@@ -1,8 +1,8 @@
 import type { OrderShipment } from '@/components/orders/SoldBySection';
 
 // Address → prescription (only when needed) → review (C-35) → payment (Sprint 26 order).
-// 'rx-fix': the order is placed but the chosen prescription could not go with it.
-export type CheckoutStep = 'address' | 'prescription' | 'review' | 'rx-fix' | 'payment' | 'confirmed';
+// Sprint 39: the prescription goes WITH the order (POST /orders refuses a prescription order without one).
+export type CheckoutStep = 'address' | 'prescription' | 'review' | 'payment' | 'confirmed';
 
 /** Subset of the order returned by POST /orders (data.order) — amounts are the server's. */
 export interface PlacedOrder {
@@ -15,4 +15,6 @@ export interface PlacedOrder {
   invoice_number?: string | null;
   /** one shipment per seller of record */
   shipments?: OrderShipment[];
+  /** Sprint 39: 'after_pharmacist_check' = the payment is only authorised until the pharmacist's check passes */
+  capture?: 'now' | 'after_pharmacist_check';
 }

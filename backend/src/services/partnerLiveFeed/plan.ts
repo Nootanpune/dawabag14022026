@@ -26,6 +26,7 @@
 import { batchKey } from '../recallAlerts/batchKey';
 import type { ParsedRow } from '../partnerStockImport/rows';
 import type { RowStatus } from '../partnerStockImport/evaluate';
+import { Provenance, provenanceOf } from '../partnerProvenance/rules';
 
 export interface PlanRow {
   status: RowStatus;
@@ -62,6 +63,8 @@ export interface BatchWrite {
   mrp_paise: number | null;
   sale_rate_paise: number | null;
   purchase_price_paise: number | null;
+  /** Sprint 39: supplier details sent with the batch (recorded once, C-02) */
+  provenance?: Provenance | null;
 }
 
 export type CheckKind = 'new_product' | 'new_listing' | 'cold_chain_batch' | 'price_change' | 'expiry_change' | 'short_for_orders';
@@ -140,6 +143,7 @@ export function planSnapshot(input: PlanInput): SnapshotPlan {
     const mrp = first.parsed.mrp_paise;
     const rate = first.parsed.sale_rate_paise ?? null;
     const purchase = first.parsed.purchase_rate_paise ?? null;
+    const provenance = g.rows.map((r) => provenanceOf(r.parsed)).find(Boolean) ?? null;
     const itemKey = first.item_key ?? `product:${g.listing.productId}`;
     const existing = ledgerBy.get(k);
     const base = { item_key: itemKey, batch_key: g.key, product_id: g.listing.productId, item_name: first.parsed.item_name, batch_number: g.batch_number };
@@ -147,11 +151,12 @@ export function planSnapshot(input: PlanInput): SnapshotPlan {
     if (!existing) {
       if (g.listing.coldChain) {
         plan.checks.push({ ...base, kind: 'cold_chain_batch', inventory_id: null,
-          details: { product_name: g.listing.name, quantity: feedQty, expiry_date: expiry, mrp_paise: mrp, sale_rate_paise: rate, purchase_price_paise: purchase } });
+          details: { product_name: g.listing.name, quantity: feedQty, expiry_date: expiry, mrp_paise: mrp, sale_rate_paise: rate, purchase_price_paise: purchase,
+            ...(provenance ? { provenance } : {}) } });
         continue;
       }
       plan.writes.push({ inventoryId: null, ppId: g.listing.ppId, productId: g.listing.productId, batch_number: g.batch_number,
-        qty_available: feedQty, feed_quantity: feedQty, expiry_date: expiry, mrp_paise: mrp, sale_rate_paise: rate, purchase_price_paise: purchase });
+        qty_available: feedQty, feed_quantity: feedQty, expiry_date: expiry, mrp_paise: mrp, sale_rate_paise: rate, purchase_price_paise: purchase, provenance });
     } else {
       const dispatched = input.dispatchedSince.get(existing.id) ?? 0;
       const shelf = Math.max(0, feedQty - dispatched);
@@ -180,7 +185,7 @@ export function planSnapshot(input: PlanInput): SnapshotPlan {
       }
       plan.writes.push({ inventoryId: existing.id, ppId: g.listing.ppId, productId: g.listing.productId, batch_number: existing.batch_number,
         qty_available: Math.max(shelf, reserved), feed_quantity: feedQty, expiry_date: keepExpiry,
-        mrp_paise: existing.mrp_paise ?? mrp, sale_rate_paise: existing.sale_rate_paise ?? rate, purchase_price_paise: purchase });
+        mrp_paise: existing.mrp_paise ?? mrp, sale_rate_paise: existing.sale_rate_paise ?? rate, purchase_price_paise: purchase, provenance });
       written.add(existing.id);
     }
     plan.lines_applied += g.rows.length;
@@ -209,7 +214,8 @@ export function planSnapshot(input: PlanInput): SnapshotPlan {
       item_name: r0.parsed.item_name, batch_number: null,
       details: { item_code: r0.parsed.item_code, quantity: rows.reduce((a, r) => a + Math.max(0, r.parsed.total_quantity ?? 0), 0),
         batches: rows.map((r) => ({ batch_number: r.parsed.batch_number, expiry_date: r.parsed.expiry_date, quantity: r.parsed.total_quantity,
-          mrp_paise: r.parsed.mrp_paise, sale_rate_paise: r.parsed.sale_rate_paise, purchase_price_paise: r.parsed.purchase_rate_paise })) } });
+          mrp_paise: r.parsed.mrp_paise, sale_rate_paise: r.parsed.sale_rate_paise, purchase_price_paise: r.parsed.purchase_rate_paise,
+          ...(provenanceOf(r.parsed) ? { provenance: provenanceOf(r.parsed) } : {}) })) } });
   }
   for (const [itemKey, rows] of newProduct) {
     const p = rows[0].parsed;

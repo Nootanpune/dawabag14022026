@@ -18,6 +18,9 @@ const licences = licenceList(20);
 const pharmacist = z.object({
   full_name: text(2, 200, 'the pharmacist\'s full name'),
   registration_no: text(2, 100, 'the pharmacist\'s registration number'),
+  // Sprint 39: State Pharmacy Council and valid-till; both given = verified by the admin entering them
+  state_council: z.string().trim().max(120).optional().nullable(),
+  valid_till: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the valid-till date as YYYY-MM-DD').optional().nullable(),
 });
 const login = z.object({
   mobile: mobile('the login mobile'),

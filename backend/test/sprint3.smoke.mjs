@@ -8,6 +8,7 @@
 // Test data: mobiles 90000002xx, SKU prefix S3-, vendors named 'S3 %', pincodes
 // 4999xx. Cleaned up before and after. NEVER point it at a production database.
 import { createRequire } from 'module';
+import { applySprint39Defaults, withPrescription } from './support/sprint39Fixtures.mjs';
 import { startFakes } from './fakes/server.mjs';
 import { licencePartner } from './support/partnerLicences.mjs';
 import { releaseInDb } from './support/pharmacistCheck.mjs';
@@ -26,7 +27,15 @@ function check(name, cond, detail) {
   else { failures++; console.log(`  FAIL ${name}${detail !== undefined ? ' — ' + JSON.stringify(detail).slice(0, 500) : ''}`); }
 }
 
-async function call(method, path, { body, token, headers = {} } = {}) {
+// Sprint 39 stand-ins (support/sprint39Fixtures.mjs): fixture products allowed for online sale, fixture
+// pharmacists verified, a prescription added when checkout asks for one
+async function call(method, path, opts = {}) {
+  if (db._connected) await applySprint39Defaults(db);
+  if (method === 'POST' && path === '/orders' && opts.body) return withPrescription(db, (body) => rawCall(method, path, { ...opts, body }), opts.body, opts.token);
+  return rawCall(method, path, opts);
+}
+
+async function rawCall(method, path, { body, token, headers = {} } = {}) {
   const h = { ...headers };
   if (token) h.Authorization = `Bearer ${token}`;
   if (body !== undefined) h['Content-Type'] = 'application/json';

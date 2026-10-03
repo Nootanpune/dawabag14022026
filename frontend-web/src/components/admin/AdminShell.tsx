@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import BrandLogo from '@/components/brand/BrandLogo';
 import AdminNav from './AdminNav';
 import AdminFeedAlert from '@/components/stockFeed/AdminFeedAlert';
+import RegistrationWarning from '@/components/staff/RegistrationWarning';
 
 interface Props {
   children: ReactNode;
@@ -53,7 +54,11 @@ export default function AdminShell({ children, section = 'Admin', homeHref = '/a
         <aside className="md:w-56 shrink-0">
           <AdminNav />
         </aside>
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="flex-1 min-w-0">
+          {/* Sprint 39: the pharmacist's own registration standing (C-03) */}
+          <RegistrationWarning />
+          {children}
+        </main>
       </div>
     </div>
   );

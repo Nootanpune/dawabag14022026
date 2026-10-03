@@ -11,15 +11,15 @@ import { usePaymentOptions } from '@/hooks/usePaymentOptions';
 import DemoPaymentPanel from '@/components/payments/DemoPaymentPanel';
 import PaymentUnavailable from '@/components/payments/PaymentUnavailable';
 import RxAttachedLine, { type ChosenRx } from './rx/RxAttachedLine';
-import RxPolicyNote from './rx/RxPolicyNote';
+import RxPolicyNote, { CHARGE_AFTER_CHECK } from './rx/RxPolicyNote';
 import type { PlacedOrder } from './types';
 
 interface Props {
   order: PlacedOrder;
   /** the prescription sent with this order, if it needs one (C-08) */
   rx: ChosenRx | null;
-  /** paidBy: how the demo payment was made, e.g. "HDFC netbanking (demo)" */
-  onPaid: (o: { demo: boolean; paidBy?: string }) => void;
+  /** paidBy: how the demo payment was made, e.g. "HDFC netbanking (demo)"; authorised: held until the pharmacist's check (Sprint 39) */
+  onPaid: (o: { demo: boolean; paidBy?: string; authorised?: boolean }) => void;
 }
 
 type Notice = { tone: 'error' | 'info'; text: string } | null;
@@ -31,6 +31,8 @@ type Notice = { tone: 'error' | 'info'; text: string } | null;
  */
 export default function PaymentStep({ order, rx, onPaid }: Props) {
   const { data: options, isLoading } = usePaymentOptions();
+  // Sprint 39: a prescription order is only authorised now; the pharmacist's check comes first (C-08, C-37)
+  const held = order.capture === 'after_pharmacist_check' || order.requires_prescription;
   const [busy, setBusy] = useState<'razorpay' | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
@@ -47,8 +49,8 @@ export default function PaymentStep({ order, rx, onPaid }: Props) {
         setNotice({ tone: 'error', text: `Your payment did not go through (${outcome.reason}). No money was taken. Please try again or choose another way to pay.` });
       } else {
         try {
-          await api.post('/payments/verify', { ...outcome.response, order_id: order.id });
-          onPaid({ demo: false });
+          const { data: v } = await api.post('/payments/verify', { ...outcome.response, order_id: order.id });
+          onPaid({ demo: false, authorised: v?.data?.payment_status === 'authorized' });
         } catch {
           setNotice({ tone: 'error', text: 'We received your payment but could not confirm it yet. Please do not pay again — check My orders in a few minutes, or contact us.' });
         }
@@ -67,7 +69,7 @@ export default function PaymentStep({ order, rx, onPaid }: Props) {
     setNotice(null);
     try {
       const r = await payOrderDemo(order.id, choice, outcome);
-      if (r.paid) { onPaid({ demo: true, paidBy: paidByLabel(choice) }); return 'paid'; }
+      if (r.paid) { onPaid({ demo: true, paidBy: paidByLabel(choice), authorised: r.payment_status === 'authorized' }); return 'paid'; }
       return 'not_paid';
     } catch (err) {
       setNotice({ tone: 'error', text: getApiErrorMessage(err, 'We could not record the demo payment. Please try again.') });
@@ -86,6 +88,7 @@ export default function PaymentStep({ order, rx, onPaid }: Props) {
           <span>Total payable</span><span className="text-brand-700">{formatPrice(order.total_paise)}</span>
         </div>
         <p className="text-xs text-gray-500">Includes delivery and all taxes (GST). No cash on delivery.</p>
+        {held && <p className="text-sm font-semibold text-brand-800" data-testid="charge-after-check">{CHARGE_AFTER_CHECK}</p>}
       </div>
 
       {rx && (<><RxAttachedLine rx={rx} /><RxPolicyNote /></>)}
@@ -103,11 +106,12 @@ export default function PaymentStep({ order, rx, onPaid }: Props) {
         <DemoPaymentPanel amountPaise={order.total_paise} methods={options.methods} providers={options.providers} onPay={payDemo} />
       ) : options?.mode === 'razorpay' ? (
         <>
-          <p className="text-sm text-gray-700">You can pay by UPI, debit or credit card, netbanking or a wallet in Razorpay’s secure window.</p>
+          <p className="text-sm text-gray-700">You can pay by UPI, debit or credit card, netbanking or a wallet in Razorpay’s secure window.
+            {held && ' The amount is held now and taken only after the pharmacist’s check.'}</p>
           <button type="button" onClick={payWithRazorpay} disabled={!!busy}
             className="btn-primary w-full py-3 flex items-center justify-center gap-2 text-base">
             {busy ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" /> : <Lock className="w-5 h-5" aria-hidden="true" />}
-            Pay {formatPrice(order.total_paise)} securely
+            {held ? `Authorise ${formatPrice(order.total_paise)} securely` : `Pay ${formatPrice(order.total_paise)} securely`}
           </button>
         </>
       ) : (

@@ -21,6 +21,7 @@ export async function cleanup() {
   await q('DELETE FROM refunds WHERE order_id = ANY($1)', [orderIds]);
   await q('DELETE FROM credit_notes WHERE order_id = ANY($1)', [orderIds]).catch(() => {});
   await q('DELETE FROM payments WHERE order_id = ANY($1)', [orderIds]);
+  await q('DELETE FROM prescriptions WHERE order_id = ANY($1) AND status = \'pending\'', [orderIds]);   // Sprint 39: uploads sent with orders
   await q('DELETE FROM stock_movements WHERE order_id = ANY($1)', [orderIds]).catch(() => {});
   await q('DELETE FROM order_items WHERE order_id = ANY($1)', [orderIds]);
   await q('DELETE FROM invoices WHERE order_id = ANY($1)', [orderIds]).catch(() => {});
@@ -142,7 +143,9 @@ export async function runTrialDemo(t) {
     r = await callAt(b, 'POST', '/payments/demo', { token: t.buyer, body: { order_id: rxOrder.id, method: 'netbanking', provider: 'HDFC' } });
     [o] = await q('SELECT status FROM orders WHERE id = $1', [rxOrder.id]);
     check('a prescription order paid by demo goes to rx_pending (pharmacist queue)', r.json.data?.paid === true && o.status === 'rx_pending', o);
-    const [bank] = await q(`SELECT new_value->>'provider' AS provider FROM audit_logs WHERE action = 'demo_payment_captured' AND (new_value->>'order_id') = $1`, [rxOrder.id]);
+    // Sprint 39: only authorised (simulated) until the pharmacist's check passes
+    check('… the demo payment is only authorised (held), not captured', r.json.data?.payment_status === 'authorized', r.json.data);
+    const [bank] = await q(`SELECT new_value->>'provider' AS provider FROM audit_logs WHERE action = 'demo_payment_authorised' AND (new_value->>'order_id') = $1`, [rxOrder.id]);
     check('… the chosen bank is in the demo audit entry only', bank?.provider === 'HDFC', bank);
 
     // Cancelling the paid OTC order: the demo refund is settled at once (no gateway, C-37)

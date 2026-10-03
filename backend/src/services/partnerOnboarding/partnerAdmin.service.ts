@@ -88,10 +88,21 @@ async function savePharmacistsTx(c: PoolClient, vendorId: string, adminId: strin
   // Pharmacists no longer listed are kept, inactive: past H1 entries name them (C-08)
   await c.query(`UPDATE vendor_pharmacists SET is_active = FALSE, updated_at = NOW() WHERE vendor_id = $1 AND registration_no <> ALL($2)`, [vendorId, regs]);
   for (const [i, p] of pharmacists.entries()) {
+    // Sprint 39: council + valid-till entered by the admin = checked and verified by that admin (C-03);
+    // without them the pharmacist cannot release orders until recorded (Admin → Pharmacist registrations)
+    const council = p.state_council?.trim() || null;
+    const validTill = p.valid_till || null;
+    if (validTill && validTill < todayIST()) throw new AppError(`Pharmacist ${p.full_name.trim()}: the registration expired on ${validTill}`, 400);
+    const verify = !!(council && validTill);
     await c.query(
-      `INSERT INTO vendor_pharmacists (vendor_id, full_name, registration_no, created_by) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (vendor_id, registration_no) DO UPDATE SET full_name = EXCLUDED.full_name, is_active = TRUE, updated_at = NOW()`,
-      [vendorId, p.full_name.trim(), regs[i], adminId]);
+      `INSERT INTO vendor_pharmacists (vendor_id, full_name, registration_no, created_by, state_council, valid_till, verified_by, verified_at)
+       VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $7 THEN $4::uuid END, CASE WHEN $7 THEN NOW() END)
+       ON CONFLICT (vendor_id, registration_no) DO UPDATE SET full_name = EXCLUDED.full_name, is_active = TRUE, updated_at = NOW(),
+         state_council = CASE WHEN $7 THEN EXCLUDED.state_council ELSE vendor_pharmacists.state_council END,
+         valid_till = CASE WHEN $7 THEN EXCLUDED.valid_till ELSE vendor_pharmacists.valid_till END,
+         verified_by = CASE WHEN $7 THEN EXCLUDED.verified_by ELSE vendor_pharmacists.verified_by END,
+         verified_at = CASE WHEN $7 THEN EXCLUDED.verified_at ELSE vendor_pharmacists.verified_at END`,
+      [vendorId, p.full_name.trim(), regs[i], adminId, council, validTill, verify]);
   }
 }
 
@@ -210,7 +221,9 @@ export async function getPartner(vendorId: string) {
   if (!v) throw new AppError('Partner not found', 404);
   const [all, pharmacists, logins] = await Promise.all([
     listLicences({ vendorId }),
-    query<any>(`SELECT full_name, registration_no FROM vendor_pharmacists WHERE vendor_id = $1 AND is_active ORDER BY created_at, full_name`, [vendorId]),
+    query<any>(`SELECT id, full_name, registration_no, state_council, to_char(valid_till, 'YYYY-MM-DD') AS valid_till, registration_status,
+                       (verified_at IS NOT NULL) AS verified, recorded_before_sprint39
+                FROM vendor_pharmacists WHERE vendor_id = $1 AND is_active ORDER BY created_at, full_name`, [vendorId]),
     query<any>(`SELECT u.id AS user_id, u.mobile, up.full_name, u.must_change_password, u.is_active, u.last_login_at
                 FROM vendor_users vu JOIN users u ON u.id = vu.user_id LEFT JOIN user_profiles up ON up.user_id = u.id
                 WHERE vu.vendor_id = $1 ORDER BY vu.created_at`, [vendorId]),
