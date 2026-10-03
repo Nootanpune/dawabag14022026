@@ -128,7 +128,7 @@ test('trust pages are linked from the product page and the footer', async ({ pag
   await expect(page.getByText(/never supply a batch that expires within 30 days/)).toBeVisible();
   await expect(page.getByText('{{')).toHaveCount(0);
   const footer = page.locator('footer');
-  await expect(footer.getByRole('link', { name: 'How a pharmacist checks your order' })).toHaveAttribute('href', '/trust/pharmacist-checked');
+  await expect(footer.getByRole('link', { name: 'Every order is checked by a pharmacist' })).toHaveAttribute('href', '/trust/pharmacist-checked');
   if (!isPhone(info.project.name)) await expect(footer.getByRole('link', { name: 'Genuine medicines' })).toBeVisible();
 });
 
@@ -240,8 +240,11 @@ test('staff write medicine information and a pharmacist approves it (C-19)', asy
   expect(before.json.data.available).toBe(false);
 
   await signIn(page, 'pharmacist');
-  await page.goto('/staff/content-review');
+  // Sprint 36: medicine information has its own approvals page (a second pharmacist approves)
+  await page.goto('/staff/medicine-info-approvals');
+  await expect(page.getByRole('heading', { name: 'Medicine information to approve', level: 1 })).toBeVisible();
   const card = page.getByTestId('info-review-card').filter({ hasText: 'E2E Zorvaquin 650 mg Tablet' });
+  await expect(card.getByTestId('own-version')).toHaveCount(0);
   await expect(card).toContainText('E2E Zorvaquin eases pain and fever.');
   await card.getByLabel('Review notes').fill('Matches the package insert.');
   await Promise.all([
@@ -257,3 +260,37 @@ test('staff write medicine information and a pharmacist approves it (C-19)', asy
   try { await c.query(`DELETE FROM product_info_versions WHERE product_id = $1`, [P.sub]); } finally { await c.end(); }
 });
 
+
+test('four eyes: the pharmacist who wrote the text cannot approve it; buyers keep the old text (Sprint 36)', async ({ page }, info) => {
+  test.skip(isPhone(info.project.name), 'staff screens are checked on desktop');
+  const ph = await token('pharmacist');
+  const content = { overview: 'E2E four-eyes text by the pharmacist.', references: [{ source: 'Manufacturer’s package insert', date: 'May 2026' }] };
+  const saved = await call('PUT', `/medicines/${P.sub}/info/draft`, { content }, ph);
+  expect(saved.status, JSON.stringify(saved.json)).toBe(200);
+  expect((await call('POST', `/medicines/${P.sub}/info/submit`, undefined, ph)).status).toBe(200);
+  try {
+    await signIn(page, 'pharmacist');
+    await page.goto('/staff/medicine-info-approvals');
+    const card = page.getByTestId('info-review-card').filter({ hasText: 'E2E Zorvaquin 650 mg Tablet' });
+    await expect(card.getByTestId('own-version')).toContainText('another registered pharmacist must approve it');
+    await expect(card.getByRole('button', { name: 'Approve' })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: 'Withdraw' })).toBeVisible();
+    // the server refuses it too
+    const r = await call('POST', `/medicines/${P.sub}/info/review`, { approve: true, notes: 'Approving my own text.' }, ph);
+    expect(r.status).toBe(403);
+    const pub = await call('GET', `/medicines/${P.sub}/info`);
+    expect(pub.json.data.sections?.overview ?? null).not.toBe(content.overview);
+    // Withdraw: it goes back to the writer with the reason
+    await card.getByLabel('Review notes').fill('Withdrawn to rewrite the overview.');
+    await Promise.all([
+      page.waitForResponse((x) => /\/info\/review$/.test(x.url()) && x.ok()),
+      card.getByRole('button', { name: 'Withdraw' }).click(),
+    ]);
+    await page.reload();
+    await expect(page.getByTestId('info-returned')).toContainText('Withdrawn to rewrite the overview.');
+  } finally {
+    const c = db();
+    await c.connect();
+    try { await c.query(`DELETE FROM product_info_versions WHERE product_id = $1 AND status <> 'approved'`, [P.sub]); } finally { await c.end(); }
+  }
+});

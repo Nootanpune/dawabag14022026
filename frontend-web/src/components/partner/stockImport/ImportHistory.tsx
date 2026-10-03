@@ -22,7 +22,7 @@ export default function ImportHistory({ imports }: { imports: ImportListItem[] }
               <p className="text-xs text-gray-500">
                 {formatDateTimeIST(i.created_at)}
                 {i.source_software ? ` · ${i.source_software}` : ''}
-                {i.uploaded_by ? ` · ${i.uploaded_by}` : ''}
+                {i.api_key_prefix ? ` · sent by your software (${i.api_key_label ?? 'API key'})` : i.uploaded_by ? ` · ${i.uploaded_by}` : ''}
               </p>
             </div>
             <div className="text-xs text-gray-600">

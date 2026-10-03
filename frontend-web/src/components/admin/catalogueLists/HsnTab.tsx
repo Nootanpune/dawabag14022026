@@ -3,19 +3,22 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import QueryState from '@/components/admin/QueryState';
 import type { HsnCode } from '@/lib/catalogueLists';
-import { fetchAllHsnCodes, manageKeys, updateHsnCode, usedByText } from '@/lib/admin/catalogueListsAdmin';
+import { fetchAllHsnCodes, manageKeys, mergeHsnCode, updateHsnCode, usedByText } from '@/lib/admin/catalogueListsAdmin';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import ListSearch from './ListSearch';
 import ActiveBadge from './ActiveBadge';
 import ActiveToggleButton from './ActiveToggleButton';
 import EditHsnDialog from './EditHsnDialog';
+import MergeDialog from './MergeDialog';
 
 /** HSN codes: search, edit words / GST (correct the code while unused), switch off / on. Read-only for pharmacists. */
 export default function HsnTab({ canEdit, onMessage }: { canEdit: boolean; onMessage: (m: { ok: boolean; text: string }) => void }) {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<HsnCode | null>(null);
+  const [merging, setMerging] = useState<HsnCode | null>(null);
   const { data = [], isLoading, error } = useQuery({ queryKey: manageKeys.hsn(q), queryFn: () => fetchAllHsnCodes(q), placeholderData: (prev) => prev });
+  const all = useQuery({ queryKey: manageKeys.hsn(''), queryFn: () => fetchAllHsnCodes(''), enabled: !!merging });
   const toggle = useMutation({
     mutationFn: (h: HsnCode) => updateHsnCode(h.code, { is_active: !h.is_active }),
     onSuccess: (r) => {
@@ -40,14 +43,17 @@ export default function HsnTab({ canEdit, onMessage }: { canEdit: boolean; onMes
                   <span className="font-normal text-gray-600"> — {h.description || 'No description yet'}</span>
                 </p>
                 <p className="text-xs text-gray-500">
-                  {h.gst_rate == null ? 'Usual GST not set' : `Usual GST ${h.gst_rate}%`} · {usedByText(h.product_count)}
+                  {h.merged_into ? `Merged into ${h.merged_into}`
+                    : <>{h.gst_rate == null ? 'Usual GST not set' : `Usual GST ${h.gst_rate}%`} · {usedByText(h.product_count)}</>}
                 </p>
               </div>
               <ActiveBadge active={h.is_active} />
-              {canEdit && (
+              {canEdit && !h.merged_into && (
                 <div className="flex items-center gap-4">
                   <button type="button" className="text-sm text-brand-700 font-medium hover:underline underline-offset-2"
                     onClick={() => setEditing(h)} aria-label={`Edit HSN ${h.code}`}>Edit</button>
+                  <button type="button" className="text-sm text-brand-700 font-medium hover:underline underline-offset-2"
+                    onClick={() => setMerging(h)} aria-label={`Merge HSN ${h.code} into another code`}>Merge into…</button>
                   <ActiveToggleButton active={h.is_active} name={`HSN ${h.code}`}
                     pending={toggle.isPending && toggle.variables?.code === h.code} onClick={() => toggle.mutate(h)} />
                 </div>
@@ -55,6 +61,13 @@ export default function HsnTab({ canEdit, onMessage }: { canEdit: boolean; onMes
             </li>
           ))}
         </ul>
+      )}
+      {merging && (
+        <MergeDialog what="HSN code" source={{ key: merging.code, label: `HSN ${merging.code}`, product_count: merging.product_count }}
+          choices={(all.data ?? []).filter((h) => h.is_active && !h.merged_into)
+            .map((h) => ({ key: h.code, label: `${h.code} — ${h.description || 'no description'}`, hint: h.gst_rate == null ? undefined : `GST ${h.gst_rate}%` }))}
+          reasonRequired onMerge={(into, reason) => mergeHsnCode(merging.code, into, reason)}
+          onClose={() => setMerging(null)} onDone={(text) => { setMerging(null); onMessage({ ok: true, text }); }} />
       )}
       {editing && (
         <EditHsnDialog hsn={editing} onClose={() => setEditing(null)}

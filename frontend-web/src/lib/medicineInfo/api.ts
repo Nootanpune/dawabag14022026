@@ -7,6 +7,7 @@ export const medicineInfoKeys = {
   public: (id: string) => ['medicine-info', id] as const,
   editor: (id: string) => ['medicine-info', id, 'editor'] as const,
   queue: ['medicine-info', 'review-queue'] as const,
+  returned: ['medicine-info', 'returned'] as const,
 };
 
 export async function fetchMedicineInfo(productId: string): Promise<PublicInfo> {
@@ -36,5 +37,11 @@ export async function reviewInfo(productId: string, approve: boolean, notes: str
 
 export async function fetchInfoQueue(): Promise<InfoQueueItem[]> {
   const { data } = await api.get('/medicines/info-review/queue');
+  return data.data?.versions ?? [];
+}
+
+/** Sprint 36: versions a second pharmacist sent back to me, with the reason. */
+export async function fetchInfoReturned(): Promise<InfoQueueItem[]> {
+  const { data } = await api.get('/medicines/info-review/returned');
   return data.data?.versions ?? [];
 }

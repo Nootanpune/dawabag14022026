@@ -5,7 +5,7 @@ import RequireAuth from '@/components/auth/RequireAuth';
 import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import ContentReviewCard from '@/components/staff/content/ContentReviewCard';
-import InfoReviewQueue from '@/components/staff/medicineInfo/InfoReviewQueue';
+import Link from 'next/link';
 import { PHARMACIST_ROLES } from '@/lib/admin/roles';
 
 // Pharmacist review of product copy before it is shown (C-19)
@@ -24,8 +24,11 @@ function ContentReviewQueue() {
       />
       <QueryState isLoading={isLoading} error={error} isEmpty={!data?.length} emptyText="No product copy waiting for review" />
       <div className="space-y-3">{data?.map((p) => <ContentReviewCard key={p.id} p={p} />)}</div>
-      {/* Sprint 33: structured medicine information goes through the same review */}
-      <InfoReviewQueue />
+      {/* Sprint 36: medicine information has its own page (a second pharmacist approves it) */}
+      <p className="text-sm text-gray-600 mt-6">
+        Medicine information (uses, side effects, warnings) is approved on{' '}
+        <Link href="/staff/medicine-info-approvals" className="text-brand-700 underline">Medicine information to approve</Link>.
+      </p>
     </div>
   );
 }

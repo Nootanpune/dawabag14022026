@@ -3,19 +3,23 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import QueryState from '@/components/admin/QueryState';
 import type { Category } from '@/lib/catalogueLists';
-import { fetchAllCategories, manageKeys, updateCategory, usedByText } from '@/lib/admin/catalogueListsAdmin';
+import { fetchAllCategories, manageKeys, mergeCategory, updateCategory, usedByText } from '@/lib/admin/catalogueListsAdmin';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import ListSearch from './ListSearch';
 import ActiveBadge from './ActiveBadge';
 import ActiveToggleButton from './ActiveToggleButton';
 import RenameCategoryDialog from './RenameCategoryDialog';
+import MergeDialog from './MergeDialog';
 
-/** Categories: search, rename (products follow), switch off / on. Read-only for pharmacists. */
+/** Categories: search, rename (products follow), merge a duplicate (Sprint 36), switch off / on. Read-only for pharmacists. */
 export default function CategoriesTab({ canEdit, onMessage }: { canEdit: boolean; onMessage: (m: { ok: boolean; text: string }) => void }) {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [renaming, setRenaming] = useState<Category | null>(null);
+  const [merging, setMerging] = useState<Category | null>(null);
   const { data = [], isLoading, error } = useQuery({ queryKey: manageKeys.categories(q), queryFn: () => fetchAllCategories(q), placeholderData: (prev) => prev });
+  // Merge targets: every switched-on entry, whatever the search shows
+  const all = useQuery({ queryKey: manageKeys.categories(''), queryFn: () => fetchAllCategories(''), enabled: !!merging });
   const toggle = useMutation({
     mutationFn: (c: Category) => updateCategory(c.id, { is_active: !c.is_active }),
     onSuccess: (r) => {
@@ -36,13 +40,17 @@ export default function CategoriesTab({ canEdit, onMessage }: { canEdit: boolean
             <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3" data-testid="category-row">
               <div className="flex-1 min-w-[12rem]">
                 <p className={`font-medium ${c.is_active ? 'text-gray-900' : 'text-gray-500'}`}>{c.name}</p>
-                <p className="text-xs text-gray-500">{usedByText(c.product_count)}</p>
+                <p className="text-xs text-gray-500">
+                  {c.merged_into_name ? `Merged into "${c.merged_into_name}"` : usedByText(c.product_count)}
+                </p>
               </div>
               <ActiveBadge active={c.is_active} />
-              {canEdit && (
+              {canEdit && !c.merged_into && (
                 <div className="flex items-center gap-4">
                   <button type="button" className="text-sm text-brand-700 font-medium hover:underline underline-offset-2"
                     onClick={() => setRenaming(c)} aria-label={`Rename ${c.name}`}>Rename</button>
+                  <button type="button" className="text-sm text-brand-700 font-medium hover:underline underline-offset-2"
+                    onClick={() => setMerging(c)} aria-label={`Merge ${c.name} into another category`}>Merge into…</button>
                   <ActiveToggleButton active={c.is_active} name={c.name}
                     pending={toggle.isPending && toggle.variables?.id === c.id} onClick={() => toggle.mutate(c)} />
                 </div>
@@ -50,6 +58,12 @@ export default function CategoriesTab({ canEdit, onMessage }: { canEdit: boolean
             </li>
           ))}
         </ul>
+      )}
+      {merging && (
+        <MergeDialog what="category" source={{ key: merging.id, label: `"${merging.name}"`, product_count: merging.product_count }}
+          choices={(all.data ?? []).filter((c) => c.is_active && !c.merged_into).map((c) => ({ key: c.id, label: c.name, hint: usedByText(c.product_count) }))}
+          reasonRequired={false} onMerge={(into, reason) => mergeCategory(merging.id, into, reason)}
+          onClose={() => setMerging(null)} onDone={(text) => { setMerging(null); onMessage({ ok: true, text }); }} />
       )}
       {renaming && (
         <RenameCategoryDialog category={renaming} onClose={() => setRenaming(null)}

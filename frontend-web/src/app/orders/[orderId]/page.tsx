@@ -15,6 +15,7 @@ import RefundsCard from '@/components/orders/RefundsCard';
 import OrderBillCard from '@/components/orders/OrderBillCard';
 import DeliveryAddressCard from '@/components/orders/DeliveryAddressCard';
 import RefillSetupButton from '@/components/orders/RefillSetupButton';
+import RefusedOrderCard from '@/components/orders/RefusedOrderCard';
 import { formatDateIST } from '@/lib/dates';
 
 export default function OrderDetailPage() {
@@ -56,6 +57,7 @@ export default function OrderDetailPage() {
               </button>
             </div>
 
+            <RefusedOrderCard order={order} />
             <OrderTimeline order={order} />
             <OrderShipmentsCard order={order} />
             <OrderItemsCard order={order} />

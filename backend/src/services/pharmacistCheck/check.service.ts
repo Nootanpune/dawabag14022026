@@ -128,7 +128,10 @@ export async function decide(
       if (!canDecide(s.pharmacist_check, decision)) throw new AppError(`Already ${s.pharmacist_check.replace('_', ' ')}`, 409);
       return { s, who: await resolveChecker(client) };
     });
-    // Cancels every shipment of the order and refunds it (C-37); refused if any part has left
+    // Cancels every shipment of the order and refunds it (C-37); refused if any part has left.
+    // orders.cancellation_reason is shown to the BUYER (web and app): it carries only this
+    // refusal reason, which the dialogs label as shown to the buyer — never the staff-only
+    // hold note (pharmacist_check_note of an earlier hold is not copied here).
     const cancelled = await cancelOrder(pre.s.order_id, { id: actorId, staff: true }, `Not supplied after the pharmacist's check: ${note}`);
     await withTransaction(async (client) => {
       await client.query(

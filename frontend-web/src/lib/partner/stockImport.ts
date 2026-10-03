@@ -77,6 +77,9 @@ export interface ImportListItem {
   created_at: string;
   applied_at: string | null;
   uploaded_by: string | null;
+  /** Sprint 36: sent by the billing software with this API key (prefix only) */
+  api_key_prefix?: string | null;
+  api_key_label?: string | null;
 }
 
 export interface Candidate { id: string; name: string; pack: string | null; schedule: string | null; mrp_paise: number; listed: boolean }

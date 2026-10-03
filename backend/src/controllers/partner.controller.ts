@@ -32,9 +32,11 @@ export async function getMe(req: Request, res: Response, next: NextFunction) {
     const vendor = await queryOne(
       `SELECT v.id, v.name, v.gst_number, v.drug_license_no, v.drug_license_type, v.drug_license_expiry,
               v.approval_status, v.vendor_type, v.invoice_prefix, v.pincode, v.city, v.vendor_rating,
-              COALESCE(r.commission_pct, 8) AS commission_pct, COALESCE(r.finding_fee_paise, 1500) AS finding_fee_paise
+              COALESCE(r.commission_pct, 8) AS commission_pct, COALESCE(r.finding_fee_paise, 1500) AS finding_fee_paise,
+              -- Sprint 36: the owner login manages the stock-feed API keys
+              COALESCE((SELECT vu.is_owner FROM vendor_users vu WHERE vu.vendor_id = v.id AND vu.user_id = $2), FALSE) AS is_owner
        FROM vendors v LEFT JOIN partner_commission_rates r ON r.partner_id = v.id
-       WHERE v.id = $1`, [req.partner!.vendorId]);
+       WHERE v.id = $1`, [req.partner!.vendorId, req.user!.id]);
     // "Your drug licences" (Sprint 30): every licence, renewals waiting for Dawabag's check
     const licences = await listLicences({ vendorId: req.partner!.vendorId });
     res.json({ success: true, data: { ...vendor, licences, licence_line: licenceLine(licences.filter((l) => l.status === 'verified')),

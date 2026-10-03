@@ -46,7 +46,7 @@ export async function customerEveryday(browser: Browser, story: Story) {
     await page.waitForTimeout(2500);
     const num = await orderNumberOnScreen(page);
     if (device === 'laptop') story.orders.otc = num;
-    await shot('Order confirmed', `Paid (test payment through the fake gateway). Order ${num} goes straight to packing.`);
+    await shot('Order confirmed', `Paid (test payment through the fake gateway). Order ${num} now waits for a registered pharmacist to check it before packing — every order is checked (Sprint 35, C-08).`);
     await page.goto('/orders');
     await shot('My orders', 'The order list, newest first, with status and amount.');
     await ctx.close();
@@ -84,6 +84,19 @@ export async function customerPrescription(browser: Browser, story: Story) {
   await page.waitForTimeout(2500);
   story.orders.rx = await orderNumberOnScreen(page);
   await shot('Order confirmed', `Paid. Order ${story.orders.rx} now waits for the pharmacist to check the prescription before anything is packed.`);
+  await ctx.close();
+}
+
+// ── Customer sees the pharmacist's check on the everyday order (phone; Sprint 35) ──
+export async function customerChecked(browser: Browser, story: Story) {
+  const device = 'phone' as const;
+  const { ctx, page } = await newSession(browser, device);
+  await signIn(page, 'buyer');
+  await page.goto(`/orders/${await orderIdOf(story.orders.otc!)}`);
+  await page.getByTestId('checked-by').waitFor({ timeout: 8000 }).catch(() => undefined);
+  await capture(page, { journey: C, role: 'Customer', device, title: 'Checked by pharmacist',
+    caption: 'The order page shows the "Pharmacist check" step done and "Checked by pharmacist <name>, Reg. no. <x>" — the same line Dawabag\'s invoice prints (C-08).' },
+  { fullPage: true });
   await ctx.close();
 }
 

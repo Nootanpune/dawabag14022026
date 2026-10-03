@@ -7,7 +7,8 @@ import { LICENCE_FILE_MAX_BYTES } from '../services/licences/register.service';
 
 const licenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LICENCE_FILE_MAX_BYTES, files: 1 } });
 import { authenticate } from '../middleware/auth.middleware';
-import { requirePartner } from '../middleware/partner.middleware';
+import { requirePartner, requirePartnerOwner } from '../middleware/partner.middleware';
+import { partnerGetKeys, partnerPostKey, partnerRevokeKey } from '../controllers/partnerApiKeys.controller';
 import { getMyReturn, getMyReturns } from '../controllers/partner.controller';
 import stockImportRoutes from './partnerStockImport.routes';
 import {
@@ -41,5 +42,9 @@ router.get('/settlements', getMySettlements);
 router.get('/settlements/:id', getMySettlement);
 // Stock file upload from the partner's billing software (Sprint 27)
 router.use('/stock-imports', stockImportRoutes);
+// Sprint 36: API keys for the billing software's automatic stock upload (owner login only)
+router.get('/api-keys', requirePartnerOwner, partnerGetKeys);
+router.post('/api-keys', requirePartnerOwner, partnerPostKey);
+router.post('/api-keys/:keyId/revoke', requirePartnerOwner, partnerRevokeKey);
 
 export default router;

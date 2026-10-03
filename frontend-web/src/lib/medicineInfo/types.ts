@@ -121,6 +121,9 @@ export interface InfoVersion {
   reviewer_reg_no: string | null;
   updated_by_name: string | null;
   submitted_by_name: string | null;
+  /** Sprint 36 (four eyes): everyone who wrote or sent this version, and who decided it */
+  author_names?: string[];
+  reviewed_by_name?: string | null;
 }
 
 export interface InfoEditorData {
@@ -138,6 +141,8 @@ export interface InfoQueueItem extends InfoVersion {
   sku: string;
   drug_schedule: string | null;
   catalogue_state: string;
+  /** Sprint 36: the viewer wrote or sent it, so another pharmacist must approve it */
+  authored_by_you?: boolean;
 }
 
 export const STATUS_LABEL: Record<VersionStatus, string> = {

@@ -83,7 +83,7 @@ export function categoryRenameProblems(current: { name: string }, raw: string, o
   const problems = categoryNameProblems(raw);
   if (problems.length) return problems;
   const clash = findDuplicateCategory(others, raw);
-  if (clash) return [`"${clash.name}" is already in the list — choose a different name (two categories cannot be merged here)`];
+  if (clash) return [`"${clash.name}" is already in the list — choose a different name, or use "Merge into" to combine the two`];
   if (tidyName(raw) === current.name) return ['The new name is the same as the current one'];
   return [];
 }
@@ -112,4 +112,37 @@ export function hsnEditProblems(current: { code: string; description: string | n
     out.push('GST rate must be 0, 5, 12, 18 or 28');
   }
   return out;
+}
+
+// ── Sprint 36: merging one entry into another (Admin → Catalogue lists) ──────
+
+export interface MergeEntry { key: string; label: string; is_active: boolean; merged: boolean }
+
+/**
+ * Problems with merging `source` into `target`; empty = fine. The target must be
+ * a different, switched-on entry that has not itself been merged away. A source
+ * already merged cannot be merged again. Shared by categories and HSN codes.
+ */
+export function mergeProblems(source: MergeEntry | null | undefined, target: MergeEntry | null | undefined, what: 'category' | 'HSN code'): string[] {
+  if (!source) return [`The ${what} to merge was not found`];
+  if (!target) return [`The ${what} to merge into was not found`];
+  if (source.key === target.key) return [`Choose a different ${what} to merge into: an entry cannot be merged into itself`];
+  if (source.merged) return [`${source.label} was already merged into another entry`];
+  if (target.merged) return [`${target.label} was merged into another entry; merge into that one instead`];
+  if (!target.is_active) return [`${target.label} is switched off. Switch it back on first, or merge into another entry`];
+  return [];
+}
+
+/** A plain reason why an HSN code cannot be merged away, from what uses it; null = it can. */
+export function hsnMergeBlock(code: string, soldLines: number): string | null {
+  if (soldLines > 0) {
+    return `HSN ${code} is on ${soldLines} sold order line${soldLines === 1 ? '' : 's'}: invoices and GST returns show the product's HSN code, so it cannot be merged. Correct the products one by one from a date your CA agrees, or keep both codes`;
+  }
+  return null;
+}
+
+/** Both codes have a usual GST rate and they differ: not a duplicate but a different tax class. */
+export function hsnGstClash(source: { code: string; gst_rate: number | null }, target: { code: string; gst_rate: number | null }): string | null {
+  if (source.gst_rate === null || target.gst_rate === null || Number(source.gst_rate) === Number(target.gst_rate)) return null;
+  return `HSN ${source.code} usually has GST ${source.gst_rate}% and ${target.code} has ${target.gst_rate}%: these are different tax classes, not duplicates`;
 }

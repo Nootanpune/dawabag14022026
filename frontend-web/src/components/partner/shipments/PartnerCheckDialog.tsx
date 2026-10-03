@@ -58,7 +58,7 @@ export default function PartnerCheckDialog({ shipment: s, onClose }: { shipment:
         <input type="checkbox" className="mt-1" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
         <span>The pharmacist named above has checked the medicines and quantities on this shipment.</span>
       </label>
-      <label htmlFor="pc-reason" className="block text-sm font-medium text-gray-700 mt-3 mb-1">Reason (needed to hold or not supply)</label>
+      <label htmlFor="pc-reason" className="block text-sm font-medium text-gray-700 mt-3 mb-1">Reason (needed to hold or not supply) — a hold reason is for staff only; a &ldquo;Do not supply&rdquo; reason is shown to the buyer</label>
       <textarea id="pc-reason" className="input" rows={2} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
       {error && <p role="alert" className="text-sm text-red-600 mt-2">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2 mt-4">

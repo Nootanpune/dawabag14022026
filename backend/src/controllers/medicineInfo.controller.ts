@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { infoEditor, infoReviewQueue, publicInfo, reviewInfo, saveInfoDraft, submitInfo } from '../services/medicineInfo/versions.service';
+import { infoEditor, infoReturnedTo, infoReviewQueue, publicInfo, reviewInfo, saveInfoDraft, submitInfo } from '../services/medicineInfo/versions.service';
 
 // Medicine information on the product page (Sprint 33). Buyers see only the
 // approved version (C-19); staff write drafts; a pharmacist reviews (C-17, C-19);
@@ -38,7 +38,12 @@ export async function postMedicineInfoReview(req: Request, res: Response, next: 
   } catch (e) { next(e); }
 }
 
-// GET /medicines/info-review/queue
-export async function getMedicineInfoQueue(_req: Request, res: Response, next: NextFunction) {
-  try { res.json({ success: true, data: { versions: await infoReviewQueue() } }); } catch (e) { next(e); }
+// GET /medicines/info-review/queue — each version says whether the viewer wrote it (Sprint 36: four eyes)
+export async function getMedicineInfoQueue(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: { versions: await infoReviewQueue(req.user!.id) } }); } catch (e) { next(e); }
+}
+
+// GET /medicines/info-review/returned — Sprint 36: rejected versions sent back to the viewer
+export async function getMedicineInfoReturned(req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: { versions: await infoReturnedTo(req.user!.id) } }); } catch (e) { next(e); }
 }

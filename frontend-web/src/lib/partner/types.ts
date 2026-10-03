@@ -4,6 +4,8 @@ import type { LicenceView } from '../licences/forms';
 export interface PartnerMe {
   id: string;
   name: string;
+  /** Sprint 36: this login is the partner's owner (manages stock-feed API keys) */
+  is_owner?: boolean;
   gst_number: string | null;
   drug_license_no: string | null;
   drug_license_type: string | null;

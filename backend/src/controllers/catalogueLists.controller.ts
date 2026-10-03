@@ -5,6 +5,7 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { createCategory, createHsnCode, listCategories, listHsnCodes } from '../services/catalogueLists/lists.service';
 import { searchLists, updateCategory, updateHsnCode } from '../services/catalogueLists/manage.service';
+import { mergeCategory, mergeHsnCode } from '../services/catalogueLists/merge.service';
 
 /** Only admins switch a switched-off entry back on (pharmacists add new entries only, Sprint 32). */
 const isAdmin = (req: Request) => ['admin', 'super_admin'].includes(req.user!.role);
@@ -69,5 +70,30 @@ export async function patchHsnCode(req: Request, res: Response, next: NextFuncti
       is_active: z.boolean().optional(),
     }).strict().parse(req.body ?? {});
     res.json({ success: true, data: await updateHsnCode(code, body, req.user!.id) });
+  } catch (err) { next(err); }
+}
+
+// ── Sprint 36: merge a duplicate entry into another (admins only; audited C-46) ──
+
+export async function postMergeCategory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({
+      into_id: z.string().uuid(),
+      reason: z.string().trim().max(300).optional(),
+    }).strict().parse(req.body ?? {});
+    res.json({ success: true, data: await mergeCategory(id, body.into_id, req.user!.id, body.reason || null) });
+  } catch (err) { next(err); }
+}
+
+export async function postMergeHsnCode(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { code } = z.object({ code: z.string().max(20) }).parse(req.params);
+    const body = z.object({
+      into_code: z.string().max(20),
+      // tax classification: say why (e.g. "typed 3004 instead of 30049099")
+      reason: z.string().trim().min(5, 'Say why the codes are the same (at least 5 characters)').max(300),
+    }).strict().parse(req.body ?? {});
+    res.json({ success: true, data: await mergeHsnCode(code, body.into_code, req.user!.id, body.reason) });
   } catch (err) { next(err); }
 }

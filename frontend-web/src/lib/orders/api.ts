@@ -110,6 +110,9 @@ export interface OrderDetail {
   shipments: OrderShipmentDetail[];
   requires_prescription: boolean;
   can_cancel: boolean;
+  /** Why the order was cancelled; for a pharmacist's refusal, the reason written for the buyer (never the staff-only hold note) */
+  cancellation_reason?: string | null;
+  cancelled_at?: string | null;
   /** Sprint 35: released once every shipment is (not_recorded: orders from before the check existed) */
   pharmacist_check?: PharmacistCheckState;
   credit_notes: OrderCreditNote[];

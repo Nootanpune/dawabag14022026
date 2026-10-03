@@ -1,6 +1,6 @@
 # Active Context
 
-## Current state (2026-10-02)
+## Current state (2026-10-03)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
 (built in a Claude chat, 30 Mar 2026). Sprints 1–35 are done (Sprint 14 video calls wired on web and mobile; Sprints 34–35 uncommitted) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
@@ -9,6 +9,17 @@ the lawyer/CA sign-off.
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Sprint 36 — merge lists, partner stock-feed keys, medicine-info four-eyes, app pharmacist check (2026-10-03)
+
+- Migration 31 (`31_sprint36_merge_feed_keys_four_eyes.sql`).
+- Category / HSN merge: `merged_into` on both lists; the products trigger follows merges. `POST /catalogue-lists/categories/:id/merge` and `POST /catalogue-lists/hsn-codes/:code/merge` (HSN only while unsold and with the same GST rate, C-30/C-31). Admin web "Merge into…".
+- Partner stock-feed API keys: `partner_api_keys` (prefix + SHA-256 only, shown once, constant-time check), `vendor_users.is_owner`, `partner_stock_imports.api_key_id`. Machine endpoints `/partner-feed/:partnerId/{stock-files,whoami}`; an upload creates a DRAFT through the same `createImport` (a person applies it in the portal). 20 uploads/key/hour (`STOCK_FEED_MAX_PER_HOUR`). Query strings on /partner-feed are never logged. Doc: `docs/partner-stock-api.md`.
+- Medicine information four-eyes (owner confirmed): `author_ids`, DB check `product_info_four_eyes`; an author cannot approve; `GET /medicines/info-review/returned`; web `/staff/medicine-info-approvals`.
+- Refused orders: buyers see `cancellation_reason` (owner confirmed); hold notes (`pharmacist_check_note`) stay staff-only. Web `RefusedOrderCard`.
+- App (commit 8730466): pharmacist check step + held/refused notices, in-app Notifications screen (GET /notifications/my), all 36 notification types routed incl. `order_on_hold`, neutral OTP wording, trust strip link.
+- Owner confirmed 2026-10-03: partner's own pharmacist releases partner shipments; four-eyes for medicine info; refusal reason visible to buyers. Razorpay test payment: owner will UAT later.
+- Tests: jest 488, smoke 1–36 1545 checks, Playwright 125 passed / 7 skipped, flutter 224 passed, analyze clean.
 
 ## Sprint 35 — app rebrand + JPEG uploads (mobile only, 2026-10-02, uncommitted)
 - **DAWA BAG brand** (DECISIONS "Adopt the DAWA BAG brand"): `mobile/assets/brand/` — logo.png and wordmark.png

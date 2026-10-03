@@ -32,5 +32,21 @@ export async function updateHsnCode(code: string, body: { code?: string; descrip
   return data.data as { hsn: HsnCode };
 }
 
+// ── Sprint 36: merge a duplicate entry into another (admins; audited on the server) ──
+export interface MergeResult { products_moved: number; entries_repointed: number }
+
+export async function mergeCategory(id: string, intoId: string, reason?: string) {
+  const { data } = await api.post(`/catalogue-lists/categories/${id}/merge`, { into_id: intoId, ...(reason?.trim() ? { reason: reason.trim() } : {}) });
+  return data.data as MergeResult & { source: { id: string; name: string }; target: { id: string; name: string } };
+}
+
+export async function mergeHsnCode(code: string, intoCode: string, reason: string) {
+  const { data } = await api.post(`/catalogue-lists/hsn-codes/${encodeURIComponent(code)}/merge`, { into_code: intoCode, reason: reason.trim() });
+  return data.data as MergeResult & { source: { code: string }; target: { code: string } };
+}
+
+/** "3 products moved" for the confirmation message. */
+export const movedText = (n: number) => (n === 1 ? '1 product moved' : `${n} products moved`);
+
 /** "Used by 3 products" / "Not used by any product". */
 export const usedByText = (n: number) => (n > 0 ? `Used by ${n} product${n === 1 ? '' : 's'}` : 'Not used by any product');

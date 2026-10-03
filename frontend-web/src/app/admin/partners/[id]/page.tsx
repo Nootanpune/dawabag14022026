@@ -11,6 +11,7 @@ import QueryState from '@/components/admin/QueryState';
 import PartnerForm from '@/components/admin/partners/PartnerForm';
 import PartnerLoginsCard from '@/components/admin/partners/PartnerLoginsCard';
 import PartnerSummaryCard from '@/components/admin/partners/PartnerSummaryCard';
+import ApiKeysPanel from '@/components/partnerApiKeys/ApiKeysPanel';
 
 /** One partner: what it may sell, its logins, and its details to edit. */
 export default function PartnerDetailPage() {
@@ -38,6 +39,8 @@ export default function PartnerDetailPage() {
           <PageHeader title={data.legal_name} subtitle={[data.trade_name, data.city, data.state].filter(Boolean).join(' · ')} />
           <PartnerSummaryCard p={data} />
           <PartnerLoginsCard vendorId={data.id} logins={data.logins} />
+          {/* Sprint 36: keys for the partner's billing software to upload its stock file */}
+          <ApiKeysPanel owner={{ kind: 'admin', vendorId: data.id }} partnerId={data.id} />
           <h2 className="text-base font-semibold pt-2">Edit details</h2>
           <PartnerForm
             key={data.id}

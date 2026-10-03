@@ -9,7 +9,8 @@ import { startFakeProviders } from './lib/fakes';
 import { setUpStaff } from './lib/people';
 import { addPackPhotos } from './lib/photos';
 import { newStory } from './lib/story';
-import { customerDelivered, customerEveryday, customerOutForDelivery, customerPrescription } from './flows/customerOrder';
+import { customerChecked, customerDelivered, customerEveryday, customerOutForDelivery, customerPrescription } from './flows/customerOrder';
+import { forgotPassword } from './flows/forgotPassword';
 import { pharmacist } from './flows/pharmacist';
 import { packer } from './flows/packer';
 import { rider } from './flows/rider';
@@ -34,6 +35,7 @@ test('record every journey', async ({ browser }) => {
     await customerEveryday(browser, story);
     await customerPrescription(browser, story);
     await pharmacist(browser, story);
+    await customerChecked(browser, story);
     await packer(browser, story);
     await customerOutForDelivery(browser, story);
     await rider(browser, story);
@@ -44,6 +46,7 @@ test('record every journey', async ({ browser }) => {
     await partnerOnboarding(browser);
     await partnerOrder(browser, story);
     await returnsAndRefunds(browser, story);
+    await forgotPassword(browser);
   } finally {
     writeManifest();   // whatever was recorded, even if a journey stopped part-way
   }

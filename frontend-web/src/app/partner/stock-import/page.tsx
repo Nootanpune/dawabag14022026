@@ -7,12 +7,15 @@ import PageHeader from '@/components/admin/PageHeader';
 import QueryState from '@/components/admin/QueryState';
 import StockFileDrop from '@/components/partner/stockImport/StockFileDrop';
 import ImportHistory from '@/components/partner/stockImport/ImportHistory';
+import ApiKeysPanel from '@/components/partnerApiKeys/ApiKeysPanel';
+import { fetchPartnerMe, partnerKeys } from '@/lib/partner/api';
 
 /** Stock upload from the partner's billing software, and past uploads (Sprint 27). */
 export default function StockImportPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const history = useQuery({ queryKey: stockImportKeys.list, queryFn: fetchStockImports });
+  const me = useQuery({ queryKey: partnerKeys.me, queryFn: fetchPartnerMe });
   const upload = useMutation({
     mutationFn: uploadStockFile,
     onSuccess: (imp) => {
@@ -41,6 +44,8 @@ export default function StockImportPage() {
         />
         {!!history.data?.length && <ImportHistory imports={history.data} />}
       </section>
+      {/* Sprint 36: the billing software can send the file itself — keys for the owner login only */}
+      {me.data?.is_owner && <ApiKeysPanel owner={{ kind: 'partner' }} partnerId={me.data.id} />}
     </div>
   );
 }

@@ -83,6 +83,8 @@ export const NAV_SECTIONS: NavSection[] = [
       // Sprint 22 — bulk pack photos by SKU; each photo goes to pharmacist review (C-19)
       { href: '/admin/products/photos', label: 'Pack photos', icon: Images, roles: MANAGER_ROLES },
       { href: '/staff/content-review', label: 'Product copy', icon: ClipboardCheck, roles: PHARMACIST_ROLES },
+      // Sprint 36 — medicine information approved by a second pharmacist (four eyes, C-19)
+      { href: '/staff/medicine-info-approvals', label: 'Medicine information to approve', icon: BookOpenCheck, roles: PHARMACIST_ROLES },
       // Sprint 29 — draft products from partner requests, completed and approved by the pharmacist
       { href: '/staff/new-products', label: 'New products to complete', icon: ListPlus, roles: PHARMACIST_ROLES },
       // Sprint 32 — rename / correct / switch off categories and HSN codes (admins; pharmacists read-only)
@@ -122,7 +124,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/staff/telemedicine-lists', label: 'Telemedicine lists', icon: ListTree, roles: TELE_LIST_ROLES },
       { href: '/admin/licences', label: 'Licences', icon: BadgeCheck, roles: MANAGER_ROLES },
       { href: '/admin/policies', label: 'Policies', icon: FileText, roles: MANAGER_ROLES },
-      // Sprint 33 — "Genuine medicines", "Expired, damaged and recalled", "How a pharmacist checks your order"
+      // Sprint 33 — "Genuine medicines", "Expired, damaged and recalled", "Every order is checked by a pharmacist"
       { href: '/admin/info-pages', label: 'Trust pages', icon: BookOpenCheck, roles: MANAGER_ROLES },
     ],
   },

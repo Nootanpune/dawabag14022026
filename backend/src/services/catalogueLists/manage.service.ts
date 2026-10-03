@@ -12,6 +12,7 @@ import { query, withTransaction } from '../../config/database';
 import { cacheDel } from '../../config/redis';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
+import { CATEGORY_LIST_COLS, HSN_LIST_COLS } from './lists.service';
 import { categoryRenameProblems, HsnEdit, hsnEditProblems, tidyHsn, tidyName } from './rules';
 
 const CATEGORY_KEY_SQL = `lower(regexp_replace(btrim(p.category), '\\s+', ' ', 'g'))`;
@@ -19,9 +20,11 @@ const CATEGORY_KEY_SQL = `lower(regexp_replace(btrim(p.category), '\\s+', ' ', '
 export async function updateCategory(id: string, edit: { name?: string; is_active?: boolean }, userId: string) {
   if (edit.name === undefined && edit.is_active === undefined) throw new AppError('Nothing to change', 400);
   const result = await withTransaction(async (c) => {
-    const cur = (await c.query<{ id: string; name: string; name_key: string; is_active: boolean }>(
-      'SELECT id, name, name_key, is_active FROM product_categories WHERE id = $1 FOR UPDATE', [id])).rows[0];
+    const cur = (await c.query<{ id: string; name: string; name_key: string; is_active: boolean; merged_into: string | null }>(
+      'SELECT id, name, name_key, is_active, merged_into FROM product_categories WHERE id = $1 FOR UPDATE', [id])).rows[0];
     if (!cur) throw new AppError('Category not found', 404);
+    // Sprint 36: a merged entry is kept only so old spellings find the target
+    if (cur.merged_into) throw new AppError(`"${cur.name}" was merged into another category and cannot be changed`, 409);
     let productIds: string[] = [];
     let name = cur.name;
     if (edit.name !== undefined && tidyName(edit.name) !== cur.name) {
@@ -47,10 +50,7 @@ export async function updateCategory(id: string, edit: { name?: string; is_activ
       await writeAuditTx(c, { userId: null, action: edit.is_active ? 'product_category_reactivated' : 'product_category_deactivated',
         performedBy: userId, oldValue: { category_id: id, name, is_active: cur.is_active }, newValue: { category_id: id, name, is_active: edit.is_active } });
     }
-    const row = (await c.query(
-      `SELECT c.id, c.name, c.is_active,
-              (SELECT COUNT(*)::int FROM products p WHERE p.category = c.name AND p.deleted_at IS NULL) AS product_count
-       FROM product_categories c WHERE c.id = $1`, [id])).rows[0];
+    const row = (await c.query(`SELECT ${CATEGORY_LIST_COLS} FROM product_categories c WHERE c.id = $1`, [id])).rows[0];
     return { category: row, products_updated: productIds.length, productIds };
   });
   // The product page caches the product row for a few minutes
@@ -62,9 +62,11 @@ export async function updateHsnCode(code: string, edit: HsnEdit & { is_active?: 
   const keys = ['code', 'description', 'gst_rate', 'is_active'] as const;
   if (!keys.some((k) => edit[k] !== undefined)) throw new AppError('Nothing to change', 400);
   return withTransaction(async (c) => {
-    const cur = (await c.query<{ code: string; description: string | null; gst_rate: number | null; is_active: boolean }>(
-      'SELECT code, description, gst_rate, is_active FROM hsn_codes WHERE code = $1 FOR UPDATE', [tidyHsn(code)])).rows[0];
-    if (!cur) throw new AppError('HSN code not found', 404);
+    const found = (await c.query<{ code: string; description: string | null; gst_rate: number | null; is_active: boolean; merged_into: string | null }>(
+      'SELECT code, description, gst_rate, is_active, merged_into FROM hsn_codes WHERE code = $1 FOR UPDATE', [tidyHsn(code)])).rows[0];
+    if (!found) throw new AppError('HSN code not found', 404);
+    if (found.merged_into) throw new AppError(`HSN ${found.code} was merged into ${found.merged_into} and cannot be changed`, 409);
+    const { merged_into: _merged, ...cur } = found;
     // Any product row, removed ones too: their invoices carry the code
     const usedBy = Number((await c.query<{ n: number }>('SELECT COUNT(*)::int AS n FROM products WHERE hsn_code = $1', [cur.code])).rows[0].n);
     const newCode = edit.code === undefined ? cur.code : tidyHsn(edit.code);
@@ -83,10 +85,7 @@ export async function updateHsnCode(code: string, edit: HsnEdit & { is_active?: 
     const action = next.is_active !== cur.is_active && next.code === cur.code && next.description === cur.description && next.gst_rate === cur.gst_rate
       ? (next.is_active ? 'hsn_code_reactivated' : 'hsn_code_deactivated') : 'hsn_code_changed';
     await writeAuditTx(c, { userId: null, action, performedBy: userId, oldValue: cur, newValue: next });
-    const row = (await c.query(
-      `SELECT h.code, h.description, h.gst_rate, h.is_active,
-              (SELECT COUNT(*)::int FROM products p WHERE p.hsn_code = h.code AND p.deleted_at IS NULL) AS product_count
-       FROM hsn_codes h WHERE h.code = $1`, [next.code])).rows[0];
+    const row = (await c.query(`SELECT ${HSN_LIST_COLS} FROM hsn_codes h WHERE h.code = $1`, [next.code])).rows[0];
     return { hsn: row };
   });
 }
@@ -97,13 +96,11 @@ export async function searchLists(kind: 'categories' | 'hsn', q: string) {
   const words = tidyName(q).toLowerCase();
   if (kind === 'categories') {
     return query(
-      `SELECT c.id, c.name, c.is_active,
-              (SELECT COUNT(*)::int FROM products p WHERE p.category = c.name AND p.deleted_at IS NULL) AS product_count
+      `SELECT ${CATEGORY_LIST_COLS}
        FROM product_categories c WHERE c.name_key LIKE $1 ORDER BY c.is_active DESC, c.name_key`, [esc(words)]);
   }
   return query(
-    `SELECT h.code, h.description, h.gst_rate, h.is_active,
-            (SELECT COUNT(*)::int FROM products p WHERE p.hsn_code = h.code AND p.deleted_at IS NULL) AS product_count
+    `SELECT ${HSN_LIST_COLS}
      FROM hsn_codes h WHERE h.code LIKE $2 OR lower(COALESCE(h.description, '')) LIKE $1 ORDER BY h.is_active DESC, h.code`,
     [esc(words), esc(tidyHsn(words))]);
 }

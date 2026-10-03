@@ -9,6 +9,9 @@ export interface Category {
   name: string;
   is_active: boolean;
   product_count: number;
+  /** Sprint 36: merged into another entry (kept switched off so old spellings find it) */
+  merged_into?: string | null;
+  merged_into_name?: string | null;
 }
 
 export interface HsnCode {
@@ -17,6 +20,7 @@ export interface HsnCode {
   gst_rate: number | null;
   is_active: boolean;
   product_count: number;
+  merged_into?: string | null;
 }
 
 export interface Created<T> {

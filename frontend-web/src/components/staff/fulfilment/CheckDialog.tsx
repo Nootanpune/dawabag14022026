@@ -59,7 +59,7 @@ export default function CheckDialog({ item, onClose }: { item: CheckQueueItem; o
       <div className="mt-3"><CheckSignals signals={item.signals} /></div>
 
       <label htmlFor="check-reason" className="block text-sm font-medium text-gray-700 mt-4 mb-1">
-        Reason (needed to hold or not supply)
+        Reason (needed to hold or not supply) — a hold reason is for staff only; a &ldquo;Do not supply&rdquo; reason is shown to the buyer
       </label>
       <textarea id="check-reason" className="input" rows={2} maxLength={500} value={reason}
         onChange={(e) => { setReason(e.target.value); setConfirmReject(false); }} />

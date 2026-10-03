@@ -18,6 +18,13 @@ export const DRAFT_VALID_HOURS = 24;
 
 export interface UploadedFile { buffer: Buffer; originalname: string; size: number }
 
+/**
+ * Who sent the file: a partner login in the portal, or (Sprint 36) the partner's
+ * billing software with an API key. Same pipeline either way; only the record of
+ * who sent it differs (C-46).
+ */
+export type ImportActor = { userId: string; apiKey?: undefined } | { userId: null; apiKey: { id: string; prefix: string } };
+
 export async function loadImport(id: string, partnerId: string | null) {
   const imp = await queryOne<any>(
     `SELECT i.*, v.name AS partner_name FROM partner_stock_imports i JOIN vendors v ON v.id = i.partner_id
@@ -31,7 +38,8 @@ export function assertDraft(imp: { status: string; applied_at?: string | Date | 
   if (imp.status === 'cancelled') throw new AppError('This import was cancelled; upload the file again', 409);
 }
 
-export async function createImport(partnerId: string, userId: string, file: UploadedFile) {
+export async function createImport(partnerId: string, actor: string | ImportActor, file: UploadedFile) {
+  const { userId, apiKey } = typeof actor === 'string' ? { userId: actor, apiKey: undefined } : actor;
   const sheet = await readStockFile(file.buffer);
   const table = locateTable(sheet.rows);
   const preset = detectPreset(table.headers, table.otherText);
@@ -48,18 +56,19 @@ export async function createImport(partnerId: string, userId: string, file: Uplo
   return withTransaction(async (c) => {
     const imp = (await c.query<{ id: string }>(
       `INSERT INTO partner_stock_imports (partner_id, file_name, file_size, file_sha256, file_kind, sheet_name, source_software,
-         header_row, headers, mapping, mapping_source, row_count, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+         header_row, headers, mapping, mapping_source, row_count, created_by, api_key_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
       [partnerId, file.originalname.slice(0, 255), file.size, sha, sheet.kind, sheet.sheetName?.slice(0, 100) ?? null, software,
-       table.headerRow, JSON.stringify(table.headers), JSON.stringify(mapping), source, table.rows.length, userId])).rows[0];
+       table.headerRow, JSON.stringify(table.headers), JSON.stringify(mapping), source, table.rows.length, userId, apiKey?.id ?? null])).rows[0];
     await c.query(
       `INSERT INTO partner_stock_import_rows (import_id, row_number, raw)
        SELECT $1, x.n, x.cells FROM jsonb_to_recordset($2::jsonb) AS x(n int, cells jsonb)`,
       [imp.id, JSON.stringify(table.rows.map((r) => ({ n: r.rowNumber, cells: r.cells })))]);
     const summary = await evaluateImport(c, imp.id, partnerId);
-    // C-46: who uploaded which file (by hash) for which partner
+    // C-46: who (person, or API key by its public prefix — never the secret) uploaded which file (by hash) for which partner
     await writeAuditTx(c, { userId, action: 'partner_stock_import_uploaded', performedBy: userId,
-      newValue: { vendor_id: partnerId, import_id: imp.id, file_name: file.originalname, sha256: sha, rows: table.rows.length, software } });
+      newValue: { vendor_id: partnerId, import_id: imp.id, file_name: file.originalname, sha256: sha, rows: table.rows.length, software,
+        via: apiKey ? 'api_key' : 'portal', ...(apiKey ? { api_key_id: apiKey.id, api_key_prefix: apiKey.prefix } : {}) } });
     return { id: imp.id, summary };
   });
 }
@@ -103,8 +112,10 @@ export async function getImport(id: string, partnerId: string | null) {
 export async function listImports(partnerId: string | null, limit = 50) {
   return query(
     `SELECT i.id, i.partner_id, v.name AS partner_name, i.file_name, i.source_software, i.status, i.row_count, i.summary, i.result,
-            i.created_at, i.applied_at, i.cancelled_at, up.full_name AS uploaded_by
+            i.created_at, i.applied_at, i.cancelled_at, up.full_name AS uploaded_by,
+            k.prefix AS api_key_prefix, k.label AS api_key_label   -- Sprint 36: sent by the partner's software
      FROM partner_stock_imports i JOIN vendors v ON v.id = i.partner_id LEFT JOIN user_profiles up ON up.user_id = i.created_by
+     LEFT JOIN partner_api_keys k ON k.id = i.api_key_id
      WHERE ($1::uuid IS NULL OR i.partner_id = $1)
      ORDER BY i.created_at DESC LIMIT $2`, [partnerId, limit]);
 }

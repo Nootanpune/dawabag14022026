@@ -4,7 +4,7 @@ import api from '../api';
 export const INFO_PAGES = [
   { key: 'genuine-medicines', label: 'Genuine medicines' },
   { key: 'expired-damaged-recalled', label: 'Expired, damaged and recalled medicines' },
-  { key: 'pharmacist-checked', label: 'How a pharmacist checks your order' },
+  { key: 'pharmacist-checked', label: 'Every order is checked by a pharmacist' },
 ] as const;
 export type InfoPageKey = (typeof INFO_PAGES)[number]['key'];
 

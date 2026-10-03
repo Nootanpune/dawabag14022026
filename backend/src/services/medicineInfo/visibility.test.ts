@@ -40,6 +40,19 @@ describe('medicine information visibility (Sprint 33)', () => {
     expect(read('routes/medicines.routes.ts')).toMatch(/info\/review', authenticate, authorize\('pharmacist_rx'\)/);
   });
 
+  it('four eyes (Sprint 36): writers and submitters are recorded and cannot review; the database refuses it too', () => {
+    expect(fn(versions, 'saveInfoDraft')).toMatch(/ADD_AUTHOR\('\$4::uuid'\)/);
+    expect(fn(versions, 'saveInfoDraft')).toMatch(/author_ids\)\s*VALUES[\s\S]*ARRAY\[\$5::uuid\]/);
+    expect(fn(versions, 'submitInfo')).toMatch(/ADD_AUTHOR\('\$2::uuid'\)/);
+    const review = fn(versions, 'reviewInfo');
+    expect(review).toMatch(/approve && \(open\.author_ids \?\? \[\]\)\.includes\(pharmacistId\)\) throw new AppError\(SELF_REVIEW_MESSAGE, 403\)/);
+    // the check comes before anything is written
+    expect(review.indexOf('SELF_REVIEW_MESSAGE')).toBeLessThan(review.indexOf("status = 'superseded'"));
+    const sql = read('../../database/31_sprint36_merge_feed_keys_four_eyes.sql');
+    expect(sql).toMatch(/product_info_four_eyes[\s\S]*NOT \(reviewed_by = ANY\(author_ids\)\)/);
+    expect(fn(versions, 'publicInfo')).toMatch(/v\.status = 'approved'/);
+  });
+
   it.each(['services/shopping/substitutes.service.ts', 'services/productPage/delivery.service.ts'])(
     '%s reads only sellable products', (file) => {
       const literals = read(file).match(/`[^`]*`/gs) ?? [];

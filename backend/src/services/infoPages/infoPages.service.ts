@@ -1,5 +1,5 @@
 // Trust pages (Sprint 33): "Genuine medicines", "Expired, damaged and recalled
-// medicines" and "How a pharmacist checks your order". Kept on the server,
+// medicines" and "Every order is checked by a pharmacist". Kept on the server,
 // versioned (a new version never overwrites an old one) and published by admins,
 // audited (C-46). The words must describe only what the system does (C-04, C-17):
 // numbers that admins can change — return windows, shelf-life rules — are not

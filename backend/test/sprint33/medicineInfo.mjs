@@ -62,7 +62,9 @@ export async function runMedicineInfo() {
   r = await call('POST', `/medicines/${id}/info/review`, { token: t.pharmacistNoReg, body: { approve: true, notes: 'Looks fine to me, checked.' } });
   check('a pharmacist without a council registration cannot approve', r.status === 403 && /registration number/.test(r.json.message), r.json);
   r = await call('POST', `/medicines/${id}/info/review`, { token: t.pharmacist, body: { approve: true, notes: 'OK by me.' } });
-  check('flagged text needs a reason of 20+ characters to approve', r.status === 400 && /flagged claims/.test(r.json.message), r.json);
+  // Sprint 36 (four eyes): this pharmacist edited and sent v1, so cannot approve it; the
+  // flagged-claims reason rule is checked with a second pharmacist in test/sprint36
+  check('the pharmacist who edited it cannot approve it (Sprint 36, four eyes)', r.status === 403 && /another registered pharmacist/.test(r.json.message), r.json);
   r = await call('POST', `/medicines/${id}/info/review`, { token: t.pharmacist, body: { approve: false, notes: 'Remove the cure claim; not in the insert.' } });
   check('the pharmacist rejects v1', r.status === 200 && r.json.data?.status === 'rejected', r.json);
   r = await call('GET', `/medicines/${id}/info/editor`, { token: t.admin });

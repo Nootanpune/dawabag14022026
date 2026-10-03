@@ -86,3 +86,23 @@ test('the buyer sees the pharmacist check on the order timeline', async ({ page 
   await page.reload();
   await expect(page.getByTestId('checked-by')).toContainText('Checked by pharmacist E2E Pharmacist, Reg. no.');
 });
+
+test('a refused order shows the buyer the refusal reason, never the staff-only hold note (Sprint 35/36)', async ({ page }) => {
+  const o = await paidOtcOrder();
+  const ph = await tokenOf('pharmacist');
+  const sid = (await call('GET', `/orders/${o.id}`, undefined, await tokenOf('buyer'))).json.data.shipments[0].id;
+  let r = await call('POST', `/fulfilment/shipments/${sid}/check`, { decision: 'hold', reason: 'Staff only: ring the buyer first' }, ph);
+  expect(r.status, JSON.stringify(r.json)).toBe(200);
+  r = await call('POST', `/fulfilment/shipments/${sid}/check`, { decision: 'reject', reason: 'The quantity is more than is safe without a prescription' }, ph);
+  expect(r.status, JSON.stringify(r.json)).toBe(200);
+  const detail = (await call('GET', `/orders/${o.id}`, undefined, await tokenOf('buyer'))).json.data;
+  expect(detail.cancellation_reason).toContain('The quantity is more than is safe without a prescription');
+  expect(JSON.stringify(detail)).not.toContain('Staff only: ring the buyer first');
+  await signIn(page, 'buyer');
+  await page.goto(`/orders/${o.id}`);
+  const card = page.getByTestId('refused-order');
+  await expect(card).toContainText('Not supplied after the pharmacist’s check');
+  await expect(card).toContainText('Reason: The quantity is more than is safe without a prescription');
+  await expect(card).toContainText('refunded the way you paid');
+  await expect(page.getByText('Staff only: ring the buyer first')).toHaveCount(0);
+});

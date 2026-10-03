@@ -78,8 +78,8 @@ async function plan(client: PoolClient, buffer: Buffer): Promise<Plan> {
 export interface SwitchedOff { categories: Map<string, string>; hsn: Set<string> }
 
 async function switchedOffEntries(client: PoolClient): Promise<SwitchedOff> {
-  const cats = (await client.query(`SELECT name_key, name FROM product_categories WHERE NOT is_active`)).rows;
-  const hsn = (await client.query(`SELECT code FROM hsn_codes WHERE NOT is_active`)).rows;
+  const cats = (await client.query(`SELECT name_key, name FROM product_categories WHERE NOT is_active AND merged_into IS NULL`)).rows;
+  const hsn = (await client.query(`SELECT code FROM hsn_codes WHERE NOT is_active AND merged_into IS NULL`)).rows;
   return { categories: new Map(cats.map((r: any) => [r.name_key, r.name])), hsn: new Set(hsn.map((r: any) => r.code)) };
 }
 

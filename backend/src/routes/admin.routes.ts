@@ -14,6 +14,7 @@ import {
   adminGetStockImport, adminGetStockImportRows, adminListProductRequests, adminListStockImports, adminResolveProductRequest,
 } from '../controllers/partnerStockImport.controller';
 import { getPartnerDetail, getPartners, postPartner, postPartnerLogin, putPartner } from '../controllers/partnerAdmin.controller';
+import { adminGetKeys, adminPostKey, adminRevokeKey } from '../controllers/partnerApiKeys.controller';
 import { postCreateDrafts } from '../controllers/catalogueDraft.controller';
 import multer from 'multer';
 import {
@@ -131,6 +132,10 @@ router.put('/partners/:vendorId', authenticate, managers, putPartner);
 router.post('/partners/:vendorId/logins', authenticate, managers, postPartnerLogin);
 router.post('/partners/:vendorId/users', authenticate, managers, linkPartnerUser);
 router.put('/partners/:vendorId/commission', authenticate, managers, setCommission);
+// Sprint 36: stock-feed API keys of a partner (shown once; hash only stored; audited C-46)
+router.get('/partners/:vendorId/api-keys', authenticate, managers, adminGetKeys);
+router.post('/partners/:vendorId/api-keys', authenticate, managers, adminPostKey);
+router.post('/partners/:vendorId/api-keys/:keyId/revoke', authenticate, managers, adminRevokeKey);
 // Partner stock imports (Sprint 27): read-only for admins; new-product requests resolved here
 router.get('/partner-stock-imports', authenticate, managers, adminListStockImports);
 router.get('/partner-stock-imports/:id', authenticate, managers, adminGetStockImport);

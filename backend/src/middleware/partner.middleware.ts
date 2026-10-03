@@ -33,3 +33,13 @@ export async function requirePartner(req: Request, _res: Response, next: NextFun
     next();
   } catch (err) { next(err); }
 }
+
+/** Sprint 36: the partner's owner login (vendor_users.is_owner) — manages API keys. Use after requirePartner. */
+export async function requirePartnerOwner(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const row = await queryOne<{ is_owner: boolean }>(
+      'SELECT is_owner FROM vendor_users WHERE user_id = $1 AND vendor_id = $2', [req.user!.id, req.partner!.vendorId]);
+    if (!row?.is_owner) throw new AppError('Only the partner\'s owner login can manage API keys. Ask your owner, or Dawabag', 403);
+    next();
+  } catch (err) { next(err); }
+}

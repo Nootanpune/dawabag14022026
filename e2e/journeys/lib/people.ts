@@ -12,6 +12,8 @@ export const staff = {
   rider: account('Journey Rider', '9000001905'),
   doctor: account('Meera Joshi', '9000001906'),
   partner: account('Journey Partner Owner', '9000001907'),
+  // Sprint 35: forgets the password and resets it with a code (a separate account, so the others keep theirs)
+  forgetful: account('Journey Forgetful', '9000001908'),
 };
 export const everyone = { ...people, ...staff };
 

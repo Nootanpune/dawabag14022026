@@ -36,6 +36,7 @@ import reportRoutes from './routes/report.routes';
 import kycRoutes from './routes/kyc.routes';
 import cartRoutes from './routes/cart.routes';
 import partnerRoutes from './routes/partner.routes';
+import partnerFeedRoutes from './routes/partnerFeed.routes';
 import refillRoutes from './routes/refill.routes';
 import fulfilmentRoutes from './routes/fulfilment.routes';
 import invoiceRoutes from './routes/invoice.routes';
@@ -128,6 +129,7 @@ const uploadLimiter = rateLimit({
 const UPLOAD_PATHS = [
   '/api/v1/prescriptions/upload', '/api/v1/catalogue/import', '/api/v1/kyc/documents',
   /^\/api\/v1\/partner\/stock-imports\/?$/,   // the file itself, not the steps after it
+  /^\/api\/v1\/partner-feed\//,               // Sprint 36: the billing software's key path (per address; per key in the route)
   /^\/api\/v1\/(users\/me|partner)\/licences\/[^/]+\/document$/,
   /^\/api\/v1\/admin\/party-licences\/[^/]+\/document$/,
 ];
@@ -143,7 +145,11 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Access logs never carry an e-prescription check code
-morgan.token('url', (req: express.Request) => (req.originalUrl || req.url).replace(/(\/eprescriptions\/verify\/)[^/?]+/, '$1[code]'));
+// nor (Sprint 36) the query string of a partner-feed call: a misconfigured billing
+// program could put its API key there; it is refused, and never written to the log (C-44)
+morgan.token('url', (req: express.Request) => (req.originalUrl || req.url)
+  .replace(/(\/eprescriptions\/verify\/)[^/?]+/, '$1[code]')
+  .replace(/^(\/api\/v1\/partner-feed\/[^?]*)\?.*$/, '$1?[removed]'));
 morgan.token('rid', (req: express.Request) => req.id ?? '-');
 app.use(morgan(':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" rid=:rid', {
   stream: { write: (msg) => logger.http(msg.trim()) },
@@ -186,6 +192,7 @@ app.use(`${api}/reports`, reportRoutes);
 app.use(`${api}/kyc`, kycRoutes);
 app.use(`${api}/cart`, cartRoutes);
 app.use(`${api}/partner`, partnerRoutes);
+app.use(`${api}/partner-feed`, partnerFeedRoutes);   // Sprint 36: stock feed with a partner API key
 app.use(`${api}/refills`, refillRoutes);
 app.use(`${api}/fulfilment`, fulfilmentRoutes);
 app.use(`${api}/invoices`, invoiceRoutes);
