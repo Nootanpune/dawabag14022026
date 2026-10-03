@@ -7,6 +7,7 @@ import { LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import BrandLogo from '@/components/brand/BrandLogo';
 import PartnerNav from './PartnerNav';
+import PartnerFeedAlert from '@/components/stockFeed/PartnerFeedAlert';
 
 export default function PartnerShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -27,6 +28,8 @@ export default function PartnerShell({ children }: { children: ReactNode }) {
           <span className="text-sm text-gray-400 hidden md:block">/ Partner</span>
         </Link>
         <div className="flex items-center gap-3 text-sm text-gray-600">
+          {/* Sprint 37: URGENT — live stock-feed items waiting for a check */}
+          <PartnerFeedAlert />
           <span className="hidden sm:block">{user?.full_name}</span>
           <button
             onClick={handleLogout}

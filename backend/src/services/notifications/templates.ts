@@ -232,6 +232,17 @@ export function buildMessage(payload: NotificationPayload) {
       email: { subject: `Returning to origin: order ${on}`, body: `AWB ${payload.awbNumber} (order ${on}) is returning to us undelivered. Contact the buyer; returned medicines go to the destruction register, never back on sale.` },
       push: { title: 'Parcel returning (RTO)', body: `Order ${on} — AWB ${payload.awbNumber}` },
     },
+    // ── Sprint 37: live stock feed (partner owner and admins; no SMS — no DLT template) ──
+    stock_feed_checks: {
+      email: { subject: `URGENT: ${payload.count} stock item(s) from ${payload.partnerName} wait for a check`,
+        body: `${payload.count} item(s) from ${payload.partnerName}'s billing software wait for a person before they can sell on Dawabag (new products, price or expiry changes). Open ${payload.where}. You will not be emailed again for these items.` },
+      push: { title: 'Stock items to check', body: `${payload.count} item(s) from ${payload.partnerName} wait for a check` },
+    },
+    stock_feed_stale: {
+      email: { subject: `Stock feed stale: ${payload.partnerName}`,
+        body: `No stock snapshot has arrived from ${payload.partnerName} since ${payload.lastAt}. ${payload.policy} Check the connector on the partner's computer. You will be told again only after the feed has recovered and gone stale again.` },
+      push: { title: 'Stock feed stale', body: `${payload.partnerName}: no snapshot since ${payload.lastAt}` },
+    },
     low_stock_digest: {
       email: {
         subject: `Low stock: ${payload.count} product(s) at or below reorder level`,

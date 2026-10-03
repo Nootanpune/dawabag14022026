@@ -12,6 +12,9 @@ import { partnerGetKeys, partnerPostKey, partnerRevokeKey } from '../controllers
 import { getMyReturn, getMyReturns } from '../controllers/partner.controller';
 import stockImportRoutes from './partnerStockImport.routes';
 import {
+  getPartnerChecks, getPartnerFeed, getPartnerFeedAlerts, postAcceptCheck, postDismissCheck, postLinkCheck, postRequestCheck,
+} from '../controllers/stockFeed.controller';
+import {
   createListing, getInventory, getListings, getMe, getPharmacists, postCheck, getMySettlement, getMySettlements, getShipments,
   postDelivered, postDispatch, putInventory, searchCatalogue,
 } from '../controllers/partner.controller';
@@ -43,6 +46,14 @@ router.get('/settlements/:id', getMySettlement);
 // Stock file upload from the partner's billing software (Sprint 27)
 router.use('/stock-imports', stockImportRoutes);
 // Sprint 36: API keys for the billing software's automatic stock upload (owner login only)
+// Sprint 37: live stock feed — status, the urgent badge, and items waiting for a person
+router.get('/stock-feed', getPartnerFeed);
+router.get('/stock-feed/alerts', getPartnerFeedAlerts);
+router.get('/stock-feed/checks', getPartnerChecks);
+router.post('/stock-feed/checks/:id/accept', postAcceptCheck);
+router.post('/stock-feed/checks/:id/link', postLinkCheck);
+router.post('/stock-feed/checks/:id/request-product', postRequestCheck);
+router.post('/stock-feed/checks/:id/dismiss', postDismissCheck);
 router.get('/api-keys', requirePartnerOwner, partnerGetKeys);
 router.post('/api-keys', requirePartnerOwner, partnerPostKey);
 router.post('/api-keys/:keyId/revoke', requirePartnerOwner, partnerRevokeKey);

@@ -12,6 +12,7 @@ import PartnerForm from '@/components/admin/partners/PartnerForm';
 import PartnerLoginsCard from '@/components/admin/partners/PartnerLoginsCard';
 import PartnerSummaryCard from '@/components/admin/partners/PartnerSummaryCard';
 import ApiKeysPanel from '@/components/partnerApiKeys/ApiKeysPanel';
+import FeedSettingsCard from '@/components/stockFeed/FeedSettingsCard';
 
 /** One partner: what it may sell, its logins, and its details to edit. */
 export default function PartnerDetailPage() {
@@ -41,6 +42,8 @@ export default function PartnerDetailPage() {
           <PartnerLoginsCard vendorId={data.id} logins={data.logins} />
           {/* Sprint 36: keys for the partner's billing software to upload its stock file */}
           <ApiKeysPanel owner={{ kind: 'admin', vendorId: data.id }} partnerId={data.id} />
+          {/* Sprint 37: manual or live stock feed (opt-in), staleness, "Stock last updated" */}
+          <FeedSettingsCard partnerId={data.id} />
           <h2 className="text-base font-semibold pt-2">Edit details</h2>
           <PartnerForm
             key={data.id}

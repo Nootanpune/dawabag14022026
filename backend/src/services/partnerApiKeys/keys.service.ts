@@ -13,7 +13,7 @@ import { getRedis } from '../../config/redis';
 import { logger } from '../../config/logger';
 import { AppError } from '../../utils/AppError';
 import { writeAudit, writeAuditTx } from '../../utils/audit';
-import { generateKey, hourlyLimit, keyMatches, keyPrefix, labelProblems, maskedKey, MAX_ACTIVE_KEYS, rateWindowKey } from './keys';
+import { generateKey, hourlyLimit, keyMatches, keyPrefix, labelProblems, maskedKey, MAX_ACTIVE_KEYS, rateWindowKey, snapshotHourlyLimit } from './keys';
 
 export const KEY_SCOPES = ['stock_upload'] as const;
 export type KeyScope = typeof KEY_SCOPES[number];
@@ -112,15 +112,15 @@ export async function authenticateKey(presented: string | null, partnerId: strin
   return { keyId: row.id, prefix: row.prefix, partnerId: row.partner_id, partnerName: row.vendor_name, scope };
 }
 
-/** Counts one upload against the key's hourly limit; throws 429 when it is used up. */
-export async function takeUploadSlot(caller: FeedCaller, ip: string | null, path: string) {
-  const max = hourlyLimit(process.env.STOCK_FEED_MAX_PER_HOUR);
-  const k = rateWindowKey(caller.keyId);
+/** Counts one upload (file, or Sprint 37 live snapshot) against the key's hourly limit; throws 429 when it is used up. */
+export async function takeUploadSlot(caller: FeedCaller, ip: string | null, path: string, kind: 'file' | 'snapshot' = 'file') {
+  const max = kind === 'snapshot' ? snapshotHourlyLimit(process.env.STOCK_FEED_LIVE_MAX_PER_HOUR) : hourlyLimit(process.env.STOCK_FEED_MAX_PER_HOUR);
+  const k = rateWindowKey(caller.keyId, new Date(), kind);
   const r = getRedis();
   const n = await r.incr(k);
   if (n === 1) await r.expire(k, 3600);
   if (n > max) {
-    throw await refuse(`Too many uploads with this key: at most ${max} an hour. Try again next hour`, 429,
+    throw await refuse(`Too many ${kind === 'snapshot' ? 'snapshots' : 'uploads'} with this key: at most ${max} an hour. Try again next hour`, 429,
       { id: caller.keyId, prefix: caller.prefix, partner_id: caller.partnerId }, 'rate limited', ip, path);
   }
 }

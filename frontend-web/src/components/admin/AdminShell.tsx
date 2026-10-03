@@ -7,6 +7,7 @@ import { LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import BrandLogo from '@/components/brand/BrandLogo';
 import AdminNav from './AdminNav';
+import AdminFeedAlert from '@/components/stockFeed/AdminFeedAlert';
 
 interface Props {
   children: ReactNode;
@@ -34,6 +35,8 @@ export default function AdminShell({ children, section = 'Admin', homeHref = '/a
           <span className="text-sm text-gray-400 hidden md:block">/ {section}</span>
         </Link>
         <div className="flex items-center gap-3 text-sm text-gray-600">
+          {/* Sprint 37: URGENT — partners' live stock-feed items waiting (admins only) */}
+          <AdminFeedAlert />
           <span className="hidden sm:block">
             {user?.full_name} <span className="text-xs text-gray-400">({user?.role})</span>
           </span>

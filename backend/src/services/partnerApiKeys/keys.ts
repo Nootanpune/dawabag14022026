@@ -73,7 +73,16 @@ export function hourlyLimit(env: string | undefined): number {
   return Number.isFinite(n) && n > 0 ? Math.min(n, 10_000) : 20;
 }
 
-/** The Redis counter for a key in the current hour (fixed window). */
-export function rateWindowKey(keyId: string, now = new Date()): string {
-  return `stockfeed:rl:${keyId}:${now.toISOString().slice(0, 13)}`;
+/**
+ * Live snapshots one key may send per hour (Sprint 37; env STOCK_FEED_LIVE_MAX_PER_HOUR;
+ * default 120 — one a minute plus retries).
+ */
+export function snapshotHourlyLimit(env: string | undefined): number {
+  const n = Number.parseInt(env ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 10_000) : 120;
+}
+
+/** The Redis counter for a key in the current hour (fixed window); live snapshots count separately. */
+export function rateWindowKey(keyId: string, now = new Date(), kind: 'file' | 'snapshot' = 'file'): string {
+  return `stockfeed:${kind === 'snapshot' ? 'live' : 'rl'}:${keyId}:${now.toISOString().slice(0, 13)}`;
 }

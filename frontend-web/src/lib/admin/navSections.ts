@@ -43,6 +43,7 @@ import {
   Store,
   ListPlus,
   BookOpenCheck,
+  Radio,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
@@ -94,6 +95,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/listings', label: 'Partner listings', icon: ListChecks, roles: ADMIN_ROLES },
       // Sprint 27 — partners' stock files and the items they ask Dawabag to add
       { href: '/admin/partner-stock', label: 'Partner stock files', icon: PackagePlus, roles: MANAGER_ROLES },
+      // Sprint 37 — partners' billing software sending stock live; items waiting are URGENT (badge)
+      { href: '/admin/stock-feeds', label: 'Live stock feeds', icon: Radio, roles: MANAGER_ROLES },
       { href: '/admin/stock', label: 'Low stock', icon: PackageX, roles: MANAGER_ROLES },
       { href: '/staff/stock', label: 'Stock', icon: Boxes, roles: STORE_ROLES },
       { href: '/admin/stock-adjustments', label: 'Stock adjustments', icon: SlidersHorizontal, roles: MANAGER_ROLES },

@@ -3,16 +3,19 @@ import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NavSection } from '@/lib/admin/navSections';
+import UrgentBadge from '@/components/stockFeed/UrgentBadge';
 
 interface Props {
   section: NavSection;
   open: boolean;
   onToggle: () => void;
   isActive: (href: string) => boolean;
+  /** Urgent counts by link (Sprint 37: live stock-feed items to check) */
+  badges?: Record<string, number>;
 }
 
 /** One collapsible group of the admin menu. */
-export default function AdminNavSection({ section, open, onToggle, isActive }: Props) {
+export default function AdminNavSection({ section, open, onToggle, isActive, badges = {} }: Props) {
   const listId = `admin-nav-${section.title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
   return (
     <div>
@@ -41,6 +44,7 @@ export default function AdminNavSection({ section, open, onToggle, isActive }: P
                   )}
                 >
                   <Icon className="w-4 h-4 shrink-0" aria-hidden="true" /> {label}
+                  {!!badges[href] && <UrgentBadge count={badges[href]} testId="nav-urgent-badge" />}
                 </Link>
               </li>
             );

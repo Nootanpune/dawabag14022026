@@ -87,6 +87,9 @@ const Map<String, NotificationKind> kNotificationKinds = {
       NotificationTarget.staff),
   'courier_rto': NotificationKind(Icons.keyboard_return, 'Parcel returning (RTO)', NotificationTarget.staff),
   'low_stock_digest': NotificationKind(Icons.inventory_outlined, 'Low stock', NotificationTarget.staff),
+  // Sprint 37: partner live stock feed (managed on the website)
+  'stock_feed_checks': NotificationKind(Icons.priority_high, 'Stock items to check', NotificationTarget.staff),
+  'stock_feed_stale': NotificationKind(Icons.sync_problem_outlined, 'Stock feed stale', NotificationTarget.staff),
 };
 
 NotificationKind notificationKind(String? type) => kNotificationKinds[type] ?? kUnknownNotification;

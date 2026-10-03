@@ -13,6 +13,7 @@ import { distanceKm, LatLng, toLatLng } from '../utils/geo';
 import { getSetting } from './settings.service';
 import { chooseSeller, ownStockFirst, SellerCandidate } from './sellerSelection';
 import { SaleKind, dawabagMaySupplySql, partnerMaySupplySql } from './stock/sellingRights';
+import { PARTNER_SELLABLE } from './stock/partnerStock';   // Sprint 37: live-feed staleness
 
 // Batches expiring within this many days are never dispatched (Rulebook C-27)
 const MIN_SHELF_DAYS = 30;
@@ -140,7 +141,7 @@ async function partnerCandidates(client: PoolClient, line: AllocationLine, buyer
      JOIN partner_products pp ON pp.partner_id = v.id
        AND pp.product_id = $1 AND pp.approval_status = 'approved' AND pp.listing_status = 'live'
      JOIN partner_inventory pi ON pi.partner_product_id = pp.id
-       AND pi.qty_available - pi.qty_reserved >= $2 AND pi.is_recalled = FALSE
+       AND ${PARTNER_SELLABLE} >= $2 AND pi.is_recalled = FALSE
        AND pi.expiry_date > CURRENT_DATE + ${MIN_SHELF_DAYS}
        AND ($3::boolean = FALSE OR pi.cold_chain_confirmed = TRUE)
      LEFT JOIN pincode_serviceability ps ON ps.pincode = v.pincode
@@ -155,7 +156,7 @@ async function partnerCandidates(client: PoolClient, line: AllocationLine, buyer
   for (const r of rows) {
     // Lock the batch row (waiting for any order holding it) and re-check the quantity
     const locked = (await client.query(
-      `SELECT id FROM partner_inventory WHERE id = $1 AND qty_available - qty_reserved >= $2 FOR UPDATE`,
+      `SELECT id FROM partner_inventory WHERE id = $1 AND dawabag_partner_sellable(partner_id, qty_available, qty_reserved) >= $2 FOR UPDATE`,
       [r.inventory_id, line.quantity])).rows[0];
     if (!locked) continue;
     candidates.push({

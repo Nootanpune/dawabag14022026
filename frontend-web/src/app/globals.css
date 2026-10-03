@@ -60,3 +60,49 @@ input[type='search']::-webkit-search-decoration {
   -webkit-appearance: none;
   appearance: none;
 }
+
+/* Sprint 37 — URGENT badge for live stock-feed items waiting for a check (owner decision
+   2026-10-03: "blinking"). White on red-700 #B91C1C is 6.5:1 and on red-900 #7F1D1D 10.3:1,
+   so the text meets WCAG AA (4.5:1) at every moment of the blink. One slow cycle every 2 s
+   (0.5 flashes a second, far under the 3 a second of WCAG 2.3.1). With "reduce motion"
+   the badge does not move: a static, high-contrast double ring instead. */
+.urgent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  background-color: #b91c1c;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.125rem 0.5rem;
+  white-space: nowrap;
+  animation: urgent-blink 2s ease-in-out infinite;
+}
+@keyframes urgent-blink {
+  0%, 100% { background-color: #b91c1c; box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.6); }
+  50% { background-color: #7f1d1d; box-shadow: 0 0 0 6px rgba(185, 28, 28, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .urgent-badge {
+    animation: none;
+    background-color: #7f1d1d;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #7f1d1d;
+  }
+}
+/* A stale feed: amber, static (a warning, not an action item). amber-900 on amber-100: 8.6:1 */
+.stale-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  background-color: #fef3c7;
+  color: #78350f;
+  border: 1px solid #b45309;
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.125rem 0.5rem;
+  white-space: nowrap;
+}

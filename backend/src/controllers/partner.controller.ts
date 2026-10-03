@@ -2,6 +2,7 @@
 import { getReturn, listReturns } from '../services/return.service';
 import { dispatchSchema, handoverSchema } from './fulfilment.controller';
 import { Request, Response, NextFunction } from 'express';
+import { assertManualStock } from '../services/partnerLiveFeed/settings.service';
 import { z } from 'zod';
 import { query, queryOne } from '../config/database';
 import { listPartnerProducts, submitListing, upsertInventory } from '../services/partnerListing.service';
@@ -100,6 +101,7 @@ const batchesSchema = z.object({
 export async function putInventory(req: Request, res: Response, next: NextFunction) {
   try {
     const { batches } = batchesSchema.parse(req.body);
+    await assertManualStock(req.partner!.vendorId);   // Sprint 37: live feed = the software is the only authority
     const rows = await upsertInventory(req.partner!.vendorId, uuid.parse(req.params.id), batches, req.user!.id);
     res.json({ success: true, data: { batches: rows } });
   } catch (err) { next(err); }

@@ -1,7 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Search, ListChecks, Truck, IndianRupee, Undo2, UploadCloud } from 'lucide-react';
+import { LayoutDashboard, Search, ListChecks, Truck, IndianRupee, Undo2, UploadCloud, Radio } from 'lucide-react';
+import UrgentBadge from '@/components/stockFeed/UrgentBadge';
+import { usePartnerFeedAlerts } from '@/components/stockFeed/PartnerFeedAlert';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
@@ -9,6 +11,7 @@ const ITEMS = [
   { href: '/partner/catalogue', label: 'Catalogue', icon: Search },
   { href: '/partner/listings', label: 'My listings', icon: ListChecks },
   { href: '/partner/stock-import', label: 'Upload stock', icon: UploadCloud },
+  { href: '/partner/stock-feed', label: 'Live stock feed', icon: Radio },   // Sprint 37
   { href: '/partner/shipments', label: 'Shipments', icon: Truck },
   { href: '/partner/returns', label: 'Returns', icon: Undo2 },
   { href: '/partner/settlements', label: 'Settlements', icon: IndianRupee },
@@ -16,6 +19,8 @@ const ITEMS = [
 
 export default function PartnerNav() {
   const pathname = usePathname();
+  const alerts = usePartnerFeedAlerts();
+  const waiting = alerts.data?.mode === 'live' ? alerts.data.waiting_checks : 0;
   return (
     <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
       {ITEMS.map(({ href, label, icon: Icon }) => {
@@ -30,6 +35,7 @@ export default function PartnerNav() {
             )}
           >
             <Icon className="w-4 h-4" /> {label}
+            {href === '/partner/stock-feed' && <UrgentBadge count={waiting} testId="nav-urgent-badge" />}
           </Link>
         );
       })}

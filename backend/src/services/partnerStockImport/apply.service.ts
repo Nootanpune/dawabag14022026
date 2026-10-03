@@ -21,6 +21,7 @@ import { batchKey, batchKeySql } from '../recallAlerts/batchKey';
 import { assertPartnerCanSell, BatchInput, h1Problems, insertListingTx, upsertInventoryTx } from '../partnerListing.service';
 import { evaluateImport } from './evaluate';
 import { assertDraft, DRAFT_VALID_HOURS } from './import.service';
+import { assertManualStock } from '../partnerLiveFeed/settings.service';
 import type { ParsedRow } from './rows';
 
 export interface ApplyInput {
@@ -54,6 +55,8 @@ export async function applyImport(id: string, partnerId: string, userId: string,
     const imp = (await c.query('SELECT * FROM partner_stock_imports WHERE id = $1 AND partner_id = $2 FOR UPDATE', [id, partnerId])).rows[0];
     if (!imp) throw new AppError('Import not found', 404);
     assertDraft(imp);
+    // Sprint 37: a partner on the live feed has one authority for quantities — its software
+    await assertManualStock(partnerId, c);
     if (!imp.mapping_confirmed_at) throw new AppError('Confirm which column holds each detail before applying', 400);
     if (Date.now() - new Date(imp.created_at).getTime() > DRAFT_VALID_HOURS * 3_600_000) {
       throw new AppError(`This file was uploaded more than ${DRAFT_VALID_HOURS} hours ago; stock has moved since. Upload a fresh export`, 409);

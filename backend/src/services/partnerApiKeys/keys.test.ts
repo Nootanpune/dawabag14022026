@@ -1,7 +1,7 @@
 // Sprint 36 — partner API keys: format, hashing, constant-time check, header parsing.
 import fs from 'fs';
 import path from 'path';
-import { generateKey, hashKey, hourlyLimit, keyFromHeader, keyMatches, keyPrefix, labelProblems, maskedKey, rateWindowKey } from './keys';
+import { generateKey, hashKey, hourlyLimit, keyFromHeader, keyMatches, keyPrefix, labelProblems, maskedKey, rateWindowKey, snapshotHourlyLimit } from './keys';
 
 describe('partner API keys', () => {
   it('a new key has the scheme, a 10-character prefix and a 43-character secret; only its hash is returned for storage', () => {
@@ -72,5 +72,12 @@ describe('partner API keys', () => {
     const d = new Date('2026-10-03T10:59:59Z');
     expect(rateWindowKey('k1', d)).toBe('stockfeed:rl:k1:2026-10-03T10');
     expect(rateWindowKey('k1', new Date('2026-10-03T11:00:00Z'))).not.toBe(rateWindowKey('k1', d));
+  });
+
+  it('Sprint 37: live snapshots have their own window and allowance (default 120 an hour)', () => {
+    const d = new Date('2026-10-03T10:59:59Z');
+    expect(rateWindowKey('k1', d, 'snapshot')).toBe('stockfeed:live:k1:2026-10-03T10');
+    expect(snapshotHourlyLimit(undefined)).toBe(120);
+    expect(snapshotHourlyLimit('300')).toBe(300);
   });
 });

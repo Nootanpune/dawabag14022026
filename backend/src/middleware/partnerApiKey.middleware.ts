@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { AppError } from '../utils/AppError';
 import { keyFromHeader } from '../services/partnerApiKeys/keys';
 import { authenticateKey, FeedCaller, KeyScope, takeUploadSlot } from '../services/partnerApiKeys/keys.service';
+import { loadFeed } from '../services/partnerLiveFeed/settings.service';
 
 declare global {
   namespace Express {
@@ -32,7 +33,17 @@ export function requirePartnerKey(scope: KeyScope) {
 /** One upload slot from the key's hourly allowance, taken BEFORE the file is read. */
 export async function stockFeedRateLimit(req: Request, _res: Response, next: NextFunction) {
   try {
-    await takeUploadSlot(req.partnerKey!, clientIp(req), req.baseUrl + req.path);
+    // Sprint 37: a live partner's files are snapshots, counted against the snapshot allowance
+    const live = (await loadFeed(req.partnerKey!.partnerId)).mode === 'live';
+    await takeUploadSlot(req.partnerKey!, clientIp(req), req.baseUrl + req.path, live ? 'snapshot' : 'file');
+    next();
+  } catch (err) { next(err); }
+}
+
+/** Sprint 37: live snapshots have their own hourly allowance (STOCK_FEED_LIVE_MAX_PER_HOUR, default 120). */
+export async function stockSnapshotRateLimit(req: Request, _res: Response, next: NextFunction) {
+  try {
+    await takeUploadSlot(req.partnerKey!, clientIp(req), req.baseUrl + req.path, 'snapshot');
     next();
   } catch (err) { next(err); }
 }

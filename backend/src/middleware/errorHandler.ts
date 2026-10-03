@@ -62,6 +62,11 @@ export function errorHandler(
     return fail(413, 'File is too large');
   }
 
+  // Request body errors from express.json (Sprint 37: a connector's snapshot that is too
+  // large or not JSON gets a plain 413 / 400, not a server error)
+  if ((err as any).type === 'entity.too.large') return fail(413, 'The request body is too large');
+  if ((err as any).type === 'entity.parse.failed') return fail(400, 'The request body is not valid JSON');
+
   // PostgreSQL errors
   // Lock wait timed out (e.g. many checkouts of one medicine at once): ask to retry
   if ((err as any).code === '55P03') {

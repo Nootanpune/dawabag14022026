@@ -3,6 +3,7 @@
 // cancel. Apply lives in apply.service.ts. A partner sees only its own imports;
 // admins see all (partnerId = null).
 import crypto from 'crypto';
+import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
@@ -38,39 +39,78 @@ export function assertDraft(imp: { status: string; applied_at?: string | Date | 
   if (imp.status === 'cancelled') throw new AppError('This import was cancelled; upload the file again', 409);
 }
 
-export async function createImport(partnerId: string, actor: string | ImportActor, file: UploadedFile) {
-  const { userId, apiKey } = typeof actor === 'string' ? { userId: actor, apiKey: undefined } : actor;
+/** A stock table ready to store: from a file (readImportFile) or a live JSON snapshot (Sprint 37). */
+export interface PreparedImport {
+  fileName: string;
+  size: number;
+  sha256: string;
+  kind: string;                 // xlsx | csv | html | json
+  sheetName: string | null;
+  software: string | null;
+  headerRow: number;
+  headers: string[];
+  rows: { rowNumber: number; cells: string[] }[];
+  mapping: Mapping;
+  mappingSource: 'saved' | 'preset' | 'suggested' | 'confirmed';
+}
+
+/** Reads a stock file in memory and chooses its columns: the partner's saved choice, the software's preset, or a suggestion. */
+export async function readImportFile(partnerId: string, file: UploadedFile): Promise<PreparedImport> {
   const sheet = await readStockFile(file.buffer);
   const table = locateTable(sheet.rows);
   const preset = detectPreset(table.headers, table.otherText);
   const saved = await queryOne<{ mapping: Record<string, string> }>('SELECT mapping FROM partner_import_mappings WHERE partner_id = $1', [partnerId]);
   const fromSaved = saved ? mappingFromNames(table.headers, saved.mapping) : null;
   let mapping: Mapping;
-  let source: 'saved' | 'preset' | 'suggested';
+  let source: PreparedImport['mappingSource'];
   if (fromSaved && !missingRequired(fromSaved).length) { mapping = fromSaved; source = 'saved'; }
   else if (preset) { mapping = mappingFromNames(table.headers, preset.mapping)!; source = 'preset'; }
   else { mapping = suggestMapping(table.headers); source = 'suggested'; }
-  const software = preset?.label ?? null;
-  const sha = crypto.createHash('sha256').update(file.buffer).digest('hex');
+  return {
+    fileName: file.originalname, size: file.size, sha256: crypto.createHash('sha256').update(file.buffer).digest('hex'),
+    kind: sheet.kind, sheetName: sheet.sheetName ?? null, software: preset?.label ?? null,
+    headerRow: table.headerRow, headers: table.headers, rows: table.rows, mapping, mappingSource: source,
+  };
+}
 
-  return withTransaction(async (c) => {
-    const imp = (await c.query<{ id: string }>(
-      `INSERT INTO partner_stock_imports (partner_id, file_name, file_size, file_sha256, file_kind, sheet_name, source_software,
-         header_row, headers, mapping, mapping_source, row_count, created_by, api_key_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
-      [partnerId, file.originalname.slice(0, 255), file.size, sha, sheet.kind, sheet.sheetName?.slice(0, 100) ?? null, software,
-       table.headerRow, JSON.stringify(table.headers), JSON.stringify(mapping), source, table.rows.length, userId, apiKey?.id ?? null])).rows[0];
-    await c.query(
-      `INSERT INTO partner_stock_import_rows (import_id, row_number, raw)
-       SELECT $1, x.n, x.cells FROM jsonb_to_recordset($2::jsonb) AS x(n int, cells jsonb)`,
-      [imp.id, JSON.stringify(table.rows.map((r) => ({ n: r.rowNumber, cells: r.cells })))]);
-    const summary = await evaluateImport(c, imp.id, partnerId);
-    // C-46: who (person, or API key by its public prefix — never the secret) uploaded which file (by hash) for which partner
+/** Live-feed details of an import (Sprint 37). */
+export interface LiveImportInfo { sequence: number; takenAt: Date }
+
+/**
+ * Stores the table and checks every line, inside the caller's transaction. The ONE
+ * pipeline for the portal upload, the API-key upload (Sprint 36) and the live feed
+ * (Sprint 37): same rows table, same matching and checks (evaluateImport).
+ */
+export async function insertImportTx(c: PoolClient, partnerId: string, actor: string | ImportActor, prep: PreparedImport, live?: LiveImportInfo) {
+  const { userId, apiKey } = typeof actor === 'string' ? { userId: actor, apiKey: undefined } : actor;
+  const imp = (await c.query<{ id: string }>(
+    `INSERT INTO partner_stock_imports (partner_id, file_name, file_size, file_sha256, file_kind, sheet_name, source_software,
+       header_row, headers, mapping, mapping_source, row_count, created_by, api_key_id, mode, feed_sequence, taken_at,
+       mapping_confirmed_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+             CASE WHEN $18::boolean THEN NOW() END) RETURNING id`,
+    [partnerId, prep.fileName.slice(0, 255), prep.size, prep.sha256, prep.kind, prep.sheetName?.slice(0, 100) ?? null,
+     prep.software?.slice(0, 100) ?? null, prep.headerRow, JSON.stringify(prep.headers), JSON.stringify(prep.mapping), prep.mappingSource,
+     prep.rows.length, userId, apiKey?.id ?? null, live ? 'live' : 'manual', live?.sequence ?? null, live?.takenAt ?? null,
+     prep.mappingSource === 'confirmed'])).rows[0];
+  await c.query(
+    `INSERT INTO partner_stock_import_rows (import_id, row_number, raw)
+     SELECT $1, x.n, x.cells FROM jsonb_to_recordset($2::jsonb) AS x(n int, cells jsonb)`,
+    [imp.id, JSON.stringify(prep.rows.map((r) => ({ n: r.rowNumber, cells: r.cells })))]);
+  const summary = await evaluateImport(c, imp.id, partnerId);
+  // C-46: who (person, or API key by its public prefix — never the secret) uploaded which file (by hash) for which
+  // partner. A live snapshot is audited once, with what it applied (partner_stock_feed_applied).
+  if (!live) {
     await writeAuditTx(c, { userId, action: 'partner_stock_import_uploaded', performedBy: userId,
-      newValue: { vendor_id: partnerId, import_id: imp.id, file_name: file.originalname, sha256: sha, rows: table.rows.length, software,
-        via: apiKey ? 'api_key' : 'portal', ...(apiKey ? { api_key_id: apiKey.id, api_key_prefix: apiKey.prefix } : {}) } });
-    return { id: imp.id, summary };
-  });
+      newValue: { vendor_id: partnerId, import_id: imp.id, file_name: prep.fileName, sha256: prep.sha256, rows: prep.rows.length,
+        software: prep.software, via: apiKey ? 'api_key' : 'portal', ...(apiKey ? { api_key_id: apiKey.id, api_key_prefix: apiKey.prefix } : {}) } });
+  }
+  return { id: imp.id, summary };
+}
+
+export async function createImport(partnerId: string, actor: string | ImportActor, file: UploadedFile) {
+  const prep = await readImportFile(partnerId, file);
+  return withTransaction((c) => insertImportTx(c, partnerId, actor, prep));
 }
 
 /** Up to three sample values per column, from stock lines, for the column chooser. */
@@ -117,6 +157,7 @@ export async function listImports(partnerId: string | null, limit = 50) {
      FROM partner_stock_imports i JOIN vendors v ON v.id = i.partner_id LEFT JOIN user_profiles up ON up.user_id = i.created_by
      LEFT JOIN partner_api_keys k ON k.id = i.api_key_id
      WHERE ($1::uuid IS NULL OR i.partner_id = $1)
+       AND i.mode = 'manual'   -- Sprint 37: live snapshots are shown on the stock-feed page, not as uploads
      ORDER BY i.created_at DESC LIMIT $2`, [partnerId, limit]);
 }
 
@@ -188,6 +229,36 @@ async function rowOf(importId: string, rowId: string) {
   return row;
 }
 
+/**
+ * "This item in the partner's software is that Dawabag product", remembered for every
+ * later import and snapshot (partner_item_links). Used by the import review (Sprint 27)
+ * and the live feed's check queue (Sprint 37). Audited (C-46).
+ */
+export async function linkItemTx(c: PoolClient, partnerId: string, itemKey: string, productId: string, label: string | null,
+  userId: string, context: Record<string, unknown>) {
+  await c.query(
+    `INSERT INTO partner_item_links (partner_id, item_key, product_id, item_label, source, created_by)
+     VALUES ($1, $2, $3, $4, 'manual', $5)
+     ON CONFLICT (partner_id, item_key) DO UPDATE SET product_id = EXCLUDED.product_id, item_label = EXCLUDED.item_label,
+       source = 'manual', created_by = EXCLUDED.created_by, updated_at = NOW()`,
+    [partnerId, itemKey, productId, label?.slice(0, 500) ?? null, userId]);
+  await writeAuditTx(c, { userId, action: 'partner_item_linked', performedBy: userId,
+    newValue: { vendor_id: partnerId, item_key: itemKey, product_id: productId, ...context } });
+}
+
+/** Asks Dawabag to add an item that is not in the catalogue; false when one is already open. */
+export async function requestProductTx(c: PoolClient, partnerId: string, importId: string | null, itemKey: string,
+  p: Partial<import('./rows').ParsedRow>, userId: string): Promise<boolean> {
+  const ins = await c.query(
+    `INSERT INTO partner_product_requests (partner_id, import_id, item_key, item_name, pack, manufacturer, item_code, hsn_code,
+       gst_rate, mrp_paise, ptr_paise, requested_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     ON CONFLICT (partner_id, item_key) WHERE status IN ('open', 'drafted') DO NOTHING RETURNING id`,
+    [partnerId, importId, itemKey, String(p.item_name ?? '').slice(0, 500), p.pack?.slice(0, 100) ?? null, p.manufacturer?.slice(0, 255) ?? null,
+     p.item_code?.slice(0, 100) ?? null, p.hsn?.slice(0, 20) ?? null, p.gst_rate ?? null, p.mrp_paise ?? null, p.ptr_paise ?? null, userId]);
+  return (ins.rowCount ?? 0) > 0;
+}
+
 /** "This line is that Dawabag product": remembered for every later import (partner_item_links). */
 export async function linkRow(id: string, rowId: string, partnerId: string, userId: string, productId: string) {
   const imp = await loadImport(id, partnerId);
@@ -199,14 +270,7 @@ export async function linkRow(id: string, rowId: string, partnerId: string, user
   if (!product) throw new AppError('Product not found in the Dawabag catalogue', 404);
   if (NEVER_ONLINE.includes(product.drug_schedule)) throw new AppError(`${product.name} can never be sold online (C-10)`, 403);
   return withTransaction(async (c) => {
-    await c.query(
-      `INSERT INTO partner_item_links (partner_id, item_key, product_id, item_label, source, created_by)
-       VALUES ($1, $2, $3, $4, 'manual', $5)
-       ON CONFLICT (partner_id, item_key) DO UPDATE SET product_id = EXCLUDED.product_id, item_label = EXCLUDED.item_label,
-         source = 'manual', created_by = EXCLUDED.created_by, updated_at = NOW()`,
-      [partnerId, row.item_key, productId, row.parsed?.item_name?.slice(0, 500) ?? null, userId]);
-    await writeAuditTx(c, { userId, action: 'partner_item_linked', performedBy: userId,
-      newValue: { vendor_id: partnerId, import_id: id, item_key: row.item_key, product_id: productId } });
+    await linkItemTx(c, partnerId, row.item_key, productId, row.parsed?.item_name ?? null, userId, { import_id: id });
     const summary = await evaluateImport(c, id, partnerId);
     await c.query(`UPDATE partner_stock_import_rows SET match_method = 'manual' WHERE import_id = $1 AND item_key = $2 AND product_id = $3`,
       [id, row.item_key, productId]);
@@ -247,15 +311,7 @@ export async function requestNewProducts(id: string, partnerId: string, userId: 
     for (const r of rows) if (!byKey.has(r.item_key)) byKey.set(r.item_key, r);
     let created = 0;
     for (const [key, r] of byKey) {
-      const p = r.parsed ?? {};
-      const ins = await c.query(
-        `INSERT INTO partner_product_requests (partner_id, import_id, item_key, item_name, pack, manufacturer, item_code, hsn_code,
-           gst_rate, mrp_paise, ptr_paise, requested_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         ON CONFLICT (partner_id, item_key) WHERE status IN ('open', 'drafted') DO NOTHING RETURNING id`,
-        [partnerId, id, key, String(p.item_name ?? '').slice(0, 500), p.pack?.slice(0, 100) ?? null, p.manufacturer?.slice(0, 255) ?? null,
-         p.item_code?.slice(0, 100) ?? null, p.hsn?.slice(0, 20) ?? null, p.gst_rate ?? null, p.mrp_paise ?? null, p.ptr_paise ?? null, userId]);
-      created += ins.rowCount ?? 0;
+      if (await requestProductTx(c, partnerId, id, key, r.parsed ?? {}, userId)) created++;
     }
     await c.query(`UPDATE partner_stock_import_rows SET new_product_requested = TRUE WHERE import_id = $1 AND id = ANY($2)`,
       [id, rows.map((r) => r.id)]);

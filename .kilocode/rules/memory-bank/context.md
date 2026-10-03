@@ -10,6 +10,18 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 37 — live stock feed from the partner's billing software (2026-10-03)
+
+- Owner CONFIRMED 2026-10-03: feed quantity changes of linked+listed products apply automatically; new products / price-MRP / other non-quantity changes wait for a person; waiting items flagged URGENT (blinking badge + once-only in-app/email to partner owner + admins). Live mode opt-in per partner (admin).
+- MediVision Gold's data files are encrypted (not readable; we do not break it). Primary path: Allied enables a scheduled stock-report export (Excel/CSV ~5 min) that a small LAN connector uploads. Owner is asking Allied (2026-10-03). JSON also supported.
+- Migration 32: `partner_stock_feeds` (mode manual|live, stale_after_minutes 15, stale_policy hide|margin, stale_margin_pct 50, billing_grace_minutes 0, last sequence/taken_at/sha256), `partner_feed_checks` (new_product, new_listing, cold_chain_batch, price_change, expiry_change, short_for_orders), feed columns on partner_stock_imports and partner_inventory, SQL `dawabag_partner_sellable()` used by stock/partnerStock.ts and allocation.
+- API: `POST /partner-feed/:id/stock-snapshot` (multipart file or JSON; order by X-Snapshot-Taken-At; idempotent by SHA-256); `/stock-files` behaves the same for a live partner; whoami adds stock_feed. 120 snapshots/key/hour. Partner `/partner/stock-feed` + checks accept/link/request-product/dismiss; admin `/admin/partners/:id/stock-feed`, `/admin/stock-feeds/*`. Job `live_stock_feed_watch` (*/5). Notification types stock_feed_checks, stock_feed_stale (app knows them).
+- Rules: full snapshot (absent linked batch → 0); expired/short-dated/recalled → 0; earlier expiry adopted, later waits; first price adopted, change waits; new cold-chain batch waits. No drift: shelf = snapshot − dispatched after snapshot (− grace), never below reserved ("billed = dispatched", proposed). Live mode refuses the portal stock editor and file apply. Stale → hide (default) or margin; alert once.
+- Web: `.urgent-badge` (white on red ≥6.5:1, 2 s blink, static under prefers-reduced-motion) in partner and admin header/menu/pages.
+- Known: a snapshot locks the partner's batches; a simultaneous checkout with two lines from that partner could hit a deadlock error (follow-up: lock ordering / retry).
+- Tests: jest 515; smoke 1–37 1622 checks; Playwright 128 passed / 7 skipped; flutter 224 passed, analyze clean.
+- Proposals awaiting owner: auto/check split details, "billed = dispatched", staleness default hide after 15 min.
+
 ## Sprint 36 — merge lists, partner stock-feed keys, medicine-info four-eyes, app pharmacist check (2026-10-03)
 
 - Migration 31 (`31_sprint36_merge_feed_keys_four_eyes.sql`).

@@ -15,6 +15,7 @@ import {
 } from '../controllers/partnerStockImport.controller';
 import { getPartnerDetail, getPartners, postPartner, postPartnerLogin, putPartner } from '../controllers/partnerAdmin.controller';
 import { adminGetKeys, adminPostKey, adminRevokeKey } from '../controllers/partnerApiKeys.controller';
+import { getAdminChecks, getAdminFeedAlerts, getAdminPartnerFeed, putAdminPartnerFeed } from '../controllers/stockFeed.controller';
 import { postCreateDrafts } from '../controllers/catalogueDraft.controller';
 import multer from 'multer';
 import {
@@ -136,6 +137,11 @@ router.put('/partners/:vendorId/commission', authenticate, managers, setCommissi
 router.get('/partners/:vendorId/api-keys', authenticate, managers, adminGetKeys);
 router.post('/partners/:vendorId/api-keys', authenticate, managers, adminPostKey);
 router.post('/partners/:vendorId/api-keys/:keyId/revoke', authenticate, managers, adminRevokeKey);
+// Sprint 37: live stock feed — mode (manual / live, opt-in) and staleness per partner; urgent counts; checks (read-only)
+router.get('/partners/:vendorId/stock-feed', authenticate, managers, getAdminPartnerFeed);
+router.put('/partners/:vendorId/stock-feed', authenticate, managers, putAdminPartnerFeed);
+router.get('/stock-feeds/alerts', authenticate, managers, getAdminFeedAlerts);
+router.get('/stock-feeds/checks', authenticate, managers, getAdminChecks);
 // Partner stock imports (Sprint 27): read-only for admins; new-product requests resolved here
 router.get('/partner-stock-imports', authenticate, managers, adminListStockImports);
 router.get('/partner-stock-imports/:id', authenticate, managers, adminGetStockImport);

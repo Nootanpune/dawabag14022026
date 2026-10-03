@@ -6,6 +6,7 @@
 // Taken / Skipped answers and ended dose reminders, and (only if set) health profiles
 // of long-inactive accounts; erasure and export of both are in privacy.service (C-43).
 import { query } from '../config/database';
+import { purgeLiveSnapshotLines } from './partnerLiveFeed/liveApply.service';
 import { writeAudit } from '../utils/audit';
 import { getSetting } from './settings.service';
 
@@ -71,6 +72,8 @@ export async function runRetentionPurge(): Promise<Record<string, unknown>> {
     if (!Number.isInteger(d) || d < retentionMinDays(key)) continue;   // unset or unsafe: keep everything
     deleted[key] = (await query(sql, [d])).length;
   }
+  // Sprint 37: lines of live stock snapshots are working data, kept 48 hours (the import record and audit stay)
+  deleted.live_snapshot_lines = await purgeLiveSnapshotLines();
   await writeAudit({ userId: null, action: 'retention_purge', performedBy: null, newValue: { deleted, days } });
   return { deleted };
 }

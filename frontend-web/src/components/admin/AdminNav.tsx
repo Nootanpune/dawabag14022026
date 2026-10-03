@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { hasRole } from '@/lib/admin/roles';
 import { NAV_SECTIONS } from '@/lib/admin/navSections';
 import AdminNavSection from './AdminNavSection';
+import { useAdminFeedAlerts } from '@/components/stockFeed/AdminFeedAlert';
 
 /** Grouped side menu with a quick filter; only links the signed-in role may open. */
 export default function AdminNav() {
@@ -14,6 +15,9 @@ export default function AdminNav() {
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Sprint 37: urgent counts shown next to menu links (server counts, polled)
+  const feed = useAdminFeedAlerts();
+  const badges: Record<string, number> = { '/admin/stock-feeds': feed.data?.waiting_checks ?? 0 };
 
   const sections = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -71,6 +75,7 @@ export default function AdminNav() {
               open={!!filter.trim() || !collapsed.has(s.title)}
               onToggle={() => toggle(s.title)}
               isActive={isActive}
+              badges={badges}
             />
           ))}
         </div>

@@ -11,6 +11,7 @@ import { runEinvoiceSweep } from '../services/einvoice/einvoice.service';
 import { runPaymentSweep } from '../services/payments/reconcile.service';
 import { runRetentionPurge } from '../services/retention.service';
 import { runRecallAlertWatch } from '../services/recallAlerts/alert.service';
+import { runLiveFeedWatch } from '../services/partnerLiveFeed/alerts.service';
 
 export interface JobDefinition {
   name: string;
@@ -20,6 +21,12 @@ export interface JobDefinition {
 }
 
 export const JOBS: JobDefinition[] = [
+  {
+    name: 'live_stock_feed_watch',
+    description: 'Alert admins once when a partner\'s live stock feed sends no snapshot within its window; its stock is then held back (Sprint 37)',
+    cron: '*/5 * * * *',                     // every 5 minutes
+    run: runLiveFeedWatch,
+  },
   {
     name: 'recall_alert_watch',
     description: 'Alert admins when a regulator recall alert passes its 4 hours with matches undecided (C-28)',
