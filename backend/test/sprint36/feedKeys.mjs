@@ -48,7 +48,7 @@ export async function runFeedKeys() {
   secrets.push(adminKey.secret);
   const [stored] = await q('SELECT * FROM partner_api_keys WHERE id = $1', [adminKey.key.id]);
   check('only the prefix and the SHA-256 are stored', stored.key_sha256 === sha(adminKey.secret)
-    && adminKey.secret.includes(stored.prefix) && !JSON.stringify(stored).includes(adminKey.secret.split('_').pop()), Object.keys(stored));
+    && adminKey.secret.includes(stored.prefix) && !JSON.stringify(stored).includes(adminKey.secret.slice(`dwbk_${stored.prefix}_`.length)), Object.keys(stored));
 
   r = await call('GET', `/admin/partners/${V.A}/api-keys`, { token: t.admin });
   const listed = JSON.stringify(r.json);
