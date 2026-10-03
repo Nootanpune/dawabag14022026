@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../orders/widgets/order_shipments_card.dart';
+import '../../orders/widgets/shipment_tile.dart' show kInvoiceAfterApproval;
 import '../../../utils/formatters.dart';
 import '../../../utils/payment_hold.dart';
 import 'rx_policy_note.dart';
@@ -9,8 +10,9 @@ import 'rx_policy_note.dart';
 class ConfirmedStep extends StatelessWidget {
   final String orderNumber;
 
-  /// `shipments` from the POST /orders response (seller + invoice per
-  /// shipment); empty when the API sent none.
+  /// `shipments` from the POST /orders response (seller per shipment; Sprint 44:
+  /// no invoice number yet — issued when our pharmacist approves); empty when
+  /// the API sent none.
   final List<Map<String, dynamic>> shipments;
 
   /// Paid with the trial's demo payment (no money moved)
@@ -106,6 +108,9 @@ class ConfirmedStep extends StatelessWidget {
         if (shipments.isNotEmpty) ...[
           const SizedBox(height: 20),
           SizedBox(width: double.infinity, child: OrderShipmentsCard(shipments: shipments)),
+        ] else ...[
+          const SizedBox(height: 8),
+          Text(kInvoiceAfterApproval, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
         ],
         const SizedBox(height: 32),
         ElevatedButton(

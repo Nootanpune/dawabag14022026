@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../utils/password_policy.dart';
 import '../../../widgets/brand/labeled_field.dart';
+import '../../../models/practitioner.dart' show kPractitionerKinds;
 import 'register_constants.dart';
 import 'register_controller.dart';
 
@@ -112,6 +113,20 @@ Widget registerDlTypeField(RegisterController c, Map<String, String> options) =>
       items: options.entries.map((e) => DropdownMenuItem<String>(value: e.key, child: Text(e.value))).toList(),
       onChanged: (v) => c.update(() => c.dlType = v),
       validator: (v) => v == null ? 'Select the drug licence type' : null,
+    ));
+
+/// Sprint 44: registering as a doctor or a medical institution (backend `practitioner_kind`).
+Widget registerPractitionerKindField(RegisterController c) => LabeledField(
+    label: 'Registering as',
+    child: DropdownButtonFormField<String>(
+      key: const ValueKey('register-practitioner-kind'),
+      initialValue: c.practitionerKind,
+      isExpanded: true,
+      decoration: const InputDecoration(),
+      items: kPractitionerKinds.entries
+          .map((e) => DropdownMenuItem<String>(value: e.key, child: Text(e.value)))
+          .toList(),
+      onChanged: (v) => c.update(() => c.practitionerKind = v ?? 'doctor'),
     ));
 
 Widget registerSpecialityField(RegisterController c) => LabeledField(

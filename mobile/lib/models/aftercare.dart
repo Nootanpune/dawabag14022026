@@ -70,7 +70,8 @@ String creditNoteReasonLabel(String? reason) {
     case 'cancellation':
       return 'order cancelled';
     case 'order_edit':
-      return 'order changed before packing';
+      // Sprint 44: changes before the invoice need no credit note; this is a Sprint 43 change after it
+      return 'order changed after it was invoiced';
     default:
       return (reason ?? '').replaceFirst(RegExp(r'^return_'), 'return: ').replaceAll('_', ' ');
   }

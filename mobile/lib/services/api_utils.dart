@@ -149,3 +149,32 @@ bool isNotForOnlineSale(Object error) =>
 
 /// The HTTP status of an API error, if any.
 int? apiErrorStatus(Object error) => error is DioException ? error.response?.statusCode : null;
+
+// ── Sprint 44: order changes and sales to doctors / institutions ─────────────
+// Every one of these refusals carries a `message` ready for the buyer.
+
+/// 409: the order can no longer be changed (invoice issued / pharmacist approved).
+const kOrderNotEditable = 'ORDER_NOT_EDITABLE';
+
+/// 403: the doctor's / institution's registration is not verified or has lapsed (r.65(9)(b)).
+const kPractitionerRegistrationInvalid = 'PRACTITIONER_REGISTRATION_INVALID';
+
+/// 422: a doctor / institution order (or addition) needs a signed written order.
+const kWrittenOrderRequired = 'WRITTEN_ORDER_REQUIRED';
+
+/// 409: the written order was already used for another order.
+const kWrittenOrderUsed = 'WRITTEN_ORDER_USED';
+
+/// 400 / 429: signing in the app was refused (wrong password or name / too many tries).
+const kWrittenOrderSignatureInvalid = 'WRITTEN_ORDER_SIGNATURE_INVALID';
+const kWrittenOrderSignPaused = 'WRITTEN_ORDER_SIGN_PAUSED';
+
+/// 404: the tax invoice is issued only when our pharmacist approves that part of the order.
+const kInvoiceNotIssued = 'INVOICE_NOT_ISSUED';
+
+/// True for a refusal about the chosen written order (required, not covering,
+/// too old, already used): the buyer signs or uploads another one.
+bool isWrittenOrderProblem(Object error) => (apiErrorCode(error) ?? '').startsWith('WRITTEN_ORDER_');
+
+/// True when the server refused because the registration does not allow sales now.
+bool isPractitionerRegistrationInvalid(Object error) => apiErrorCode(error) == kPractitionerRegistrationInvalid;

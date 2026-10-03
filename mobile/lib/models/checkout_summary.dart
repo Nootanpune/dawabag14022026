@@ -16,6 +16,9 @@ class CheckoutSummary {
   final bool prescriptionRequired;
   /// Sprint 39: 'now' | 'after_pharmacist_check' (held until the check, C-37)
   final String capture;
+  /// Sprint 44: a doctor / institution signs or uploads a written order before
+  /// the order is placed (Drugs Rules r.65(9)(b))
+  final bool writtenOrderRequired;
 
   const CheckoutSummary({
     this.shipments = const [],
@@ -25,6 +28,7 @@ class CheckoutSummary {
     this.policies = const [],
     this.prescriptionRequired = false,
     this.capture = kCaptureNow,
+    this.writtenOrderRequired = false,
   });
 
   /// The payment is only authorised now and charged after the pharmacist's check.
@@ -38,6 +42,7 @@ class CheckoutSummary {
         policies: PolicyRef.listFrom(json['policies']),
         prescriptionRequired: json['prescription_required'] == true,
         capture: asString(json['capture']) ?? kCaptureNow,
+        writtenOrderRequired: json['written_order_required'] == true,
       );
 }
 

@@ -11,6 +11,7 @@ import '../../utils/order_status.dart';
 import '../../widgets/error_retry_view.dart';
 import 'widgets/cancel_order_button.dart';
 import 'widgets/edit/edit_order_card.dart';
+import 'widgets/edit/extra_payment_card.dart';
 import 'widgets/edit/order_edits_card.dart';
 import 'widgets/handover_code_card.dart';
 import 'widgets/order_aftercare_card.dart';
@@ -20,6 +21,7 @@ import 'widgets/order_payment_card.dart';
 import 'widgets/order_shipments_card.dart';
 import 'widgets/order_timeline_card.dart';
 import 'widgets/refill_order_card.dart';
+import 'widgets/written_orders_card.dart';
 
 /// /orders/:id — everything comes from GET /orders/:id and is reloaded on
 /// open, pull-to-refresh and after every action.
@@ -77,13 +79,23 @@ class OrderDetailScreen extends ConsumerWidget {
       gap,
       OrderItemsCard(order: order),
       gap,
-      // Sprint 43 (URS-074): lower or remove lines until packing starts, or why not
+      // Sprint 44: the difference to pay for a change; the pharmacist approves once paid (C-37)
+      if (ExtraPaymentCard.showsFor(order)) ...[
+        ExtraPaymentCard(order: order),
+        gap,
+      ],
+      // Sprint 44: change the order until the pharmacist approves it (invoice issued then), or why not
       if (EditOrderCard.showsFor(order)) ...[
         EditOrderCard(order: order),
         gap,
       ],
       if (OrderEditsCard.showsFor(order)) ...[
         OrderEditsCard(order: order),
+        gap,
+      ],
+      // Sprint 44: a doctor / institution order's signed written order (r.65(9)(b))
+      if (WrittenOrdersCard.showsFor(order)) ...[
+        WrittenOrdersCard(order: order),
         gap,
       ],
       // Seller, invoice PDF and "Report a problem" per shipment (C-05, C-33, C-37)
@@ -147,6 +159,10 @@ class _Header extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(formatDateIst(asString(order['created_at']) ?? ''),
                     style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+                // Sprint 44: "The tax invoice is issued when our pharmacist approves the order."
+                if ((asString(order['invoice_note'])?.trim() ?? '').isNotEmpty)
+                  Text(asString(order['invoice_note'])!.trim(),
+                      key: const ValueKey('invoice-note'), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               ],
             ),
           ),

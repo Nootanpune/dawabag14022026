@@ -42,11 +42,12 @@ class CheckoutRazorpay {
       };
 
   /// Creates the server's payment order and opens the Razorpay sheet.
-  Future<void> pay(String orderId, {String? orderNumber}) async {
+  /// Sprint 44: [orderEditId] pays the difference for an order change.
+  Future<void> pay(String orderId, {String? orderNumber, String? orderEditId}) async {
     _orderId = orderId;
     onBusy(true);
     try {
-      final paymentOrder = await apiService.createPaymentOrder(orderId);
+      final paymentOrder = await apiService.createPaymentOrder(orderId, orderEditId: orderEditId);
       final note = paymentOrder['charge_note']?.toString().trim();
       if (note != null && note.isNotEmpty) onChargeNote?.call(note);
       _razorpay.open(sheetOptions(paymentOrder, orderNumber: orderNumber));

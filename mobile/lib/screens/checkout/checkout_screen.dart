@@ -8,6 +8,7 @@ import '../../models/payment_result.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/practitioner_provider.dart';
 import '../../providers/sales_status_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/api_utils.dart';
@@ -16,6 +17,7 @@ import '../../services/payment_api.dart';
 import '../../services/prescription_api.dart';
 import '../../utils/payment_hold.dart';
 import '../../widgets/payments/demo_checkout/demo_checkout.dart';
+import '../../widgets/practitioner/registration_status_card.dart';
 import '../../widgets/rx_sales_banner.dart';
 import '../../widgets/trade_price_banner.dart';
 import 'checkout_flow.dart';
@@ -27,10 +29,13 @@ import 'widgets/checkout_step_body.dart';
 import 'widgets/prescription_step.dart' show pickPrescriptionImage;
 
 /// Checkout, in the web's order: address → prescription (Rx orders, chosen
-/// before the order exists, C-08) → review (C-35) → place order WITH the chosen
-/// prescription (Sprint 39: POST /orders + prescription_id; the server refuses a
-/// prescription order without one) → payment (only held until the pharmacist's
-/// check for a prescription order, C-37) → confirmed. Items, coupon and prices
+/// before the order exists, C-08) → review (C-35) → written order (Sprint 44:
+/// doctors / institutions, r.65(9)(b)) → place order WITH the chosen
+/// prescription / written order (POST /orders + prescription_id /
+/// written_order_id; the server refuses the order without them) → payment (only
+/// held until the pharmacist's check for a prescription order, C-37) →
+/// confirmed. A doctor / institution whose registration does not allow sales
+/// now sees the server's reason and cannot continue. Items, coupon and prices
 /// come from the server cart; the summary and totals from the server.
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -60,6 +65,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   bool _paidAuthorised = false; // Sprint 39: held, not charged, until the pharmacist's check
   String? _chargeNote; // the server's charge_note, when it sent one
   List<String> _orderedRxItems = const []; // the order's prescription lines, kept when the cart empties
+  // Sprint 44: a doctor's / institution's signed written order — held by the server, only its id here
+  String? _writtenOrderId;
+  String? _writtenOrderError;
+  bool _writtenAsked = false; // the server asked for one the preview did not announce
 
   @override
   void initState() {
@@ -95,6 +104,25 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   bool get _isPractitioner => ref.read(authProvider).customerType == 'doc_hospital';
 
+  /// Sprint 44: the preview (or POST /orders) says a signed written order must go with this order.
+  bool get _needsWrittenOrder => (_summary?.writtenOrderRequired ?? false) || _writtenAsked;
+
+  /// Sprint 44: a doctor / institution whose registration is not verified or has
+  /// lapsed — the server's reason is shown and checkout stops (403 otherwise).
+  bool get _registrationBlocked {
+    if (!_isPractitioner || _order != null) return false;
+    final reg = ref.read(practitionerRegistrationProvider).valueOrNull;
+    return reg != null && reg.applies && !reg.canOrder;
+  }
+
+  /// [{product_id, quantity}] of the cart, for the written order (requisition).
+  List<Map<String, dynamic>> _cartItems() => ref
+      .read(cartProvider)
+      .view
+      .orderableItems
+      .map((l) => <String, dynamic>{'product_id': l.productId, 'quantity': l.quantity})
+      .toList();
+
   /// "Amoxicillin 500 mg Capsule × 1" for each cart line that needs a prescription.
   List<String> _cartRxItems() => ref
       .read(cartProvider)
@@ -112,7 +140,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   /// Order body for the selected address and the server cart, or null
   /// (with a message) when something is missing.
-  Map<String, dynamic>? _orderBody({bool? declaration, String? prescriptionId}) {
+  Map<String, dynamic>? _orderBody({bool? declaration, String? prescriptionId, String? writtenOrderId}) {
     Map<String, dynamic>? address;
     for (final a in ref.read(addressesProvider).valueOrNull ?? const <Map<String, dynamic>>[]) {
       if (a['id']?.toString() == _selectedAddressId) address = a;
@@ -133,7 +161,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _showError('Your cart has no items that can be ordered');
       return null;
     }
-    return checkoutOrderBody(cart, address, practitionerDeclaration: declaration, prescriptionId: prescriptionId);
+    return checkoutOrderBody(cart, address,
+        practitionerDeclaration: declaration, prescriptionId: prescriptionId, writtenOrderId: writtenOrderId);
   }
 
   /// Runs [request] with the button spinner and shows its error, if any.
@@ -223,24 +252,53 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _toPrescriptionStep(error: 'Choose or upload your prescription first.');
       return;
     }
-    final body = _orderBody(declaration: practitioner ? true : null, prescriptionId: needsRx ? _rx.selectedId : null);
+    // Sprint 44 (r.65(9)(b)): the written order comes before the order is placed
+    if (_needsWrittenOrder && (_step != CheckoutStep.writtenOrder || _writtenOrderId == null)) {
+      setState(() => _step = CheckoutStep.writtenOrder);
+      return;
+    }
+    final body = _orderBody(
+      declaration: practitioner ? true : null,
+      prescriptionId: needsRx ? _rx.selectedId : null,
+      writtenOrderId: _needsWrittenOrder ? _writtenOrderId : null,
+    );
     if (body == null) return;
     _orderedRxItems = _cartRxItems();
-    await _busy(() async {
-      final order = PlacedOrder.fromJson(await apiService.placeOrder(body));
-      if (!mounted) return;
-      ref.read(cartProvider.notifier).load(); // the server removed the ordered lines
-      setState(() {
-        _order = order;
-        _step = CheckoutStep.payment;
-        _rxError = null;
-      });
-    }, 'We could not place your order. Please try again.', handled: (e) {
-      // Nothing was placed: choose or upload another prescription, then place it again
-      if (!isPrescriptionProblem(e)) return false;
-      _toPrescriptionStep(error: prescriptionProblemText(e, fallback: 'This prescription could not be used.'));
-      return true;
-    });
+    await _busy(
+        () async {
+          final order = PlacedOrder.fromJson(await apiService.placeOrder(body));
+          if (!mounted) return;
+          ref.read(cartProvider.notifier).load(); // the server removed the ordered lines
+          setState(() {
+            _order = order;
+            _step = CheckoutStep.payment;
+            _rxError = null;
+          });
+        },
+        'We could not place your order. Please try again.',
+        handled: (e) {
+          // Sprint 44: registration not verified / lapsed — fresh status; the server's words in the snackbar
+          if (isPractitionerRegistrationInvalid(e)) {
+            ref.invalidate(practitionerRegistrationProvider);
+            return false;
+          }
+          // Sprint 44: written order missing, not covering, too old or already used — sign or upload another
+          if (isWrittenOrderProblem(e)) {
+            ref.invalidate(myWrittenOrdersProvider);
+            setState(() {
+              _writtenAsked = true;
+              _writtenOrderId = null;
+              _writtenOrderError =
+                  ApiService.errorMessage(e, fallback: 'Sign or upload a written order for this order.');
+              _step = CheckoutStep.writtenOrder;
+            });
+            return true;
+          }
+          // Nothing was placed: choose or upload another prescription, then place it again
+          if (!isPrescriptionProblem(e)) return false;
+          _toPrescriptionStep(error: prescriptionProblemText(e, fallback: 'This prescription could not be used.'));
+          return true;
+        });
   }
 
   // ── The order is placed but payment was refused for want of a prescription ──
@@ -397,14 +455,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  VoidCallback? _bottomAction() => switch (_step) {
-        CheckoutStep.address => _continueFromAddress,
-        CheckoutStep.prescription => _rx.hasChoice ? _continueFromPrescription : null,
-        CheckoutStep.review => _placeOrder,
-        CheckoutStep.rxFix => _rx.hasChoice ? _retryAttach : null,
-        CheckoutStep.payment => _payAction(),
-        CheckoutStep.confirmed => null,
-      };
+  // Sprint 44: nothing goes on while a doctor's / institution's registration does not allow sales
+  VoidCallback? _bottomAction() => _registrationBlocked
+      ? null
+      : switch (_step) {
+          CheckoutStep.address => _continueFromAddress,
+          CheckoutStep.prescription => _rx.hasChoice ? _continueFromPrescription : null,
+          CheckoutStep.review => _placeOrder,
+          CheckoutStep.writtenOrder => _order != null || _writtenOrderId != null ? _placeOrder : null,
+          CheckoutStep.rxFix => _rx.hasChoice ? _retryAttach : null,
+          CheckoutStep.payment => _payAction(),
+          CheckoutStep.confirmed => null,
+        };
 
   @override
   Widget build(BuildContext context) {
@@ -415,7 +477,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     ref.watch(cartProvider.select((s) => s.view.requiresPrescription));
     final cartRxPaused = ref.watch(cartProvider.select((s) => s.view.rxSalesPaused));
     final isPractitioner = ref.watch(authProvider.select((s) => s.customerType == 'doc_hospital'));
+    // Sprint 44: a doctor's / institution's registration decides whether checkout may go on
+    if (isPractitioner) ref.watch(practitionerRegistrationProvider);
     final hasRx = _requiresPrescription;
+    final written = _needsWrittenOrder;
     final confirmed = _step == CheckoutStep.confirmed;
 
     return Scaffold(
@@ -426,11 +491,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       body: Column(
         children: [
           if (!confirmed)
-            CheckoutStepBar(steps: checkoutBarLabels(hasRx), currentIndex: _step.barIndex(hasRx)),
+            CheckoutStepBar(
+                steps: checkoutBarLabels(hasRx, written: written),
+                currentIndex: _step.barIndex(hasRx, written: written)),
           // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
           if (!confirmed) const TradePriceBanner(margin: EdgeInsets.fromLTRB(16, 8, 16, 0)),
           // Sprint 38: emergency stop on prescription medicines (C-08)
           if (!confirmed) RxSalesBanner(serverMessage: cartRxPaused, margin: const EdgeInsets.fromLTRB(16, 8, 16, 0)),
+          // Sprint 44: orders paused for a doctor / institution — the server's reason (r.65(9)(b))
+          if (isPractitioner &&
+              !confirmed &&
+              _order == null &&
+              _step != CheckoutStep.writtenOrder &&
+              _registrationBlocked)
+            const Padding(padding: EdgeInsets.fromLTRB(16, 8, 16, 0), child: RegistrationStatusCard(compact: true)),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -468,6 +542,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 // Sprint 39: held until the pharmacist's check (C-37)
                 chargeNote: _chargeAfterCheck ? chargeNoteOr(_chargeNote) : null,
                 paidAuthorised: _paidAuthorised,
+                writtenOrderItems: _step == CheckoutStep.writtenOrder ? _cartItems() : const [],
+                writtenOrderId: _writtenOrderId,
+                writtenOrderError: _writtenOrderError,
+                onWrittenOrder: (id) => setState(() {
+                  _writtenOrderId = id;
+                  if (id != null) _writtenOrderError = null;
+                }),
               ),
             ),
           ),
@@ -482,6 +563,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       hasRx: hasRx,
                       rxChosen: _rx.hasChoice,
                       chargeAfterCheck: _chargeAfterCheck,
+                      written: written,
+                      writtenChosen: _writtenOrderId != null,
                     ),
               onPressed: _bottomAction(),
               isLoading: _isLoading,

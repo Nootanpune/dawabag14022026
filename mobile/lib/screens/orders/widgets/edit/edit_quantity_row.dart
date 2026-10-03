@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../../../config/theme.dart';
 
-/// One line in "Change this order": lower (never above [was]), Remove / Keep.
-/// Same wording as the website (EditOrderDialog).
+/// One line in "Change this order": lower, raise (Sprint 44, up to [max]),
+/// Remove / Keep. Same wording as the website (EditOrderDialog).
 class EditQuantityRow extends StatelessWidget {
   final String name;
 
-  /// What is to be supplied now (supply_qty): the most the buyer can go back up to.
+  /// What is to be supplied now (supply_qty).
   final int was;
+  /// The most the app offers (the website's 999); the server checks the real limits.
+  final int max;
   final int quantity;
   final bool enabled;
   final ValueChanged<int> onChanged;
@@ -20,9 +22,10 @@ class EditQuantityRow extends StatelessWidget {
     required this.quantity,
     required this.onChanged,
     this.enabled = true,
+    this.max = 999,
   });
 
-  String get _note => quantity == 0 ? 'Will be removed' : quantity < was ? 'Was $was' : 'Ordered $was';
+  String get _note => quantity == 0 ? 'Will be removed' : quantity != was ? 'Was $was' : 'Ordered $was';
 
   @override
   Widget build(BuildContext context) {
@@ -73,12 +76,12 @@ class EditQuantityRow extends StatelessWidget {
                             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                       ),
                       IconButton(
-                        tooltip: 'Raise quantity of $name back',
+                        tooltip: 'Raise quantity of $name',
                         color: AppTheme.brandTeal700,
                         visualDensity: VisualDensity.compact,
                         icon: const Icon(Icons.add, size: 18),
-                        // Never above what is on the order now: an order is only lowered
-                        onPressed: enabled && n < was ? () => onChanged(n + 1) : null,
+                        // Sprint 44: more is allowed before the pharmacist's approval (the server checks stock)
+                        onPressed: enabled && n < max ? () => onChanged(n + 1) : null,
                       ),
                     ],
                   ),

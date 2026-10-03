@@ -59,7 +59,22 @@ class StepDetails extends StatelessWidget {
 
             if (c.isDoctor) ...[
               const RegisterSectionTitle('Registration details'),
-              registerTextField(c.nmcRegCtrl, 'NMC / State Medical Council reg. number',
+              // Sprint 44: a doctor, or a hospital / clinic / nursing home (Drugs Rules r.65(9)(b))
+              registerPractitionerKindField(c),
+              const SizedBox(height: 14),
+              if (c.practitionerKind == 'institution') ...[
+                registerTextField(c.businessCtrl, 'Hospital / clinic / nursing home name',
+                    hint: 'Sunrise Nursing Home',
+                    validator: (v) => (v == null || v.trim().length < 2)
+                        ? 'Enter the hospital, clinic or nursing home name'
+                        : null),
+                const SizedBox(height: 14),
+              ],
+              registerTextField(
+                  c.nmcRegCtrl,
+                  c.practitionerKind == 'institution'
+                      ? "Responsible doctor's NMC / State Medical Council reg. number"
+                      : 'NMC / State Medical Council reg. number',
                   caps: true,
                   validator: (v) => (v == null || v.trim().isEmpty)
                       ? 'Registration number is required'

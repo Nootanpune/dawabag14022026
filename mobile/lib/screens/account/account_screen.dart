@@ -7,6 +7,8 @@ import '../../config/theme.dart';
 import '../../utils/formatters.dart';
 import '../../models/drug_licence.dart';
 import '../../models/two_factor.dart';
+import '../../models/practitioner.dart' show kPractitionerType;
+import '../../widgets/practitioner/registration_status_card.dart';
 import 'two_factor/two_factor_settings_screen.dart' show kTwoFactorSettingsPath;
 
 class AccountScreen extends ConsumerWidget {
@@ -137,6 +139,14 @@ class AccountScreen extends ConsumerWidget {
             ),
           ),
 
+          // Sprint 44: a doctor's / institution's registration as Dawabag verified it, and the
+          // renewed certificate (Drugs Rules r.65(9)(b); FDA Pune circular 16/2026)
+          if (user['customer_type'] == kPractitionerType)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: RegistrationStatusCard(allowRenewal: true),
+            ),
+
           const SizedBox(height: 16),
 
           // Menu sections
@@ -243,7 +253,8 @@ class _Section extends StatelessWidget {
         child: Text(title.toUpperCase(),
           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade500, letterSpacing: 0.8)),
       ),
-      Container(
+      // Material (not a coloured box) so the list tiles' ink shows
+      Material(
         color: Colors.white,
         child: Column(children: items),
       ),

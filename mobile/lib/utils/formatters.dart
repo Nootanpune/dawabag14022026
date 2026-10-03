@@ -10,3 +10,6 @@ String discountPercent(int mrp, int offer) {
   if (mrp <= 0) return '0';
   return ((mrp - offer) / mrp * 100).round().toString();
 }
+
+/// "5 MB" for an upload limit given in bytes.
+String formatMegabytes(int bytes) => '${(bytes / (1024 * 1024)).round()} MB';

@@ -44,6 +44,9 @@ extension RegisterPayload on RegisterController {
       });
     } else if (isDoctor) {
       payload.addAll({
+        // Sprint 44: a doctor, or an institution whose registration above is its responsible doctor's
+        'practitioner_kind': practitionerKind,
+        if (practitionerKind == 'institution') 'business_name': businessCtrl.text.trim(),
         'nmc_reg_number': nmcRegCtrl.text.trim(),
         'nmc_council_state': nmcCouncilCtrl.text.trim(),
         'speciality': speciality,

@@ -52,6 +52,9 @@ class RegisterController extends ChangeNotifier {
   String? speciality;
   bool gstDeclared = false;
   bool practitionerDeclared = false; // doctors: own patients only, not for resale (C-15)
+  /// Sprint 44 (r.65(9)(b)): 'doctor' or 'institution' (a hospital / clinic /
+  /// nursing home naming its responsible doctor's registration; its name in [businessCtrl])
+  String practitionerKind = 'doctor';
   bool showPassword = false;
 
   // Consents (all customer types)
@@ -144,6 +147,7 @@ class RegisterController extends ChangeNotifier {
       speciality = null;
       gstDeclared = false;
       practitionerDeclared = false;
+      practitionerKind = 'doctor';
       files.clear();
     });
   }

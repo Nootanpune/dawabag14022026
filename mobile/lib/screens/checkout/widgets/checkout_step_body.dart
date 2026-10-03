@@ -10,6 +10,7 @@ import 'payment_step.dart';
 import 'prescription_step.dart';
 import 'review_step.dart';
 import 'rx_choice_card.dart';
+import 'written_order_step.dart';
 
 /// The content of the current checkout step. State lives in the screen;
 /// this only picks the widget for [step].
@@ -47,6 +48,11 @@ class CheckoutStepBody extends StatelessWidget {
   final String? chargeNote;
   /// The payment came back authorised (held), not captured (C-37)
   final bool paidAuthorised;
+  /// Sprint 44: a doctor's / institution's written order for the cart (r.65(9)(b))
+  final List<Map<String, dynamic>> writtenOrderItems;
+  final String? writtenOrderId;
+  final ValueChanged<String?>? onWrittenOrder;
+  final String? writtenOrderError;
 
   const CheckoutStepBody({
     super.key,
@@ -78,6 +84,10 @@ class CheckoutStepBody extends StatelessWidget {
     this.paidBy,
     this.chargeNote,
     this.paidAuthorised = false,
+    this.writtenOrderItems = const [],
+    this.writtenOrderId,
+    this.onWrittenOrder,
+    this.writtenOrderError,
   });
 
   Widget _prescriptionStep({String? error}) => PrescriptionStep(
@@ -110,6 +120,13 @@ class CheckoutStepBody extends StatelessWidget {
             rxLabel: prescriptionLabel,
             onChangeRx: onChangeRx,
             chargeNote: chargeNote,
+          ),
+        CheckoutStep.writtenOrder => WrittenOrderStep(
+            items: writtenOrderItems,
+            value: writtenOrderId,
+            onChanged: onWrittenOrder ?? (_) {},
+            error: writtenOrderError,
+            orderPlaced: order != null,
           ),
         CheckoutStep.rxFix => _prescriptionStep(error: rxError),
         CheckoutStep.payment => PaymentStep(

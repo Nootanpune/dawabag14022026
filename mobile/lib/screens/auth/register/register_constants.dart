@@ -43,8 +43,8 @@ const List<CustomerTypeOption> kCustomerTypes = [
   ),
   CustomerTypeOption(
     value: 'doc_hospital',
-    label: 'Doctor (NMC / State Medical Council reg.)',
-    description: 'Institutional pricing for your clinic or hospital.',
+    label: 'Doctor / Hospital / Clinic (medical council reg.)',
+    description: 'For your own patients: a registered doctor, or a hospital, clinic or nursing home through its responsible doctor.',
     kycNote: 'KYC review: 1–2 working days',
     icon: Icons.medical_services_outlined,
   ),

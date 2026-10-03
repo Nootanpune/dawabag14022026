@@ -12,9 +12,21 @@ import '../../../widgets/open_pdf_button.dart';
 import 'pharmacist_check_notice.dart';
 import 'tracking_timeline.dart';
 
+/// Sprint 44: the tax invoice is issued when our pharmacist approves this
+/// shipment (`invoice_number` null and `invoice_issued_at` null until then).
+const kInvoiceAfterApproval = 'Invoice is issued after our pharmacist approves the order';
+
+/// Whether [shipment]'s tax invoice has been issued (number taken at the
+/// pharmacist's approval, Sprint 44). Older servers send no `invoice_issued_at`.
+bool shipmentInvoiceIssued(Map<String, dynamic> shipment) {
+  final number = shipment['invoice_number']?.toString().trim() ?? '';
+  if (number.isEmpty) return false;
+  return !shipment.containsKey('invoice_issued_at') || shipment['invoice_issued_at'] != null;
+}
+
 /// One shipment: seller, tax invoice, status, seal number and who received
-/// it. With [orderId] it offers the invoice PDF (signed link, C-33) and,
-/// once delivered, "Report a problem" (C-37).
+/// it. With [orderId] it offers the invoice PDF (signed link, C-33) once it is
+/// issued and, once delivered, "Report a problem" (C-37).
 class ShipmentTile extends StatelessWidget {
   final Map<String, dynamic> shipment;
   final String sellerLabel;
@@ -37,8 +49,10 @@ class ShipmentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final id = _text('id') ?? '';
-    final invoice = _text('invoice_number');
     final status = _text('status');
+    // Sprint 44: no invoice (and no download) until our pharmacist approves the shipment
+    final invoice = shipmentInvoiceIssued(shipment) ? _text('invoice_number') : null;
+    final awaitingInvoice = invoice == null && status != 'cancelled';
     final seal = _text('seal_number');
     final receivedBy = _text('received_by_name');
     final relation = _text('received_by_relation');
@@ -64,6 +78,8 @@ class ShipmentTile extends StatelessWidget {
                 children: [
                   Text(sellerLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   if (invoice != null) Text('Tax invoice $invoice', style: grey),
+                  if (awaitingInvoice)
+                    Text(kInvoiceAfterApproval, key: const ValueKey('invoice-after-approval'), style: grey),
                   if (detailed && status != null) Text('Status: ${status.replaceAll('_', ' ')}', style: grey),
                   if (checkedBy != null) CheckedByText(checkedBy),
                   if (checkNote != null)

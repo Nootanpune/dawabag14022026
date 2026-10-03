@@ -4,8 +4,10 @@ import '../../../../models/order_edit.dart';
 import '../../../../utils/formatters.dart';
 import '../../../../utils/ist.dart';
 
-/// "Changes you made" before packing (Sprint 43, URS-074): what changed and
-/// the money back (C-37), worded as on the website. Hidden when there are none.
+/// "Changes you made" (Sprint 43 after the invoice; Sprint 44 before the
+/// pharmacist's approval): what changed — lowered, removed, raised, added — the
+/// money back or the difference to pay (C-37), and whether it went back to our
+/// pharmacist, worded as on the website. Hidden when there are none.
 class OrderEditsCard extends StatelessWidget {
   final Map<String, dynamic> order;
   const OrderEditsCard({super.key, required this.order});
@@ -38,6 +40,18 @@ class OrderEditsCard extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Text('${formatPrice(e.refundPaise)} ${e.refundWords}'.trim(),
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                      ),
+                    if (e.extraPaise > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text('${formatPrice(e.extraPaise)} more — ${e.extraWords}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                      ),
+                    if (e.sentToPharmacist)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text('Sent back to our pharmacist for the prescription check.',
                             style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                       ),
                   ],

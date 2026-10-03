@@ -47,6 +47,7 @@ extension CheckoutApi on ApiService {
     required String pincode,
     bool? practitionerDeclaration,
     String? prescriptionId,
+    String? writtenOrderId,
   }) =>
       {
         'address_id': addressId,
@@ -56,6 +57,8 @@ extension CheckoutApi on ApiService {
         if (practitionerDeclaration != null) 'practitioner_declaration': practitionerDeclaration,
         // Sprint 39: the prescription goes WITH the order, chosen before payment (C-08)
         if (prescriptionId != null) 'prescription_id': prescriptionId,
+        // Sprint 44: a doctor's / institution's signed written order (Drugs Rules r.65(9)(b))
+        if (writtenOrderId != null) 'written_order_id': writtenOrderId,
       };
 
   /// POST /orders/preview (same body as POST /orders) → the checkout summary
@@ -68,7 +71,11 @@ extension CheckoutApi on ApiService {
   /// POST /orders [body] → the `order` object (id, order_number,
   /// total_paise, requires_prescription, shipments; Sprint 39: prescription,
   /// capture). A prescription order without `prescription_id` is refused
-  /// (422 PRESCRIPTION_REQUIRED) and nothing is placed.
+  /// (422 PRESCRIPTION_REQUIRED) and nothing is placed. Sprint 44: no invoice
+  /// number yet (issued at the pharmacist's approval); a doctor / institution
+  /// order is refused without `written_order_id` (422 WRITTEN_ORDER_*,
+  /// 409 WRITTEN_ORDER_USED) or with a lapsed registration (403
+  /// PRACTITIONER_REGISTRATION_INVALID).
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> body) async {
     final res = await dio.post('/orders', data: body);
     final order = apiData(res)['order'];
@@ -80,8 +87,11 @@ extension CheckoutApi on ApiService {
   /// and charge_note. The server creates the Razorpay order with the capture
   /// setting, so the app passes nothing about capture. 422
   /// PRESCRIPTION_REQUIRED while the order has no prescription with it.
-  Future<Map<String, dynamic>> createPaymentOrder(String orderId) async {
-    final res = await dio.post('/payments/create-order', data: {'order_id': orderId});
+  /// Sprint 44: [orderEditId] pays the difference for an order change instead
+  /// (held until the pharmacist's check when the order has prescription medicines).
+  Future<Map<String, dynamic>> createPaymentOrder(String orderId, {String? orderEditId}) async {
+    final res = await dio.post('/payments/create-order',
+        data: {'order_id': orderId, if (orderEditId != null) 'order_edit_id': orderEditId});
     return Map<String, dynamic>.from(res.data['data'] as Map);
   }
 

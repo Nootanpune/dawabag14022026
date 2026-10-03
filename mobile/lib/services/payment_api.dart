@@ -50,9 +50,12 @@ extension PaymentApi on ApiService {
   /// authorised (simulated) until the pharmacist's check — `payment_status`
   /// 'authorized' — and 422 PRESCRIPTION_REQUIRED while it has no prescription.
   /// [provider]: the bank or wallet chosen (never card data); kept in the audit only.
-  Future<PaymentResult> payOrderDemo(String orderId, {required String method, String? provider, bool fail = false}) async {
+  /// Sprint 44: [orderEditId] pays the difference for an order change.
+  Future<PaymentResult> payOrderDemo(String orderId,
+      {required String method, String? provider, bool fail = false, String? orderEditId}) async {
     final res = await dio.post('/payments/demo', data: {
       'order_id': orderId,
+      if (orderEditId != null) 'order_edit_id': orderEditId,
       'method': method,
       if (provider != null) 'provider': provider,
       'outcome': fail ? 'failure' : 'success',

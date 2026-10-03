@@ -7,35 +7,46 @@ import '../../utils/payment_hold.dart';
 import '../orders/widgets/order_shipments_card.dart';
 
 /// Checkout order (the same as the web): address → prescription (Rx orders
-/// only, chosen BEFORE the order exists) → review (C-35 summary) → place order
-/// (POST /orders WITH `prescription_id` — Sprint 39, the server refuses a
-/// prescription order without one, C-08) → payment (held until the
-/// pharmacist's check for a prescription order, C-37) → confirmed.
+/// only, chosen BEFORE the order exists) → review (C-35 summary) → written order
+/// (Sprint 44: doctors / institutions only, when the preview says
+/// `written_order_required` — Drugs Rules r.65(9)(b)) → place order (POST
+/// /orders WITH `prescription_id` / `written_order_id` — the server refuses the
+/// order without them) → payment (held until the pharmacist's check for a
+/// prescription order, C-37) → confirmed.
 /// [rxFix]: the order is placed but payment was refused because no
 /// prescription is with it; the buyer chooses or uploads one for it.
-enum CheckoutStep { address, prescription, review, rxFix, payment, confirmed }
+enum CheckoutStep { address, prescription, review, writtenOrder, rxFix, payment, confirmed }
 
-/// Step-bar labels; the prescription step appears only for Rx orders.
-List<String> checkoutBarLabels(bool hasRx) => hasRx
-    ? const ['Address', 'Prescription', 'Review', 'Payment']
-    : const ['Address', 'Review', 'Payment'];
+/// Step-bar labels; the prescription step appears only for Rx orders, the
+/// written-order step only for doctors / institutions ([written]).
+List<String> checkoutBarLabels(bool hasRx, {bool written = false}) => [
+      'Address',
+      if (hasRx) 'Prescription',
+      'Review',
+      if (written) 'Written order',
+      'Payment',
+    ];
 
-/// Where the bottom button leads (before the order exists, review places it).
-CheckoutStep checkoutNextStep(CheckoutStep step, {required bool hasRx}) => switch (step) {
+/// Where the bottom button leads (before the order exists, review — or the
+/// written order for a doctor / institution — places it).
+CheckoutStep checkoutNextStep(CheckoutStep step, {required bool hasRx, bool written = false}) => switch (step) {
       CheckoutStep.address => hasRx ? CheckoutStep.prescription : CheckoutStep.review,
       CheckoutStep.prescription => CheckoutStep.review,
-      CheckoutStep.review => CheckoutStep.payment,
+      CheckoutStep.review => written ? CheckoutStep.writtenOrder : CheckoutStep.payment,
+      CheckoutStep.writtenOrder => CheckoutStep.payment,
       CheckoutStep.rxFix => CheckoutStep.payment,
       CheckoutStep.payment => CheckoutStep.confirmed,
       CheckoutStep.confirmed => CheckoutStep.confirmed,
     };
 
 /// Where Back leads inside checkout, or null to leave the checkout screen.
-/// Once the order is placed, address and prescription can no longer change.
-CheckoutStep? checkoutPreviousStep(CheckoutStep step, {required bool hasRx, required bool orderPlaced}) => switch (step) {
+/// Once the order is placed, address, prescription and written order can no longer change.
+CheckoutStep? checkoutPreviousStep(CheckoutStep step, {required bool hasRx, required bool orderPlaced}) =>
+    switch (step) {
       CheckoutStep.address => null,
       CheckoutStep.prescription => CheckoutStep.address,
       CheckoutStep.review => orderPlaced ? null : (hasRx ? CheckoutStep.prescription : CheckoutStep.address),
+      CheckoutStep.writtenOrder => orderPlaced ? null : CheckoutStep.review,
       CheckoutStep.rxFix => null,
       CheckoutStep.payment => CheckoutStep.review,
       CheckoutStep.confirmed => null,
@@ -43,13 +54,17 @@ CheckoutStep? checkoutPreviousStep(CheckoutStep step, {required bool hasRx, requ
 
 extension CheckoutStepX on CheckoutStep {
   /// Position in the step bar (-1 once confirmed; the bar is then hidden).
-  int barIndex(bool hasRx) => switch (this) {
-        CheckoutStep.address => 0,
-        CheckoutStep.prescription || CheckoutStep.rxFix => 1,
-        CheckoutStep.review => hasRx ? 2 : 1,
-        CheckoutStep.payment => hasRx ? 3 : 2,
-        CheckoutStep.confirmed => -1,
-      };
+  int barIndex(bool hasRx, {bool written = false}) {
+    final review = hasRx ? 2 : 1;
+    return switch (this) {
+      CheckoutStep.address => 0,
+      CheckoutStep.prescription || CheckoutStep.rxFix => 1,
+      CheckoutStep.review => review,
+      CheckoutStep.writtenOrder => review + 1,
+      CheckoutStep.payment => review + (written ? 2 : 1),
+      CheckoutStep.confirmed => -1,
+    };
+  }
 
   /// Bottom-button label; amounts are the server's figures.
   String buttonLabel({
@@ -58,11 +73,22 @@ extension CheckoutStepX on CheckoutStep {
     bool hasRx = false,
     bool rxChosen = false,
     bool chargeAfterCheck = false,
+    bool written = false,
+    bool writtenChosen = false,
   }) =>
       switch (this) {
         CheckoutStep.address => hasRx ? 'Continue to prescription' : 'Review order',
         CheckoutStep.prescription => rxChosen ? 'Continue to review' : 'Choose or upload a prescription',
-        CheckoutStep.review => orderPlaced ? 'Continue to payment' : 'Place order and pay',
+        CheckoutStep.review => orderPlaced
+            ? 'Continue to payment'
+            : written
+                ? 'Continue to written order'
+                : 'Place order and pay',
+        CheckoutStep.writtenOrder => orderPlaced
+            ? 'Continue to payment'
+            : writtenChosen
+                ? 'Place order and pay'
+                : 'Sign or upload the written order',
         CheckoutStep.rxFix => rxChosen ? 'Continue to payment' : 'Choose or upload a prescription',
         CheckoutStep.payment => payButtonLabel(totalPaise, chargeAfterCheck: chargeAfterCheck),
         CheckoutStep.confirmed => '',
@@ -117,8 +143,8 @@ Future<PlaceOutcome> attachRxToPlacedOrder(
     await attach(order.id!);
     return PlaceOutcome(order, CheckoutStep.payment);
   } catch (e) {
-    return PlaceOutcome(order, CheckoutStep.rxFix,
-        '${errorText(e)} Please choose or upload another one for order $number.');
+    return PlaceOutcome(
+        order, CheckoutStep.rxFix, '${errorText(e)} Please choose or upload another one for order $number.');
   }
 }
 
@@ -130,6 +156,7 @@ class PlacedOrder {
   final int totalPaise;
   final bool requiresPrescription;
   final List<Map<String, dynamic>> shipments;
+
   /// Sprint 39: 'now' | 'after_pharmacist_check' (held until the check, C-37)
   final String capture;
 
@@ -160,21 +187,23 @@ class PlacedOrder {
 /// Body for POST /orders/preview and POST /orders from the server cart and
 /// the chosen address (its pincode decides serviceability and sellers).
 /// [prescriptionId]: the prescription chosen for a prescription order (C-08).
+/// [writtenOrderId]: a doctor's / institution's signed written order (Sprint 44, r.65(9)(b)).
 Map<String, dynamic> checkoutOrderBody(
   CartView cart,
   Map<String, dynamic> address, {
   bool? practitionerDeclaration,
   String? prescriptionId,
+  String? writtenOrderId,
 }) {
   final coupon = cart.coupon;
   return CheckoutApi.orderBody(
     addressId: address['id'],
-    items: cart.orderableItems
-        .map((l) => <String, dynamic>{'product_id': l.productId, 'quantity': l.quantity})
-        .toList(),
+    items:
+        cart.orderableItems.map((l) => <String, dynamic>{'product_id': l.productId, 'quantity': l.quantity}).toList(),
     couponCode: coupon != null && coupon.valid ? coupon.code : null,
     pincode: address['pincode']?.toString() ?? '',
     practitionerDeclaration: practitionerDeclaration,
     prescriptionId: prescriptionId,
+    writtenOrderId: writtenOrderId,
   );
 }

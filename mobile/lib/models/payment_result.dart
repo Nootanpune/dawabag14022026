@@ -10,17 +10,27 @@ class PaymentResult {
   final String? paymentStatus;
   /// e.g. "You'll only be charged after our pharmacist checks your prescription."
   final String? chargeNote;
+  /// Sprint 44: set when the payment was the difference for an order change
+  final String? orderEditId;
 
-  const PaymentResult({required this.paid, this.paymentStatus, this.chargeNote});
+  const PaymentResult({required this.paid, this.paymentStatus, this.chargeNote, this.orderEditId});
 
   /// Held, not charged, until the pharmacist's check.
   bool get authorised => paid && paymentStatus == 'authorized';
 
   /// POST /payments/verify answers only when the payment is good, so it is paid.
   factory PaymentResult.fromVerify(Map<String, dynamic> j) =>
-      PaymentResult(paid: true, paymentStatus: asString(j['payment_status']), chargeNote: asString(j['charge_note']));
+      PaymentResult(
+          paid: true,
+          paymentStatus: asString(j['payment_status']),
+          chargeNote: asString(j['charge_note']),
+          orderEditId: asString(j['order_edit_id']));
 
   /// POST /payments/demo: `paid` false when the (simulated) payment was declined.
   factory PaymentResult.fromDemo(Map<String, dynamic> j) =>
-      PaymentResult(paid: j['paid'] == true, paymentStatus: asString(j['payment_status']), chargeNote: asString(j['charge_note']));
+      PaymentResult(
+          paid: j['paid'] == true,
+          paymentStatus: asString(j['payment_status']),
+          chargeNote: asString(j['charge_note']),
+          orderEditId: asString(j['order_edit_id']));
 }

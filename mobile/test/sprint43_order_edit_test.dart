@@ -182,7 +182,7 @@ void main() {
       expect(refundSourceLabel('order_edit'), 'order changed');
       expect(refundSourceLabel('cancellation'), 'order cancelled');
       expect(refundSourceLabel('admin'), 'from Dawabag');
-      expect(creditNoteReasonLabel('order_edit'), 'order changed before packing');
+      expect(creditNoteReasonLabel('order_edit'), 'order changed after it was invoiced');
       expect(creditNoteReasonLabel('return_damaged'), 'return: damaged');
     });
 
@@ -233,7 +233,7 @@ void main() {
       expect(find.text('Testirizine 10: removed'), findsOneWidget);
       expect(find.text('₹200.00 refunded as soon as the held payment is taken'), findsOneWidget);
       expect(find.text('Processing · order changed'), findsOneWidget);
-      expect(find.text('₹200.00 · order changed before packing'), findsOneWidget);
+      expect(find.text('₹200.00 · order changed after it was invoiced'), findsOneWidget);
     });
 
     testWidgets('not editable: the server reason, no "Change order"', (tester) async {
@@ -247,8 +247,9 @@ void main() {
       expect(find.text(reason), findsOneWidget);
     });
 
-    testWidgets('Change order: lower only, server refusal shown, then saved and reloaded', (tester) async {
-      const increase = 'To get more Testamol 500, place a new order — an order can only be lowered once it is placed.';
+    testWidgets('Change order: lowered, server refusal shown, then saved and reloaded', (tester) async {
+      // Sprint 44: raising is allowed now; a minimum refusal stands in for any server sentence
+      const increase = 'The minimum for Testamol 500 is 2; remove it instead or keep at least 2.';
       final server = _serve(tester, {
         'GET /orders/o1': [
           (200, _ok(_order())),
@@ -256,7 +257,7 @@ void main() {
           (200, _ok(_order(canEdit: true, items: [_item('a', 'Testamol 500', 3, removed: 2), _item('b', 'Testirizine 10', 2)]))),
         ],
         'POST /orders/o1/edit': [
-          (422, {'success': false, 'message': increase, 'code': 'ORDER_EDIT_INCREASE_NOT_SUPPORTED'}),
+          (400, {'success': false, 'message': increase, 'code': 'ORDER_EDIT_BELOW_MINIMUM'}),
           (200, _ok({'id': 'e1', 'refund_paise': 10000, 'refund_status': 'recorded',
               'message': 'Your order is changed. ₹100.00 is being refunded the way you paid.'})),
         ],
@@ -266,10 +267,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Change this order'), findsOneWidget);
 
-      // Nothing changed yet: Save is off; + is off at the current quantity (no increases)
+      // Nothing changed yet: Save is off; + is on (Sprint 44: raising is allowed before approval)
       final save = find.byKey(const ValueKey('edit-save'));
       expect(tester.widget<ElevatedButton>(save).onPressed, isNull);
-      expect(tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.add).first).onPressed, isNull);
+      expect(tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.add).first).onPressed, isNotNull);
 
       // Removing everything is refused here: cancel instead
       await tester.tap(find.text('Remove').first);
@@ -298,6 +299,7 @@ void main() {
         'lines': [
           {'order_item_id': 'a', 'quantity': 1},
         ],
+        'add': [],
       });
       expect(find.byKey(const ValueKey('edit-error')), findsOneWidget);
       expect(find.text(increase), findsOneWidget);
