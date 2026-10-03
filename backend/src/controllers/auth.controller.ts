@@ -21,6 +21,9 @@ import { LicenceIn, licenceProblems } from '../services/licences/forms';
 import { assertNumbersFree, submitLicencesTx } from '../services/licences/register.service';
 import { todayIST } from '../utils/ist';
 import { clearSession, issueSession, readRefreshToken } from '../utils/sessionCookie';
+import { CHALLENGE_MESSAGE, isChallenge, sessionOrChallenge } from '../services/twoFactor/signIn.service';
+import { appliesToRole, sessionMayContinue } from '../services/twoFactor/policy';
+import { isEnrolled, twoFactorPolicy } from '../services/twoFactor/enrolment.service';
 
 // ─── Validation Schemas ─────────────────────────────────────────────────────
 const MOBILE_RE = /^[6-9]\d{9}$/;
@@ -292,32 +295,21 @@ export async function verifyMobileOTP(req: Request, res: Response, next: NextFun
     if (check === 'too_many') throw new AppError(TOO_MANY_WRONG_CODES, 400);
     if (check !== 'ok') throw new AppError('Invalid or expired OTP', 400);
 
-    const user = await queryOne<{ id: string; role: string; customer_type: string; kyc_status: string }>(
+    const user = await queryOne<{ id: string; role: string; customer_type: string; kyc_status: string; must_change_password: boolean }>(
       `UPDATE users SET mobile_verified = TRUE, updated_at = NOW()
        WHERE mobile = $1 AND deleted_at IS NULL
-       RETURNING id, role, customer_type, kyc_status`,
+       RETURNING id, role, customer_type, kyc_status, must_change_password`,
       [mobile]
     );
 
     if (!user) throw new AppError('User not found', 404);
 
-    const tokens = await generateTokens(user.id, user.role, user.customer_type);
-    const profile = await queryOne<{ full_name: string }>(
-      'SELECT full_name FROM user_profiles WHERE user_id = $1',
-      [user.id]
-    );
-
+    // Sprint 42: an SMS code is only the FIRST step for a login with two-step sign-in (C-41, C-44)
+    const data = await sessionOrChallenge(req, res, { ...user, mobile }, 'sms_code');
     res.json({
       success: true,
-      message: 'Mobile verified successfully',
-      data: {
-        user_id: user.id,
-        role: user.role,
-        customer_type: user.customer_type,
-        kyc_status: user.kyc_status,
-        full_name: profile?.full_name,
-        ...issueSession(req, res, tokens),
-      },
+      message: isChallenge(data) ? CHALLENGE_MESSAGE[data.two_factor] : 'Mobile verified successfully',
+      data,
     });
   } catch (error) {
     next(error);
@@ -394,27 +386,10 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       [user.id]
     );
 
-    const tokens = await generateTokens(user.id, user.role, user.customer_type);
-
-    // Fetch profile
-    const profile = await queryOne<{ full_name: string }>(
-      'SELECT full_name FROM user_profiles WHERE user_id = $1',
-      [user.id]
-    );
-
-    res.json({
-      success: true,
-      data: {
-        user_id: user.id,
-        role: user.role,
-        customer_type: user.customer_type,
-        kyc_status: user.kyc_status,
-        full_name: profile?.full_name,
-        // Sprint 28: a temporary password from Dawabag's admin must be replaced first
-        must_change_password: user.must_change_password,
-        ...issueSession(req, res, tokens),
-      },
-    });
+    // Sprint 42: staff and partner logins with two-step sign-in get the code step first;
+    // tokens and the cookie are issued only after it (services/twoFactor/signIn.service.ts)
+    const data = await sessionOrChallenge(req, res, { ...user, mobile }, 'password');
+    res.json({ success: true, ...(isChallenge(data) ? { message: CHALLENGE_MESSAGE[data.two_factor] } : {}), data });
   } catch (error) {
     next(error);
   }
@@ -443,10 +418,17 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
       throw new AppError('Your password was changed. Please sign in again', 401);
     }
 
+    // Sprint 42: a session without the second step is not renewed once two-step sign-in
+    // applies to this login (switched on, or required by the super-admin): sign in again
+    if (appliesToRole(user.role)
+        && !sessionMayContinue(user.role, await isEnrolled(user.id), await twoFactorPolicy(), payload.mfa === true)) {
+      throw new AppError('Please sign in again: this login now uses two-step sign-in', 401, true, 'TWO_FACTOR_SIGN_IN_REQUIRED');
+    }
+
     // Rotate: the old refresh token can never be used again
     await blacklistToken(payload.jti, 7 * 24 * 3600);
 
-    const tokens = await generateTokens(user.id, user.role, user.customer_type);
+    const tokens = await generateTokens(user.id, user.role, user.customer_type, { mfa: payload.mfa === true });
     const profile = await queryOne<{ full_name: string }>(
       'SELECT full_name FROM user_profiles WHERE user_id = $1',
       [user.id]

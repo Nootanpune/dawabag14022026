@@ -4,6 +4,9 @@
 // forgot-password screens call the same endpoint). Every existing session ends
 // (password_changed_at, Sprint 34) and a fresh one is issued. After 5 wrong codes the
 // OTP is thrown away. Passwords are never logged or audited (C-41, C-44, C-46).
+// Sprint 42: the SMS code never bypasses two-step sign-in — for a login with an
+// authenticator the password is changed, but no session is issued until the
+// authenticator code (or a recovery code) is given (security review Sprints 35–40 #16).
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -11,9 +14,8 @@ import { queryOne, withTransaction } from '../config/database';
 import { checkOtp, TOO_MANY_WRONG_CODES } from '../services/otp/otp.service';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
-import { generateTokens } from '../utils/jwt';
 import { passwordProblem } from '../utils/passwordPolicy';
-import { issueSession } from '../utils/sessionCookie';
+import { CHALLENGE_MESSAGE, isChallenge, sessionOrChallenge } from '../services/twoFactor/signIn.service';
 
 const schema = z.object({
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
@@ -43,16 +45,11 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
                 failed_login_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = $1`, [user.id, hash, changedAt]);
       await writeAuditTx(c, { userId: user.id, action: 'password_reset_by_otp', performedBy: user.id, ip: req.ip ?? null });
     });
-    const tokens = await generateTokens(user.id, user.role, user.customer_type);
-    const profile = await queryOne<{ full_name: string }>('SELECT full_name FROM user_profiles WHERE user_id = $1', [user.id]);
+    const data = await sessionOrChallenge(req, res, { ...user, mobile: d.mobile, must_change_password: false }, 'password_reset');
     res.json({
       success: true,
-      message: 'Password changed',
-      data: {
-        user_id: user.id, role: user.role, customer_type: user.customer_type, kyc_status: user.kyc_status,
-        mobile: d.mobile, full_name: profile?.full_name, must_change_password: false,
-        ...issueSession(req, res, tokens),
-      },
+      message: isChallenge(data) ? `Password changed. ${CHALLENGE_MESSAGE[data.two_factor]}` : 'Password changed',
+      data,
     });
   } catch (err) { next(err); }
 }

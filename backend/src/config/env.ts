@@ -104,6 +104,17 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
       errors.push('AWS_S3_BUCKET / AWS_ACCESS_KEY_ID are the test fakes; set the real bucket and keys');
     }
   }
+  // Sprint 42: the key that encrypts authenticator secrets and keys recovery-code hashes
+  // (services/twoFactor/keys.ts). Real production must set it; elsewhere it is derived from
+  // JWT_REFRESH_SECRET with a warning (the trial server derives a stable one in trial.sh).
+  const totpKey = String(env.TOTP_ENC_KEY ?? '').trim();
+  if (totpKey) {
+    if (totpKey.length < 32 || PLACEHOLDER.test(totpKey)) (production ? errors : warnings).push('TOTP_ENC_KEY must be at least 32 random characters (not the example value)');
+  } else if (realProduction) {
+    errors.push('TOTP_ENC_KEY must be set when APP_ENV=production (it encrypts two-step sign-in secrets; RUNBOOK §6)');
+  } else {
+    warnings.push('TOTP_ENC_KEY not set: two-step sign-in secrets use a key derived from JWT_REFRESH_SECRET (set TOTP_ENC_KEY; RUNBOOK §6)');
+  }
   const missing = INTEGRATIONS.filter((k) => !env[k] || PLACEHOLDER.test(String(env[k])));
   if (missing.length) {
     const msg = `Not configured: ${missing.join(', ')}`;

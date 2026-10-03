@@ -52,6 +52,8 @@ export async function cleanup(c: Client) {
   const ids = (await c.query(`SELECT id::text FROM users WHERE mobile LIKE '90000019%'`)).rows.map((r) => r.id);
   const products = (await c.query(`SELECT id::text FROM products WHERE sku LIKE 'E2E-%'`)).rows.map((r) => r.id);
   await c.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
+  // Sprint 42: two-step sign-in back to optional (twoFactor.spec.ts switches it to required)
+  await c.query(`UPDATE app_settings SET value = '"optional"' WHERE key = 'security.two_factor'`);
   // Keep the shared trail rows, just unlink them from the test people
   await c.query('UPDATE audit_logs SET performed_by = NULL WHERE performed_by = ANY($1)', [ids]);
   await c.query('UPDATE app_settings SET updated_by = NULL WHERE updated_by = ANY($1)', [ids]);

@@ -53,11 +53,14 @@ import {
   Snowflake,
   SearchCheck,
   ClipboardCheck as ChecklistIcon,
+  Fingerprint,
+  KeySquare,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
 import { STORE_ROLES } from '@/lib/purchasing/roles';
 import { DOCTOR_ADMIN_ROLES, TELE_LIST_ROLES } from '@/lib/telemedicine/roles';
+import { TWO_FACTOR_STAFF_ROLES } from '@/lib/auth/twoFactor';
 
 export interface NavItem {
   href: string;
@@ -170,6 +173,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/doctors', label: 'Doctors', icon: Stethoscope, roles: DOCTOR_ADMIN_ROLES },
       { href: '/admin/grievances', label: 'Complaints', icon: MessageSquareWarning, roles: ADMIN_ROLES },
       { href: '/admin/privacy', label: 'Data requests', icon: UserCog, roles: MANAGER_ROLES },
+      // Sprint 42 — who uses two-step sign-in; a super-admin resets a lost authenticator (C-41, C-46)
+      { href: '/admin/two-factor', label: 'Two-step sign-in (all)', icon: KeySquare, roles: MANAGER_ROLES },
     ],
   },
   {
@@ -180,6 +185,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/jobs', label: 'Jobs', icon: Timer, roles: MANAGER_ROLES },
       { href: '/admin/incidents', label: 'Security incidents', icon: Siren, roles: MANAGER_ROLES },
       { href: '/admin/settings', label: 'Settings', icon: Settings, roles: MANAGER_ROLES },
+      // Sprint 42 — each staff login's own authenticator app
+      { href: '/staff/two-factor', label: 'My two-step sign-in', icon: Fingerprint, roles: TWO_FACTOR_STAFF_ROLES },
     ],
   },
 ];

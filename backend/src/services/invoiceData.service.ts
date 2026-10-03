@@ -32,8 +32,10 @@ export interface InvoiceData {
   totals: { taxablePaise: number; cgstPaise: number; sgstPaise: number; igstPaise: number; totalPaise: number };
   /** Dawabag's own invoice carries the DAWA BAG logo; a partner's invoice is the partner's (C-05) */
   sellerType?: 'dawabag' | 'partner';
-  /** Sprint 35: the registered pharmacist who checked and released this shipment (C-08) */
-  pharmacist?: { name: string; regNo: string } | null;
+  /** Sprint 35: the registered pharmacist who checked and released this shipment (C-08); Sprint 42: council as at the check */
+  pharmacist?: { name: string; regNo: string; council?: string | null } | null;
+  /** Sprint 42: the sale as fixed at order placement — channel and the licences the lines were sold under (C-07, C-13, C-33) */
+  sale?: { channel: 'retail' | 'wholesale' | null; licences: InvoiceLicence[]; source: 'sale' | 'backfill' | null };
 }
 
 export interface InvoiceLicence { form: string; label: string; number: string; valid_upto: string | null }
@@ -46,7 +48,7 @@ async function registered(where: string, id: string): Promise<InvoiceData['einvo
 
 export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
   const s = await queryOne<any>(
-    `SELECT s.*, o.order_number, o.created_at AS order_date, o.buyer_gstin, o.buyer_pan, o.buyer_drug_license, o.buyer_drug_licences,
+    `SELECT s.*, o.order_number, o.created_at AS order_date, o.buyer_gstin, o.buyer_pan, o.buyer_drug_license, o.buyer_drug_licences AS order_buyer_drug_licences,
             a.full_name AS ship_name, concat_ws(', ', a.address_line1, a.city, a.state, a.pincode) AS ship_address, a.state AS ship_state,
             u.business_name, up.full_name AS buyer_name,
             v.name AS partner_name, concat_ws(', ', v.address_line1, v.city, v.state, v.pincode) AS partner_address,
@@ -60,13 +62,15 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
      WHERE s.id = $1`, [shipmentId]);
   if (!s) throw new AppError('Shipment not found', 404);
 
-  // Licences as on the day of sale (snapshots, Sprint 30); invoices of older orders read the register now
+  // Licences as on the day of sale: the shipment's frozen sale record (Sprint 42; Sprint 30
+  // snapshots; older shipments were filled by migration 37). Only a shipment without one
+  // (none since migration 37) would read the register as it is now.
   const entity = await queryOne<{ value: any }>(`SELECT value FROM app_settings WHERE key = 'legal.entity'`);
   const sellerLicences: InvoiceLicence[] = s.seller_drug_licences
     ?? snapshot(s.seller_type === 'partner'
       ? (await listLicences({ vendorId: s.partner_id })).filter((l) => l.status === 'verified')
       : await dawabagDrugLicences());
-  const buyerLicences: InvoiceLicence[] = s.buyer_drug_licences
+  const buyerLicences: InvoiceLicence[] = s.buyer_drug_licences ?? s.order_buyer_drug_licences
     ?? (s.buyer_drug_license && TRADE_TYPES.includes(s.buyer_type)
       ? snapshot((await listLicences({ userId: s.buyer_id })).filter((l) => l.status === 'verified')) : []);
   const seller = s.seller_type === 'partner'
@@ -121,7 +125,9 @@ export async function loadInvoice(shipmentId: string): Promise<InvoiceData> {
     einvoice: s.seller_type === 'dawabag' ? await registered('shipment_id = $1 AND doc_type = \'INV\'', shipmentId) : null,
     lines, totals,
     sellerType: s.seller_type,
-    pharmacist: s.pharmacist_check === 'released' && s.pharmacist_name ? { name: s.pharmacist_name, regNo: s.pharmacist_reg_no } : null,
+    pharmacist: s.pharmacist_check === 'released' && s.pharmacist_name
+      ? { name: s.pharmacist_name, regNo: s.pharmacist_reg_no, council: s.pharmacist_registration?.state_council ?? null } : null,
+    sale: { channel: s.sale_channel ?? null, licences: s.sale_licences ?? [], source: s.sale_identity_source ?? null },
   };
 }
 

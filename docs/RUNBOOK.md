@@ -59,6 +59,28 @@ Razorpay test mode.
 number; five wrong codes (sign-in by code and "Forgot password" together) throw the code away.
 JSON bodies are limited to `JSON_BODY_LIMIT` (1 MB) except the partner stock feed (10 MB).
 
+**Two-step sign-in (Sprint 42).** Super-admin, admin, pharmacist, packer and **every partner
+login** can add an authenticator app (RFC 6238: SHA-1, 30 s, 6 digits, ±1 step; Staff → "My
+two-step sign-in", Partner → "Two-step sign-in"). Enforcement is the super-admin setting
+`security.two_factor` (Admin → Settings → "Two-step sign-in"): `optional` (default, until the
+owner decides) or `required` — then anyone in those roles without it sets it up at the next
+sign-in, and sessions opened without it stop at their next renewal (401
+`TWO_FACTOR_SIGN_IN_REQUIRED`). Password, SMS code and "Forgot password" are only the first
+step: no token or cookie before the code. Each code works once (newest step kept per login);
+five wrong codes pause the second step for 15 minutes (429 `TWO_FACTOR_PAUSED`). Ten one-time
+recovery codes per enrolment, stored as keyed hashes. **Key:** `TOTP_ENC_KEY` (≥ 32 random
+characters, e.g. `openssl rand -hex 32`) encrypts the app keys (AES-256-GCM) and keys the
+recovery-code hashes; **required with `APP_ENV=production`**. Without it staging / CI derive a
+key from `JWT_REFRESH_SECRET` (dashboard warning `TOTP_KEY_NOT_SET`); the trial derives a stable
+one from `DB_PASSWORD` in `deploy/trial/trial.sh` (no change to an existing `TRIAL_ENV`). Keep
+the key stable and in the secret store: a new key makes every enrolled app unreadable — those
+people sign in with a recovery code (409 `TWO_FACTOR_KEY_CHANGED` otherwise) or a super-admin
+resets them (Admin → Two-step sign-in (all) → Reset, reason required, audited
+`two_factor_reset_by_admin`). A reset after a lost phone: confirm the person's identity by a
+call first. Audit actions: `two_factor_enrolled`, `two_factor_failed`, `two_factor_paused`,
+`two_factor_recovery_code_used`, `two_factor_recovery_codes_renewed`, `two_factor_disabled`,
+`two_factor_reset_by_admin`, `setting_changed` (the policy).
+
 **SMS (MSG91, DLT).** Indian operators deliver only templates registered on DLT
 (TRAI). Register each message in the DLT portal and MSG91, then map it in Admin →
 Settings → SMS templates (message type → template id → variables). A message type
@@ -208,6 +230,18 @@ starting unless `RUN_MIGRATIONS=false`. By hand: `npm run build && npm run db:mi
 - Statutory records are final in the database: the H1 register, credit notes, audit
   and consent logs, the prescription dispense ledger, verified prescriptions cannot be
   updated or deleted; invoice amounts cannot change.
+- **Sale record per shipment (Sprint 42, migration 37).** At order placement each shipment
+  keeps its sale identity: the seller's licences that day and the ones its lines were sold
+  under (`sale_licences`; per line `order_items.sale_licence_form` / `_number`, `price_field`),
+  the channel (`retail` Form 20/21 or `wholesale` Form 20B/21B), the buyer's type and a trade
+  buyer's licences. The trigger `order_shipments_identity_final` refuses any change once
+  frozen; the pharmacist of record (name, number, who, when, and `pharmacist_registration` —
+  council, valid till, status as at the check) is written by the release or refusal and is
+  then final (a hold may be overwritten by the decision). Invoices, the H1 register and the
+  sales register read this record, not today's licence register — renewing a licence changes
+  only later sales. Shipments from before migration 37 were filled from the data held then and
+  carry `sale_identity_source = 'backfill'`. A genuine correction needs the maintenance role
+  (operator SQL with an audit entry), never the API.
 - **Maintenance bypass (Sprint 38, migration 33).** `SET LOCAL dawabag.maintenance = 'on'`
   alone no longer does anything. It counts only while the session acts as the NOLOGIN
   role `dawabag_maintenance` — either inside a controlled function owned by that role
@@ -667,6 +701,9 @@ search works without typo matching; to add it later, as a superuser:
    API user, webhook and pickup address (section 2).
 8. Agora App ID and certificate; WhatsApp number and templates if WhatsApp is used;
    rider logins for own delivery.
+9. `TOTP_ENC_KEY` set (section 2). Owner decision on two-step sign-in: recommended — every
+   admin and super-admin switches it on, then Settings → "Two-step sign-in" → required
+   (security review Sprints 35–40 #16: without it an SMS code alone resets an admin's password).
 
 ## 9. Incidents
 

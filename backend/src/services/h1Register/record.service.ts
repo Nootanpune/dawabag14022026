@@ -3,7 +3,9 @@
 // detail throws a plain 409 and the whole dispatch rolls back; the database checks the
 // same (constraint h1_register_complete). The entry goes to the register of the
 // seller's licence; its number and hash are set when the dispatch commits
-// (migration 33, h1_register_seal).
+// (migration 33, h1_register_seal). Sprint 42: the licence is the one the line was SOLD
+// under, frozen at the sale (order_items.sale_licence_*), and the pharmacist is the one
+// recorded on the shipment at the check — never the registers as they are later.
 import { PoolClient } from 'pg';
 import { AppError } from '../../utils/AppError';
 import { dawabagDrugLicences, listLicences } from '../licences/register.service';
@@ -23,6 +25,7 @@ async function sellerLicences(client: PoolClient, s: { seller_type: string; part
 export async function recordH1Dispensing(client: PoolClient, shipmentId: string): Promise<number> {
   const rows = (await client.query(
     `SELECT s.seller_type, s.partner_id, s.seller_drug_licences, o.id AS order_id, oi.id AS order_item_id, oi.product_id,
+            oi.sale_licence_form, oi.sale_licence_number,
             oi.product_name, oi.quantity,
             COALESCE(ib.batch_number, pi.batch_number) AS batch_number,
             rx.id AS prescription_id, rx.patient_name, rx.prescriber_name, rx.prescriber_address, rx.prescriber_reg_no,
@@ -49,8 +52,10 @@ export async function recordH1Dispensing(client: PoolClient, shipmentId: string)
   const lines = rows.filter((r) => r.prescription_id);
   if (!lines.length) return 0;
 
-  const lic = registerLicence(await sellerLicences(client, lines[0]));
+  const fallback = registerLicence(await sellerLicences(client, lines[0]));
   for (const r of lines) {
+    // The licence this line was sold under (Sprint 42); shipments recorded without one use the snapshot's retail licence
+    const lic: LicenceRef | null = r.sale_licence_number?.trim() ? { form: r.sale_licence_form, number: r.sale_licence_number } : fallback;
     const draft: H1Draft = { ...r, seller_licence_no: lic?.number ?? null };
     const refusal = h1RefusalMessage(draft, r.seller_type);
     if (refusal) throw new AppError(refusal, 409, true, 'H1_REGISTER_INCOMPLETE');

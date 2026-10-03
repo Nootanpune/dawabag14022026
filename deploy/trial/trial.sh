@@ -31,6 +31,17 @@ if [ -z "$(val DB_APP_PASSWORD)" ]; then
   export DB_APP_PASSWORD
   unset owner_pw
 fi
+# Sprint 42: the key that encrypts two-step sign-in secrets (TOTP_ENC_KEY, RUNBOOK §6). A
+# TRIAL_ENV generated before Sprint 42 has none: derived here the same way (one-way, stable
+# across deploys, never stored or printed). Adding TOTP_ENC_KEY later changes the key, so
+# anyone already using two-step sign-in then signs in with a recovery code or is reset.
+if [ -z "$(val TOTP_ENC_KEY)" ]; then
+  owner_pw="$(val DB_PASSWORD)"
+  [ -n "$owner_pw" ] || { echo "$ENV_FILE has no DB_PASSWORD" >&2; exit 1; }
+  TOTP_ENC_KEY="$(printf 'dawabag-totp-key:%s' "$owner_pw" | sha256sum | cut -c1-64)"
+  export TOTP_ENC_KEY
+  unset owner_pw
+fi
 profile=()
 [ "$(val S3_ENDPOINT)" = "http://objectstore:9000" ] && profile=(--profile objectstore)
 dc() { docker compose "${profile[@]}" -f "$ROOT/deploy/staging/compose.yml" --env-file "$ENV_FILE" "$@"; }

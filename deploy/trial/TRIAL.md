@@ -102,6 +102,16 @@ If you prefer to set it yourself (optional):
 3. Run the workflow (no reset needed). The server changes the API's password before
    the API starts. Update your saved copy of `TRIAL_ENV` too.
 
+### Two-step sign-in key (new in Sprint 42 — nothing to do for an existing trial)
+
+Staff and partner logins can now sign in with a code from an authenticator app on their
+phone as well as the password. The server encrypts each person's app key with
+`TOTP_ENC_KEY`. A `TRIAL_ENV` made from now on contains that line. **If your `TRIAL_ENV`
+was made earlier, change nothing**: the server works it out from your `DB_PASSWORD` by
+itself, the same on every deploy. Do not add or change `TOTP_ENC_KEY` later while people
+use two-step sign-in — their apps would stop being accepted (they would sign in with a
+recovery code, or the super-admin resets them under Admin → Two-step sign-in).
+
 ### Razorpay test keys (so checkout and consultation fees can be paid with test money)
 
 *Optional.* Until these keys are added, the trial shows a **demo payment** instead:

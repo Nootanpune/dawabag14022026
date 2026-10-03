@@ -56,7 +56,8 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     const oldAccess = access ? await verifyAccessToken(access).catch(() => null) : null;
     if (oldAccess) await blacklistToken(oldAccess.jti, 15 * 60);
 
-    const tokens = await generateTokens(user.id, user.role, user.customer_type);
+    // Sprint 42: a session opened with the authenticator code stays a two-step session
+    const tokens = await generateTokens(user.id, user.role, user.customer_type, { mfa: req.authMfa === true });
     const profile = await queryOne<{ full_name: string }>('SELECT full_name FROM user_profiles WHERE user_id = $1', [user.id]);
     res.json({
       success: true,

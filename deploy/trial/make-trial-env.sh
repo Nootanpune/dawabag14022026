@@ -37,6 +37,7 @@ sed -e "s|__BASE__|$base|g" \
     -e "s|^DB_APP_PASSWORD=.*|DB_APP_PASSWORD=$(hex 24)|" \
     -e "s|^JWT_ACCESS_SECRET=.*|JWT_ACCESS_SECRET=$(hex 48)|" \
     -e "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(hex 48)|" \
+    -e "s|^TOTP_ENC_KEY=.*|TOTP_ENC_KEY=$(hex 32)|" \
     -e "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$(hex 24)|" \
     -e "s|^OBJECTSTORE_KMS_KEY=.*|OBJECTSTORE_KMS_KEY=$(b64)|" \
     -e "s|^TRIAL_DEMO_PASSWORD=.*|TRIAL_DEMO_PASSWORD=$(readable)|" \

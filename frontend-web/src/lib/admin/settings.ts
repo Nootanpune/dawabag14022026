@@ -63,6 +63,16 @@ export const SETTING_KINDS: Record<string, SettingMeta> = {
     ],
   },
   'courier.pickup_location': { kind: 'text', label: 'Shiprocket pickup location', hint: 'The pickup location name exactly as set up in Shiprocket' },
+  // Sprint 42 — two-step sign-in for staff and partner logins (owner decision pending; C-41, C-43)
+  'security.two_factor': {
+    kind: 'choice',
+    label: 'Two-step sign-in (authenticator app)',
+    options: [
+      { value: 'optional', label: 'Optional — each staff or partner login may switch it on' },
+      { value: 'required', label: 'Required — admins, pharmacists, packers and partner logins must set it up at their next sign-in' },
+    ],
+    hint: 'Once required, nobody in these roles can sign in — by password, SMS code or "Forgot password" — without the code from their app. Tell them before you switch.',
+  },
   // Sprint 41 — approved cold-chain couriers (URS-105, C-25): checked at every dispatch of a refrigerated parcel
   'delivery.cold_chain_couriers': { kind: 'text', label: 'Approved cold-chain couriers', nullable: true,
     hint: 'Names separated by commas, as staff and partners type them at dispatch (own riders: "Dawabag rider"). A refrigerated parcel leaves only with one of these. Leave blank to allow any courier.' },

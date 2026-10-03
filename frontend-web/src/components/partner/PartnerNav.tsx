@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Search, ListChecks, Truck, IndianRupee, Undo2, UploadCloud, Radio, BookLock, Thermometer, Waypoints } from 'lucide-react';
+import { LayoutDashboard, Search, ListChecks, Truck, IndianRupee, Undo2, UploadCloud, Radio, BookLock, Thermometer, Waypoints, Fingerprint } from 'lucide-react';
 import UrgentBadge from '@/components/stockFeed/UrgentBadge';
 import { usePartnerFeedAlerts } from '@/components/stockFeed/PartnerFeedAlert';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ const ITEMS = [
   { href: '/partner/batch-suppliers', label: 'Batch suppliers', icon: Waypoints },   // Sprint 40 (C-02)
   { href: '/partner/returns', label: 'Returns', icon: Undo2 },
   { href: '/partner/settlements', label: 'Settlements', icon: IndianRupee },
+  { href: '/partner/two-factor', label: 'Two-step sign-in', icon: Fingerprint },   // Sprint 42 (C-41)
 ];
 
 export default function PartnerNav() {

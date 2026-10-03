@@ -74,10 +74,17 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Buffer> {
       .text(`Taxable value: ${rs(t.taxablePaise)}`, { align: 'right' })
       .text(d.interState ? `IGST: ${rs(t.igstPaise)}` : `CGST: ${rs(t.cgstPaise)}   SGST: ${rs(t.sgstPaise)}`, { align: 'right' })
       .fontSize(11).text(`${isCredit ? 'Credit note' : 'Invoice'} total: ${rs(t.totalPaise)}`, { align: 'right' });
+    // Sprint 42: the kind of sale and the seller's licence(s) it was made under, as fixed at the sale (C-07, C-13, C-33)
+    if (d.sale?.channel && d.sale.licences.length) {
+      doc.moveDown(0.6).font('Helvetica').fontSize(8.5).fillColor('#000')
+        .text(`${d.sale.channel === 'wholesale' ? 'Sale by way of wholesale' : 'Retail sale'} under ${d.sale.licences
+          .map((l) => `${l.label} No. ${l.number}${l.valid_upto ? ` (valid till ${l.valid_upto})` : ''}`).join('; ')}`, 36, doc.y, { width: 523 });
+    }
     // Sprint 35: every order is checked and released by a registered pharmacist (C-08)
     if (!isCredit && d.pharmacist) {
       doc.moveDown(0.6).font('Helvetica').fontSize(8.5).fillColor('#000')
-        .text(`Checked by pharmacist ${d.pharmacist.name}, Reg. no. ${d.pharmacist.regNo}`, 36, doc.y, { width: 523 });
+        .text(`Checked by pharmacist ${d.pharmacist.name}, Reg. no. ${d.pharmacist.regNo}${d.pharmacist.council ? ` (${d.pharmacist.council})` : ''}`,
+          36, doc.y, { width: 523 });
     }
     doc.moveDown(2).font('Helvetica').fontSize(8).fillColor('#444')
       .text('Delivery charges, discounts and wallet use appear on the order summary. Goods once dispensed cannot be returned except as per the refund policy.')

@@ -93,6 +93,8 @@ services:
       DB_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in staging.env (deploy/trial/trial.sh derives it on the trial server)}
       RUN_MIGRATIONS: "false"
       REDIS_URL: redis://redis:6379
+      # Sprint 42: two-step sign-in key — from staging.env, or derived by deploy/trial/trial.sh
+      TOTP_ENC_KEY: ${TOTP_ENC_KEY:-}
       # One proxy (Caddy) in front: rate limits see the visitor's address
       TRUST_PROXY_HOPS: 1
       CORS_ORIGINS: https://${WEB_DOMAIN}

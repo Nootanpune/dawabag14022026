@@ -16,23 +16,12 @@ import { createShipmentsAndLines } from './shipment.service';
 import { OrderPreview, buildCheckoutSummary } from './checkoutSummary.service';
 import { moveOrderToFulfilment } from './paymentCapture.service';
 import { freeDeliveryAbovePaise, qualifiesForFreeDelivery } from './delivery/freeDelivery';
-import { dawabagDrugLicences, listLicences, partyEligibility, snapshot } from './licences/register.service';
+import { listLicences, partyEligibility, snapshot } from './licences/register.service';
+import { recordSaleIdentityTx } from './saleIdentity/record.service';
 import { assertRxSalesOpen } from './emergencyStop/state.service';
 import { attachPrescriptionTx } from './rxReuse.service';
 import { notOnlineMessage } from './onlineSale/rules';
 import { prescriptionRequiredError } from './prescriptions/requirement.service';
-
-/** The seller of record's licences on each shipment, as on the day of sale — printed on its invoice (C-13). */
-async function snapshotSellerLicences(client: PoolClient, orderId: string) {
-  const shipments = (await client.query(`SELECT id, seller_type, partner_id FROM order_shipments WHERE order_id = $1`, [orderId])).rows;
-  let own: Awaited<ReturnType<typeof dawabagDrugLicences>> | null = null;
-  for (const sh of shipments) {
-    const rows = sh.seller_type === 'partner' && sh.partner_id
-      ? (await listLicences({ vendorId: sh.partner_id }, { client })).filter((l) => l.status === 'verified')
-      : (own ??= await dawabagDrugLicences(client));
-    if (rows.length) await client.query(`UPDATE order_shipments SET seller_drug_licences = $2 WHERE id = $1`, [sh.id, JSON.stringify(snapshot(rows))]);
-  }
-}
 
 export const createOrderSchema = z.object({
   patient_id:           z.string().uuid().optional(),
@@ -323,7 +312,9 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
 
     // One shipment + invoice per seller of record; lines attached to their shipment
     const shipments = await createShipmentsAndLines(client, orderId, lineItems, allocations);
-    await snapshotSellerLicences(client, orderId);
+    // Sprint 42: the sale identity of each shipment, fixed now with its invoice number and
+    // amounts (seller licences, the licence each line is sold under, channel, buyer licences)
+    await recordSaleIdentityTx(client, orderId, { saleKind: saleKindFor(customerType), buyerType: customerType, priceColumn });
     const invoiceNumber = shipments.find((sh) => sh.seller_type === 'dawabag')?.invoice_number ?? null;
     if (invoiceNumber) {
       await client.query('UPDATE orders SET invoice_number = $1 WHERE id = $2', [invoiceNumber, orderId]);

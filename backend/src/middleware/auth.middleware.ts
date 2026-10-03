@@ -17,6 +17,8 @@ declare global {
         pricing_type: BuyerType;      // customer_type once KYC-approved (and licences in date), else 'customer'
         trade_paused: TradePause | null;   // a lapsed drug licence pauses trade prices (Sprint 32, C-14)
       };
+      /** Sprint 42: this session was opened with the authenticator code (two-step sign-in) */
+      authMfa?: boolean;
     }
   }
 }
@@ -82,6 +84,7 @@ export async function authenticate(
     }
 
     req.user = await toRequestUser(user);
+    req.authMfa = payload.mfa === true;
     next();
   } catch (error) {
     next(error);

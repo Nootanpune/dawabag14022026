@@ -138,6 +138,8 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   // Sprint 41 — approved cold-chain couriers, names separated by commas (null = not enforced; URS-105, C-25)
   'delivery.cold_chain_couriers': z.string().trim().max(500).regex(/^[^<>]*$/, 'Plain names only').nullable()
     .transform((v) => (v ? v : null)),
+  // Sprint 42 — two-step sign-in for staff and partner logins (owner decision pending; C-41, C-43)
+  'security.two_factor': z.enum(['optional', 'required']),
   // Sprint 20 — retail free delivery from this many paise (null = off)
   'delivery.free_above_paise': z.number().int().min(0).max(10_000_000).nullable(),
   // Sprint 4 — public legal details (C-03, C-04, C-36)

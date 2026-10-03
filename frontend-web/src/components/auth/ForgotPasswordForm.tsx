@@ -12,6 +12,9 @@ import SmsUnavailableNotice from './SmsUnavailableNotice';
 import { staffHome } from '@/lib/fulfilment/roles';
 import { useAuthStore } from '@/store/authStore';
 import IconField from './IconField';
+import SignInSecondStep from '@/components/twoFactor/SignInSecondStep';
+import { isTwoFactorChallenge, type TwoFactorChallenge } from '@/lib/auth/twoFactor';
+import type { AuthResponseData } from '@/lib/session';
 
 const mobileSchema = z.object({ mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number') });
 // Same rules as the server (utils/passwordPolicy.ts); the server has the last word
@@ -33,6 +36,8 @@ export default function ForgotPasswordForm() {
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [smsOff, setSmsOff] = useState<string | null>(null);   // Sprint 40: no SMS provider on this server
+  // Sprint 42: the SMS code never skips two-step sign-in — the password is changed, then the authenticator code
+  const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
   const mobileForm = useForm<{ mobile: string }>({ resolver: zodResolver(mobileSchema) });
   const resetForm = useForm<z.infer<typeof resetSchema>>({ resolver: zodResolver(resetSchema) });
 
@@ -48,13 +53,23 @@ export default function ForgotPasswordForm() {
     } finally { setBusy(false); }
   };
 
+  const finish = (d: AuthResponseData) => {
+    login(d);
+    setChallenge(null);
+    setDone(true);
+    setTimeout(() => router.push(homeForRole(d.role, staffHome, null)), 1500);
+  };
+
   const onReset = async (v: z.infer<typeof resetSchema>) => {
     setBusy(true);
     try {
       const d = await resetPassword(mobile, v.otp, v.password);
-      login(d);
-      setDone(true);
-      setTimeout(() => router.push(homeForRole(d.role, staffHome, null)), 1500);
+      if (isTwoFactorChallenge(d)) {
+        toast.success('Password changed');
+        setChallenge(d);
+        return;
+      }
+      finish(d);
     } catch (err) {
       resetForm.setError('otp', { message: getApiErrorMessage(err, 'The code is wrong or has expired') });
     } finally { setBusy(false); }
@@ -66,6 +81,15 @@ export default function ForgotPasswordForm() {
         <CheckCircle2 className="w-10 h-10 text-brand-600 mx-auto mb-2" aria-hidden="true" />
         <p className="font-semibold">Password changed</p>
         <p className="text-sm text-gray-600 mt-1">You are signed in. Other devices have been signed out.</p>
+      </div>
+    );
+  }
+
+  if (challenge) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-gray-700" role="status">Password changed. To sign in, finish with your authenticator app.</p>
+        <SignInSecondStep challenge={challenge} onSignedIn={finish} onCancel={() => router.push('/auth/login')} />
       </div>
     );
   }

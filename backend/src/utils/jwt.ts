@@ -9,6 +9,8 @@ interface TokenPayload {
   customer_type?: string;
   jti: string;
   type: 'access' | 'refresh';
+  /** Sprint 42: true when the session was opened with the authenticator code (two-step sign-in) */
+  mfa?: boolean;
   iat: number;
   exp: number;
 }
@@ -16,22 +18,27 @@ interface TokenPayload {
 // customer_type is carried for clients (web/mobile) to pick the right screens.
 // The API itself re-reads customer_type and kyc_status from the database on
 // every request (auth.middleware), so a stale token cannot unlock B2B pricing.
+// Sprint 42: `mfa` says the session passed the second step (authenticator code); a refresh
+// keeps it, and a staff session without it stops at renewal once two-step sign-in applies
+// to that login (services/twoFactor/policy.ts sessionMayContinue).
 export async function generateTokens(
   userId: string,
   role: string,
-  customerType: string = 'customer'
+  customerType: string = 'customer',
+  opts: { mfa?: boolean } = {}
 ): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
+  const mfa = opts.mfa === true;
   const accessJti = uuidv4();
   const refreshJti = uuidv4();
 
   const accessToken = jwt.sign(
-    { sub: userId, role, customer_type: customerType, jti: accessJti, type: 'access' },
+    { sub: userId, role, customer_type: customerType, jti: accessJti, type: 'access', mfa },
     process.env.JWT_ACCESS_SECRET!,
     { expiresIn: (process.env.JWT_ACCESS_EXPIRY || '15m') as SignOptions['expiresIn'] }
   );
 
   const refreshToken = jwt.sign(
-    { sub: userId, role, customer_type: customerType, jti: refreshJti, type: 'refresh' },
+    { sub: userId, role, customer_type: customerType, jti: refreshJti, type: 'refresh', mfa },
     process.env.JWT_REFRESH_SECRET!,
     { expiresIn: (process.env.JWT_REFRESH_EXPIRY || '7d') as SignOptions['expiresIn'] }
   );

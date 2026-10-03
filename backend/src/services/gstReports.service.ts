@@ -10,14 +10,26 @@ type Range = { from: string; to: string };
 
 const BUYER = `COALESCE(NULLIF(u.business_name, ''), up.full_name, a.full_name)`;
 
-// One row per Dawabag tax invoice (cancelled ones stay; their credit notes reverse them)
+// "Form 20: MH-1 · Form 21: MH-2" from a frozen licence snapshot (Sprint 42)
+const LICENCES = (col: string) =>
+  `(SELECT string_agg((l->>'label') || ': ' || (l->>'number'), ' · ') FROM jsonb_array_elements(COALESCE(${col}, '[]'::jsonb)) l)`;
+
+// One row per Dawabag tax invoice (cancelled ones stay; their credit notes reverse them).
+// Sprint 42: the sale channel, the licences sold under, the buyer's licences and the
+// pharmacist of record come from the shipment's sale record as fixed at the sale (C-07,
+// C-08, C-13) — not from today's licence register; sale_record says if it was backfilled.
 export async function salesRegister({ from, to }: Range) {
   return query(
     `SELECT s.invoice_number, s.created_at::date AS invoice_date, o.order_number, ${BUYER} AS buyer_name,
             o.buyer_gstin, CASE WHEN o.buyer_gstin IS NULL THEN 'B2C' ELSE 'B2B' END AS supply_type,
             a.state AS place_of_supply, s.subtotal_paise AS taxable_paise,
             SUM(oi.cgst_paise)::int AS cgst_paise, SUM(oi.sgst_paise)::int AS sgst_paise, SUM(oi.igst_paise)::int AS igst_paise,
-            s.total_paise, s.status
+            s.total_paise, s.status,
+            s.sale_channel, ${LICENCES('s.sale_licences')} AS sold_under_licences,
+            ${LICENCES('s.buyer_drug_licences')} AS buyer_licences,
+            CASE WHEN s.pharmacist_check IN ('released', 'rejected') THEN s.pharmacist_name END AS pharmacist_name,
+            CASE WHEN s.pharmacist_check IN ('released', 'rejected') THEN s.pharmacist_reg_no END AS pharmacist_reg_no,
+            s.sale_identity_source AS sale_record
      FROM order_shipments s JOIN orders o ON o.id = s.order_id JOIN addresses a ON a.id = o.address_id
      JOIN users u ON u.id = o.user_id LEFT JOIN user_profiles up ON up.user_id = o.user_id
      JOIN order_items oi ON oi.shipment_id = s.id

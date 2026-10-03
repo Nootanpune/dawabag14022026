@@ -24,6 +24,7 @@ import {
 import { LICENCE_FILE_MAX_BYTES } from '../services/licences/register.service';
 import { sellingRightsStatus } from '../services/stock/sellingRightsStatus';
 import { getEmergencyStop, postPause, postResume } from '../controllers/emergencyStop.controller';
+import { getOverview as getTwoFactorOverview, postReset as postTwoFactorReset } from '../controllers/twoFactor.controller';
 import { getAuditChainVerify } from '../controllers/h1Register.controller';
 import { latestHeads, runChainVerify } from '../services/chainVerify/heads.service';
 import { configWarnings } from '../services/system/configWarnings';
@@ -165,6 +166,9 @@ router.put('/settings/:key', authenticate, authorize('super_admin'), putSetting)
 router.get('/emergency-stop', authenticate, authorize('admin', 'super_admin'), getEmergencyStop);
 router.post('/emergency-stop/pause', authenticate, authorize('super_admin'), postPause);
 router.post('/emergency-stop/resume', authenticate, authorize('super_admin'), postResume);
+// Sprint 42: two-step sign-in of staff and partner logins — admins see it, a super-admin resets a lost authenticator (audited)
+router.get('/two-factor', authenticate, authorize('admin', 'super_admin'), getTwoFactorOverview);
+router.post('/two-factor/:userId/reset', authenticate, authorize('super_admin'), postTwoFactorReset);
 router.get('/audit-chain/verify', authenticate, authorize('admin', 'super_admin'), getAuditChainVerify);
 // Sprint 40: recorded chain heads (truncation check) and a manual run of the nightly chain check (C-09, C-46)
 router.get('/chain-heads', authenticate, authorize('admin', 'super_admin'), async (_req, res, next) => {

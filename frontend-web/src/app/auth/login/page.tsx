@@ -16,6 +16,8 @@ import SmsUnavailableNotice from '@/components/auth/SmsUnavailableNotice';
 import type { AuthResponseData } from '@/lib/session';
 import AuthShell from '@/components/auth/AuthShell';
 import IconField from '@/components/auth/IconField';
+import SignInSecondStep from '@/components/twoFactor/SignInSecondStep';
+import { isTwoFactorChallenge, type SignInAnswer, type TwoFactorChallenge } from '@/lib/auth/twoFactor';
 
 // Shoppers return to the page that sent them here (?next=/prescriptions); staff go to their portal
 const nextPath = () => (typeof window === 'undefined' ? null : safeNextPath(new URLSearchParams(window.location.search).get('next')));
@@ -42,6 +44,8 @@ export default function LoginPage() {
   const [codeSentTo, setCodeSentTo] = useState('');
   const [smsOff, setSmsOff] = useState<string | null>(null);   // Sprint 40: no SMS provider on this server
   const [isLoading, setIsLoading] = useState(false);
+  // Sprint 42: staff / partner logins with two-step sign-in get the code step before any session
+  const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
   const otpMobileForm = useForm<{ mobile: string }>({ resolver: zodResolver(otpMobileSchema) });
@@ -53,13 +57,22 @@ export default function LoginPage() {
     router.push(homeForRole(d.role, staffHome, nextPath()));
   };
 
+  const signedIn = (d: AuthResponseData, welcome: string) => {
+    login(d);
+    toast.success(welcome);
+    goHome(d);
+  };
+  /** A session, or the second step of two-step sign-in (Sprint 42) */
+  const afterFirstStep = (d: SignInAnswer, welcome: string) => {
+    if (isTwoFactorChallenge(d)) setChallenge(d);
+    else signedIn(d, welcome);
+  };
+
   const onLogin = async (data: LoginForm) => {
     setIsLoading(true);
     try {
       const res = await api.post('/auth/login', data);
-      login(res.data.data);
-      toast.success('Welcome back!');
-      goHome(res.data.data);
+      afterFirstStep(res.data.data, 'Welcome back!');
     } catch (err: any) {
       const msg = getApiErrorMessage(err, 'Login failed');
       // A mobile not yet verified gets a code first
@@ -93,10 +106,7 @@ export default function LoginPage() {
   const onVerifyOTP = async (data: OTPForm) => {
     setIsLoading(true);
     try {
-      const d = await signInWithOtp(codeSentTo, data.otp);
-      login(d);
-      toast.success('Welcome to Dawabag.');
-      goHome(d);
+      afterFirstStep(await signInWithOtp(codeSentTo, data.otp), 'Welcome to Dawabag.');
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'The code is wrong or has expired'));
     } finally {
@@ -105,6 +115,15 @@ export default function LoginPage() {
   };
 
   const switchMode = (m: Mode) => { setMode(m); setCodeSentTo(''); setSmsOff(null); otpForm.reset(); };
+
+  if (challenge) {
+    return (
+      <AuthShell title={challenge.two_factor === 'code' ? 'Two-step sign-in' : 'Set up two-step sign-in'} subtitle="Licensed online pharmacy">
+        <SignInSecondStep challenge={challenge} onSignedIn={(d) => signedIn(d, 'Welcome back!')}
+          onCancel={() => { setChallenge(null); loginForm.reset(); switchMode('password'); }} />
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell title="Sign in" subtitle="Licensed online pharmacy">

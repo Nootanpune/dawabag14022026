@@ -3,17 +3,19 @@
 // holds the mobile. Nothing is kept in the browser (the session is an httpOnly cookie).
 import api from '../api';
 import type { AuthResponseData } from '../session';
+import type { SignInAnswer } from './twoFactor';
 
 export async function sendOtp(mobile: string): Promise<void> {
   await api.post('/auth/send-otp', { mobile });
 }
 
-export async function signInWithOtp(mobile: string, otp: string): Promise<AuthResponseData> {
+/** A session — or, for a login with two-step sign-in, its code step (Sprint 42). */
+export async function signInWithOtp(mobile: string, otp: string): Promise<SignInAnswer> {
   const { data } = await api.post('/auth/verify-otp', { mobile, otp });
   return data.data;
 }
 
-export async function resetPassword(mobile: string, otp: string, newPassword: string): Promise<AuthResponseData> {
+export async function resetPassword(mobile: string, otp: string, newPassword: string): Promise<SignInAnswer> {
   const { data } = await api.post('/auth/reset-password', { mobile, otp, new_password: newPassword });
   return data.data;
 }

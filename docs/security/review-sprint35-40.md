@@ -23,6 +23,10 @@ the Dawabag Regulatory Compliance Rulebook.
 | Low | 16 | 10 | 6 |
 | Information (checked, no issue) | 12 | — | — |
 
+**Update, Sprint 42:** #16 (SMS-only password reset for admin logins) is **mitigated** — two-step
+sign-in with an authenticator app is built for staff and partner logins; it is fully closed once the
+owner sets `security.two_factor` to `required`. Five low findings remain left as described.
+
 Every fix has a test: jest (`*.test.ts` named below) and `backend/test/sprint41.smoke.mjs`
 (sections A–E, against the running API, which in this run connects as the restricted login).
 The capture-race checks (C) were run against the old code first and failed there (a capture
@@ -49,7 +53,7 @@ Line numbers are after the fix.
 | 13 | Low | `backend/src/services/partnerLiveFeed/checks.service.ts:85` | One update of a partner batch from an accepted feed check was keyed by `partner_product_id` without the partner id. The id comes from the partner's own locked check row (no path to another partner), so hardening only. | `AND partner_id = $6`. | Fixed (no behaviour change; covered by Sprint 37 smoke) |
 | 14 | Low | `backend/src/services/selfInspection/register.service.ts:167` | The corrective-action owner list fell back to a staff member's mobile number when no name was recorded. C-41 (minimum necessary). | Falls back to "Staff member (role)". | Fixed. Smoke E |
 | 15 | Low | `backend/src/scripts/demo/remove.ts` | `trial.sh unseed` failed once a demo admin had run a job by hand (`job_runs.triggered_by`). Found while checking the seed and removal as the owner. | The link is cleared like the other "touched by a demo person" columns. | Fixed (run by hand on the compose stack) |
-| 16 | Low — **left** | `controllers/passwordReset.controller.ts` | Staff, admin and partner logins can reset their password with an SMS code alone (SIM-swap risk for the most powerful accounts). | Left (owner decision): recommend a second factor (authenticator app) for super-admin / admin logins before real customers; until SMS is configured the trial has no code reset at all. | — |
+| 16 | Low — **mitigated (Sprint 42), closed when the owner sets it to required** | `controllers/passwordReset.controller.ts`, `controllers/auth.controller.ts` (`/auth/login`, `/auth/verify-otp`, `/auth/refresh`), `services/twoFactor/*` | Staff, admin and partner logins can reset their password with an SMS code alone (SIM-swap risk for the most powerful accounts). | Sprint 42: two-step sign-in with an authenticator app (RFC 6238) for super-admin, admin, pharmacist, packer and every partner login. For an enrolled login an SMS reset sets the password but issues **no session** — the next step asks for the authenticator code or a one-time recovery code; sign-in by SMS code likewise. Tokens and the cookie only after the second step; a session without it is not renewed once it applies. Each code once, five wrong codes pause it, secrets encrypted with `TOTP_ENC_KEY`, recovery codes as keyed hashes, super-admin reset with a reason; all audited. Enforcement is the super-admin setting `security.two_factor` — **optional** until the owner decides (then a login that has not enrolled still has SMS-only reset); **required** closes the finding for those roles. The dashboard warns `TWO_FACTOR_NOT_REQUIRED` while admins are without it. | Mitigated. `services/twoFactor/{totp,keys,policy}.test.ts` (RFC 4226 / 6238 vectors); `test/sprint42.smoke.mjs` B (SMS reset and sign-in by code do not bypass; replay; recovery once; pause; REQUIRED forces enrolment; renewal refused); `e2e/tests/twoFactor.spec.ts`. Owner: set `required` (DECISIONS 2026-10-03 "Two-step sign-in…") |
 | 17 | Low — **left** | `services/otp/otp.service.ts` | One code per mobile serves sign-in, mobile verification and password reset (not scoped by purpose). | Left: sign-in by code already grants the same access as a reset; #1 and #2 bound guessing. | — |
 | 18 | Low — **left** | `services/partnerApiKeys/keys.service.ts` | A partner's API keys stay valid when the owner login that issued them is switched off. | Left: keys belong to the partner, not to a person; the list shows who issued each one, and the admin or the new owner revokes it. | — |
 | 19 | Low — **left** | `services/partnerApiKeys/keys.service.ts` (`refuse`) | Every refused call with a known key prefix writes an audit row. | Left: bounded by the per-address upload limit on `/partner-feed` (40 / 15 min) and wanted for C-46. | — |
@@ -102,5 +106,10 @@ Line numbers are after the fix.
 - **Mobile app:** handle 429 `OTP_SEND_LIMIT` on `/auth/send-otp` (show the server's message, keep
   the code step) and the message "Too many wrong codes. Ask for a new code." on `/auth/verify-otp`
   and `/auth/reset-password`; nothing else changes for the app.
-- **Owner:** second factor for admin logins (#16) before real customers; the approved cold-chain
-  courier list (Settings) once couriers are contracted.
+- **Owner:** second factor for admin logins (#16) — built in Sprint 42; switch Settings →
+  "Two-step sign-in" to required before real customers (after every admin has enrolled); the
+  approved cold-chain courier list (Settings) once couriers are contracted.
+- **Sprint 42 note (two-step sign-in, first enrolment):** while it is required but not yet set
+  up, whoever knows a login's password can enrol their own authenticator at that sign-in (trust
+  on first use). Ask every admin to enrol while `optional`, check Admin → Two-step sign-in (all),
+  then switch to `required`.

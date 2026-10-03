@@ -16,6 +16,7 @@ import { queueNotification } from '../notification.service';
 import { captureHeldPaymentQuietly } from '../payments/rxHold/hold.service';
 import { assertStaffRegistrationValid } from '../pharmacistRegistration/gate.service';
 import { CHECKABLE_ORDER_STATES, CheckDecision, SignalLine, abuseSignals, canDecide, reasonProblem } from './rules';
+import { partnerRegistrationAtCheck, staffRegistrationAtCheck } from '../saleIdentity/pharmacist';
 
 export interface Checker { userId: string; name: string; regNo: string; vendorPharmacistId?: string | null }
 
@@ -83,13 +84,24 @@ export async function orderCheckDetail(orderId: string) {
   return { order: o, lines: lines.map((l) => ({ ...lineOut(l), shipment_id: l.shipment_id })), signals: abuseSignals(lines as SignalLine[]), shipments };
 }
 
-/** Record a release on locked shipment rows and write the trail (C-46). */
+/** Sprint 42: the checker's registration as at this check — kept on the shipment, filled once (C-03, C-08). */
+const registrationAtCheck = (client: PoolClient, who: Checker) => (who.vendorPharmacistId
+  ? partnerRegistrationAtCheck(client, who.vendorPharmacistId, who.regNo)
+  : staffRegistrationAtCheck(client, who.userId, who.regNo));
+
+/**
+ * Record a release on locked shipment rows and write the trail (C-46). The release (or a
+ * refusal) is final: the pharmacist of record and their registration cannot be changed
+ * afterwards (trigger order_shipments_identity_final, Sprint 42).
+ */
 export async function recordRelease(client: PoolClient, shipmentIds: string[], who: Checker, via: string, buyerId: string, orderId: string) {
+  const registration = shipmentIds.length ? JSON.stringify(await registrationAtCheck(client, who)) : null;
   for (const id of shipmentIds) {
     await client.query(
       `UPDATE order_shipments SET pharmacist_check = 'released', pharmacist_checked_by = $2, pharmacist_checked_at = NOW(),
-         pharmacist_name = $3, pharmacist_reg_no = $4, vendor_pharmacist_id = $5, pharmacist_check_note = NULL
-       WHERE id = $1`, [id, who.userId, who.name, who.regNo, who.vendorPharmacistId ?? null]);
+         pharmacist_name = $3, pharmacist_reg_no = $4, vendor_pharmacist_id = $5, pharmacist_check_note = NULL,
+         pharmacist_registration = $6
+       WHERE id = $1`, [id, who.userId, who.name, who.regNo, who.vendorPharmacistId ?? null, registration]);
     await writeAuditTx(client, { userId: buyerId, action: 'pharmacist_check_released', performedBy: who.userId,
       newValue: { order_id: orderId, shipment_id: id, pharmacist_name: who.name, pharmacist_reg_no: who.regNo,
         vendor_pharmacist_id: who.vendorPharmacistId ?? null, via } });
@@ -140,8 +152,10 @@ export async function decide(
     await withTransaction(async (client) => {
       await client.query(
         `UPDATE order_shipments SET pharmacist_check = 'rejected', pharmacist_checked_by = $2, pharmacist_checked_at = NOW(),
-           pharmacist_name = $3, pharmacist_reg_no = $4, vendor_pharmacist_id = $5, pharmacist_check_note = $6 WHERE id = $1`,
-        [pre.s.id, pre.who.userId, pre.who.name, pre.who.regNo, pre.who.vendorPharmacistId ?? null, note]);
+           pharmacist_name = $3, pharmacist_reg_no = $4, vendor_pharmacist_id = $5, pharmacist_check_note = $6,
+           pharmacist_registration = $7 WHERE id = $1`,
+        [pre.s.id, pre.who.userId, pre.who.name, pre.who.regNo, pre.who.vendorPharmacistId ?? null, note,
+         JSON.stringify(await registrationAtCheck(client, pre.who))]);
       await writeAuditTx(client, { userId: pre.s.user_id, action: 'pharmacist_check_rejected', performedBy: actorId,
         newValue: { order_id: pre.s.order_id, shipment_id: pre.s.id, pharmacist_name: pre.who.name, pharmacist_reg_no: pre.who.regNo,
           refund_paise: cancelled.refund_paise }, notes: note });
