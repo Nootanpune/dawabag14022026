@@ -1,4 +1,6 @@
+import '../models/two_factor.dart';
 import 'api_service.dart';
+import 'api_utils.dart';
 import 'registration_api.dart';
 
 /// The sentence shown after asking for a code. Since Sprint 35 the server
@@ -21,12 +23,18 @@ extension PasswordResetApi on ApiService {
   /// expired code — or a mobile with no account — is the same 400
   /// ("The code is wrong or has expired"); throws the DioException for
   /// [ApiService.errorMessage].
-  Future<void> resetPassword({required String mobile, required String otp, required String newPassword}) async {
-    await dio.post('/auth/reset-password', data: {
+  ///
+  /// Sprint 42: for a staff or partner login with two-step sign-in the answer
+  /// is the second step's challenge (returned, memory only); otherwise null and
+  /// the person signs in with the new password as before.
+  Future<TwoFactorChallenge?> resetPassword({required String mobile, required String otp, required String newPassword}) async {
+    final res = await dio.post('/auth/reset-password', data: {
       'mobile': mobile,
       'otp': otp,
       'new_password': newPassword,
     });
+    final body = res.data;
+    return TwoFactorChallenge.tryParse(apiData(res), message: body is Map ? body['message']?.toString() : null);
   }
 }
 

@@ -24,7 +24,9 @@ extension RegistrationApi on ApiService {
       'otp': otp,
     });
     final data = apiData(res);
-    await setSessionFromAuthData(data);
+    // Sprint 42: a staff or partner login may get the two-step challenge
+    // instead of tokens; the caller continues with the second step
+    if (data['access_token'] is String) await setSessionFromAuthData(data);
     return data;
   }
 

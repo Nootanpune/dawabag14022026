@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
-import '../../config/password_gate.dart';
+import '../../config/sign_in_home.dart';
 import '../../config/theme.dart';
 import '../../services/api_service.dart';
 import '../../services/otp_errors.dart';
@@ -11,6 +11,7 @@ import '../../services/registration_api.dart';
 import '../../utils/mobile_number.dart';
 import '../../widgets/brand/auth_page.dart';
 import '../../widgets/brand/labeled_field.dart';
+import 'two_factor/two_factor_screen.dart' show kTwoFactorPath;
 
 /// How the person signs in: mobile + password, or mobile + OTP.
 enum LoginMethod { password, otp }
@@ -61,14 +62,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (success) {
       final auth = ref.read(authProvider);
-      final role = auth.user?['role'];
-      final home = role == 'admin' || role == 'super_admin'
-          ? '/admin'
-          : role == 'doctor'
-              ? '/doctor/portal'
-              : '/';
       // A temporary password from Dawabag's admin is replaced first (Sprint 32)
-      context.go(auth.mustChangePassword ? changePasswordLocation(required: true, next: home) : home);
+      context.go(homeAfterSignIn(auth.user?['role'] as String?, mustChangePassword: auth.mustChangePassword));
+    } else if (ref.read(authProvider).challenge != null) {
+      // Sprint 42: a staff or partner login gives the second step before any session
+      context.push(kTwoFactorPath);
     } else {
       final error = ref.read(authProvider).error;
       if (error?.contains('OTP') == true) {
@@ -123,6 +121,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onSelectionChanged: (s) => setState(() => _method = s.first),
         ),
         const SizedBox(height: 20),
+        // Sprint 42: why the sign-in or session ended (expired step, two-step now required)
+        if (authState.notice != null) ...[
+          SmsNotice(authState.notice!),
+          const SizedBox(height: 16),
+        ],
         if (_smsNotice != null && byPassword) ...[
           SmsNotice(_smsNotice!),
           const SizedBox(height: 16),

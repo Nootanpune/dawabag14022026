@@ -6,6 +6,8 @@ import '../../config/password_gate.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
 import '../../models/drug_licence.dart';
+import '../../models/two_factor.dart';
+import 'two_factor/two_factor_settings_screen.dart' show kTwoFactorSettingsPath;
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -184,6 +186,13 @@ class AccountScreen extends ConsumerWidget {
             // Sprint 36: order updates, holds, refunds… from the server's inbox
             _MenuItem(icon: Icons.notifications_outlined, label: 'Notifications', onTap: () => context.push('/account/notifications')),
             _MenuItem(icon: Icons.lock_outline, label: 'Change password', onTap: () => context.push(kChangePasswordPath)),
+            // Sprint 42: staff and partner logins — the authenticator app (C-41, C-43)
+            if (kTwoFactorRoles.contains(user['role']))
+              _MenuItem(
+                icon: Icons.verified_user_outlined,
+                label: 'Two-step sign-in',
+                onTap: () => context.push(kTwoFactorSettingsPath),
+              ),
             _MenuItem(
               icon: Icons.logout,
               label: 'Sign out',

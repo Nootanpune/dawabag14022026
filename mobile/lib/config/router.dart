@@ -9,6 +9,8 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/welcome_screen.dart';
 import '../screens/auth/register/register_screen.dart';
 import '../screens/auth/otp_screen.dart';
+import '../screens/auth/two_factor/two_factor_screen.dart';
+import '../screens/account/two_factor/two_factor_settings_screen.dart';
 import '../screens/shop/home_screen.dart';
 import '../screens/shop/product_detail_screen.dart';
 import '../screens/search/search_screen.dart';
@@ -59,14 +61,20 @@ final routerProvider = Provider<GoRouter>((ref) {
   // the whole GoRouter on every AuthState change (which reset navigation to
   // '/' whenever isLoading toggled, e.g. in the middle of registration).
   final authRefresh = ValueNotifier<int>(0);
+  late final GoRouter router;
   ref.listen<AuthState>(authProvider, (previous, next) {
     if (previous?.isAuthenticated != next.isAuthenticated ||
         previous?.mustChangePassword != next.mustChangePassword) {
       authRefresh.value++;
     }
+    // Sprint 42: the server ended the session or sign-in with a sentence
+    // (TWO_FACTOR_SIGN_IN_REQUIRED on refresh): to sign-in, where it is shown
+    if (next.notice != null && previous?.notice != next.notice && !next.isAuthenticated) {
+      router.go('/auth/login');
+    }
   });
 
-  final router = GoRouter(
+  router = GoRouter(
     // Sprint 35: the brand welcome page first; a restored session moves on to the shop
     initialLocation: '/welcome',
     refreshListenable: authRefresh,
@@ -114,6 +122,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (c, s) => ForgotPasswordScreen(initialMobile: s.uri.queryParameters['mobile'] ?? ''),
       ),
       GoRoute(path: '/auth/register', builder: (c, s) => const RegisterScreen()),
+      // Sprint 42: the second step of a staff or partner sign-in (challenge in memory)
+      GoRoute(path: kTwoFactorPath, builder: (c, s) => const TwoFactorScreen()),
       GoRoute(
         path: '/auth/otp',
         builder: (c, s) => OTPScreen(mobile: s.uri.queryParameters['mobile'] ?? ''),
@@ -140,6 +150,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Sprint 34: ?dose=<reminder ids>&at=<time> highlights the dose from an alert
       GoRoute(path: '/account/medicines', builder: (c, s) => MyMedicinesScreen(highlight: doseFromQuery(s.uri.queryParameters))),
       GoRoute(path: '/account/health', builder: (c, s) => const HealthProfileScreen()),
+      // Sprint 42: a staff or partner login's own two-step sign-in (signed-in only via /account)
+      GoRoute(path: kTwoFactorSettingsPath, builder: (c, s) => const TwoFactorSettingsScreen()),
       // Change password: from Account, or forced for a temporary password (Sprint 32)
       GoRoute(
         path: kChangePasswordPath,

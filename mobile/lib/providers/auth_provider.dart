@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart' show Response;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/two_factor.dart';
 import '../services/api_service.dart';
 import '../services/push_device_service.dart';
 import '../services/registration_api.dart';
@@ -15,12 +17,24 @@ class AuthState {
   /// else (Sprint 28 server rule; Sprint 32 app screen). From the server only.
   final bool mustChangePassword;
 
+  /// Sprint 42: a staff or partner login passed the first step and the server
+  /// asks for the second (authenticator code, or setting it up). Memory only;
+  /// no session exists yet. Like [error], [copyWith] drops it unless passed.
+  final TwoFactorChallenge? challenge;
+
+  /// A sentence for the sign-in screen after the session or the sign-in ended
+  /// on the server's word (challenge expired, two-step sign-in now required).
+  /// Like [error], [copyWith] drops it unless passed.
+  final String? notice;
+
   const AuthState({
     this.isAuthenticated = false,
     this.isLoading = false,
     this.user,
     this.error,
     this.mustChangePassword = false,
+    this.challenge,
+    this.notice,
   });
 
   AuthState copyWith({
@@ -29,6 +43,8 @@ class AuthState {
     Map<String, dynamic>? user,
     String? error,
     bool? mustChangePassword,
+    TwoFactorChallenge? challenge,
+    String? notice,
   }) =>
       AuthState(
         isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -36,6 +52,8 @@ class AuthState {
         user: user ?? this.user,
         error: error,
         mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+        challenge: challenge,
+        notice: notice,
       );
 
   /// 'customer' | 'b2b_retailer' | 'b2b_wholesaler' | 'doc_hospital'
@@ -49,6 +67,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier() : super(const AuthState()) {
     apiService.onSessionExpired = _onSessionExpired;
     apiService.onPasswordChangeRequired = requirePasswordChange;
+    apiService.onSignInRequired = _onSignInRequired;
     _restoreSession();
   }
 
@@ -58,7 +77,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final data = await apiService.restoreSession();
     if (!mounted) return;
     if (data == null) {
-      state = const AuthState();
+      // Keeps a "sign in again" sentence the refresh just produced (Sprint 42)
+      state = AuthState(notice: state.notice);
       return;
     }
     completeSignIn(data);
@@ -68,6 +88,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (mounted && state.isAuthenticated) state = const AuthState();
   }
 
+  /// /auth/refresh answered 401 TWO_FACTOR_SIGN_IN_REQUIRED (Sprint 42): the
+  /// API client already cleared the session; sign-in shows [message].
+  void _onSignInRequired(String message) {
+    if (mounted) state = AuthState(notice: message);
+  }
+
+  /// The challenge in an auth answer, published to [state]; null for a session.
+  bool _tookChallenge(Response<dynamic> res) {
+    final body = res.data;
+    final ch = TwoFactorChallenge.tryParse(ApiService.dataOf(res),
+        message: body is Map ? body['message']?.toString() : null);
+    if (ch == null) return false;
+    state = AuthState(challenge: ch);
+    return true;
+  }
+
+  /// Signs in with mobile + password. True when signed in. False with
+  /// [AuthState.challenge] set when a staff or partner login must give the
+  /// second step first (Sprint 42), or with [AuthState.error] on failure.
   Future<bool> login(String mobile, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -75,6 +114,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'mobile': mobile,
         'password': password,
       });
+      if (_tookChallenge(res)) return false;
       final data = ApiService.dataOf(res);
       await apiService.setSessionFromAuthData(data);
       // The login response has no mobile; the change-password rules need it
@@ -90,6 +130,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final data = await verifyOTPAndSaveTokens(mobile, otp);
+      // Sprint 42: a staff or partner login gives the second step first
+      final ch = TwoFactorChallenge.tryParse(data);
+      if (ch != null) {
+        state = AuthState(challenge: ch);
+        return false;
+      }
       completeSignIn(data);
       return true;
     } catch (e) {
@@ -123,6 +169,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     fetchMe();
     // Push: register this device with the server (POST /users/me/devices).
     PushDeviceService.register();
+  }
+
+  // ── Two-step sign-in (Sprint 42) ─────────────────────────────────────────
+
+  /// A first step elsewhere (e.g. "Forgot password") answered with a challenge.
+  void startSecondStep(TwoFactorChallenge challenge) => state = AuthState(challenge: challenge);
+
+  /// The challenge is gone on the server (expired, used, or the sign-in was
+  /// paused): back to sign-in with [message].
+  void challengeEnded(String message) => state = AuthState(notice: message);
+
+  /// "Cancel and sign in again": forget the challenge.
+  void cancelSecondStep() => state = const AuthState();
+
+  /// The sign-in screen has shown the notice.
+  void clearNotice() {
+    if (state.notice != null) state = state.copyWith(challenge: state.challenge);
   }
 
   /// The server answered 403 PASSWORD_CHANGE_REQUIRED: show the change screen.

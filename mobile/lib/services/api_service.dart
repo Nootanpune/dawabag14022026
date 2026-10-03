@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
@@ -31,6 +32,11 @@ class ApiService {
   /// Called when the server rejects the refresh token (session is over).
   void Function()? onSessionExpired;
 
+  /// Called (before [onSessionExpired]) with the server's sentence when
+  /// /auth/refresh answers 401 TWO_FACTOR_SIGN_IN_REQUIRED: this staff or
+  /// partner login now uses two-step sign-in and must sign in again (Sprint 42).
+  void Function(String message)? onSignInRequired;
+
   /// Called when the server answers 403 PASSWORD_CHANGE_REQUIRED: a login with
   /// a temporary password from Dawabag's admin must choose its own first (Sprint 32).
   void Function()? onPasswordChangeRequired;
@@ -55,6 +61,14 @@ class ApiService {
   }
 
   Dio get dio => _dio;
+
+  /// Tests: one fake server for both clients (the bare one serves
+  /// /auth/refresh and /auth/logout).
+  @visibleForTesting
+  set httpClientAdapter(HttpClientAdapter adapter) {
+    _dio.httpClientAdapter = adapter;
+    _bare.httpClientAdapter = adapter;
+  }
 
   String? get accessToken => _accessToken;
 
@@ -154,6 +168,9 @@ class ApiService {
       final status = e.response?.statusCode;
       if (status == 401 || status == 403) {
         await clearSession();
+        if (status == 401 && apiErrorCode(e) == 'TWO_FACTOR_SIGN_IN_REQUIRED') {
+          onSignInRequired?.call(apiErrorMessage(e, fallback: 'Please sign in again: this login now uses two-step sign-in'));
+        }
         onSessionExpired?.call();
       }
       return null;

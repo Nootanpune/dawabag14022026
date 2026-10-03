@@ -1,14 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../services/otp_errors.dart';
 import '../../../services/password_reset_api.dart';
 import '../../../utils/password_policy.dart';
 import '../../../widgets/brand/auth_page.dart';
 import '../../../widgets/otp_input.dart';
+import '../two_factor/two_factor_screen.dart' show kTwoFactorPath;
 import 'forgot_password_steps.dart';
 
 enum ResetStep { mobile, otp, password, done }
@@ -19,15 +22,15 @@ enum ResetStep { mobile, otp, password, done }
 /// has an account), so the app never tells a registered number from another. The OTP, mobile and passwords live in
 /// this screen's memory only and go to the server (C-41); the server checks
 /// the OTP and the password rules and ends other sessions (C-44).
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   final String initialMobile;
   const ForgotPasswordScreen({super.key, this.initialMobile = ''});
 
   @override
-  State<ForgotPasswordScreen> createState() => ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() => ForgotPasswordScreenState();
 }
 
-class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _otpKey = GlobalKey<OtpInputState>();
   late final _mobile = TextEditingController(text: widget.initialMobile);
@@ -123,10 +126,16 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _error = null;
     });
     try {
-      await apiService.resetPassword(mobile: _mobileNumber, otp: _otp, newPassword: _next.text);
+      final challenge = await apiService.resetPassword(mobile: _mobileNumber, otp: _otp, newPassword: _next.text);
       if (!mounted) return;
       _next.clear();
       _again.clear();
+      if (challenge != null) {
+        // Sprint 42: a staff or partner login gives the second step before any session
+        ref.read(authProvider.notifier).startSecondStep(challenge);
+        context.go(kTwoFactorPath);
+        return;
+      }
       _go(ResetStep.done);
     } catch (e) {
       if (!mounted) return;

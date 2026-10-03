@@ -9,6 +9,7 @@ import '../../services/otp_errors.dart';
 import '../../services/password_reset_api.dart' show codeSentText;
 import '../../services/registration_api.dart';
 import '../../widgets/otp_input.dart';
+import 'two_factor/two_factor_screen.dart' show kTwoFactorPath;
 
 /// Stand-alone OTP screen (sign-in with OTP, and login when the mobile is not
 /// yet verified). The registration flow embeds its own OTP step. Sprint 36:
@@ -95,6 +96,9 @@ class _OTPScreenState extends ConsumerState<OTPScreen> {
     if (!mounted) return;
     if (success) {
       context.go('/');
+    } else if (ref.read(authProvider).challenge != null) {
+      // Sprint 42: a staff or partner login gives the second step before any session
+      context.push(kTwoFactorPath);
     } else {
       _otpKey.currentState?.clear();
       final error = ref.read(authProvider).error;
