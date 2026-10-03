@@ -72,6 +72,15 @@ export function errorHandler(
   if ((err as any).code === '55P03') {
     return fail(503, 'We are busy right now. Please try again in a moment.');
   }
+  // Two transactions waited on each other, or a serialisation conflict: safe to try again
+  if ((err as any).code === '40P01' || (err as any).code === '40001') {
+    return fail(503, 'We are busy right now. Please try again in a moment.');
+  }
+  // A rule raised by a record trigger (Sprint 38: final records, frozen prescriptions,
+  // the dispense ledger; C-08, C-34, C-46). Those messages are ours and plain.
+  if ((err as any).code === 'P0001') {
+    return fail(409, err.message);
+  }
   if ((err as any).code === '23505') {
     return fail(409, 'Duplicate entry. This record already exists.');
   }
@@ -87,6 +96,8 @@ export function errorHandler(
       products_decided_unless_draft: 'Schedule, category and GST rate must be set before a product leaves draft',
       // Sprint 34: the database refuses a NEW choice of a switched-off list entry (any path)
       products_category_switched_off: 'This category is switched off in Admin → Catalogue lists. Choose another category, or ask an admin to switch it back on',
+      // Sprint 38: an H1 register entry is complete or it is not written (C-09)
+      h1_register_complete: 'The Schedule H1 register entry is incomplete; the parcel was not dispatched',
       products_hsn_switched_off: 'This HSN code is switched off in Admin → Catalogue lists. Choose another code, or ask an admin to switch it back on',
     };
     return fail(400, (constraint && known[constraint]) || 'This change breaks a business rule');

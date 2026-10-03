@@ -52,7 +52,7 @@ export async function upsertPeople(c: PoolClient, password: string): Promise<Rec
     ids[p.key] = r.id;
     if (!(await c.query('SELECT 1 FROM user_profiles WHERE user_id = $1', [r.id])).rows[0]) {
       await c.query(`INSERT INTO user_profiles (user_id, full_name, referral_code) VALUES ($1, $2, $3)`,
-        [r.id, p.name, `DEMO${p.mobile.slice(-4)}`]);
+        [r.id, p.name, p.key === 'doctor' ? null : `DEMO${p.mobile.slice(-4)}`]);   // no referral code for doctors (C-20)
     } else {
       await c.query('UPDATE user_profiles SET full_name = $2, updated_at = NOW() WHERE user_id = $1', [r.id, p.name]);
     }

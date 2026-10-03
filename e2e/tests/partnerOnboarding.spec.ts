@@ -23,7 +23,7 @@ test.beforeAll(async ({}, info) => {
   const c = db();
   await c.connect();
   try {
-    await c.query("SET dawabag.maintenance = 'on'");
+    await c.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
     const old = (await c.query(`SELECT id FROM vendors WHERE name = $1`, [p.name])).rows.map((x) => x.id);
     const users = (await c.query(`SELECT id FROM users WHERE mobile = ANY($1)`, [p.logins])).rows.map((x) => x.id);
     await c.query('DELETE FROM vendor_users WHERE vendor_id = ANY($1) OR user_id = ANY($2)', [old, users]);

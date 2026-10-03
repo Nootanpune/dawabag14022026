@@ -11,7 +11,7 @@ import { runMedicineInfoFourEyes } from './sprint36/medicineInfo.mjs';
 
 async function main() {
   await db.connect();
-  await db.query("SET dawabag.maintenance = 'on'");   // lets cleanup remove this run's audit rows
+  await db.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");   // lets cleanup remove this run's audit rows
   await cleanup();
   try {
     await setup();

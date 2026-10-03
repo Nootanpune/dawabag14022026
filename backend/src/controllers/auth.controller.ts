@@ -219,8 +219,10 @@ export async function register(req: Request, res: Response, next: NextFunction) 
         );
       }
 
-      // Generate referral code for this user
-      const myReferralCode = `${full_name.substring(0, 4).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      // Referral code for consumer accounts only: never for doctors / hospitals (handover D22,
+      // Sprint 38; C-20 — no referral or reward scheme for prescribers)
+      const myReferralCode = data.customer_type === 'doc_hospital'
+        ? null : `${full_name.substring(0, 4).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
       // Create profile
       await client.query(

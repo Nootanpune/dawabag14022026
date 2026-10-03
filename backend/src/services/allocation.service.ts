@@ -68,8 +68,11 @@ export async function allocateAndReserve(
   // can never wait on each other; a bounded wait turns congestion into a clear
   // retry message rather than a hung request.
   await client.query("SET LOCAL lock_timeout = '5s'");
-  const order = params.lines.map((_, i) => i)
-    .sort((a, b) => params.lines[a].product_id.localeCompare(params.lines[b].product_id));
+  // Sprint 38: plain code-unit order of the lower-case id = PostgreSQL's uuid order, the
+  // order a partner's live stock snapshot locks its batches in (liveApply.loadPlanInput),
+  // so a checkout and a snapshot can never wait on each other.
+  const key = (i: number) => params.lines[i].product_id.toLowerCase();
+  const order = params.lines.map((_, i) => i).sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
   const allocations: Allocation[] = new Array(params.lines.length);
   for (const i of order) {
     const line = params.lines[i];

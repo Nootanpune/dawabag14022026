@@ -125,6 +125,8 @@ export interface StaffOrder {
 export interface VerifyRxInput {
   prescriber_name: string;
   prescriber_reg_no: string;
+  /** Sprint 38: needed for the Schedule H1 register (C-09) */
+  prescriber_address: string;
   prescribed_on: string; // YYYY-MM-DD
   patient_name: string;
   valid_days: number;
@@ -133,6 +135,12 @@ export interface VerifyRxInput {
 }
 
 export interface H1Entry {
+  /** Sprint 38: one register per seller licence, numbered 1, 2, 3 … (null = before Sprint 38) */
+  register_key: string | null;
+  entry_no: number | null;
+  seller_licence_no: string | null;
+  prescriber_address: string | null;
+  chain_legacy: boolean;
   dispensed_at: string;
   seller_type: string;
   partner_name: string | null;

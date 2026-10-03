@@ -77,6 +77,7 @@ export default function RxVerifyForm({ order, prescriptionId, onDone }: Props) {
         {field('prescribed_on', 'Prescription date', { type: 'date', max: todayIST() })}
         {field('valid_days', 'Valid for (days)', { inputMode: 'numeric' })}
       </div>
+      {field('prescriber_address', 'Prescriber address (clinic / hospital, as on the prescription)', { maxLength: 500, autoComplete: 'off' })}
       {field('patient_name', 'Patient name', { maxLength: 255 })}
       <div>
         <p className="text-sm font-medium text-gray-700 mb-1">Prescribed products</p>

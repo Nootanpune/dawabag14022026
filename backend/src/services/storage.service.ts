@@ -6,7 +6,7 @@
 // (the server's own object store, deploy/staging/compose.yml profile objectstore);
 // S3_PUBLIC_ENDPOINT is that store's public HTTPS address, used only to sign the
 // links browsers open — uploads and reads by the API stay on the internal address.
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AppError } from '../utils/AppError';
 
@@ -67,6 +67,11 @@ export async function getPrivateObjectUrl(key: string, expiresSeconds = 300): Pr
 }
 
 export const isObjectStoreConfigured = () => !!process.env.AWS_S3_BUCKET;
+
+// Sprint 38: removes a private document once its retention period has passed (C-44)
+export async function deletePrivateObject(key: string): Promise<void> {
+  await getS3().send(new DeleteObjectCommand({ Bucket: process.env.AWS_S3_BUCKET!, Key: key }));
+}
 
 // Short-lived link to a catalogue object (product pack photos). Public content,
 // not personal data, so no audit entry; the bucket itself stays private and the

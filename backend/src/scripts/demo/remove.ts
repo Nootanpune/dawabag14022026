@@ -4,7 +4,7 @@
 // placeholders. Statutory records are final (C-34, C-46), so it refuses once demo
 // accounts have orders, consultations or prescriptions: a used trial is reset by
 // recreating its database instead (deploy/trial/TRIAL.md, "Reset"). Runs in one
-// transaction in a maintenance session (the only way to delete audit rows).
+// transaction in a maintenance session as role dawabag_maintenance (the only way to delete audit rows).
 // Pack photos stay in the trial's object store, which is thrown away with it.
 import { withTransaction } from '../../config/database';
 import { cacheDel } from '../../config/redis';
@@ -15,6 +15,13 @@ import { DEMO_MARK, DEMO_PINCODES, LEGAL_DEFAULTS } from './places';
 
 export async function removeDemoData() {
   const counts = await withTransaction(async (c) => {
+    // Sprint 38: the maintenance setting counts only for the dawabag_maintenance role
+    // (migration 33); the trial's database login is the owner and may take that role
+    try {
+      await c.query('SET LOCAL ROLE dawabag_maintenance');
+    } catch {
+      throw new Error('This login may not act as dawabag_maintenance; run the removal as the database owner (deploy/trial/TRIAL.md)');
+    }
     await c.query(`SET LOCAL dawabag.maintenance = 'on'`);
     const q = async (sql: string, params: unknown[] = []) => (await c.query(sql, params)).rows;
     const users = (await q('SELECT id FROM users WHERE mobile = ANY($1)', [DEMO_MOBILES])).map((r) => r.id);

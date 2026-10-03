@@ -14,7 +14,7 @@ test.beforeAll(async () => {
   const c = db(); const r = redis();
   await c.connect();
   try {
-    await c.query("SET dawabag.maintenance = 'on'");
+    await c.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
     const old = (await c.query(`SELECT id FROM vendors WHERE name = 'E2E S37 Live Partner'`)).rows.map((x) => x.id);
     for (const t of ['partner_feed_checks', 'partner_stock_feeds']) await c.query(`DELETE FROM ${t} WHERE partner_id = ANY($1)`, [old]);
     await c.query('DELETE FROM vendor_users WHERE vendor_id = ANY($1)', [old]);

@@ -119,7 +119,7 @@ export async function runOperations({ t, P, addr, ids }) {
   const rx1 = r.json.data.order;
   await q(`UPDATE orders SET status = 'rx_pending' WHERE id = $1`, [rx1.id]);
   const rxId = (await q(`INSERT INTO prescriptions (user_id, order_id, s3_key, file_type) VALUES ($1, $2, 'test/s6.jpg', 'jpg') RETURNING id`, [ids.buyer2, rx1.id]))[0].id;
-  r = await call('POST', `/fulfilment/prescriptions/${rxId}/verify`, { token: t.pharmacist, body: { prescriber_name: 'Dr. S6', prescriber_reg_no: 'MMC-S6-1',
+  r = await call('POST', `/fulfilment/prescriptions/${rxId}/verify`, { token: t.pharmacist, body: { prescriber_name: 'Dr. S6', prescriber_reg_no: 'MMC-S6-1', prescriber_address: 'S6 Clinic, Nashik',
     prescribed_on: today, patient_name: 'S6 Buyer Two', valid_days: 90, items: [{ product_id: P.rx, prescribed_qty: 6 }] } });
   check('prescription verified for 6 units', r.status === 200, r.json);
   r = await call('POST', '/orders', { token: t.buyer2, body: { address_id: addr.buyer2, pincode: PIN, items: [{ product_id: P.rx, quantity: 3 }] } });

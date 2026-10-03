@@ -113,7 +113,7 @@ export async function markDelivered(shipmentId: string, handover: HandoverInput 
 
 export async function fetchH1Register(from: string, to: string): Promise<H1Entry[]> {
   const { data } = await api.get('/fulfilment/h1-register', { params: { from, to } });
-  return data.data?.entries ?? [];
+  return data.data?.entries ?? [];   // Sprint 38: one register per seller licence, entry numbers, prescriber address
 }
 
 export function downloadH1Csv(from: string, to: string) {

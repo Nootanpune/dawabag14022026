@@ -15,7 +15,7 @@ async function main() {
   if (!process.env.RAZORPAY_WEBHOOK_SECRET) throw new Error('Run with the fake provider environment (eval "$(node test/fakes/fake-env.mjs)")');
   fakes = await startFakes();
   await db.connect();
-  await db.query("SET dawabag.maintenance = 'on'");
+  await db.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
   await cleanup();
   const ctx = await setup();
   try {

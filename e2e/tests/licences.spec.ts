@@ -36,7 +36,7 @@ test.beforeAll(async ({}, info) => {
   const c = db(); const r = redis();
   await c.connect();
   try {
-    await c.query("SET dawabag.maintenance = 'on'");
+    await c.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
     const old = (await c.query(`SELECT id FROM users WHERE mobile = $1`, [d.retailer])).rows.map((x) => x.id);
     for (const t of ['kyc_documents', 'audit_logs', 'user_profiles', 'notifications', 'consent_records']) await c.query(`DELETE FROM ${t} WHERE user_id = ANY($1)`, [old]);
     await c.query('DELETE FROM users WHERE id = ANY($1)', [old]);

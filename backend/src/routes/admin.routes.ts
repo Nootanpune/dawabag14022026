@@ -23,6 +23,8 @@ import {
 } from '../controllers/partyLicence.controller';
 import { LICENCE_FILE_MAX_BYTES } from '../services/licences/register.service';
 import { sellingRightsStatus } from '../services/stock/sellingRightsStatus';
+import { getEmergencyStop, postPause, postResume } from '../controllers/emergencyStop.controller';
+import { getAuditChainVerify } from '../controllers/h1Register.controller';
 
 const licenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LICENCE_FILE_MAX_BYTES, files: 1 } });
 
@@ -157,6 +159,11 @@ router.get('/settlements/:id', authenticate, managers, getSettlementDetail);
 router.post('/settlements/:id/pay', authenticate, managers, postSettlementPaid);
 router.get('/settings', authenticate, managers, getSettings);
 router.put('/settings/:key', authenticate, authorize('super_admin'), putSetting);
+// Sprint 38: emergency stop for prescription-medicine sales (super-admin; audited) and the audit-log chain check
+router.get('/emergency-stop', authenticate, authorize('admin', 'super_admin'), getEmergencyStop);
+router.post('/emergency-stop/pause', authenticate, authorize('super_admin'), postPause);
+router.post('/emergency-stop/resume', authenticate, authorize('super_admin'), postResume);
+router.get('/audit-chain/verify', authenticate, authorize('admin', 'super_admin'), getAuditChainVerify);
 router.patch('/users/:userId/pharmacist', authenticate, authorize('admin', 'super_admin'), setPharmacistRegistration);
 
 export default router;

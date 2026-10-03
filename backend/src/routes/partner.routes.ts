@@ -11,6 +11,7 @@ import { requirePartner, requirePartnerOwner } from '../middleware/partner.middl
 import { partnerGetKeys, partnerPostKey, partnerRevokeKey } from '../controllers/partnerApiKeys.controller';
 import { getMyReturn, getMyReturns } from '../controllers/partner.controller';
 import stockImportRoutes from './partnerStockImport.routes';
+import { getPartnerH1Register, getPartnerH1Verify } from '../controllers/h1Register.controller';
 import {
   getPartnerChecks, getPartnerFeed, getPartnerFeedAlerts, postAcceptCheck, postDismissCheck, postLinkCheck, postRequestCheck,
 } from '../controllers/stockFeed.controller';
@@ -39,6 +40,9 @@ router.get('/pharmacists', getPharmacists);
 router.post('/shipments/:id/check', postCheck);          // Sprint 35: release / hold / refuse (C-08)
 router.post('/shipments/:id/dispatch', postDispatch);
 router.post('/shipments/:id/delivered', postDelivered);
+// Sprint 38: the partner's own Schedule H1 register (it is the licensee, C-09)
+router.get('/h1-register', getPartnerH1Register);
+router.get('/h1-register/verify', getPartnerH1Verify);
 router.get('/returns', getMyReturns);
 router.get('/returns/:id', getMyReturn);
 router.get('/settlements', getMySettlements);

@@ -191,9 +191,36 @@ skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
   for **8 years** (GST books 72 months, C-34). Test a restore every quarter. (Staging: nightly backups to the object store and
   `restore.sh`, section 7c.)
 - Statutory records are final in the database: the H1 register, credit notes, audit
-  and consent logs cannot be updated or deleted; invoice amounts cannot change.
-  A retention purge after the legal period runs in a session that first executes
-  `SET LOCAL dawabag.maintenance = 'on'` — only with written approval.
+  and consent logs, the prescription dispense ledger, verified prescriptions cannot be
+  updated or deleted; invoice amounts cannot change.
+- **Maintenance bypass (Sprint 38, migration 33).** `SET LOCAL dawabag.maintenance = 'on'`
+  alone no longer does anything. It counts only while the session acts as the NOLOGIN
+  role `dawabag_maintenance` — either inside a controlled function owned by that role
+  (today: `dawabag_purge_prescriptions`, used by the retention job) or after
+  `SET LOCAL ROLE dawabag_maintenance`, which only a superuser or a login explicitly
+  granted the role can run. The API's login is never granted it. A data repair: written
+  approval first, then, as the database owner,
+  `BEGIN; SET LOCAL ROLE dawabag_maintenance; SET LOCAL dawabag.maintenance = 'on'; …; COMMIT;`
+  and an entry in the incident register. Repairs to the H1 register or the audit log
+  break their hash chains — the integrity check will report it (that is the point).
+- **Database roles.** Migration 33 creates `dawabag_app` (NOLOGIN; SELECT / INSERT /
+  UPDATE / DELETE on every table, sequences, and EXECUTE on the purge function) and
+  `dawabag_maintenance`. Today the API connects as the owner (`POSTGRES_USER`), which
+  can still switch triggers off; to close that, run migrations as the owner and the API
+  as a separate login: `CREATE ROLE dawabag_api LOGIN PASSWORD '…' IN ROLE dawabag_app;`
+  then set `DB_USER=dawabag_api` for the API only (keep the owner for `db:migrate`).
+  Check it on staging first (the smoke suite's probe login already works with exactly
+  these privileges).
+- **Hash chains (C-09, C-46).** The H1 register (one chain per seller licence, numbered
+  1, 2, 3 …) and the audit log (one chain) are sealed when each transaction commits.
+  Admin → Record integrity (or `GET /fulfilment/h1-register/verify`,
+  `GET /admin/audit-chain/verify`) recomputes every hash and names the first broken
+  entry. Note the latest hash it shows (for example monthly, with the backup): removing
+  the newest entries cannot be seen without it.
+- **Prescription retention (Sprint 38).** Each prescription has `retain_until` = its last
+  dispense + `retention.prescription_years` (owner confirmed 3). Purging is OFF until
+  the owner switches `retention.prescription_purge` on; then the retention job deletes
+  prescriptions past `retain_until` that are not on the H1 register, and their files.
 
 ## 7. Scheduled jobs
 
@@ -453,3 +480,13 @@ Log every security incident in Admin → Incidents as soon as it is detected. CE
 must be told within **6 hours** of detection for reportable incidents; a personal-data
 breach also goes to the Data Protection Board and affected users (C-43). The register
 shows each deadline and refuses to close a breach until the notices are recorded.
+
+**Emergency stop for prescription medicines (Sprint 38).** If a government notification
+or a regulator instruction requires it, a super-admin opens Admin → Emergency stop,
+enters the reason and the reference (e.g. the notification number) and types PAUSE.
+At once: retail buyers cannot add Schedule H / H1 medicines to the cart, check them out
+or pay for an unpaid order holding them (they see a plain message and a banner on the
+website and app); paid parcels holding them are held at dispatch for Dawabag and every
+partner (pharmacists can still check and pack). Everything else keeps selling. Resume
+the same way (type RESUME); both steps are in the audit log. Held orders the business
+decides not to supply are cancelled and refunded from the order page as usual.

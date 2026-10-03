@@ -5,7 +5,14 @@
 // they follow the record-keeping periods in the runbook (C-34). Sprint 34 adds the
 // Taken / Skipped answers and ended dose reminders, and (only if set) health profiles
 // of long-inactive accounts; erasure and export of both are in privacy.service (C-43).
+// Sprint 38: prescriptions have a second clock, retain_until (N years after the last
+// dispense; setting retention.prescription_years, owner confirmed 3). Only if the owner
+// switches retention.prescription_purge on are prescriptions past retain_until — and not
+// on the H1 register — deleted, through the database's controlled maintenance function
+// dawabag_purge_prescriptions (migration 33); nothing before retain_until is touched.
 import { query } from '../config/database';
+import { logger } from '../config/logger';
+import { deletePrivateObject, isObjectStoreConfigured } from './storage.service';
 import { purgeLiveSnapshotLines } from './partnerLiveFeed/liveApply.service';
 import { writeAudit } from '../utils/audit';
 import { getSetting } from './settings.service';
@@ -64,6 +71,16 @@ export const RETENTION_KEYS = Object.keys(PURGES);
 export const RETENTION_MIN_DAYS: Record<string, number> = { payment_webhook_events: 180, inactive_health_profiles: 365 };
 export const retentionMinDays = (key: string) => RETENTION_MIN_DAYS[key] ?? 30;
 
+async function purgeExpiredPrescriptions(): Promise<number> {
+  const rows = await query<{ prescription_id: string; s3_key: string | null }>('SELECT * FROM dawabag_purge_prescriptions($1)', [BATCH]);
+  for (const r of rows) {
+    if (!r.s3_key || !isObjectStoreConfigured()) continue;
+    // The record is already gone; a file left behind is logged for the operator, never kept silently
+    await deletePrivateObject(r.s3_key).catch((e) => logger.error(`Retention: prescription file ${r.s3_key} not deleted: ${(e as Error).message}`));
+  }
+  return rows.length;
+}
+
 export async function runRetentionPurge(): Promise<Record<string, unknown>> {
   const days = await getSetting<Record<string, number>>('retention.days', {});
   const deleted: Record<string, number> = {};
@@ -72,6 +89,7 @@ export async function runRetentionPurge(): Promise<Record<string, unknown>> {
     if (!Number.isInteger(d) || d < retentionMinDays(key)) continue;   // unset or unsafe: keep everything
     deleted[key] = (await query(sql, [d])).length;
   }
+  if (await getSetting<boolean>('retention.prescription_purge', false)) deleted.prescriptions = await purgeExpiredPrescriptions();
   // Sprint 37: lines of live stock snapshots are working data, kept 48 hours (the import record and audit stay)
   deleted.live_snapshot_lines = await purgeLiveSnapshotLines();
   await writeAudit({ userId: null, action: 'retention_purge', performedBy: null, newValue: { deleted, days } });

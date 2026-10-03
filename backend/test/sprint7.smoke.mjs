@@ -11,7 +11,7 @@ import { runStock } from './sprint7/stock.mjs';
 
 async function main() {
   await db.connect();
-  await db.query("SET dawabag.maintenance = 'on'");   // clean-up deletes final records; the API never sets this
+  await db.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");   // clean-up deletes final records; the API never sets this
   await cleanup();
   const ctx = await setup();
   const made = await runPurchasing(ctx);

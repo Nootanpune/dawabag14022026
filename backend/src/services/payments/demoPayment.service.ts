@@ -6,7 +6,8 @@
 // and an audit entry with demo: true (C-46). Refused unless paymentMode() is 'demo'
 // (APP_ENV=trial and no Razorpay keys; config/env.ts refuses DEMO_PAYMENTS elsewhere).
 import crypto from 'crypto';
-import { query, queryOne, withTransaction } from '../../config/database';
+import { pool, query, queryOne, withTransaction } from '../../config/database';
+import { assertOrderPayable } from '../emergencyStop/state.service';
 import { AppError } from '../../utils/AppError';
 import { writeAudit } from '../../utils/audit';
 import { applyCapture } from './capture.service';
@@ -35,6 +36,7 @@ export async function payOrderDemo(userId: string, orderId: string, input: DemoP
   if (!order || order.user_id !== userId) throw new AppError('Order not found', 404);
   if (!['pending_payment', 'payment_failed'].includes(order.status)) throw new AppError('This order is already paid or closed', 409);
   if (order.total_paise <= 0) throw new AppError('Nothing to pay on this order', 400);
+  await assertOrderPayable(pool, order.id);   // emergency stop (Sprint 38, C-08)
 
   const id = ids();
   await query(`INSERT INTO payments (order_id, gateway, gateway_order_id, status, amount_paise, method)

@@ -12,6 +12,7 @@ export interface RxLineDraft {
 export interface RxDraft {
   prescriber_name: string;
   prescriber_reg_no: string;
+  prescriber_address: string;
   prescribed_on: string;
   patient_name: string;
   valid_days: string;
@@ -35,12 +36,14 @@ export function rxLinesFor(items: StaffOrderItem[]): RxLineDraft[] {
 }
 
 export function emptyDraft(patientName: string, lines: RxLineDraft[]): RxDraft {
-  return { prescriber_name: '', prescriber_reg_no: '', prescribed_on: '', patient_name: patientName, valid_days: '180', notes: '', lines };
+  return { prescriber_name: '', prescriber_reg_no: '', prescriber_address: '', prescribed_on: '', patient_name: patientName, valid_days: '180', notes: '', lines };
 }
 
 export function toVerifyBody(d: RxDraft): { body: VerifyRxInput } | { error: string } {
   if (d.prescriber_name.trim().length < 3) return { error: 'Enter the prescriber’s name' };
   if (d.prescriber_reg_no.trim().length < 3) return { error: 'Enter the prescriber’s registration number' };
+  // The Schedule H1 register needs it; a missing address refuses dispatch (Sprint 38, C-09)
+  if (d.prescriber_address.trim().length < 5) return { error: 'Enter the prescriber’s address as written on the prescription' };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.prescribed_on)) return { error: 'Enter the prescription date' };
   if (d.patient_name.trim().length < 2) return { error: 'Enter the patient’s name' };
   const validDays = Number(d.valid_days);
@@ -56,6 +59,7 @@ export function toVerifyBody(d: RxDraft): { body: VerifyRxInput } | { error: str
     body: {
       prescriber_name: d.prescriber_name.trim(),
       prescriber_reg_no: d.prescriber_reg_no.trim(),
+      prescriber_address: d.prescriber_address.trim(),
       prescribed_on: d.prescribed_on,
       patient_name: d.patient_name.trim(),
       valid_days: validDays,

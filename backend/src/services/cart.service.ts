@@ -10,6 +10,8 @@ import { freeDeliveryAbovePaise, freeDeliveryProgress } from './delivery/freeDel
 import { sellableStockSql } from './stock/partnerStock';
 import { saleKindFor } from './stock/sellingRights';
 import { approvedImageKeySql, imageUrlFor } from './productImage.service';
+import { getRxPause, pausedError } from './emergencyStop/state.service';
+import { PAUSED_LINE_ISSUE, customerMessage, isPausedLine } from './emergencyStop/rules';
 
 const BLOCKED_SCHEDULES = ['Schedule X', 'NDPS'];
 
@@ -67,6 +69,7 @@ export async function getCart(userId: string, pricingType: BuyerType) {
   );
   const products = new Map((await productRows(rows.map((r) => r.product_id), pricingType)).map((p) => [p.id, p]));
   const column = priceField(pricingType);
+  const rxPause = await getRxPause();   // emergency stop (Sprint 38, C-08)
   // Pack photos a customer may see (approved, C-19), signed once per product
   const imageUrls = new Map(await Promise.all([...products.values()].map(async (p) => [p.id, await imageUrlFor(p.approved_image_key)] as const)));
 
@@ -79,6 +82,7 @@ export async function getCart(userId: string, pricingType: BuyerType) {
     else if (p.stock_qty < r.quantity) issue = p.stock_qty > 0 ? `Only ${p.stock_qty} in stock` : 'Out of stock';
     else if (r.quantity < min) issue = `Minimum order is ${min}`;
     else if (r.quantity > max) issue = `Maximum per order is ${max}`;
+    else if (isPausedLine(rxPause, pricingType, p.drug_schedule)) issue = PAUSED_LINE_ISSUE;
     return {
       product_id: p.id, name: p.name, sku: p.sku, drug_schedule: p.drug_schedule,
       cold_chain: p.cold_chain, image_key: p.s3_image_key, image_url: imageUrls.get(p.id) ?? null,
@@ -114,12 +118,14 @@ export async function getCart(userId: string, pricingType: BuyerType) {
     discount_paise: discount,
     free_delivery: freeDelivery,
     requires_prescription: items.some((i) => i.available && i.requires_prescription),
+    // Sprint 38: emergency stop — the banner text when prescription medicines are paused
+    rx_sales_paused: rxPause.paused ? customerMessage(rxPause) : null,
     item_count: items.reduce((s, i) => s + i.quantity, 0),
   };
 }
 
 // Sets an absolute quantity; 0 removes the line.
-export async function setCartItem(userId: string, productId: string, quantity: number): Promise<void> {
+export async function setCartItem(userId: string, productId: string, quantity: number, pricingType: BuyerType = 'customer'): Promise<void> {
   if (quantity === 0) {
     await query('DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2', [userId, productId]);
     return;
@@ -127,6 +133,12 @@ export async function setCartItem(userId: string, productId: string, quantity: n
   const [p] = await productRows([productId], 'customer');
   if (!p || !p.is_active || p.deleted_at) throw new AppError('Product not found', 404);
   if (BLOCKED_SCHEDULES.includes(p.drug_schedule)) throw new AppError(`${p.name} cannot be ordered online`, 403);
+  // Emergency stop (Sprint 38): no new or larger prescription-medicine lines; lowering or removing is fine
+  const rxPause = await getRxPause();
+  if (isPausedLine(rxPause, pricingType, p.drug_schedule)) {
+    const had = await queryOne<{ quantity: number }>('SELECT quantity FROM cart_items WHERE user_id = $1 AND product_id = $2', [userId, productId]);
+    if (!had || quantity > had.quantity) throw pausedError(customerMessage(rxPause));
+  }
 
   await withTransaction(async (client) => {
     await client.query(

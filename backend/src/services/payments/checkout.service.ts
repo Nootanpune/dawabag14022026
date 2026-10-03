@@ -1,10 +1,11 @@
 // Order checkout through Razorpay: the order to pay, then the app's signed
 // confirmation. The capture itself is recorded by capture.service, the same way
 // a webhook or the reconciliation sweep would record it.
-import { query, queryOne } from '../../config/database';
+import { pool, query, queryOne } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { getRazorpay, validCheckoutSignature } from '../razorpay.client';
 import { applyCapture } from './capture.service';
+import { assertOrderPayable } from '../emergencyStop/state.service';
 
 export async function createOrderPayment(userId: string, orderId: string) {
   const order = await queryOne<{ id: string; order_number: string; total_paise: number; status: string; user_id: string }>(
@@ -12,6 +13,8 @@ export async function createOrderPayment(userId: string, orderId: string) {
   if (!order || order.user_id !== userId) throw new AppError('Order not found', 404);
   if (!['pending_payment', 'payment_failed'].includes(order.status)) throw new AppError('Order is not waiting for payment', 400);
   if (order.total_paise <= 0) throw new AppError('Nothing to pay on this order', 400);
+  // Emergency stop (Sprint 38): an unpaid order holding prescription medicines is not taken further (C-08)
+  await assertOrderPayable(pool, order.id);
   const rzpOrder: any = await getRazorpay().orders.create({
     amount: order.total_paise, currency: 'INR', payment_capture: true, receipt: order.order_number,
     notes: { order_id: order.id },

@@ -44,6 +44,8 @@ import {
   ListPlus,
   BookOpenCheck,
   Radio,
+  OctagonPause,
+  Link2,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
@@ -126,6 +128,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/staff/destruction-register', label: 'Destruction register', icon: Flame, roles: STORE_ROLES },
       { href: '/staff/telemedicine-lists', label: 'Telemedicine lists', icon: ListTree, roles: TELE_LIST_ROLES },
       { href: '/admin/licences', label: 'Licences', icon: BadgeCheck, roles: MANAGER_ROLES },
+      // Sprint 38 — emergency stop for prescription-medicine sales (super-admin acts) and the chain checks (C-08, C-09, C-46)
+      { href: '/admin/emergency-stop', label: 'Emergency stop', icon: OctagonPause, roles: MANAGER_ROLES },
+      { href: '/admin/integrity', label: 'Record integrity', icon: Link2, roles: MANAGER_ROLES },
       { href: '/admin/policies', label: 'Policies', icon: FileText, roles: MANAGER_ROLES },
       // Sprint 33 — "Genuine medicines", "Expired, damaged and recalled", "Every order is checked by a pharmacist"
       { href: '/admin/info-pages', label: 'Trust pages', icon: BookOpenCheck, roles: MANAGER_ROLES },

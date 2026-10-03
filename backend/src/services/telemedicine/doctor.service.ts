@@ -25,6 +25,8 @@ export async function enableDoctor(adminId: string, mobile: string) {
     if (!u) throw new AppError('No account with that mobile number', 404);
     if (!['customer', 'doctor'].includes(u.role)) throw new AppError(`This account is ${u.role}; use a separate account for teleconsultation`, 409);
     await client.query(`UPDATE users SET role = 'doctor' WHERE id = $1`, [u.id]);
+    // Doctors have no referral code (handover D22; C-20: no inducements to prescribers)
+    await client.query(`UPDATE user_profiles SET referral_code = NULL WHERE user_id = $1`, [u.id]);
     await writeAuditTx(client, { userId: u.id, action: 'doctor_enabled', performedBy: adminId });
     return { user_id: u.id, role: 'doctor' };
   });

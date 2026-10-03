@@ -45,7 +45,7 @@ const login = async (p) => (await call('POST', '/auth/login', { body: { mobile: 
 async function main() {
   await db.connect();
   // Test clean-up may delete final records (H1, credit notes, audit); the API never sets this
-  await db.query("SET dawabag.maintenance = 'on'");
+  await db.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
   await cleanup(q);
   await q(`INSERT INTO pincode_serviceability (pincode, city, state, latitude, longitude, dawabag_delivery_hours, cold_chain_available)
            VALUES ($1, 'Nashik', 'Maharashtra', 20.0110, 73.7900, 12, FALSE)`, [PIN]);
@@ -106,7 +106,7 @@ async function main() {
   r = await call('GET', '/fulfilment/queue?stage=rx', { token: t.packer });
   check('packer cannot see the Rx queue', r.status === 403, r.json);
 
-  const verifyBody = (qty, product = H1) => ({ prescriber_name: 'Dr. Asha Kulkarni', prescriber_reg_no: 'MMC-2011-4455',
+  const verifyBody = (qty, product = H1) => ({ prescriber_name: 'Dr. Asha Kulkarni', prescriber_reg_no: 'MMC-2011-4455', prescriber_address: 'Kulkarni Clinic, College Road, Nashik',
     prescribed_on: new Date(Date.now() - 5 * 864e5).toISOString().slice(0, 10), patient_name: 'S4 Buyer',
     valid_days: 90, items: [{ product_id: product, prescribed_qty: qty }] });
   r = await call('POST', `/fulfilment/prescriptions/${rx1}/verify`, { token: t.pharmacist, body: verifyBody(6) });
@@ -127,7 +127,7 @@ async function main() {
   const chk = (await q(`SELECT pharmacist_check, pharmacist_reg_no FROM order_shipments WHERE id = $1`, [s1]))[0];
   check('…and releases Dawabag\'s shipment for packing in the same step', r.json.data?.shipments_released === 1
     && chk.pharmacist_check === 'released' && chk.pharmacist_reg_no === 'MSPC-S4-001', { r: r.json.data, chk });
-  const disp = (await q(`SELECT dispensed_qty FROM prescription_items WHERE prescription_id = $1`, [rx1]))[0];
+  const disp = (await q(`SELECT dispensed_qty FROM prescription_item_balances WHERE prescription_id = $1`, [rx1]))[0];
   check('dispensed quantity recorded against prescription', disp?.dispensed_qty === 2, disp);
 
   console.log('Pack, dispatch, H1 register (C-09)');

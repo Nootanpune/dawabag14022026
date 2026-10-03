@@ -212,7 +212,7 @@ export function buildRegisterPayload(type: CustomerType, d: DetailsFormValues): 
     mobile: d.mobile.trim(),
     password: d.password,
     email: opt(d.email),
-    referral_code: opt(d.referral_code)?.toUpperCase(),
+    referral_code: type === 'doc_hospital' ? undefined : opt(d.referral_code)?.toUpperCase(),   // C-20
     pincode: opt(d.pincode),
     accept_privacy_notice: d.accept_privacy_notice,
     notice_language: d.notice_language, // C-40

@@ -25,7 +25,7 @@ async function removeOld(c: ReturnType<typeof db>) {
   const products = (await c.query(
     `SELECT product_id AS id FROM catalogue_drafts WHERE from_file->>'company' = $1
      UNION SELECT product_id FROM partner_product_requests WHERE partner_id = ANY($2) AND product_id IS NOT NULL`, [company, vendors])).rows.map((r) => r.id);
-  await c.query("SET dawabag.maintenance = 'on'");
+  await c.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
   await c.query(`DELETE FROM audit_logs WHERE new_value->>'product_id' = ANY($1::text[])`, [products]);
   await c.query('DELETE FROM partner_product_requests WHERE partner_id = ANY($1) OR product_id = ANY($2)', [vendors, products]);
   await c.query('DELETE FROM partner_item_links WHERE partner_id = ANY($1) OR product_id = ANY($2)', [vendors, products]);

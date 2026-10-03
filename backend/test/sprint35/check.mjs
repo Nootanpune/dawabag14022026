@@ -100,7 +100,7 @@ export async function runRxOrder() {
   check('releasing it without the prescription review is refused, plainly', r.status === 409 && /review the prescription/.test(r.json.message), r.json);
   const rx = (await q(`INSERT INTO prescriptions (user_id, order_id, s3_key, file_type) VALUES ($1, $2, 'test/s35.jpg', 'jpg') RETURNING id`, [ids.buyer, a.order.id]))[0].id;
   r = await call('POST', `/fulfilment/prescriptions/${rx}/verify`, { token: t.pharmacist, body: { prescriber_name: 'Dr. S35 Kulkarni',
-    prescriber_reg_no: 'MMC-S35-1', prescribed_on: new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10), patient_name: 'S35 Buyer',
+    prescriber_reg_no: 'MMC-S35-1', prescriber_address: 'S35 Clinic, College Road, Nashik', prescribed_on: new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10), patient_name: 'S35 Buyer',
     valid_days: 90, items: [{ product_id: P.rx, prescribed_qty: 4 }] } });
   const s = await ship(a.own);
   check('verifying the prescription also releases Dawabag\'s shipment (single step)', r.status === 200 && r.json.data?.shipments_released === 1

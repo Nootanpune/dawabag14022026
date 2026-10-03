@@ -10,7 +10,7 @@
 //   6. the feed's state, the import's result and one audit entry (C-46) are recorded.
 // Notifications go out after the commit, only when new items start waiting.
 import { PoolClient } from 'pg';
-import { query, withTransaction } from '../../config/database';
+import { query, withTransactionRetry } from '../../config/database';
 import { logger } from '../../config/logger';
 import { AppError } from '../../utils/AppError';
 import { writeAuditTx } from '../../utils/audit';
@@ -49,12 +49,14 @@ async function loadPlanInput(c: PoolClient, partnerId: string, importId: string,
     `SELECT pp.id, pp.product_id, p.name, COALESCE(p.cold_chain, FALSE) AS cold_chain FROM partner_products pp JOIN products p ON p.id = pp.product_id
      WHERE pp.partner_id = $1 AND pp.product_id IS NOT NULL`, [partnerId])).rows
     .map((r): [string, Listing] => [r.product_id, { ppId: r.id, productId: r.product_id, name: r.name, coldChain: r.cold_chain }]));
-  // Locks the partner's batches: dispatch and allocation wait until the snapshot is written
+  // Locks the partner's batches: dispatch and allocation wait until the snapshot is written.
+  // Sprint 38: in product order, then batch — the order checkout locks them in
+  // (allocation.service), so the two cannot deadlock
   const ledger = (await c.query<LedgerBatch & { expiry_date: string }>(
     `SELECT pi.id, pi.partner_product_id AS "ppId", pp.product_id AS "productId", pi.batch_number, pi.qty_available, pi.qty_reserved,
             to_char(pi.expiry_date, 'YYYY-MM-DD') AS expiry_date, pi.mrp_paise, pi.sale_rate_paise
      FROM partner_inventory pi JOIN partner_products pp ON pp.id = pi.partner_product_id
-     WHERE pi.partner_id = $1 ORDER BY pi.id FOR UPDATE OF pi`, [partnerId])).rows;
+     WHERE pi.partner_id = $1 ORDER BY pp.product_id NULLS LAST, pi.id FOR UPDATE OF pi`, [partnerId])).rows;
   // Units dispatched (= billed in the partner's software) after the snapshot was taken, less the grace
   const since = new Date(takenAt.getTime() - graceMinutes * 60_000);
   const dispatched = new Map((await c.query<{ id: string; n: number }>(
@@ -141,7 +143,7 @@ export async function receiveSnapshot(caller: FeedCaller, input: SnapshotInput):
   const actor: ImportActor = { userId: null, apiKey: { id: caller.keyId, prefix: caller.prefix } };
   let notify: { count: number } | null = null;
 
-  const result = await withTransaction(async (c) => {
+  const result = await withTransactionRetry(async (c) => {
     // One snapshot at a time per partner (row lock); a partner never set up has no row → manual
     const feed = (await c.query<FeedRow>('SELECT * FROM partner_stock_feeds WHERE partner_id = $1 FOR UPDATE', [partnerId])).rows[0];
     if (!feed || feed.mode !== 'live') {

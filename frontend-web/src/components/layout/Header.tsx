@@ -10,6 +10,7 @@ import { staffHome } from '@/lib/fulfilment/roles';
 import HeaderSearch from '@/components/search/HeaderSearch';
 import BackButton from './BackButton';
 import BrandLogo from '@/components/brand/BrandLogo';
+import RxSalesBanner from './RxSalesBanner';
 
 interface Props {
   /** the query of the search results page, shown in the header's search box */
@@ -39,6 +40,7 @@ export default function Header({ searchQuery }: Props = {}) {
 
   return (
     <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <RxSalesBanner />
       <div className="max-w-6xl mx-auto px-4 min-h-16 flex flex-wrap items-center justify-between gap-x-3">
 
         {/* Back on every page but home (Sprint 26), then the logo */}

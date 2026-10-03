@@ -10,6 +10,18 @@ the lawyer/CA sign-off.
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
 
+## Sprint 38 — registers and integrity (2026-10-03)
+
+- Source: external design handover compared in docs/reviews/handover-gap-analysis-2026-10-03.md. Owner rulings CONFIRMED 2026-10-03: marketplace stays (handover "seller-only" rejected); no legal-opinion lock (partners invoice with their own pharmacist); build handover ideas that strengthen Dawabag; emergency stop added. Owner answers for Sprint 39 (not built yet): pay-first + Rx upload before payment + authorise-then-capture; new products restricted by default; partner batch provenance optional then required for H1/cold-chain. Rx retention 3 years after last dispense CONFIRMED.
+- Migration 33: roles dawabag_maintenance (trigger bypass works only as that role: SECURITY DEFINER fn or SET ROLE) and dawabag_app (API privileges). Test clean-ups use "SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'". Deploy TODO: run the API as a non-owner login in dawabag_app (RUNBOOK §6).
+- H1 register: prescriber_address required at verify; missing detail → 409 H1_REGISTER_INCOMPLETE; register per seller licence (register_key dawabag:<LIC> / partner:<id>:<LIC>); gapless entry_no + prev_hash/row_hash sealed at commit under advisory lock; canonical text utils/hashChain.ts = SQL dawabag_h1_canonical; old rows chain_legacy. Pharmacist completes old prescriptions: /fulfilment/prescriptions/h1-incomplete. Partner /partner/h1-register (+csv, verify); admin /admin/integrity.
+- Audit log: global hash chain sealed at commit; GET /admin/audit-chain/verify; writeAudit() retries then 503 AUDIT_WRITE_FAILED.
+- Prescriptions frozen once verified; rx_dispense_ledger + view prescription_item_balances replace dispensed_qty; retain_until = last dispense + 3 years; purge only if retention.prescription_purge=true.
+- Emergency stop: GET /sales-status (public); /admin/emergency-stop (super_admin, typed PAUSE/RESUME, audited). Paused: Rx cart/checkout/payment → 409 RX_SALES_PAUSED; paid orders held at dispatch.
+- Extras: no referral codes for doctors; checkout/snapshot consistent lock order + retry on 40P01/40001 (fixes Sprint 37 known issue).
+- Follow-ups: nightly chain-verify job; note latest chain hash with monthly backup; API as dawabag_app login.
+- Tests: jest 539; smoke 1–38 1703 checks; Playwright 131 passed / 7 skipped.
+
 ## Sprint 37 — live stock feed from the partner's billing software (2026-10-03)
 
 - Owner CONFIRMED 2026-10-03: feed quantity changes of linked+listed products apply automatically; new products / price-MRP / other non-quantity changes wait for a person; waiting items flagged URGENT (blinking badge + once-only in-app/email to partner owner + admins). Live mode opt-in per partner (admin).

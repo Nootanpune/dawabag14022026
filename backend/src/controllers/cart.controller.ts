@@ -15,7 +15,7 @@ export async function putCartItem(req: Request, res: Response, next: NextFunctio
   try {
     const productId = z.string().uuid().parse(req.params.productId);
     const { quantity } = z.object({ quantity: z.number().int().min(0).max(9999) }).parse(req.body);
-    await setCartItem(req.user!.id, productId, quantity);
+    await setCartItem(req.user!.id, productId, quantity, req.user!.pricing_type);
     res.json({ success: true, data: await getCart(req.user!.id, req.user!.pricing_type) });
   } catch (err) { next(err); }
 }

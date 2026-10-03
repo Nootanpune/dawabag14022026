@@ -9,6 +9,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { assertRxCleared, recordH1Dispensing } from './rxGate.service';
 import { assertNoRecalledLines } from './recall.service';
+import { assertDispatchAllowed } from './emergencyStop/state.service';
 import { DispatchRecord, handoverCode, prepareHandover } from './handover.service';
 import { queueNotification } from './notification.service';
 import { assignAtDispatch } from './delivery/rider.service';
@@ -105,6 +106,7 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
     if (!mayDispatch(s.pharmacist_check)) throw new AppError(notReleasedMessage(s.pharmacist_check, s.pharmacist_check_note, 'dawabag'), 409);
     await assertRxCleared(client, s.order_id, shipmentId);
     await assertNoRecalledLines(client, shipmentId);
+    await assertDispatchAllowed(client, shipmentId);   // emergency stop holds Rx parcels (Sprint 38, C-08)
     await assertEinvoiceReady(client, shipmentId);
     // Reserved → shipped
     await client.query(

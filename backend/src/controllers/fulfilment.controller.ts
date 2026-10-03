@@ -2,14 +2,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { listRiders, myRun, reassignRider, ridesShipment } from '../services/delivery/rider.service';
-import { query } from '../config/database';
+import { withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
-import { writeAudit } from '../utils/audit';
-import { toCsv } from '../utils/csv';
+import { writeAuditTx } from '../utils/audit';
 import { fulfilmentQueue, packShipment, dispatchOwnShipment, QueueStage } from '../services/fulfilment.service';
 import { markShipmentDelivered } from '../services/partnerFulfilment.service';
-import { applyPrescriptionToOrder, rejectPrescription, verifyPrescription } from '../services/rxVerification.service';
+import { applyPrescriptionToOrder, completePrescriberDetails, rejectPrescription, verifyPrescription } from '../services/rxVerification.service';
 import { checkQueue, decideOwnShipment, orderCheckDetail } from '../services/pharmacistCheck/check.service';
+import { h1IncompletePrescriptions } from '../services/h1Register/incomplete.service';
 
 const uuid = z.string().uuid();
 
@@ -55,6 +55,9 @@ export async function getQueue(req: Request, res: Response, next: NextFunction) 
 const verifySchema = z.object({
   prescriber_name: z.string().trim().min(3).max(255),
   prescriber_reg_no: z.string().trim().min(3).max(100),
+  // Sprint 38: the Schedule H1 register needs the prescriber's address (C-09)
+  prescriber_address: z.string({ required_error: "Enter the prescriber's address as written on the prescription" })
+    .trim().min(5, "Enter the prescriber's address as written on the prescription").max(500),
   prescribed_on: date,
   patient_name: z.string().trim().min(2).max(255),
   valid_days: z.number().int().min(1).max(365).default(180),
@@ -65,6 +68,23 @@ const verifySchema = z.object({
 export async function postVerify(req: Request, res: Response, next: NextFunction) {
   try {
     res.json({ success: true, data: await verifyPrescription(req.user!.id, uuid.parse(req.params.id), verifySchema.parse(req.body)) });
+  } catch (err) { next(err); }
+}
+
+// Sprint 38: fill in prescriber details a prescription verified before Sprint 38 lacks
+// (only empty fields; everything else on a verified prescription is frozen, C-08 / C-09)
+export const prescriberDetailsSchema = z.object({
+  prescriber_address: z.string().trim().min(5).max(500).optional(),
+  prescriber_reg_no: z.string().trim().min(3).max(100).optional(),
+}).refine((b) => b.prescriber_address || b.prescriber_reg_no, 'Enter the prescriber\'s address or registration number');
+
+export async function getH1Incomplete(_req: Request, res: Response, next: NextFunction) {
+  try { res.json({ success: true, data: { prescriptions: await h1IncompletePrescriptions() } }); } catch (err) { next(err); }
+}
+
+export async function postPrescriberDetails(req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json({ success: true, data: await completePrescriberDetails(req.user!.id, uuid.parse(req.params.id), prescriberDetailsSchema.parse(req.body)) });
   } catch (err) { next(err); }
 }
 
@@ -120,37 +140,20 @@ export async function postDelivered(req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 }
 
-// GET /fulfilment/h1-register?from=&to=&format=csv — inspector export (C-09).
-// Built from the database on each request; nothing is written to disk.
-export async function getH1Register(req: Request, res: Response, next: NextFunction) {
-  try {
-    const { from, to, format } = z.object({ from: date, to: date, format: z.enum(['json', 'csv']).default('json') }).parse(req.query);
-    const rows = await query<any>(
-      `SELECT h.dispensed_at, h.seller_type, v.name AS partner_name, o.order_number, h.product_name, h.batch_number,
-              h.quantity, h.patient_name, h.patient_address, h.prescriber_name, h.prescriber_reg_no,
-              h.pharmacist_name, h.pharmacist_reg_no
-       FROM h1_register h JOIN orders o ON o.id = h.order_id LEFT JOIN vendors v ON v.id = h.partner_id
-       WHERE h.dispensed_at::date BETWEEN $1 AND $2 ORDER BY h.dispensed_at`, [from, to]);
-    await writeAudit({ userId: null, action: 'h1_register_exported', performedBy: req.user!.id, newValue: { from, to, rows: rows.length, format } });
-    if (format === 'json') return res.json({ success: true, data: { from, to, entries: rows } });
-
-    const cols = ['dispensed_at', 'seller_type', 'partner_name', 'order_number', 'product_name', 'batch_number', 'quantity',
-      'patient_name', 'patient_address', 'prescriber_name', 'prescriber_reg_no', 'pharmacist_name', 'pharmacist_reg_no'];
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="h1-register-${from}-to-${to}.csv"`);
-    res.send(toCsv(cols, rows));
-  } catch (err) { next(err); }
-}
+// GET /fulfilment/h1-register — moved to h1Register.controller.ts (Sprint 38: per seller licence, chain check)
 
 // PATCH /admin/users/:userId/pharmacist { pharmacist_reg_no } — required before a pharmacist reviews
 export async function setPharmacistRegistration(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = uuid.parse(req.params.userId);
     const { pharmacist_reg_no } = z.object({ pharmacist_reg_no: z.string().trim().min(3).max(50) }).parse(req.body);
-    const r = await query(`UPDATE users SET pharmacist_reg_no = $2, updated_at = NOW()
-                           WHERE id = $1 AND role IN ('pharmacist_rx', 'pharmacist_pack') RETURNING id`, [userId, pharmacist_reg_no]);
-    if (!r.length) throw new AppError('Pharmacist account not found', 404);
-    await writeAudit({ userId, action: 'pharmacist_registration_set', performedBy: req.user!.id, newValue: { pharmacist_reg_no } });
+    // A regulated change and its audit entry commit together (Sprint 38, C-46)
+    await withTransaction(async (c) => {
+      const r = await c.query(`UPDATE users SET pharmacist_reg_no = $2, updated_at = NOW()
+                               WHERE id = $1 AND role IN ('pharmacist_rx', 'pharmacist_pack') RETURNING id`, [userId, pharmacist_reg_no]);
+      if (!r.rowCount) throw new AppError('Pharmacist account not found', 404);
+      await writeAuditTx(c, { userId, action: 'pharmacist_registration_set', performedBy: req.user!.id, newValue: { pharmacist_reg_no } });
+    });
     res.json({ success: true, data: { user_id: userId, pharmacist_reg_no } });
   } catch (err) { next(err); }
 }

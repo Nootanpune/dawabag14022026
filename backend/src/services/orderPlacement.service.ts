@@ -4,7 +4,7 @@
 // limits, prescription flags, allocation to sellers, coupon, wallet, credit.
 import { PoolClient } from 'pg';
 import { z } from 'zod';
-import { withTransaction } from '../config/database';
+import { withTransactionRetry } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { generateOrderNumber } from '../utils/helpers';
 import { queueNotification } from './notification.service';
@@ -17,6 +17,7 @@ import { OrderPreview, buildCheckoutSummary } from './checkoutSummary.service';
 import { moveOrderToFulfilment } from './paymentCapture.service';
 import { freeDeliveryAbovePaise, qualifiesForFreeDelivery } from './delivery/freeDelivery';
 import { dawabagDrugLicences, listLicences, partyEligibility, snapshot } from './licences/register.service';
+import { assertRxSalesOpen } from './emergencyStop/state.service';
 
 /** The seller of record's licences on each shipment, as on the day of sale — printed on its invoice (C-13). */
 async function snapshotSellerLicences(client: PoolClient, orderId: string) {
@@ -92,7 +93,8 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
     throw new AppError('Credit and CAD terms are only available for B2B accounts', 400);
   }
 
-  const order = await withTransaction(async (client) => {
+  // Retried if chosen as a deadlock victim, e.g. against a partner's live stock snapshot (Sprint 38)
+  const order = await withTransactionRetry(async (client) => {
     // The address and patient must be the buyer's own; the delivery PIN code is
     // the address's, never a separate value from the request
     const addr = (await client.query(
@@ -178,6 +180,9 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
         line_total_paise: assessable + gstAmt,
       });
     }
+
+    // Emergency stop (Sprint 38): no checkout of prescription medicines while paused (C-08)
+    await assertRxSalesOpen(client, customerType, lineItems.map((li) => ({ name: li.product_name, drug_schedule: li.drug_schedule })));
 
     // Seller per line (Dawabag or partner) + stock reservation — services/allocation.service.ts
     const allocations = await allocateAndReserve(client, {

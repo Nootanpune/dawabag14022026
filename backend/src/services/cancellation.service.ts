@@ -33,11 +33,18 @@ export async function cancelOrder(orderId: string, actor: { id: string; staff: b
     const refundable = await refundableAmount(client, orderId);
 
     await releaseOrderReservations(client, orderId);
-    // Give the prescription quantities back
+    // Give the prescription quantities back: a 'reversal' row in the append-only dispense
+    // ledger for what each line still holds (Sprint 38, C-08). Lines dispensed before
+    // Sprint 38 (no ledger row of their own) are not given back.
     await client.query(
-      `UPDATE prescription_items pi SET dispensed_qty = GREATEST(pi.dispensed_qty - oi.quantity, 0)
-       FROM order_items oi WHERE oi.order_id = $1 AND oi.prescription_id = pi.prescription_id AND oi.product_id = pi.product_id`,
-      [orderId]);
+      `INSERT INTO rx_dispense_ledger (prescription_id, product_id, kind, quantity, order_id, order_item_id, recorded_by, reason)
+       SELECT l.prescription_id, l.product_id, 'reversal',
+              SUM(CASE WHEN l.kind = 'reversal' THEN -l.quantity ELSE l.quantity END), $1, l.order_item_id, $2, 'Order cancelled'
+       FROM rx_dispense_ledger l JOIN order_items oi ON oi.id = l.order_item_id
+       WHERE oi.order_id = $1
+       GROUP BY l.prescription_id, l.product_id, l.order_item_id
+       HAVING SUM(CASE WHEN l.kind = 'reversal' THEN -l.quantity ELSE l.quantity END) > 0`,
+      [orderId, actor.id]);
     const creditNotes = [];
     for (const s of shipments) creditNotes.push(await creditWholeShipment(client, s.id, 'cancellation', actor.id));
     await client.query(

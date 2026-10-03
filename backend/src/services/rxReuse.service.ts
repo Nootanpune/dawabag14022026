@@ -49,7 +49,7 @@ export async function requestPrescriptionReuse(userId: string, prescriptionId: s
     const lines = (await rxRequiredLines(client, orderId)).filter((l) => !l.prescription_id);
     if (!lines.length) throw new AppError('This order has no medicines waiting for a prescription', 400);
     const left = new Map((await client.query(
-      `SELECT product_id, prescribed_qty - dispensed_qty AS left FROM prescription_items WHERE prescription_id = $1`, [prescriptionId]))
+      `SELECT product_id, remaining_qty AS left FROM prescription_item_balances WHERE prescription_id = $1`, [prescriptionId]))
       .rows.map((r: any) => [r.product_id, Number(r.left)]));
     const short = lines.filter((l) => (left.get(l.product_id) ?? 0) < l.quantity).map((l) => l.product_name);
     if (short.length) throw new AppError(`This prescription does not cover: ${short.join(', ')}`, 400);

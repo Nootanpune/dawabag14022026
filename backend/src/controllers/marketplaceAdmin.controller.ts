@@ -159,6 +159,9 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
     ended_reminders: z.number().int().min(30).max(3650).optional(),
     inactive_health_profiles: z.number().int().min(365).max(3650).nullable().optional(),
   }).strict(),
+  // Sprint 38 — prescriptions: kept N years after the last dispense (owner confirmed 3); purge off by default (C-34)
+  'retention.prescription_years': z.number().int().min(3).max(30),
+  'retention.prescription_purge': z.boolean(),
   // Sprint 9 — e-invoicing once turnover crosses the threshold (C-31)
   'einvoice.enabled': z.boolean(),
   // Sprint 8 — courier and DLT SMS templates (TRAI: only registered templates are delivered)

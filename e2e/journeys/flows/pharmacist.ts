@@ -18,10 +18,11 @@ export async function pharmacist(browser: Browser, story: Story) {
   await shot('Pharmacist check', 'The pharmacist lands on "Pharmacist check": prescription orders first, then every other order waiting to be checked before packing (Sprint 35, C-08).');
   await page.getByRole('button', { name: 'Review', exact: true }).first().click();
   await page.waitForTimeout(1200);
-  await shot('Prescription and form', 'The uploaded prescription beside the form: doctor, registration number, date, patient and prescribed quantity (C-08, C-09).', { fullPage: true });
+  await shot('Prescription and form', 'The uploaded prescription beside the form: doctor, registration number and address, date, patient and prescribed quantity (C-08, C-09).', { fullPage: true });
   const note = await onScreenOr(async () => {
     await page.getByLabel('Prescriber (doctor) name').fill('Dr. Asha Kulkarni');
     await page.getByLabel('Prescriber registration no.').fill('MMC-2011-4455');
+    await page.getByLabel(/Prescriber address/).fill('Kulkarni Clinic, College Road, Nashik');   // Sprint 38 (C-09)
     await page.getByLabel('Prescription date').fill(todayIST());
     await page.getByLabel('Patient name').fill('E2E Buyer');
     const qty = page.locator('table input').first();
@@ -31,7 +32,7 @@ export async function pharmacist(browser: Browser, story: Story) {
     await page.getByRole('button', { name: /verify prescription/i }).waitFor({ state: 'detached', timeout: 8000 });
   }, async () => {
     const rx = (await dbRow(`SELECT p.id FROM prescriptions p JOIN orders o ON o.id = p.order_id WHERE o.order_number = $1`, [story.orders.rx]))!.id;
-    const r = await call('POST', `/fulfilment/prescriptions/${rx}/verify`, { prescriber_name: 'Dr. Asha Kulkarni', prescriber_reg_no: 'MMC-2011-4455',
+    const r = await call('POST', `/fulfilment/prescriptions/${rx}/verify`, { prescriber_name: 'Dr. Asha Kulkarni', prescriber_reg_no: 'MMC-2011-4455', prescriber_address: 'Kulkarni Clinic, College Road, Nashik',
       prescribed_on: todayIST(), patient_name: 'E2E Buyer', valid_days: 90, items: [{ product_id: rxId, prescribed_qty: 10 }] }, await token('pharmacist'));
     if (r.status >= 300) throw new Error(JSON.stringify(r.json));
   }, page);

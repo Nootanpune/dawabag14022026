@@ -195,9 +195,12 @@ export default function DetailsStep({
         />
       </Field>
 
-      <Field label="Referral code" optional>
-        <input {...register('referral_code')} placeholder="e.g. RAJA20" className="input uppercase" />
-      </Field>
+      {/* No referral scheme for doctors / hospitals (handover D22, Sprint 38; C-20) */}
+      {customerType !== 'doc_hospital' && (
+        <Field label="Referral code" optional>
+          <input {...register('referral_code')} placeholder="e.g. RAJA20" className="input uppercase" />
+        </Field>
+      )}
 
       <ConsentFields register={register} errors={errors} noticeLanguage={watch('notice_language')} />
 

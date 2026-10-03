@@ -12,7 +12,7 @@ let fakes;
 async function main() {
   fakes = await startFakes();
   await db.connect();
-  await db.query("SET dawabag.maintenance = 'on'");   // lets cleanup remove this run's audit rows
+  await db.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");   // lets cleanup remove this run's audit rows
   await cleanup();
   const ctx = await setup();
   try {

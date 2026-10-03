@@ -15,7 +15,7 @@ async function clearLists() {
   const c = db();
   await c.connect();
   try {
-    await c.query("SET dawabag.maintenance = 'on'");
+    await c.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
     await c.query(`DELETE FROM products WHERE sku = ANY($1)`, [[d.sku, d.sku2]]);
     await c.query(`DELETE FROM audit_logs WHERE action = 'product_category_merged' AND old_value->>'name' LIKE 'E2E S32 ${d.tag}%'`);
     await c.query(`DELETE FROM audit_logs WHERE new_value->>'name' LIKE 'E2E S32 ${d.tag}%' OR old_value->>'name' LIKE 'E2E S32 ${d.tag}%'

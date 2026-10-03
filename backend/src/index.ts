@@ -60,6 +60,7 @@ import medicineRoutes from './routes/medicines.routes';
 import infoPageRoutes from './routes/infoPages.routes';
 import reminderRoutes from './routes/reminders.routes';
 import healthProfileRoutes from './routes/healthProfile.routes';
+import salesStatusRoutes from './routes/salesStatus.routes';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
@@ -215,6 +216,7 @@ app.use(`${api}/medicines`, medicineRoutes);             // Sprint 33: product p
 app.use(`${api}/info-pages`, infoPageRoutes);           // Sprint 33: trust pages
 app.use(`${api}/reminders`, reminderRoutes);            // Sprint 33: "My medicines" dose reminders
 app.use(`${api}/health-profile`, healthProfileRoutes);  // Sprint 33: health profile (consent, C-41)
+app.use(`${api}/sales-status`, salesStatusRoutes);      // Sprint 38: emergency stop state (public)
 
 // ─── Error Handling ─────────────────────────────────────────────────────────
 app.use(notFound);

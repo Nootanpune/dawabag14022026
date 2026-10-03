@@ -15,7 +15,7 @@ async function main() {
   if (missing.length) throw new Error(`Run with the fake provider environment (eval "$(node test/fakes/fake-env.mjs)"); missing ${missing.join(', ')}`);
   fakes = await startFakes();
   await db.connect();
-  await db.query("SET dawabag.maintenance = 'on'");   // clean-up deletes final records; the API never sets this
+  await db.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");   // clean-up deletes final records; the API never sets this
   await cleanup();
   const ctx = await setup();
   try { await runTelemedicine(ctx); } finally { await cleanup(); }

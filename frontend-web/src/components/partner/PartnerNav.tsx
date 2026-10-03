@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Search, ListChecks, Truck, IndianRupee, Undo2, UploadCloud, Radio } from 'lucide-react';
+import { LayoutDashboard, Search, ListChecks, Truck, IndianRupee, Undo2, UploadCloud, Radio, BookLock } from 'lucide-react';
 import UrgentBadge from '@/components/stockFeed/UrgentBadge';
 import { usePartnerFeedAlerts } from '@/components/stockFeed/PartnerFeedAlert';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ const ITEMS = [
   { href: '/partner/stock-import', label: 'Upload stock', icon: UploadCloud },
   { href: '/partner/stock-feed', label: 'Live stock feed', icon: Radio },   // Sprint 37
   { href: '/partner/shipments', label: 'Shipments', icon: Truck },
+  { href: '/partner/h1-register', label: 'H1 register', icon: BookLock },   // Sprint 38 (C-09)
   { href: '/partner/returns', label: 'Returns', icon: Undo2 },
   { href: '/partner/settlements', label: 'Settlements', icon: IndianRupee },
 ];

@@ -63,6 +63,26 @@ export async function withTransaction<T>(
   }
 }
 
+const RETRYABLE = new Set(['40P01', '40001']);   // deadlock detected, serialisation failure
+
+/**
+ * A transaction that is run again (up to `attempts` times, after a short random pause)
+ * when PostgreSQL aborts it as a deadlock victim or for a serialisation conflict
+ * (Sprint 38: checkout vs. a partner's live stock snapshot). Only for callbacks whose
+ * effects are all inside the transaction.
+ */
+export async function withTransactionRetry<T>(callback: (client: PoolClient) => Promise<T>, attempts = 3): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await withTransaction(callback);
+    } catch (e) {
+      if (!RETRYABLE.has((e as any)?.code) || attempt >= attempts) throw e;
+      logger.warn(`Transaction retried after ${(e as any).code} (attempt ${attempt})`);
+      await new Promise((r) => setTimeout(r, 20 + Math.floor(Math.random() * 80 * attempt)));
+    }
+  }
+}
+
 export async function query<T = any>(
   text: string,
   params?: any[]

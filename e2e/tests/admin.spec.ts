@@ -56,7 +56,7 @@ test('an admin adds a category from the product form with Alt+C and sees Non-sch
     const c = db();
     await c.connect();
     try {
-      await c.query("SET dawabag.maintenance = 'on'");
+      await c.query("SET ROLE dawabag_maintenance; SET dawabag.maintenance = 'on'");
       await c.query(`DELETE FROM audit_logs WHERE action = 'product_category_created' AND new_value->>'name' = $1`, [name]);
       await c.query('DELETE FROM product_categories WHERE name = $1', [name]);
     } finally { await c.end(); }

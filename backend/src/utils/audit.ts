@@ -4,6 +4,7 @@
 import { PoolClient } from 'pg';
 import { query } from '../config/database';
 import { logger } from '../config/logger';
+import { AppError } from './AppError';
 
 export interface AuditEntry {
   userId: string | null;
@@ -32,11 +33,32 @@ export async function writeAuditTx(client: PoolClient, e: AuditEntry): Promise<v
   await client.query(SQL, params(e));
 }
 
-// Outside a transaction: never let a logging failure break the request, but say so.
+/** Raised when an audit entry could not be written (Sprint 38, C-46). */
+export class AuditWriteError extends AppError {
+  constructor(action: string) {
+    super(`This could not be recorded in the audit log (${action}). Please try again; if it keeps happening, tell the administrator.`,
+      503, true, 'AUDIT_WRITE_FAILED');
+  }
+}
+
+const RETRY_DELAYS_MS = [50, 250];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Outside a transaction. Sprint 38: an audit entry is never dropped silently — a
+// failed write is retried twice, then logged and thrown, so the request fails loudly
+// (C-46). Regulated actions belong in their transaction with writeAuditTx instead, and
+// callers that release data (e.g. the H1 export) write the entry before sending it.
 export async function writeAudit(e: AuditEntry): Promise<void> {
-  try {
-    await query(SQL, params(e));
-  } catch (err) {
-    logger.error(`Audit log write failed for ${e.action}: ${(err as Error).message}`);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await query(SQL, params(e));
+      return;
+    } catch (err) {
+      if (attempt >= RETRY_DELAYS_MS.length) {
+        logger.error(`Audit log write failed for ${e.action} after ${attempt + 1} attempts: ${(err as Error).message}`);
+        throw new AuditWriteError(e.action);
+      }
+      await sleep(RETRY_DELAYS_MS[attempt]);
+    }
   }
 }
