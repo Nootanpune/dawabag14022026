@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/otp_errors.dart';
 import '../../services/password_reset_api.dart' show codeSentText;
 import '../../services/registration_api.dart';
 import '../../widgets/otp_input.dart';
@@ -68,6 +69,14 @@ class _OTPScreenState extends ConsumerState<OTPScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      if (isSmsNotConfigured(e)) {
+        // Sprint 40: no code can arrive — back to password sign-in with the server's words
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(smsNotConfiguredMessage(e)), duration: const Duration(seconds: 8)),
+        );
+        context.go('/auth/login');
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(ApiService.errorMessage(e, fallback: 'Could not resend OTP')),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../services/api_service.dart';
+import '../../../services/otp_errors.dart';
 import '../../../services/password_reset_api.dart';
 import '../../../utils/password_policy.dart';
 import '../../../widgets/brand/auth_page.dart';
@@ -37,6 +38,9 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _busy = false;
   bool _show = false;
   String? _error;
+
+  /// Sprint 40: the server cannot send text messages, so offer password sign-in.
+  bool _smsOff = false;
   int _resendIn = 0;
   Timer? _timer;
 
@@ -76,6 +80,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _smsOff = false;
     });
     try {
       await apiService.sendPasswordResetOtp(_mobileNumber);
@@ -83,7 +88,17 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _startResendTimer();
       _go(ResetStep.otp);
     } catch (e) {
-      if (mounted) setState(() => _error = ApiService.errorMessage(e, fallback: 'Could not send the OTP'));
+      if (!mounted) return;
+      if (isSmsNotConfigured(e)) {
+        // No code can arrive: stay on (or go back to) the first step with the
+        // server's sentence and a way back to password sign-in
+        _timer?.cancel();
+        _resendIn = 0;
+        _smsOff = true;
+        _go(ResetStep.mobile, error: smsNotConfiguredMessage(e));
+      } else {
+        setState(() => _error = ApiService.errorMessage(e, fallback: 'Could not send the OTP'));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -130,7 +145,14 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _body() => switch (step) {
         ResetStep.mobile =>
-          ResetMobileStep(mobile: _mobile, formKey: _formKey, onSend: _sendOtp, busy: _busy, error: _error),
+          ResetMobileStep(
+            mobile: _mobile,
+            formKey: _formKey,
+            onSend: _sendOtp,
+            busy: _busy,
+            error: _error,
+            onSignIn: _smsOff ? () => context.go('/auth/login') : null,
+          ),
         ResetStep.otp => ResetOtpStep(
             mobile: _mobileNumber,
             otpKey: _otpKey,

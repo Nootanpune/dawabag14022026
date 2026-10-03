@@ -28,6 +28,8 @@ const kServerTypes = [
   'courier_rto', 'low_stock_digest', 'stock_feed_checks', 'stock_feed_stale',
   // Sprint 39
   'payment_authorised', 'payment_hold_expiring', 'pharmacist_registration_expiring', 'online_sale_status_changed',
+  // Sprint 40
+  'gdp_excursion', 'self_inspection_overdue', 'chain_break',
 ];
 
 /// Records each call; answers 200.

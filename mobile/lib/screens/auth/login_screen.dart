@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../config/password_gate.dart';
 import '../../config/theme.dart';
 import '../../services/api_service.dart';
+import '../../services/otp_errors.dart';
 import '../../services/registration_api.dart';
 import '../../utils/mobile_number.dart';
 import '../../widgets/brand/auth_page.dart';
@@ -17,6 +18,8 @@ enum LoginMethod { password, otp }
 /// Sign in (Sprint 35 DAWA BAG restyle after the owner's mock-up). Same flows
 /// as before: mobile + password (an unverified mobile is sent to the OTP
 /// screen), or mobile + OTP (POST /auth/send-otp, then /auth/verify-otp).
+/// Sprint 40: when the server cannot send text messages (SMS_NOT_CONFIGURED)
+/// its sentence is shown and the screen goes back to password sign-in.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -31,6 +34,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _showPassword = false;
   bool _sendingOtp = false;
   LoginMethod _method = LoginMethod.password;
+
+  /// The server's sentence when codes cannot be sent by text (Sprint 40).
+  String? _smsNotice;
 
   @override
   void dispose() {
@@ -82,7 +88,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await apiService.sendOtp(mobile);
       if (mounted) context.push('/auth/otp?mobile=$mobile');
     } catch (e) {
-      if (mounted) _showError(ApiService.errorMessage(e, fallback: 'Could not send the OTP'));
+      if (!mounted) return;
+      if (isSmsNotConfigured(e)) {
+        // No code can arrive: back to the password path, with the server's words
+        setState(() {
+          _smsNotice = smsNotConfiguredMessage(e);
+          _method = LoginMethod.password;
+        });
+      } else {
+        _showError(ApiService.errorMessage(e, fallback: 'Could not send the OTP'));
+      }
     } finally {
       if (mounted) setState(() => _sendingOtp = false);
     }
@@ -108,6 +123,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           onSelectionChanged: (s) => setState(() => _method = s.first),
         ),
         const SizedBox(height: 20),
+        if (_smsNotice != null && byPassword) ...[
+          SmsNotice(_smsNotice!),
+          const SizedBox(height: 16),
+        ],
         Form(
           key: _formKey,
           child: Column(
@@ -185,6 +204,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ],
     );
   }
+}
+
+/// The server's "text-message codes are not switched on" sentence, kept on
+/// screen above the password fields (Sprint 40).
+class SmsNotice extends StatelessWidget {
+  final String message;
+  const SmsNotice(this.message, {super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.info_outline, size: 20, color: Theme.of(context).colorScheme.onSecondaryContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message,
+                style: TextStyle(fontSize: 13.5, height: 1.35, color: Theme.of(context).colorScheme.onSecondaryContainer)),
+          ),
+        ]),
+      );
 }
 
 class _OrDivider extends StatelessWidget {

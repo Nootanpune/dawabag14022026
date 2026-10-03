@@ -23,6 +23,9 @@ the lawyer/CA sign-off.
 - Tests: jest 590 (gdp, productClass, selfInspection, trace rules; template supplier mapping); smoke 1–40 1955 checks (sprint40 123; sprint6 uses test/support/gdpHolds.mjs to release the excursion its >8 °C dispatch now logs); Playwright 139 passed / 4 skipped (with the S3 fake) incl. e2e/tests/sprint40.spec.ts (excursion queue, drill page, self-inspection, SMS notice).
 - App (mobile, NOT done): handle 503 SMS_NOT_CONFIGURED on send-otp (login by code + forgot password) by showing the server message instead of the code step; staff-only notification types gdp_excursion, self_inspection_overdue, chain_break (fall back gracefully); partner app none.
 
+- App (Sprint 40): send-otp 503 SMS_NOT_CONFIGURED → server sentence shown, back to password sign-in (login, OTP resend, forgot password); staff-only notification types gdp_excursion, self_inspection_overdue, chain_break. flutter 262 passed.
+- Stock connector (tools/stock-connector, docs/stock-connector.md): PowerShell 5.1 module + scheduled task on the partner's Windows server; uploads new MediVision exports to /partner-feed/:id/stock-snapshot; stateless (whoami), key in Windows Credential Manager, Event Log only; not yet run on Windows. MediVision Platinum runs on Nootan's LAN server 192.168.1.7 via Allied's app server (port 54322); database not reachable directly — owner asking Allied for scheduled export / read-only DB login / API.
+
 ## Sprint 39 — Rx before payment + authorise-then-capture, online-sale status, pharmacist registrations, partner provenance (2026-10-03, uncommitted)
 
 - Owner answers CONFIRMED 2026-10-03 built (DECISIONS rows 2026-10-03 "Prescription before payment…", "Online-sale status…", "Pharmacist registration validity…", "Partner batch provenance…"). Migration 34 (`34_sprint39_rx_capture_online_status_registrations.sql`).

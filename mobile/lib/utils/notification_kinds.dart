@@ -100,6 +100,12 @@ const Map<String, NotificationKind> kNotificationKinds = {
       NotificationTarget.staff),
   'online_sale_status_changed': NotificationKind(Icons.storefront_outlined, 'Product switched off for online sale',
       NotificationTarget.staff),
+  // Sprint 40: quality and record-integrity alerts for staff — handled on the website
+  'gdp_excursion': NotificationKind(Icons.thermostat_outlined, 'Batch on hold: cold-chain excursion',
+      NotificationTarget.staff),
+  'self_inspection_overdue': NotificationKind(Icons.fact_check_outlined, 'Self-inspection overdue',
+      NotificationTarget.staff),
+  'chain_break': NotificationKind(Icons.link_off, 'Record integrity break', NotificationTarget.staff),
 };
 
 NotificationKind notificationKind(String? type) => kNotificationKinds[type] ?? kUnknownNotification;

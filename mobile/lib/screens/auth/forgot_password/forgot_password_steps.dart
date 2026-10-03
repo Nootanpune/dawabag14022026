@@ -65,8 +65,17 @@ class ResetMobileStep extends StatelessWidget {
   final VoidCallback onSend;
   final bool busy;
   final String? error;
+
+  /// Shown as "Sign in with password" when codes cannot be sent (Sprint 40).
+  final VoidCallback? onSignIn;
   const ResetMobileStep(
-      {super.key, required this.mobile, required this.formKey, required this.onSend, required this.busy, this.error});
+      {super.key,
+      required this.mobile,
+      required this.formKey,
+      required this.onSend,
+      required this.busy,
+      this.error,
+      this.onSignIn});
 
   @override
   Widget build(BuildContext context) => Form(
@@ -98,7 +107,12 @@ class ResetMobileStep extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ResetError(error),
-            ResetButton('Send OTP', onSend, busy: busy),
+            if (onSignIn != null) ...[
+              ResetButton('Sign in with password', onSignIn),
+              const SizedBox(height: 12),
+              OutlinedButton(onPressed: busy ? null : onSend, child: const Text('Try sending the OTP again')),
+            ] else
+              ResetButton('Send OTP', onSend, busy: busy),
           ],
         ),
       );
