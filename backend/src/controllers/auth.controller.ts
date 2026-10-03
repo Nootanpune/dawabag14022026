@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import crypto from 'crypto';
 import { privacyNoticeRef } from '../services/policy.service';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { query, queryOne, withTransaction } from '../config/database';
-import { storeOTP, verifyOTP, blacklistToken } from '../config/redis';
+import { blacklistToken } from '../config/redis';
+import { checkOtp, otpSendLimitError, storeNewOtp, takeOtpSendSlot, TOO_MANY_WRONG_CODES } from '../services/otp/otp.service';
 import { generateTokens, issuedBeforePasswordChange, verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
 import { sendOTP } from '../services/sms.service';
 import { smsConfigured } from '../services/notifications/channels/sms';
@@ -253,10 +253,9 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       return userId;
     });
 
-    // Send OTP for mobile verification
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    await storeOTP(mobile, otp);
-    await sendOTP(mobile, otp);
+    // Send OTP for mobile verification (Sprint 41 review #2, #9: per-mobile send limit, OS random source)
+    const slot = await takeOtpSendSlot(mobile);
+    if (slot.ok) await sendOTP(mobile, await storeNewOtp(mobile));
 
     if (email) {
       await sendWelcomeEmail(email, full_name);
@@ -272,7 +271,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       message: 'Registration successful. Please verify your mobile number.',
       data: {
         mobile,
-        otp_sent: true,
+        otp_sent: slot.ok,
         customer_type,
         kyc_required: customer_type !== 'customer',
         required_documents: requiredDocuments,
@@ -288,8 +287,10 @@ export async function verifyMobileOTP(req: Request, res: Response, next: NextFun
   try {
     const { mobile, otp } = otpSchema.parse(req.body);
 
-    const isValid = await verifyOTP(mobile, otp);
-    if (!isValid) throw new AppError('Invalid or expired OTP', 400);
+    // Sprint 41 review #1: wrong codes count per mobile here too (five, then the code is gone)
+    const check = await checkOtp(mobile, otp);
+    if (check === 'too_many') throw new AppError(TOO_MANY_WRONG_CODES, 400);
+    if (check !== 'ok') throw new AppError('Invalid or expired OTP', 400);
 
     const user = await queryOne<{ id: string; role: string; customer_type: string; kyc_status: string }>(
       `UPDATE users SET mobile_verified = TRUE, updated_at = NOW()
@@ -382,9 +383,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     }
 
     if (!user.mobile_verified) {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      await storeOTP(mobile, otp);
-      await sendOTP(mobile, otp);
+      if ((await takeOtpSendSlot(mobile)).ok) await sendOTP(mobile, await storeNewOtp(mobile));
       throw new AppError('Mobile not verified. OTP sent.', 403);
     }
 
@@ -481,6 +480,10 @@ export async function sendLoginOTP(req: Request, res: Response, next: NextFuncti
     // Sprint 40: no SMS provider (e.g. the trial) → say so plainly instead of "code sent".
     // The same answer for every number, so it reveals nothing about who has an account.
     if (!smsConfigured()) throw new AppError(SMS_NOT_CONFIGURED_MESSAGE, 503, true, 'SMS_NOT_CONFIGURED');
+    // Sprint 41 review #2: a limit per mobile, counted before the account lookup (so it
+    // says nothing about who has an account) — no SMS flooding or SMS bill through this form
+    const slot = await takeOtpSendSlot(mobile);
+    if (!slot.ok) throw otpSendLimitError(slot.retryAfterS);
 
     // Same answer, at the same speed, whether or not the mobile is registered (Sprint 35:
     // sign-in by OTP and "Forgot password" use this; it must not tell anyone which
@@ -490,8 +493,7 @@ export async function sendLoginOTP(req: Request, res: Response, next: NextFuncti
       [mobile]
     );
     if (user) {
-      const otp = crypto.randomInt(100000, 1000000).toString();
-      await storeOTP(mobile, otp);
+      const otp = await storeNewOtp(mobile);
       setImmediate(() => { sendOTP(mobile, otp).catch((e) => logger.warn(`OTP SMS failed: ${(e as Error).message}`)); });
     }
 

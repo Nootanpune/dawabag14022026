@@ -6,6 +6,8 @@
 // break. Each run appends the new heads (number + hash) to chain_heads (append-only),
 // and any break alerts every admin at once.
 import { query, queryOne } from '../../config/database';
+import { getRedis } from '../../config/redis';
+import { AppError } from '../../utils/AppError';
 import { getSetting } from '../settings.service';
 import { writeAudit } from '../../utils/audit';
 import { queueNotification } from '../notification.service';
@@ -58,7 +60,20 @@ export async function headProblem(chain: string, prev: { last_no: number; head_h
   return null;
 }
 
+/**
+ * Sprint 41 review #12: one chain check at a time (each walks every chain): a second request
+ * while one runs is answered 409 instead of starting another walk.
+ */
 export async function runChainVerify(opts: { source: 'job' | 'manual'; userId?: string | null } = { source: 'job' }) {
+  const lock = 'chain_verify:running';
+  const r = getRedis();
+  if ((await r.set(lock, opts.source, 'EX', 900, 'NX')) === null) {
+    throw new AppError('A record-integrity check is already running; look again in a few minutes', 409, true, 'CHAIN_CHECK_RUNNING');
+  }
+  try { return await runChainVerifyOnce(opts); } finally { await r.del(lock); }
+}
+
+async function runChainVerifyOnce(opts: { source: 'job' | 'manual'; userId?: string | null }) {
   const keys = (await query<{ register_key: string }>(
     `SELECT DISTINCT register_key FROM h1_register WHERE register_key IS NOT NULL AND NOT chain_legacy
      UNION SELECT substr(chain, 4) FROM chain_heads WHERE chain LIKE 'h1:%' ORDER BY 1`)).map((r) => r.register_key);

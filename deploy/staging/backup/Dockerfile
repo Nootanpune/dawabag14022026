@@ -13,7 +13,7 @@ COPY backup/package.json backup/package-lock.json ./
 RUN --mount=type=secret,id=ca,required=false \
     if [ -f /run/secrets/ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/ca; fi; \
     npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
-COPY backup/lib.sh backup/backup.sh backup/s3.mjs ./
+COPY backup/lib.sh backup/backup.sh backup/s3.mjs backup/heads.sql ./
 COPY restore.sh /app/restore.sh
 RUN chmod +x /app/backup/backup.sh /app/restore.sh && pg_dump --version | grep -q ' 16\.'
 USER node

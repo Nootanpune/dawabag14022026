@@ -6,7 +6,8 @@
 #
 # Point DNS for WEB_DOMAIN and API_DOMAIN at the server first. Only ports 80 and 443
 # are open; the database and Redis are reachable only inside this stack. The API runs
-# in production mode and applies pending migrations on start. Production itself is the
+# in production mode; the one-shot `migrate` service applies pending migrations first, as
+# the database owner, and the API then connects as its own restricted login (Sprint 41). Production itself is the
 # AWS set-up in docs/RUNBOOK.md (RDS, ElastiCache, S3); this file is for staging.
 #
 # Trial server without AWS (deploy/trial/TRIAL.md): add `--profile objectstore` to run
@@ -45,7 +46,35 @@ services:
       timeout: 3s
       retries: 20
 
+  migrate:
+    # Sprint 41 (RUNBOOK §6): database migrations run here, once per start, as the database
+    # OWNER (dawabag_user = POSTGRES_USER), which also creates or corrects the API's own login
+    # DB_APP_LOGIN — a member of dawabag_app only — with DB_APP_PASSWORD. Then it exits and
+    # the API starts. The trial's demo seed runs here too (trial.sh seed / unseed): removing
+    # demo data needs the maintenance role, which only the owner may take.
+    image: dawabag-staging-api
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    restart: "no"
+    command: ["node", "dist/db/migrate.js"]
+    env_file: staging.env
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: dawabag
+      DB_USER: dawabag_user
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_APP_LOGIN: ${DB_APP_LOGIN:-dawabag_api}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in staging.env (deploy/trial/trial.sh derives it on the trial server)}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
   api:
+    image: dawabag-staging-api
     build:
       context: ../..
       dockerfile: backend/Dockerfile
@@ -57,13 +86,19 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: dawabag
-      DB_USER: dawabag_user
+      # Sprint 41: its own restricted login, never the owner — it cannot switch the record
+      # triggers off, take dawabag_maintenance or alter tables (C-34, C-46). The owner's
+      # DB_PASSWORD from staging.env is replaced here, so this container never holds it.
+      DB_USER: ${DB_APP_LOGIN:-dawabag_api}
+      DB_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in staging.env (deploy/trial/trial.sh derives it on the trial server)}
+      RUN_MIGRATIONS: "false"
       REDIS_URL: redis://redis:6379
       # One proxy (Caddy) in front: rate limits see the visitor's address
       TRUST_PROXY_HOPS: 1
       CORS_ORIGINS: https://${WEB_DOMAIN}
       PUBLIC_WEB_URL: https://${WEB_DOMAIN}
     depends_on:
+      migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 

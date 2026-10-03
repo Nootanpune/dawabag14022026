@@ -81,14 +81,23 @@ async function captureOrder(client: PoolClient, p: GatewayPayment, actor: string
     notify: { userId: order.user_id, type: 'payment_confirmed', orderId: pay.order_id, orderNumber: order.order_number, status } };
 }
 
+/** What applyCaptureTx leaves for after the commit (gateway refunds, notifications). */
+export type CaptureRecord = CaptureOutcome & { refundIds?: string[]; consultRefund?: string; notify?: any };
+
+/** Records a capture inside the caller's transaction (Sprint 41: the held-payment capture records it under the order lock). */
+export async function applyCaptureTx(client: PoolClient, p: GatewayPayment, actor: string | null = null): Promise<CaptureRecord> {
+  if (await activateMandateFromCapture(client, p)) return { kind: 'mandate' as const, outcome: p.token_id ? 'mandate authorised' : 'authorisation without token' };
+  return (await captureConsultation(client, p)) ?? (await captureOrder(client, p, actor)) ?? { kind: 'unknown' as const, outcome: 'not a Dawabag payment' };
+}
+
+/** After the transaction committed: refunds to the gateway and the buyer's notification. */
+export async function afterCapture(r: CaptureRecord): Promise<CaptureOutcome> {
+  if (r.refundIds?.length) await sendGatewayRefunds(r.refundIds);
+  if (r.consultRefund) await refundConsultationFee(r.consultRefund);
+  if (r.notify) await queueNotification(r.notify);
+  return { kind: r.kind, outcome: r.outcome, orderId: r.orderId };
+}
+
 export async function applyCapture(p: GatewayPayment, actor: string | null = null): Promise<CaptureOutcome> {
-  const r = await withTransaction(async (client) => {
-    if (await activateMandateFromCapture(client, p)) return { kind: 'mandate' as const, outcome: p.token_id ? 'mandate authorised' : 'authorisation without token' };
-    return (await captureConsultation(client, p)) ?? (await captureOrder(client, p, actor)) ?? { kind: 'unknown' as const, outcome: 'not a Dawabag payment' };
-  });
-  const extra = r as any;
-  if (extra.refundIds?.length) await sendGatewayRefunds(extra.refundIds);
-  if (extra.consultRefund) await refundConsultationFee(extra.consultRefund);
-  if (extra.notify) await queueNotification(extra.notify);
-  return { kind: r.kind, outcome: r.outcome, orderId: extra.orderId };
+  return afterCapture(await withTransaction((client) => applyCaptureTx(client, p, actor)));
 }

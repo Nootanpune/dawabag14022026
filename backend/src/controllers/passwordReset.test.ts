@@ -3,18 +3,15 @@
 // code is spent, and a successful reset that ends every older session.
 const redisStore = new Map<string, string>();
 const fakeRedis = {
+  get: jest.fn(async (k: string) => redisStore.get(k) ?? null),
+  set: jest.fn(async (k: string, v: string) => { redisStore.set(k, v); return 'OK'; }),
   incr: jest.fn(async (k: string) => { const n = Number(redisStore.get(k) ?? 0) + 1; redisStore.set(k, String(n)); return n; }),
   expire: jest.fn(async () => 1),
-  del: jest.fn(async (k: string) => { redisStore.delete(k); return 1; }),
+  ttl: jest.fn(async () => 60),
+  del: jest.fn(async (k: string) => (redisStore.delete(k) ? 1 : 0)),
 };
-jest.mock('../config/redis', () => ({
-  getRedis: () => fakeRedis,
-  verifyOTP: jest.fn(async (mobile: string, otp: string) => {
-    if (redisStore.get(`otp:${mobile}`) !== otp) return false;
-    redisStore.delete(`otp:${mobile}`);
-    return true;
-  }),
-}));
+// The OTP service (Sprint 41) keeps codes and counters in Redis
+jest.mock('../config/redis', () => ({ getRedis: () => fakeRedis }));
 const sql: { text: string; params: unknown[] }[] = [];
 jest.mock('../config/database', () => ({
   queryOne: jest.fn(async (text: string, params: unknown[]) => {

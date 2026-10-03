@@ -3,10 +3,12 @@
 # (the deploy workflow calls it; you can too, e.g. in the DigitalOcean console:
 # `sudo -iu dawabag dawabag/deploy/trial/trial.sh status`).
 #
-#   trial.sh up          build and start everything (the API migrates the database on start)
+#   trial.sh up          build and start everything (the `migrate` service applies the migrations
+#                        as the database owner and makes the API's own login, then the API starts)
 #   trial.sh ready       wait until the API answers over HTTPS (up to 10 minutes)
 #   trial.sh seed        load / refresh the demo data (src/scripts/demoSeed.ts; refused unless APP_ENV=trial)
 #   trial.sh unseed      remove the demo data again (refused once demo accounts have orders)
+#   trial.sh dblogin     show the API's database login and its role membership (Sprint 41)
 #   trial.sh backup-once take a database backup now if the store has none yet
 #   trial.sh check       the staging checks: HTTPS, headers, CORS, closed ports, backup age
 #   trial.sh status      containers and disk
@@ -18,6 +20,17 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ENV_FILE="$ROOT/deploy/staging/staging.env"
 [ -f "$ENV_FILE" ] || { echo "No $ENV_FILE yet: run the GitHub workflow \"Deploy trial server\" first." >&2; exit 1; }
 val() { sed -n "s/^$1=//p" "$ENV_FILE" | tail -1 | tr -d '\r'; }
+# Sprint 41: the API connects as its own restricted login (RUNBOOK §6), made by the compose
+# service `migrate` with DB_APP_PASSWORD. A TRIAL_ENV generated before Sprint 41 has no such
+# line: then it is derived here from DB_PASSWORD (one-way; the same every run, never stored
+# or printed). Adding DB_APP_PASSWORD to TRIAL_ENV later simply replaces it on the next deploy.
+if [ -z "$(val DB_APP_PASSWORD)" ]; then
+  owner_pw="$(val DB_PASSWORD)"
+  [ -n "$owner_pw" ] || { echo "$ENV_FILE has no DB_PASSWORD" >&2; exit 1; }
+  DB_APP_PASSWORD="$(printf 'dawabag-api-login:%s' "$owner_pw" | sha256sum | cut -c1-48)"
+  export DB_APP_PASSWORD
+  unset owner_pw
+fi
 profile=()
 [ "$(val S3_ENDPOINT)" = "http://objectstore:9000" ] && profile=(--profile objectstore)
 dc() { docker compose "${profile[@]}" -f "$ROOT/deploy/staging/compose.yml" --env-file "$ENV_FILE" "$@"; }
@@ -49,8 +62,19 @@ case "${1:-}" in
     done
     echo "The API did not become ready in 10 minutes" >&2; dc ps -a; dc logs --tail 60 api caddy; exit 1
     ;;
-  seed) dc exec -T -e DEMO_SEED=true api node dist/scripts/demoSeed.js ;;
-  unseed) dc exec -T -e DEMO_SEED=true api node dist/scripts/demoSeed.js --remove ;;
+  # The demo seed runs as the database owner in the one-shot `migrate` container (removal
+  # needs the maintenance role; the API's own login is never given it — Sprint 41)
+  seed) dc run --rm --no-deps -T -e DEMO_SEED=true migrate node dist/scripts/demoSeed.js ;;
+  unseed) dc run --rm --no-deps -T -e DEMO_SEED=true migrate node dist/scripts/demoSeed.js --remove ;;
+  dblogin)
+    # Which login the API uses and what it may do (expects: dawabag_api, restricted)
+    dc exec -T postgres psql -U dawabag_user -d dawabag -Atc \
+      "SELECT r.rolname, r.rolsuper, r.rolcreaterole, string_agg(g.rolname, ',') FROM pg_roles r
+       LEFT JOIN pg_auth_members m ON m.member = r.oid LEFT JOIN pg_roles g ON g.oid = m.roleid
+       WHERE r.rolname = '${DB_APP_LOGIN:-dawabag_api}' GROUP BY 1, 2, 3"
+    dc logs --no-log-prefix migrate | tail -3
+    dc logs --no-log-prefix api | grep -m1 'PostgreSQL connected' || true
+    ;;
   backup-once)
     rc=0; dc exec -T backup /app/backup/backup.sh latest >/dev/null 2>&1 || rc=$?
     case $rc in
@@ -71,5 +95,5 @@ case "${1:-}" in
     "$0" up
     ;;
   down) dc down ;;
-  *) sed -n '2,20p' "$0"; exit 2 ;;
+  *) sed -n '2,17p' "$0"; exit 2 ;;
 esac

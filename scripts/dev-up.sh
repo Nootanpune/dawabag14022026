@@ -31,7 +31,7 @@ if ! psql "$DATABASE_URL" -qAtc 'SELECT 1' >/dev/null 2>&1; then
   as_postgres "psql -qAtc \"SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'\" | grep -q 1 || createdb -O $DB_USER $DB_NAME"
 fi
 
-say "Applying migrations"
+say "Applying migrations${DB_APP_LOGIN:+ (and the API login $DB_APP_LOGIN)}"
 (cd "$ROOT/backend" && [ -d node_modules ] || (cd "$ROOT/backend" && npm ci --no-audit --no-fund >/dev/null))
 (cd "$ROOT/backend" && MIGRATIONS_DIR="$ROOT/database" npx ts-node --transpile-only src/db/migrate.ts | tail -3)
 # Dawabag's own stock sells only under its licence register (Sprint 32, C-07): placeholder
@@ -45,6 +45,8 @@ fi
 say "Starting the API at $API_URL (log: ${API_LOG:=/tmp/dawabag-api.log})"
 cd "$ROOT/backend"
 # Fully detached from this script and its terminal: the script returns, the API keeps running
+# Sprint 41: as its own restricted login when DB_APP_LOGIN is set (created by the migration step above)
+if [ -n "${DB_APP_LOGIN:-}" ]; then export DB_USER="$DB_APP_LOGIN" DB_PASSWORD="$DB_APP_PASSWORD"; fi
 setsid nohup npx ts-node --transpile-only src/index.ts </dev/null >"$API_LOG" 2>&1 &
 disown
 cd "$ROOT"

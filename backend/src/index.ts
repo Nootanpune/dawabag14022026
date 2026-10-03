@@ -11,6 +11,7 @@ import 'dotenv/config';
 import { logger } from './config/logger';
 import { connectDB, getDB } from './config/database';
 import { checkEnv } from './config/env';
+import { loginPosture } from './db/appLogin';
 import { installProcessGuards } from './config/processGuards';
 import { connectRedis, getRedis } from './config/redis';
 import { startScheduler, stopScheduler } from './jobs/scheduler';
@@ -146,11 +147,13 @@ app.use(UPLOAD_PATHS, uploadLimiter);
 app.use(compression());
 app.use(cookieParser());
 // Keep the raw bytes for webhook signature checks (payment.controller handleWebhook)
-app.use(express.json({
-  limit: '10mb',
-  verify: (req, _res, buf) => { (req as express.Request & { rawBody?: Buffer }).rawBody = buf; },
-}));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Sprint 41 review #11: 1 MB for every JSON body (they are forms and lists), parsed before any
+// sign-in check; only a partner connector's full stock snapshot may be up to 10 MB (and that
+// path is limited per address above and per key in its route)
+const keepRaw = (req: express.Request, _res: express.Response, buf: Buffer) => { (req as express.Request & { rawBody?: Buffer }).rawBody = buf; };
+app.use('/api/v1/partner-feed', express.json({ limit: '10mb', verify: keepRaw }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb', verify: keepRaw }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // Access logs never carry an e-prescription check code
 // nor (Sprint 36) the query string of a partner-feed call: a misconfigured billing
 // program could put its API key there; it is refused, and never written to the log (C-44)
@@ -248,7 +251,15 @@ async function bootstrap() {
     }
 
     await connectDB();
-    logger.info('PostgreSQL connected');
+    // Sprint 41: which database login the API uses — its own restricted one (member of
+    // dawabag_app only) on every server; production refuses the owner (RUNBOOK §6, C-46)
+    const login = await loginPosture(getDB());
+    logger.info(`PostgreSQL connected as ${login.user}${login.restricted ? ' (restricted API login)' : ''}`);
+    if (!login.restricted) {
+      const msg = `The API connects as "${login.user}", not a restricted login in dawabag_app: record protections can be switched off by this login (RUNBOOK §6)`;
+      if (process.env.APP_ENV === 'production') throw new Error(msg);
+      logger.warn(`Config: ${msg}`);
+    }
 
     await connectRedis();
     logger.info('Redis connected');

@@ -5,7 +5,11 @@
 //
 //   node s3.mjs dump <key> -- pg_dump …   run the command, stream its stdout to <key>;
 //                                         the object appears only if the command exits 0
+//                                         (BACKUP_CHAIN_HEADS: JSON of the chain heads, stored in
+//                                         the object's metadata and as <key>.heads.json; Sprint 41)
 //   node s3.mjs get <key>                 object → stdout
+//   node s3.mjs heads <key>               the chain heads recorded with that backup, checked
+//                                         against the checksum in the dump's metadata
 //   node s3.mjs latest                    newest backup: "<key>\t<last-modified epoch s>"
 //   node s3.mjs has <prefix>              exit 0 when any object starts with <prefix>
 //   node s3.mjs prune                     delete expired backups (only for stores
@@ -21,6 +25,7 @@
 // aws:kms with BACKUP_KMS_KEY_ID, or none for a store that rejects the header),
 // BACKUP_PART_MB (multipart part size, default 64; S3 needs at least 5).
 // Exit codes: 0 ok, 1 failure, 2 usage, 3 backup storage not configured, 4 no backup found.
+import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import {
@@ -74,7 +79,11 @@ async function dump(key, cmd) {
     child.on('error', (e) => { process.stderr.write(`s3: cannot start ${cmd[0]}: ${e.message}\n`); resolve(127); });
     child.on('close', (code, signal) => resolve(code ?? (signal ? 128 : 1)));
   });
-  const meta = { ContentType: 'application/octet-stream', Metadata: { source: 'dawabag-staging-backup' }, ...encryption() };
+  // Sprint 41: the chain heads read just before the dump (backup.sh, heads.sql) go into the
+  // object's metadata (audit head, number of H1 registers, SHA-256 of the full list) and, in
+  // full, into <key>.heads.json beside it — a copy of the heads outside the database (C-09, C-46)
+  const heads = chainHeads();
+  const meta = { ContentType: 'application/octet-stream', Metadata: { source: 'dawabag-staging-backup', ...(heads?.metadata ?? {}) }, ...encryption() };
   let uploadId, total = 0, buffered = [], size = 0;
   const parts = [];
   const sendPart = async (body) => {
@@ -106,7 +115,59 @@ async function dump(key, cmd) {
   // Read back what the store holds and compare with what was sent
   const head = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
   if (Number(head.ContentLength) !== total) fail(`stored size ${head.ContentLength} differs from ${total} bytes sent`);
-  process.stdout.write(`${total}\n`);
+  if (heads) {
+    try {
+      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: `${key}.heads.json`, Body: heads.text, ContentType: 'application/json',
+        Metadata: { source: 'dawabag-staging-backup', 'backup-key': key, 'chain-heads-sha256': heads.metadata['chain-heads-sha256'] }, ...encryption() }));
+    } catch (e) {
+      // The dump and its metadata (audit head + checksum) are stored; only the full list is missing
+      process.stderr.write(`s3: WARNING chain heads list not stored beside ${key}: ${e?.message || e}\n`);
+    }
+  }
+  process.stdout.write(`${total}${heads ? ` ${heads.summary}` : ''}\n`);
+}
+
+/** BACKUP_CHAIN_HEADS (JSON from heads.sql) → object metadata, the sidecar text and a log summary. */
+function chainHeads() {
+  const text = (process.env.BACKUP_CHAIN_HEADS ?? '').trim();
+  if (!text) return null;
+  let h;
+  try { h = JSON.parse(text); } catch { process.stderr.write('s3: WARNING BACKUP_CHAIN_HEADS is not JSON; stored without chain heads\n'); return null; }
+  const registers = Object.keys(h.h1 ?? {}).length;
+  const audit = h.audit ? `${h.audit.last_no}:${h.audit.head_hash}` : 'none';
+  return {
+    text,
+    metadata: {
+      'chain-heads-sha256': crypto.createHash('sha256').update(text).digest('hex'),
+      'chain-heads-taken-at': String(h.taken_at ?? ''),
+      'chain-audit-head': audit,
+      'chain-h1-registers': String(registers),
+    },
+    summary: `audit head ${h.audit ? h.audit.last_no : 'none'}, ${registers} H1 register head(s)`,
+  };
+}
+
+/** The chain heads recorded with a backup (Sprint 41): the sidecar, checked against the dump's metadata. */
+async function heads(key) {
+  if (!key) fail('usage: heads <backup key>', 2);
+  const s3 = client();
+  const dumpHead = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+  const want = dumpHead.Metadata?.['chain-heads-sha256'];
+  if (!want) fail(`${key} was stored without chain heads (a backup from before Sprint 41)`, 4);
+  let text;
+  try {
+    const out = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: `${key}.heads.json` }));
+    text = await out.Body.transformToString();
+  } catch {
+    // Only the metadata: the audit head is still checkable
+    const a = dumpHead.Metadata?.['chain-audit-head'] ?? 'none';
+    const [last_no, head_hash] = a.split(':');
+    process.stdout.write(`${JSON.stringify({ partial: true, audit: a === 'none' ? null : { last_no: Number(last_no), head_hash }, h1: {} })}\n`);
+    return;
+  }
+  const got = crypto.createHash('sha256').update(text.trim()).digest('hex');
+  if (got !== want) fail(`the chain heads beside ${key} do not match the checksum stored with the dump (changed after the backup?)`, 1);
+  process.stdout.write(`${text.trim()}\n`);
 }
 
 async function get(key) {
@@ -176,7 +237,7 @@ async function ensureBucket() {
 const [command, arg, ...rest] = process.argv.slice(2);
 const commands = {
   dump: () => dump(arg, rest[0] === '--' ? rest.slice(1) : rest),
-  get: () => get(arg), latest, has: () => has(arg), prune, 'ensure-bucket': ensureBucket,
+  get: () => get(arg), latest, has: () => has(arg), prune, 'ensure-bucket': ensureBucket, heads: () => heads(arg),
 };
-if (!commands[command]) fail('usage: s3.mjs dump|get|latest|has|prune|ensure-bucket …', 2);
+if (!commands[command]) fail('usage: s3.mjs dump|get|latest|has|prune|ensure-bucket|heads …', 2);
 commands[command]().catch((e) => fail(e?.name === 'NoSuchKey' ? `no such object: ${arg}` : (e?.message || String(e))));

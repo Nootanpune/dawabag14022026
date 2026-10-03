@@ -38,13 +38,19 @@ run_backup() {
     tier=monthly
   fi
   key="${PREFIX}${tier}/$ym/${PGDATABASE}-${stamp}.dump"
+  # Sprint 41: the H1 register and audit-log chain heads, read just before the dump, are kept
+  # with the backup (object metadata + <key>.heads.json) — a copy outside the database for the
+  # restore drill (RUNBOOK §6). A database without the chains (older) is backed up without them.
+  local heads=""
+  heads="$(q "$PGDATABASE" -f "$(dirname "$0")/heads.sql" 2>/dev/null)" \
+    || { log "WARNING: chain heads not readable (database before migration 35?); backing up without them"; heads=""; }
   started=$(date +%s)
   log "starting pg_dump of $PGDATABASE@$PGHOST to $key"
-  if ! bytes="$(s3 dump "$key" -- pg_dump --format=custom --compress=6 --no-password "$PGDATABASE")"; then
+  if ! bytes="$(BACKUP_CHAIN_HEADS="$heads" s3 dump "$key" -- pg_dump --format=custom --compress=6 --no-password "$PGDATABASE")"; then
     log "BACKUP FAILED: $PGDATABASE to $key — see the lines above; no object was stored"
     return 1
   fi
-  log "backup ok: $key ($bytes bytes, $(( $(date +%s) - started )) s, $tier)"
+  log "backup ok: $key (${bytes%% *} bytes, $(( $(date +%s) - started )) s, $tier${heads:+; chain heads: ${bytes#* }})"
   if [ "${BACKUP_PRUNE:-false}" = true ]; then
     s3 prune >&2 || log "WARNING: pruning old backups failed (the backup itself is stored)"
   fi

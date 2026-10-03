@@ -70,7 +70,9 @@ export async function removeDemoData() {
       // Sprint 40
       ['products', 'new_drug_confirmed_by'], ['gdp_records', 'recorded_by'], ['gdp_records', 'pharmacist_user_id'],
       ['self_inspection_templates', 'created_by'], ['self_inspection_templates', 'updated_by'], ['corrective_action_events', 'changed_by'],
-      ['chain_heads', 'recorded_by']] as const) {
+      ['chain_heads', 'recorded_by'],
+      // Sprint 41: a job a demo admin ran by hand (Admin → Jobs) kept the admin as its trigger
+      ['job_runs', 'triggered_by']] as const) {
       await q(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ANY($1)`, [users]);
     }
     // Sprint 40: drills a demo admin ran on other products, and self-inspections by demo staff (with their actions)

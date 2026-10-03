@@ -10,6 +10,10 @@ export PORT="${PORT:-4000}"
 export DB_HOST="${DB_HOST:-127.0.0.1}" DB_PORT="${DB_PORT:-5432}"
 export DB_NAME="${DB_NAME:-dawabag}" DB_USER="${DB_USER:-dawabag_user}" DB_PASSWORD="${DB_PASSWORD:-dawabag_dev_only}"
 export DATABASE_URL="${DATABASE_URL:-postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME}"
+# Sprint 41: the API runs as its own restricted login (member of dawabag_app only), as on the
+# trial / staging servers: DB_USER above is the owner for migrations and the test suites;
+# dev-up.sh and the suites' extra APIs connect as DB_APP_LOGIN (RUNBOOK §6)
+export DB_APP_LOGIN="${DB_APP_LOGIN:-dawabag_api}" DB_APP_PASSWORD="${DB_APP_PASSWORD:-dawabag_api_dev_only_0000}"
 export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 export API_URL="${API_URL:-http://localhost:$PORT}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:3000}"
@@ -24,6 +28,8 @@ fi
 # Generous limits: the smoke suites sign in and verify many times
 export AUTH_RATE_LIMIT_MAX="${AUTH_RATE_LIMIT_MAX:-5000}" RATE_LIMIT_MAX="${RATE_LIMIT_MAX:-50000}" VERIFY_RATE_LIMIT_MAX="${VERIFY_RATE_LIMIT_MAX:-1000}"
 export UPLOAD_RATE_LIMIT_MAX="${UPLOAD_RATE_LIMIT_MAX:-5000}"
+# Sprint 41: sign-in codes per mobile (production default: one per 30 s, five an hour)
+export OTP_SEND_MIN_GAP_SECONDS="${OTP_SEND_MIN_GAP_SECONDS:-0}" OTP_SENDS_PER_HOUR="${OTP_SENDS_PER_HOUR:-1000}"
 export DISABLE_SCHEDULER="${DISABLE_SCHEDULER:-true}"
 _dawabag_root="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 if [ -z "${FAKE_PROVIDERS_PORT:-}" ]; then

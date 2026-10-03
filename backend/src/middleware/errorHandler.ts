@@ -12,6 +12,10 @@ const REDACTED_FIELDS = new Set([
   'allergies', 'conditions', 'current_medicines', 'medicine_name', 'dose', 'full_name',
   // Sprint 34 review: licence numbers in the newer licence rows, relationship and age of family members
   'licence_number', 'relationship', 'age_years',
+  // Sprint 41 review: personal details added in Sprints 35–40 (prescriber and patient addresses
+  // for the H1 register, registration numbers, supplier licences and bills, partner snapshot lines)
+  'prescriber_address', 'prescriber_name', 'prescriber_reg_no', 'patient_address', 'registration_no', 'pharmacist_reg_no',
+  'supplier_licence', 'supplier_licence_no', 'supplier_invoice_no', 'justification', 'close_out_note',
 ]);
 
 /**

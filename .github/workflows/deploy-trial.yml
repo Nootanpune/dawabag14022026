@@ -78,6 +78,20 @@ jobs:
           if printf '%s\n' "$TRIAL_ENV" | grep -v '^#' | grep -qi 'change-me'; then
             echo "::error::TRIAL_ENV still has change-me values — use the output of deploy/trial/make-trial-env.sh"; exit 1
           fi
+          # Sprint 41: the API's own database login. Optional (an older TRIAL_ENV keeps working:
+          # trial.sh derives it from DB_PASSWORD on the server); when present it must be usable.
+          app_pw="$(val DB_APP_PASSWORD)"
+          if [ -z "$app_pw" ]; then
+            echo "::notice::TRIAL_ENV has no DB_APP_PASSWORD: the server derives the API's database password from DB_PASSWORD. To set your own, add one line DB_APP_PASSWORD=<48 random hex characters> to the TRIAL_ENV secret (deploy/trial/TRIAL.md)."
+          else
+            if [ ${#app_pw} -lt 16 ] || ! [[ "$app_pw" =~ ^[!-~]+$ ]]; then
+              echo "::error::TRIAL_ENV DB_APP_PASSWORD must be at least 16 printable characters without spaces (e.g. 48 random hex characters)"; exit 1
+            fi
+            if [ "$app_pw" = "$(val DB_PASSWORD)" ]; then
+              echo "::error::TRIAL_ENV DB_APP_PASSWORD must differ from DB_PASSWORD (the API must not hold the owner's password)"; exit 1
+            fi
+          fi
+          unset app_pw
           if [[ "$(val RAZORPAY_KEY_ID)" == rzp_live_* ]]; then
             echo "::error::A trial must use Razorpay TEST keys (rzp_test_…), never live keys"; exit 1
           fi
@@ -142,7 +156,7 @@ jobs:
         if: env.RESET_DATA == 'true'
         run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh reset'
 
-      - name: Build and start (the API applies database migrations on start)
+      - name: Build and start (the migrate service applies database migrations as the owner, then the API starts as its own login)
         run: ssh -F "$SSH_DIR/config" trial 'bash dawabag/deploy/trial/trial.sh up'
 
       - name: Wait until the API is ready over HTTPS

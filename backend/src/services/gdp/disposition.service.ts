@@ -17,11 +17,13 @@ import { DispositionInput, Disposition, dispositionProblems } from './rules';
 
 type Actor = { kind: 'staff'; userId: string; role: string } | { kind: 'partner'; userId: string; partnerId: string; vendorPharmacistId: string };
 
-async function lockExcursion(c: PoolClient, excursionId: string) {
+async function lockExcursion(c: PoolClient, excursionId: string, actor: Actor) {
   const ex = (await c.query(
     `SELECT r.id, r.event_kind, r.cold_chain, r.batch_id, r.partner_inventory_id, r.partner_id, r.batch_number, p.name AS product_name
      FROM gdp_records r JOIN products p ON p.id = r.product_id WHERE r.id = $1`, [excursionId])).rows[0];
   if (!ex || ex.event_kind !== 'excursion') throw new AppError('Excursion not found', 404);
+  // Sprint 41 review: another partner's excursion is "not found" BEFORE anything is locked or said about it
+  if (actor.kind === 'partner' && (ex.partner_id !== actor.partnerId || !ex.partner_inventory_id)) throw new AppError('Excursion not found', 404);
   // One decision at a time per batch
   if (ex.batch_id) await c.query(`SELECT id FROM inventory_batches WHERE id = $1 FOR UPDATE`, [ex.batch_id]);
   else await c.query(`SELECT id FROM partner_inventory WHERE id = $1 FOR UPDATE`, [ex.partner_inventory_id]);
@@ -54,7 +56,7 @@ export async function decideExcursion(actor: Actor, excursionId: string, input: 
   const disposition = input.disposition as Disposition;
   const justification = String(input.justification).trim();
   return withTransaction(async (c) => {
-    const ex = await lockExcursion(c, excursionId);
+    const ex = await lockExcursion(c, excursionId, actor);
     const ph = await pharmacistOf(c, actor, ex);
     let adjustment: { id: string; adjustment_no: string } | null = null;
     if (disposition === 'destroy' && ex.batch_id) {

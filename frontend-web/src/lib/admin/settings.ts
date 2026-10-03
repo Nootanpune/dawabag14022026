@@ -63,6 +63,9 @@ export const SETTING_KINDS: Record<string, SettingMeta> = {
     ],
   },
   'courier.pickup_location': { kind: 'text', label: 'Shiprocket pickup location', hint: 'The pickup location name exactly as set up in Shiprocket' },
+  // Sprint 41 — approved cold-chain couriers (URS-105, C-25): checked at every dispatch of a refrigerated parcel
+  'delivery.cold_chain_couriers': { kind: 'text', label: 'Approved cold-chain couriers', nullable: true,
+    hint: 'Names separated by commas, as staff and partners type them at dispatch (own riders: "Dawabag rider"). A refrigerated parcel leaves only with one of these. Leave blank to allow any courier.' },
   // Sprint 9 — GST e-invoicing (C-31): changes when B2B parcels may be dispatched
   'einvoice.enabled': {
     kind: 'boolean',

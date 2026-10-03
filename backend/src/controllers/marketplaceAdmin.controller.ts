@@ -135,6 +135,9 @@ const SETTING_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'returns.expiry_claim_days': z.number().int().min(7).max(90),
   'returns.near_expiry_days': z.number().int().min(30).max(365),
   'delivery.handover_code_scope': z.enum(['rx_only', 'all', 'off']),
+  // Sprint 41 — approved cold-chain couriers, names separated by commas (null = not enforced; URS-105, C-25)
+  'delivery.cold_chain_couriers': z.string().trim().max(500).regex(/^[^<>]*$/, 'Plain names only').nullable()
+    .transform((v) => (v ? v : null)),
   // Sprint 20 — retail free delivery from this many paise (null = off)
   'delivery.free_above_paise': z.number().int().min(0).max(10_000_000).nullable(),
   // Sprint 4 — public legal details (C-03, C-04, C-36)

@@ -16,6 +16,14 @@ describe('error log redaction', () => {
     expect(out).toContain('"form":"dl20"');
     expect(out).toContain('08:00');
   });
+  it('blanks the personal details added in Sprints 35–40 (Sprint 41 review)', () => {
+    const out = JSON.stringify(redact({
+      prescriber_name: 'Dr Kale', prescriber_address: '39 College Road', prescriber_reg_no: 'MMC-77', patient_address: '12 Lake Road',
+      items: [{ supplier_licence: 'MH-SUP-1', supplier_invoice_no: 'INV-9' }], registration_no: 'MSPC-1', disposition: 'release',
+    }));
+    for (const secret of ['Dr Kale', 'College Road', 'MMC-77', 'Lake Road', 'MH-SUP-1', 'INV-9', 'MSPC-1']) expect(out).not.toContain(secret);
+    expect(out).toContain('"disposition":"release"');
+  });
   it('leaves plain values alone and stops at a sane depth', () => {
     expect(redact('text')).toBe('text');
     let deep: any = { v: 1 };

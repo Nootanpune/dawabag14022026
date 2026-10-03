@@ -9,7 +9,7 @@ the Compliance Rulebook (C-xx).
 
 | Piece | Image / source | Notes |
 | --- | --- | --- |
-| API | `backend/Dockerfile` (build from repo root) | Node 20, port 4000, applies DB migrations on start |
+| API | `backend/Dockerfile` (build from repo root) | Node 20, port 4000; on staging / trial a one-shot `migrate` container (same image) applies DB migrations as the owner first, then the API connects as its own restricted login (Sprint 41) |
 | Website | `frontend-web/Dockerfile` | Next.js standalone, port 3000; `NEXT_PUBLIC_API_URL` is baked in at build |
 | Database | PostgreSQL 16 (AWS RDS, ap-south-1) | the only record of truth |
 | Cache / queues | Redis 7 (ElastiCache) | OTPs, rate limits, job locks — nothing that must survive |
@@ -53,6 +53,11 @@ press Retry, or refund by bank transfer and mark it processed with the UTR. The 
 lines — fees, GST on fees, UTR — to Dawabag's payments and refunds and flags anything
 missing or different. Before going live, run one real ₹1 payment, refund and mandate in
 Razorpay test mode.
+
+**Sign-in codes (Sprint 41).** At most one code per mobile every `OTP_SEND_MIN_GAP_SECONDS`
+(30) and `OTP_SENDS_PER_HOUR` (5) — 429 `OTP_SEND_LIMIT` with a plain wait, the same for every
+number; five wrong codes (sign-in by code and "Forgot password" together) throw the code away.
+JSON bodies are limited to `JSON_BODY_LIMIT` (1 MB) except the partner stock feed (10 MB).
 
 **SMS (MSG91, DLT).** Indian operators deliver only templates registered on DLT
 (TRAI). Register each message in the DLT portal and MSG91, then map it in Admin →
@@ -171,8 +176,12 @@ Local run of the whole stack: `docker compose up -d --build` (see `docker-compos
 
 `database/NN_*.sql` are applied in order, once each, by `backend/src/db/migrate.ts`
 (recorded in `schema_migrations` with a checksum; an edited applied file is reported,
-never re-run). The API container runs it before starting (`RUN_MIGRATIONS=false` to
-skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
+never re-run). On staging / trial the compose service `migrate` runs it as the database
+owner before the API starts (the API runs with `RUN_MIGRATIONS=false`); with
+`DB_APP_LOGIN` / `DB_APP_PASSWORD` set it then creates or corrects the API's own login
+(section 6, "Database roles"). Without compose the API image still runs it before
+starting unless `RUN_MIGRATIONS=false`. By hand: `npm run build && npm run db:migrate`
+(`-- --status` to list).
 
 - **New database:** nothing to do — all migrations run.
 - **A database created before the runner existed** (first-boot SQL, up to 08):
@@ -209,14 +218,36 @@ skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
   `BEGIN; SET LOCAL ROLE dawabag_maintenance; SET LOCAL dawabag.maintenance = 'on'; …; COMMIT;`
   and an entry in the incident register. Repairs to the H1 register or the audit log
   break their hash chains — the integrity check will report it (that is the point).
-- **Database roles.** Migration 33 creates `dawabag_app` (NOLOGIN; SELECT / INSERT /
-  UPDATE / DELETE on every table, sequences, and EXECUTE on the purge function) and
-  `dawabag_maintenance`. Today the API connects as the owner (`POSTGRES_USER`), which
-  can still switch triggers off; to close that, run migrations as the owner and the API
-  as a separate login: `CREATE ROLE dawabag_api LOGIN PASSWORD '…' IN ROLE dawabag_app;`
-  then set `DB_USER=dawabag_api` for the API only (keep the owner for `db:migrate`).
-  Check it on staging first (the smoke suite's probe login already works with exactly
-  these privileges).
+- **Database roles (Sprint 38; the API's own login since Sprint 41).** Migration 33 creates
+  `dawabag_app` (NOLOGIN; SELECT / INSERT / UPDATE / DELETE on every table, sequences, and
+  EXECUTE on the purge function) and `dawabag_maintenance`. **Migrations run as the owner**
+  (`POSTGRES_USER` = `dawabag_user`, with `DB_PASSWORD`) in the one-shot compose service
+  `migrate`; the same run creates or corrects **the API's login** `DB_APP_LOGIN` (default
+  `dawabag_api`) with `DB_APP_PASSWORD`: LOGIN, not a superuser, cannot create roles or
+  databases, member of `dawabag_app` only (any other membership is revoked), the password sent
+  as a SCRAM verifier (`backend/src/db/appLogin.ts`). It also re-grants `dawabag_app`'s
+  privileges and gives the purge function back to `dawabag_maintenance` — so it repairs a
+  database restored without privileges. **The API connects only as that login** (compose
+  replaces `DB_PASSWORD` for the API, so the API container never holds the owner's password).
+  The API, its scheduler and its Bull queues (one process) all use it; it cannot
+  `ALTER TABLE … DISABLE TRIGGER`, `TRUNCATE` a register, `SET ROLE dawabag_maintenance` or
+  create objects. The API logs `PostgreSQL connected as dawabag_api (restricted API login)`;
+  otherwise it warns, Admin → dashboard shows `DB_LOGIN_NOT_RESTRICTED`, and with
+  `APP_ENV=production` it refuses to start. Check on a server: `deploy/trial/trial.sh dblogin`.
+  - **Demo seed / removal** run as the owner in the `migrate` container
+    (`trial.sh seed` / `unseed`: `docker compose … run --rm --no-deps -e DEMO_SEED=true migrate
+    node dist/scripts/demoSeed.js [--remove]`) — removal needs the maintenance role.
+  - **Retention purge** (job `retention_purge`) runs in the API as the restricted login; it
+    deletes prescriptions only through `dawabag_purge_prescriptions` (SECURITY DEFINER, owned
+    by `dawabag_maintenance`).
+  - **Passwords:** `DB_PASSWORD` (owner) and `DB_APP_PASSWORD` (API) — at least 16 printable
+    characters, different. On the trial, a `TRIAL_ENV` without `DB_APP_PASSWORD` still deploys:
+    `trial.sh` derives it from `DB_PASSWORD` (one-way SHA-256, never stored or printed). To
+    choose one: add `DB_APP_PASSWORD=<openssl rand -hex 24>` to the settings (TRIAL_ENV secret
+    or `staging.env`) and deploy; the `migrate` service sets the new password before the API
+    starts. Production (RDS): the same split — the RDS master user runs `db:migrate` with
+    `DB_APP_LOGIN` / `DB_APP_PASSWORD`, the API task gets `DB_USER=dawabag_api` and that
+    password only.
 - **Hash chains (C-09, C-46).** The H1 register (one chain per seller licence, numbered
   1, 2, 3 …) and the audit log (one chain) are sealed when each transaction commits.
   Admin → Record integrity (or `GET /fulfilment/h1-register/verify`,
@@ -225,8 +256,10 @@ skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
   chain and records each chain's head (last number + hash) in the append-only table
   `chain_heads`; the next run checks that the old head is still there unchanged, so
   removing the newest entries is caught too. Admin → Record integrity shows the latest
-  heads and can run the check now. Still note the latest audit head with the monthly
-  backup (a copy outside the database).
+  heads and can run the check now (one check at a time). **Sprint 41:** every backup
+  records the heads too — the audit head and each H1 register's last entry and hash, read
+  just before `pg_dump` — in the dump's object metadata and as `<key>.heads.json` beside it
+  (a copy outside the database; `restore.sh` checks them, "Restore drill" below).
 - **Chain break (alert `chain_break`).** Every admin is told at once. Do not "fix" rows:
   keep the database as it is, take a snapshot, open an incident (Admin → Security
   incidents, C-43), compare with the last backup and the recorded heads to find what was
@@ -235,6 +268,35 @@ skip). By hand: `npm run build && npm run db:migrate` (`-- --status` to list).
   chain; use it only after a documented restore that legitimately restarted a chain (and
   in test databases whose clean-ups delete rows) — it is a super-admin settings change,
   audited, and shown on the integrity page.
+- **Restore drill (Sprint 41; with the quarterly restore test, section 7c).**
+  1. `deploy/staging/restore.sh latest` (or a monthly key) on the server. Besides the row
+     counts and the last migration it now prints `chain heads  N recorded with the backup, all
+     present and unchanged`: the heads recorded with that backup (`s3.mjs heads <key>`,
+     checked against the SHA-256 stored in the dump's metadata) must all be in the restored
+     database with the same hash. `RESTORE FAILED: chain head …` or "do not match the
+     backup's checksum" is an incident (C-43): keep both, do not restore that copy.
+     A backup from before Sprint 41 has no heads (a warning); compare by hand with Admin →
+     Record integrity.
+  2. Live restore only after written approval and an incident entry: stop the API
+     (`docker compose … stop api`), `restore.sh <key> --into-live`, then `trial.sh up` (or
+     `docker compose … up -d`): the `migrate` service runs first and restores the API
+     login, `dawabag_app`'s privileges and the purge function's owner (the dump is restored
+     without owners / privileges), then the API starts. `trial.sh dblogin` shows the login.
+  3. Admin → Record integrity → run the check. On a restored database the chains are
+     intact up to the backup's heads, but the `chain_heads` rows recorded **after** the
+     backup (by the nightly job on the old database) are not in it; `chain_heads` from before
+     the backup are, and they match. If entries were made after the backup and are lost, the
+     check is still clean (they are simply not there) — record in the incident which numbers
+     were lost (from the old database or the last recorded heads), and the new entries
+     continue from the restored head.
+  4. `integrity.chain_start` — only when a chain legitimately restarts (e.g. a register
+     re-created from paper records after a disaster, or a test database whose clean-ups
+     delete rows). It is not editable through the API (deliberately: no super-admin can move a
+     chain's start past a break); the operator sets it as the owner, with written approval,
+     and writes an audit entry in the same transaction:
+     `BEGIN; INSERT INTO app_settings (key, value, description) VALUES ('integrity.chain_start', '{"audit": 2823}', 'Set after restore of <key>, incident <no>') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW(); INSERT INTO audit_logs (action, new_value, notes) VALUES ('integrity_chain_start_set', '{"audit": 2823}', 'restore of <key>; incident <no>; approved by <name>'); COMMIT;`
+     The value shows on Admin → Record integrity and is recorded with every later backup.
+  5. Log the drill (date, backup key, counts, heads found, time taken) in the ops log.
 - **Prescription retention (Sprint 38).** Each prescription has `retain_until` = its last
   dispense + `retention.prescription_years` (owner confirmed 3). Purging is OFF until
   the owner switches `retention.prescription_purge` on; then the retention job deletes
@@ -435,10 +497,12 @@ ap-south-1) runs the whole stack from `deploy/staging/`:
 1. Install Docker; point DNS for the website and API names (e.g. `staging.dawabag.in`,
    `api-staging.dawabag.in`) at the server; open only ports 80 and 443.
 2. `cp deploy/staging/staging.env.example deploy/staging/staging.env` and fill it in
-   (long random `DB_PASSWORD` and JWT secrets; test-mode Razorpay/MSG91 keys). The file
-   stays on the server only (git ignores it).
+   (long random `DB_PASSWORD`, a different `DB_APP_PASSWORD` for the API's own database
+   login, JWT secrets; test-mode Razorpay/MSG91 keys). The file stays on the server only
+   (git ignores it).
 3. `docker compose -f deploy/staging/compose.yml --env-file deploy/staging/staging.env up -d --build`
-   — Caddy obtains HTTPS certificates by itself; the API migrates the database on start.
+   — Caddy obtains HTTPS certificates by itself; the `migrate` service applies the
+   migrations as the owner and makes the API's login, then the API starts (section 6).
 4. `WEB_DOMAIN=… API_DOMAIN=… deploy/staging/check.sh` — HTTPS, redirects, HSTS, CORS,
    request ids, closed database port.
 5. Set the GitHub variable `MOBILE_API_URL=https://api-staging.dawabag.in` so test APKs
@@ -491,7 +555,9 @@ last migration applied (next to the live database's), and drops the check databa
 to the live database, asks you to type its name, then swaps the restored copy in and
 keeps the old one as `dawabag_pre_restore_<time>` — drop that by hand once the API is
 verified. Steps: `docker compose … stop api` → `deploy/staging/restore.sh <key> --into-live`
-→ `docker compose … start api` → `check.sh`.
+→ `docker compose … up -d` (the `migrate` service restores the API login and privileges
+first) → `check.sh`. Since Sprint 41 each backup carries its chain heads and the restore
+check verifies them (section 6, "Restore drill").
 
 **Quarterly restore test** (January, April, July, October; record the result in the
 ops log): `deploy/staging/restore.sh latest`, and once a year the oldest monthly backup
@@ -522,7 +588,8 @@ Bangalore droplet (4 GB), one bootstrap command, four GitHub secrets, one click.
   `OBJECTSTORE_KMS_KEY`, bucket created by `objectstore-init` (`s3.mjs ensure-bucket`),
   reachable from browsers only through Caddy at `FILES_DOMAIN` for signed GETs. Backups
   go to the same store (`BACKUP_PRUNE=true`).
-- Demo data: `node dist/scripts/demoSeed.js` in the API container (`trial.sh seed`),
+- Demo data: `node dist/scripts/demoSeed.js` in the one-shot `migrate` container, as the
+  database owner (`trial.sh seed`; Sprint 41 — the API's own login may not remove demo rows),
   refused unless `APP_ENV=trial` and `DEMO_SEED=true`; upserts by SKU (`DEMO-…`), mobile
   (`90000900xx`) and licence; `--remove` (`trial.sh unseed`) takes it out while no demo
   order exists. Locally: `APP_ENV=trial DEMO_SEED=true TRIAL_DEMO_PASSWORD=… npx ts-node

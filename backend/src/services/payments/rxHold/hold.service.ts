@@ -19,13 +19,19 @@ import { queueNotification } from '../../notification.service';
 import { moveOrderToFulfilment } from '../../paymentCapture.service';
 import { rxRequiredLines } from '../../rxGate.service';
 import { getRazorpay } from '../../razorpay.client';
-import { applyCapture, GatewayPayment } from '../capture.service';
+import { afterCapture, applyCaptureTx, CaptureRecord, GatewayPayment } from '../capture.service';
 import { isDemoPaymentId } from '../paymentMode';
 import {
   DEFAULT_RX_HOLD, HOLD_WORDING, Readiness, RxHoldSettings, authorisationGone, captureReadiness, holdAction, holdTimes, parseRxHoldSettings,
 } from './rules';
 
 type Q = Pick<PoolClient, 'query'>;
+
+const GATEWAY_TIMEOUT_MS = 20_000;
+function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  let t: NodeJS.Timeout;
+  return Promise.race([p, new Promise<T>((_, reject) => { t = setTimeout(() => reject(new Error(message)), ms); })]).finally(() => clearTimeout(t));
+}
 
 export async function rxHoldSettings(db?: Q): Promise<RxHoldSettings> {
   return parseRxHoldSettings(await getSetting<unknown>('payments.rx_authorisation', DEFAULT_RX_HOLD, db));
@@ -131,40 +137,52 @@ async function authorisationLost(orderId: string, gatewayStatus: string) {
  * After the pharmacist check: capture the held payment if the order is ready. Safe to
  * call any number of times (only a ready, authorised payment is captured). A transient
  * gateway error is recorded and retried by the watch job.
+ *
+ * Sprint 41 (security review #3): the whole capture — readiness, the gateway call and
+ * recording it — runs under the ORDER's row lock, which a cancellation takes first too.
+ * So a cancellation (buyer, staff refusal, the hold-expiry job) either happens before
+ * (nothing is captured: the buyer is never charged) or waits until the capture is
+ * recorded (then it refunds a captured payment as for any paid order); and two
+ * concurrent callers never both ask the gateway to capture.
  */
 export async function captureHeldPayment(orderId: string, actor: string | null = null): Promise<{ captured: boolean; outcome: string }> {
-  const pre = await withTransaction(async (client) => {
-    const r = await holdReadiness(client, orderId);
-    if (!r.payment) return { skip: r.ready ? 'no held payment' : r.reason };
-    if (!r.ready) return { skip: r.reason };
-    await client.query(`UPDATE payments SET capture_attempts = capture_attempts + 1 WHERE id = $1`, [r.payment.id]);
-    return { pay: r.payment };
-  });
-  if ('skip' in pre) return { captured: false, outcome: pre.skip! };
-  const pay = pre.pay;
-  let gw: GatewayPayment;
-  if (pay.gateway === 'demo' || isDemoPaymentId(pay.gateway_payment_id)) {
-    // The trial's demo: no gateway, the capture is simulated (audited as demo by capture.service's caller)
-    gw = { id: pay.gateway_payment_id, order_id: pay.gateway_order_id, amount: Number(pay.amount_paise), method: pay.method, status: 'captured' };
-  } else {
-    try {
-      gw = await getRazorpay().payments.capture(pay.gateway_payment_id, Number(pay.amount_paise), 'INR') as any;
-    } catch (e: any) {
-      const now: any = await getRazorpay().payments.fetch(pay.gateway_payment_id).catch(() => null);
-      if (now?.status === 'captured') gw = now;
-      else if (now && authorisationGone(now.status)) {
-        await authorisationLost(orderId, now.status);
-        return { captured: false, outcome: 'authorisation ended at the gateway: order cancelled, buyer not charged' };
-      } else {
-        const why = String(e?.error?.description || e?.message || e).slice(0, 500);
-        logger.error(`Capture of held payment for order ${orderId} failed: ${why}`);
-        await query(`UPDATE payments SET capture_failure = $2 WHERE id = $1`, [pay.id, why]);
-        return { captured: false, outcome: 'capture failed; retried by the payment-hold watch' };
+  const r = await withTransaction(async (client): Promise<{ captured: boolean; outcome: string; record?: CaptureRecord; lost?: string }> => {
+    await client.query('SELECT id FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
+    const ready = await holdReadiness(client, orderId);
+    if (!ready.payment) return { captured: false, outcome: ready.ready ? 'no held payment' : ready.reason ?? 'not ready' };
+    if (!ready.ready) return { captured: false, outcome: ready.reason ?? 'not ready' };
+    const pay = ready.payment;
+    await client.query(`UPDATE payments SET capture_attempts = capture_attempts + 1 WHERE id = $1`, [pay.id]);
+    let gw: GatewayPayment;
+    if (pay.gateway === 'demo' || isDemoPaymentId(pay.gateway_payment_id)) {
+      // The trial's demo: no gateway, the capture is simulated (audited as demo by capture.service)
+      gw = { id: pay.gateway_payment_id, order_id: pay.gateway_order_id, amount: Number(pay.amount_paise), method: pay.method, status: 'captured' };
+    } else {
+      try {
+        // Bounded: the order stays locked while the gateway answers (a late success is found by the next try's fetch)
+        gw = await withTimeout(getRazorpay().payments.capture(pay.gateway_payment_id, Number(pay.amount_paise), 'INR') as Promise<any>,
+          GATEWAY_TIMEOUT_MS, 'the payment gateway did not answer in time');
+      } catch (e: any) {
+        const now: any = await withTimeout(getRazorpay().payments.fetch(pay.gateway_payment_id) as Promise<any>, GATEWAY_TIMEOUT_MS, 'timeout').catch(() => null);
+        if (now?.status === 'captured') gw = now;
+        else if (now && authorisationGone(now.status)) return { captured: false, outcome: 'authorisation ended', lost: String(now.status) };
+        else {
+          const why = String(e?.error?.description || e?.message || e).slice(0, 500);
+          logger.error(`Capture of held payment for order ${orderId} failed: ${why}`);
+          await client.query(`UPDATE payments SET capture_failure = $2 WHERE id = $1`, [pay.id, why]);
+          return { captured: false, outcome: 'capture failed; retried by the payment-hold watch' };
+        }
       }
     }
+    const record = await applyCaptureTx(client, gw, actor);
+    return { captured: true, outcome: record.outcome, record };
+  });
+  if (r.lost) {
+    await authorisationLost(orderId, r.lost);
+    return { captured: false, outcome: 'authorisation ended at the gateway: order cancelled, buyer not charged' };
   }
-  const r = await applyCapture(gw, actor);
-  return { captured: true, outcome: r.outcome };
+  if (r.record) await afterCapture(r.record);
+  return { captured: r.captured, outcome: r.outcome };
 }
 
 /** Same as captureHeldPayment, never throwing: callers are pharmacist decisions that already committed. */

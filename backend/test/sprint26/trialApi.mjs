@@ -8,7 +8,9 @@ const backend = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** Starts the API with `env` overrides; resolves { base, stop } once /health answers, or { exitCode, log } if it refused to start. */
 export async function startApi(port, env) {
-  const merged = { ...process.env, PORT: String(port), API_URL: `http://localhost:${port}`, DISABLE_SCHEDULER: 'true', ...env };
+  // Sprint 41: like the main API (scripts/dev-up.sh), as the restricted login when one is configured
+  const login = process.env.DB_APP_LOGIN && process.env.DB_APP_PASSWORD ? { DB_USER: process.env.DB_APP_LOGIN, DB_PASSWORD: process.env.DB_APP_PASSWORD } : {};
+  const merged = { ...process.env, ...login, PORT: String(port), API_URL: `http://localhost:${port}`, DISABLE_SCHEDULER: 'true', ...env };
   for (const [k, v] of Object.entries(merged)) if (v === undefined) delete merged[k];
   const child = spawn('npx', ['ts-node', '--transpile-only', 'src/index.ts'], { cwd: backend, env: merged, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   // npx starts ts-node as a child: signal the whole process group

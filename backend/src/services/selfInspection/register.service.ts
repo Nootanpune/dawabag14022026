@@ -164,6 +164,6 @@ export async function changeActionStatus(user: { id: string; role: string }, id:
 
 /** People who may own a corrective action (Dawabag staff). */
 export async function actionOwners() {
-  return query<any>(`SELECT u.id, COALESCE(up.full_name, u.mobile) AS name, u.role FROM users u LEFT JOIN user_profiles up ON up.user_id = u.id
+  return query<any>(`SELECT u.id, COALESCE(up.full_name, 'Staff member (' || u.role || ')') AS name, u.role FROM users u LEFT JOIN user_profiles up ON up.user_id = u.id
     WHERE u.role IN ('admin', 'super_admin', 'pharmacist_rx', 'pharmacist_pack') AND u.is_active AND u.deleted_at IS NULL ORDER BY 2 LIMIT 300`);
 }

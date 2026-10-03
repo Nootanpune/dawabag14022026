@@ -1,6 +1,7 @@
 // src/services/partnerFulfilment.service.ts
 // Partner shipments: what a partner must ship, dispatch with AWB, delivery.
 // Dispatch consumes the reserved batch stock.
+import { assertColdChainCourier } from './delivery/coldChainCourier';
 import { query, queryOne, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
@@ -63,6 +64,7 @@ export async function dispatchShipment(vendorId: string, shipmentId: string, cou
     await assertNoGdpHeldLines(client, shipmentId);    // Sprint 40 (C-25)
     await assertDispatchAllowed(client, shipmentId);   // emergency stop holds Rx parcels (Sprint 38, C-08)
     await assertPaymentTaken(client, s.order_id);      // Sprint 39: held prescription payment captured first (C-37)
+    await assertColdChainCourier(client, shipmentId, courier);   // Sprint 41: approved cold-chain couriers (URS-105, C-25)
     // Reserved → shipped: take the units out of the partner's batch
     await client.query(
       `UPDATE partner_inventory pi

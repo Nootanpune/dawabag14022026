@@ -232,7 +232,7 @@ jobs:
           cp deploy/staging/staging.env.example deploy/staging/staging.env
           r() { openssl rand -hex 24; }
           sed -i "s/^WEB_DOMAIN=.*/WEB_DOMAIN=$WEB_DOMAIN/; s/^API_DOMAIN=.*/API_DOMAIN=$API_DOMAIN/" deploy/staging/staging.env
-          sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$(r)/; s/^JWT_ACCESS_SECRET=.*/JWT_ACCESS_SECRET=$(r)/; s/^JWT_REFRESH_SECRET=.*/JWT_REFRESH_SECRET=$(r)/" deploy/staging/staging.env
+          sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$(r)/; s/^DB_APP_PASSWORD=.*/DB_APP_PASSWORD=$(r)/; s/^JWT_ACCESS_SECRET=.*/JWT_ACCESS_SECRET=$(r)/; s/^JWT_REFRESH_SECRET=.*/JWT_REFRESH_SECRET=$(r)/" deploy/staging/staging.env
           echo "CADDY_GLOBAL_OPTIONS=local_certs" >> deploy/staging/staging.env
       - name: Build and start the stack
         run: docker compose -f deploy/staging/compose.yml --env-file deploy/staging/staging.env up -d --build --wait --wait-timeout 300

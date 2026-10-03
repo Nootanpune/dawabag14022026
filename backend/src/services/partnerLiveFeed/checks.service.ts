@@ -82,8 +82,8 @@ async function addBatches(c: PoolClient, partnerId: string, ppId: string, userId
   for (const b of usable) {
     await c.query(
       `UPDATE partner_inventory SET mrp_paise = $3, sale_rate_paise = $4, feed_quantity = $5, feed_updated_at = NOW()
-       WHERE partner_product_id = $1 AND batch_number = $2`,
-      [ppId, b.batch_number, b.mrp_paise ?? null, b.sale_rate_paise ?? null, Math.max(0, Number(b.quantity) || 0)]);
+       WHERE partner_product_id = $1 AND batch_number = $2 AND partner_id = $6`,   // Sprint 41 review: never another partner's row
+      [ppId, b.batch_number, b.mrp_paise ?? null, b.sale_rate_paise ?? null, Math.max(0, Number(b.quantity) || 0), partnerId]);
   }
   return usable.length;
 }

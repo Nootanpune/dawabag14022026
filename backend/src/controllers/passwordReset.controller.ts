@@ -8,14 +8,13 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { queryOne, withTransaction } from '../config/database';
-import { getRedis, verifyOTP } from '../config/redis';
+import { checkOtp, TOO_MANY_WRONG_CODES } from '../services/otp/otp.service';
 import { AppError } from '../utils/AppError';
 import { writeAuditTx } from '../utils/audit';
 import { generateTokens } from '../utils/jwt';
 import { passwordProblem } from '../utils/passwordPolicy';
 import { issueSession } from '../utils/sessionCookie';
 
-const MAX_WRONG = 5;
 const schema = z.object({
   mobile: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
   otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
@@ -28,17 +27,13 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     const d = schema.parse(req.body);
     const problem = passwordProblem(d.new_password, d.mobile);
     if (problem) throw new AppError(problem, 400);
-    const redis = getRedis();
-    const wrongKey = `otp_wrong:${d.mobile}`;
-    if (!(await verifyOTP(d.mobile, d.otp))) {
-      const wrong = await redis.incr(wrongKey);
-      await redis.expire(wrongKey, 15 * 60);
-      if (wrong >= MAX_WRONG) { await redis.del(`otp:${d.mobile}`); await redis.del(wrongKey); }
-      throw new AppError(wrong >= MAX_WRONG ? 'Too many wrong codes. Ask for a new code.' : 'The code is wrong or has expired', 400);
-    }
-    await redis.del(wrongKey);
+    // Wrong codes are counted per mobile by the OTP service, also across /auth/verify-otp (Sprint 41 review #1)
+    const check = await checkOtp(d.mobile, d.otp);
+    if (check === 'too_many') throw new AppError(TOO_MANY_WRONG_CODES, 400);
+    if (check !== 'ok') throw new AppError('The code is wrong or has expired', 400);
     const user = await queryOne<{ id: string; role: string; customer_type: string; kyc_status: string }>(
-      `SELECT id, role, customer_type, kyc_status FROM users WHERE mobile = $1 AND deleted_at IS NULL`, [d.mobile]);
+      `SELECT id, role, customer_type, kyc_status FROM users WHERE mobile = $1 AND deleted_at IS NULL AND is_active`, [d.mobile]);
+    // Unknown or switched-off account: the same answer as a wrong code (Sprint 41 review #10)
     if (!user) throw new AppError('The code is wrong or has expired', 400);
     const hash = await bcrypt.hash(d.new_password, parseInt(process.env.BCRYPT_ROUNDS || '12'));
     const changedAt = new Date();   // API clock, as token iat is: older sessions stop working

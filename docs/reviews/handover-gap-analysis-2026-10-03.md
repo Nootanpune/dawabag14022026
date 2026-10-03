@@ -145,6 +145,8 @@ Labels: **HAVE** = we already have it · **PARTIAL** = some of it exists · **MI
 | 16 | **DPDP Consent Manager integration** (obligation from Nov 2026). Map `consent_records` purposes to the Consent Manager artefacts. | M | D20, C-41, C-44 |
 | 17 | **Smaller URS gaps.** Minimum-age rule per drug, checked against `patients.date_of_birth` (URS-042). Approved cold-chain courier list enforced at booking (URS-105). Column-level encryption of `health_profiles` (URS-006). Editing an order before packing (URS-074). | S each | C-25, C-41, C-43 |
 
+**Status after Sprint 41:** #1–#6, #8–#14 built (Sprints 38–40); #15 settled in Sprint 38; #17 approved cold-chain couriers built in Sprint 41 (min age per medicine, health-profile column encryption and editing an order before packing deferred — DECISIONS 2026-10-03 "Approved cold-chain couriers"); #16 DPDP Consent Manager not started (not yet notified); **#7 frozen sale identity per shipment still open** (recommended for Sprint 42).
+
 Suggested split: **Sprint 38** #1–#5 (registers and integrity) **+ #14 emergency stop (confirmed)**. **Sprint 39** #6–#9 (people, sale identity, eligibility, partner provenance). **Sprint 40** #10–#13. Then #15–#17.
 
 ### 5.2 Questions still needing an owner decision

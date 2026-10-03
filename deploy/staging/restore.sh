@@ -94,6 +94,34 @@ ok=true
 for v in "$users" "$orders" "$products"; do [ "$v" != missing ] || ok=false; done
 [ -n "$migration" ] || ok=false
 [ "$ok" = true ] || die "the restored database is missing core tables or its migration history"
+
+# Sprint 41: the chain heads recorded with this backup (backup.sh, heads.sql) must be in the
+# restored database with the same hashes — the audit log and every H1 register (C-09, C-46)
+heads_rc=0; heads="$(s3 heads "$KEY")" || heads_rc=$?
+[ "$heads_rc" = 0 ] || [ "$heads_rc" = 4 ] || die "the chain heads recorded with $KEY could not be read or do not match the backup's checksum"
+if [ "$heads_rc" = 0 ]; then
+  checked=0
+  while IFS='|' read -r chain key no hash; do
+    [ -n "$chain" ] || continue
+    if [ "$chain" = audit ]; then
+      got=$(q "$CHECK" -c "SELECT row_hash FROM audit_logs WHERE chain_seq = $no" 2>/dev/null)
+    else
+      # The register key (licence number) goes in as a psql variable, quoted by psql (stdin, not -c)
+      got=$(echo "SELECT row_hash FROM h1_register WHERE register_key = :'k' AND entry_no = $no AND NOT chain_legacy;" | q "$CHECK" -v k="$key" 2>/dev/null)
+    fi
+    [ "$got" = "$hash" ] || die "chain head $chain${key:+ $key} entry $no recorded with the backup is ${got:+changed}${got:-missing} in the restored database"
+    checked=$((checked + 1))
+  done < <(printf '%s' "$heads" | node -e '
+    let t = ""; process.stdin.on("data", (d) => (t += d)).on("end", () => {
+      const h = JSON.parse(t), num = (n) => (/^\d+$/.test(String(n)) ? String(n) : null), hex = (x) => (/^[0-9a-f]{64}$/.test(String(x)) ? x : null);
+      if (h.audit && num(h.audit.last_no) && hex(h.audit.head_hash)) console.log(["audit", "", h.audit.last_no, h.audit.head_hash].join("|"));
+      for (const [k, v] of Object.entries(h.h1 || {})) if (num(v.last_no) && hex(v.head_hash) && !k.includes("|")) console.log(["h1", k, v.last_no, v.head_hash].join("|"));
+    });')
+  log "chain heads recorded with the backup: $checked found unchanged in the restored database"
+  echo "  chain heads    $checked recorded with the backup, all present and unchanged"
+else
+  log "WARNING: no chain heads were recorded with $KEY (a backup from before Sprint 41); compare with Admin → Record integrity by hand"
+fi
 log "restore check passed for $KEY"
 
 if [ "$INTO_LIVE" = true ]; then
@@ -111,5 +139,8 @@ if [ "$INTO_LIVE" = true ]; then
   fi
   trap - EXIT
   log "LIVE DATABASE RESTORED from $KEY; previous database kept as $old (drop it once the API is verified)"
-  echo "Start the API again: docker compose -f deploy/staging/compose.yml --env-file deploy/staging/staging.env start api"
+  # The dump was restored without owners or privileges: the migrate service (as the owner) gives
+  # dawabag_app its privileges back and re-creates the API's own login before the API starts
+  echo "Next (RUNBOOK §6 Restore drill): deploy/trial/trial.sh up   (or: docker compose … up -d) — the migrate service"
+  echo "re-applies the API login and privileges, then the API starts. Then Admin → Record integrity → Run the check now."
 fi

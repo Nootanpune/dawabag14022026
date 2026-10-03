@@ -34,6 +34,7 @@ template="$(dirname "$0")/trial.env.example"
 sed -e "s|__BASE__|$base|g" \
     -e "s|^ACME_EMAIL=.*|ACME_EMAIL=$email|" \
     -e "s|^DB_PASSWORD=.*|DB_PASSWORD=$(hex 24)|" \
+    -e "s|^DB_APP_PASSWORD=.*|DB_APP_PASSWORD=$(hex 24)|" \
     -e "s|^JWT_ACCESS_SECRET=.*|JWT_ACCESS_SECRET=$(hex 48)|" \
     -e "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(hex 48)|" \
     -e "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$(hex 24)|" \

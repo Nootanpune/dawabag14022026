@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import http from 'http';
 import { irpRoute } from './irp.mjs';
-import { razorpayRoute } from './razorpay.mjs';
+import { razorpay, razorpayRoute } from './razorpay.mjs';
 import { handleS3, isS3Request } from './s3.mjs';
 
 export const seen = [];
@@ -78,11 +78,16 @@ export function startFakes(port = Number(process.env.FAKE_PROVIDERS_PORT || 4890
     let body = '';
     req.on('data', (d) => { body += d; });
     req.on('end', () => {
-      let status, out;
-      try { [status, out] = route(req, body); } catch (e) { [status, out] = [400, { message: String(e) }]; }
-      seen.push({ method: req.method, url: req.url, headers: req.headers, body, status });
-      res.writeHead(status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(out));
+      const answer = () => {
+        let status, out;
+        try { [status, out] = route(req, body); } catch (e) { [status, out] = [400, { message: String(e) }]; }
+        seen.push({ method: req.method, url: req.url, headers: req.headers, body, status });
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(out));
+      };
+      // Sprint 41: a slow gateway capture, to test a capture crossing a cancellation
+      if (razorpay.captureDelayMs && /\/v1\/payments\/[^/]+\/capture$/.test(req.url)) setTimeout(answer, razorpay.captureDelayMs);
+      else answer();
     });
   });
   return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(server)));

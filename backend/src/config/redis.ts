@@ -45,19 +45,7 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 // ─── OTP Store ──────────────────────────────────────────────────────────────
-export async function storeOTP(mobile: string, otp: string): Promise<void> {
-  const key = `otp:${mobile}`;
-  const expiry = parseInt(process.env.OTP_EXPIRY_MINUTES || '10') * 60;
-  await redis.set(key, otp, 'EX', expiry);
-}
-
-export async function verifyOTP(mobile: string, otp: string): Promise<boolean> {
-  const key = `otp:${mobile}`;
-  const stored = await redis.get(key);
-  if (!stored || stored !== otp) return false;
-  await redis.del(key);
-  return true;
-}
+// One-time codes: services/otp/otp.service.ts (send limits, wrong-code counter; Sprint 41).
 
 // ─── Session / Refresh Token Blacklist ─────────────────────────────────────
 export async function blacklistToken(jti: string, ttl: number): Promise<void> {

@@ -3,6 +3,7 @@
 // takes the units out of the reserved batches and writes the H1 register.
 // Nothing moves while a prescription line is unverified (rxGate) or before a
 // registered pharmacist has checked and released the shipment (Sprint 35, C-08).
+import { assertColdChainCourier } from './delivery/coldChainCourier';
 import { PoolClient } from 'pg';
 import { query, withTransaction } from '../config/database';
 import { AppError } from '../utils/AppError';
@@ -118,6 +119,7 @@ export async function dispatchOwnShipment(shipmentId: string, courierIn: string 
     await assertDispatchAllowed(client, shipmentId);   // emergency stop holds Rx parcels (Sprint 38, C-08)
     await assertPaymentTaken(client, s.order_id);      // Sprint 39 (C-37)
     await assertEinvoiceReady(client, shipmentId);
+    await assertColdChainCourier(client, shipmentId, courier);   // Sprint 41: approved cold-chain couriers (URS-105, C-25)
     // Reserved → shipped
     await client.query(
       `UPDATE inventory_batches b

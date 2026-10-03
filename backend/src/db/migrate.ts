@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { Client } from 'pg';
 import dotenv from 'dotenv';
+import { ensureAppLogin } from './appLogin';
 
 dotenv.config();
 
@@ -79,6 +80,12 @@ export async function migrate(args: string[] = process.argv.slice(2)) {
       }
     }
     if (!pending.length) console.log('Database is up to date');
+    // Sprint 41: the API's own restricted login (member of dawabag_app only), created or
+    // corrected by the owner here, before the API starts (RUNBOOK §6; C-34, C-46)
+    if (process.env.DB_APP_LOGIN) {
+      const r = await ensureAppLogin(client, process.env.DB_APP_LOGIN, process.env.DB_APP_PASSWORD ?? '');
+      console.log(`API login ${r.login} ${r.created ? 'created' : 'checked'} (member of dawabag_app only${r.revoked.length ? `; removed from ${r.revoked.join(', ')}` : ''})`);
+    }
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [LOCK_KEY]).catch(() => undefined);
     await client.end();

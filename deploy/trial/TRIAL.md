@@ -85,6 +85,23 @@ password (`TRIAL_DEMO_PASSWORD=…`) you will log in with, and GitHub never show
 secret again once saved. If you ever generate a new one, also tick *reset data* on the
 next deploy (the database keeps the password it was created with).
 
+### The API's own database password (new in Sprint 41 — nothing to do for an existing trial)
+
+The website's server (the API) now connects to the database with its **own, restricted
+login**, so it cannot switch off the protections of the pharmacy registers. A `TRIAL_ENV`
+made from now on contains a line `DB_APP_PASSWORD=…` for it. **If your `TRIAL_ENV` secret
+was made earlier, you do not have to change anything**: the server works out that password
+from your `DB_PASSWORD` by itself, and the deploy log shows a note saying so.
+If you prefer to set it yourself (optional):
+
+1. On any computer with a terminal, run `openssl rand -hex 24` (or take any 48 random
+   letters and digits from your password manager).
+2. GitHub → Settings → Secrets and variables → Actions → `TRIAL_ENV` → **Update** —
+   paste your saved copy of the whole block **plus one new line** at the end:
+   `DB_APP_PASSWORD=<the 48 characters>` (it must differ from the `DB_PASSWORD=` line).
+3. Run the workflow (no reset needed). The server changes the API's password before
+   the API starts. Update your saved copy of `TRIAL_ENV` too.
+
 ### Razorpay test keys (so checkout and consultation fees can be paid with test money)
 
 *Optional.* Until these keys are added, the trial shows a **demo payment** instead:
@@ -200,7 +217,9 @@ The artifact is kept for 14 days; run the workflow again for a fresh one.
 - **Start again with clean demo data:** Run workflow with **reset data** and **seed demo**
   both ticked. This deletes every order, account and file on the trial server.
 - **See what is running** (DigitalOcean droplet console):
-  `sudo -iu dawabag bash dawabag/deploy/trial/trial.sh status` (also `logs`, `check`).
+  `sudo -iu dawabag bash dawabag/deploy/trial/trial.sh status` (also `logs`, `check`,
+  and `dblogin` — shows that the API uses its own login `dawabag_api`, a member of
+  `dawabag_app` only).
 - **Tear it down:** DigitalOcean → the droplet → **Destroy** → *Destroy this Droplet*.
   Billing stops; everything on it is gone. Then delete the `TRIAL_*` secrets in GitHub
   and, in Razorpay test mode, the API key and webhook.
