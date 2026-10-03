@@ -50,7 +50,12 @@ class OrderAftercareCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(refundMethodLabel(r.method), style: const TextStyle(fontSize: 13)),
-                              Text(refundStatusLabel(r.status), style: grey),
+                              Text(
+                                  [
+                                    refundStatusLabel(r.status),
+                                    if (refundSourceLabel(r.source).isNotEmpty) refundSourceLabel(r.source),
+                                  ].join(' · '),
+                                  style: grey),
                             ],
                           ),
                         ),
@@ -69,7 +74,12 @@ class OrderAftercareCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(c.number, style: const TextStyle(fontSize: 13)),
-                            Text(formatPrice(c.totalPaise), style: grey),
+                            Text(
+                                [
+                                  formatPrice(c.totalPaise),
+                                  if (creditNoteReasonLabel(c.reason).isNotEmpty) creditNoteReasonLabel(c.reason),
+                                ].join(' · '),
+                                style: grey),
                           ],
                         ),
                       ),

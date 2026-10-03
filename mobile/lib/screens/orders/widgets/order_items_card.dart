@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../config/theme.dart';
 import '../../../models/json_utils.dart';
+import '../../../models/order_edit.dart';
 import '../../../utils/formatters.dart';
 
 /// "Items ordered", with "Report a side effect" per line (C-29).
@@ -57,11 +58,16 @@ class OrderItemsCard extends StatelessWidget {
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis),
-                            Text(
-                              [
-                                if (item['sku'] != null) '${item['sku']}',
-                                'Qty: ${asInt(item['quantity'])}',
-                              ].join(' · '),
+                            // What will be supplied (supply_qty), with "(was N)" after a change (Sprint 43)
+                            Text.rich(
+                              TextSpan(children: [
+                                TextSpan(text: [
+                                  if (item['sku'] != null) '${item['sku']}',
+                                  'Qty: ${supplyQty(item)}',
+                                ].join(' · ')),
+                                if (orderLineChangeNote(item).isNotEmpty)
+                                  TextSpan(text: orderLineChangeNote(item), style: const TextStyle(color: AppTheme.amberText)),
+                              ]),
                               style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                             ),
                             InkWell(

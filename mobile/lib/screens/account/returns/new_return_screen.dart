@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../config/theme.dart';
 import '../../../models/aftercare.dart';
 import '../../../models/json_utils.dart';
+import '../../../models/order_edit.dart';
 import '../../../providers/order_detail_provider.dart';
 import '../../../services/aftercare_api.dart';
 import '../../../services/api_service.dart';
@@ -89,6 +90,8 @@ class _NewReturnScreenState extends ConsumerState<NewReturnScreen> {
         ),
         data: (order) => _form(asMapList(order['items'])
             .where((i) => asString(i['shipment_id']) == widget.shipmentId)
+            // Sprint 43: only what was supplied can be returned (lines removed before packing are not)
+            .where((i) => supplyQty(i) > 0)
             .toList()),
       ),
     );
@@ -124,7 +127,7 @@ class _NewReturnScreenState extends ConsumerState<NewReturnScreen> {
                 final itemId = asString(item['id']) ?? '';
                 return ReturnItemPicker(
                   name: asString(item['product_name']) ?? '',
-                  maxQuantity: asInt(item['quantity']),
+                  maxQuantity: supplyQty(item),
                   quantity: _quantities[itemId] ?? 0,
                   enabled: !_submitting && itemId.isNotEmpty,
                   onChanged: (q) => setState(() => _quantities[itemId] = q),

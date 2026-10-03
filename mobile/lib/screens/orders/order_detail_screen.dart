@@ -7,9 +7,11 @@ import '../../models/json_utils.dart';
 import '../../providers/order_detail_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/ist.dart';
-import '../../utils/pharmacist_check.dart';
+import '../../utils/order_status.dart';
 import '../../widgets/error_retry_view.dart';
 import 'widgets/cancel_order_button.dart';
+import 'widgets/edit/edit_order_card.dart';
+import 'widgets/edit/order_edits_card.dart';
 import 'widgets/handover_code_card.dart';
 import 'widgets/order_aftercare_card.dart';
 import 'widgets/order_bill_card.dart';
@@ -63,7 +65,7 @@ class OrderDetailScreen extends ConsumerWidget {
     final shipments = OrderShipmentsCard.fromOrder(order);
     const gap = SizedBox(height: 12);
     return [
-      _Header(order: order, status: status),
+      _Header(order: order),
       const SizedBox(height: 16),
       // Delivery code for the sealed pack, buyer only, while dispatched (C-26)
       if (HandoverCodeCard.withCode(shipments).isNotEmpty) ...[
@@ -75,6 +77,15 @@ class OrderDetailScreen extends ConsumerWidget {
       gap,
       OrderItemsCard(order: order),
       gap,
+      // Sprint 43 (URS-074): lower or remove lines until packing starts, or why not
+      if (EditOrderCard.showsFor(order)) ...[
+        EditOrderCard(order: order),
+        gap,
+      ],
+      if (OrderEditsCard.showsFor(order)) ...[
+        OrderEditsCard(order: order),
+        gap,
+      ],
       // Seller, invoice PDF and "Report a problem" per shipment (C-05, C-33, C-37)
       if (shipments.isNotEmpty) ...[
         OrderShipmentsCard(shipments: shipments, orderId: id),
@@ -117,14 +128,13 @@ class OrderDetailScreen extends ConsumerWidget {
 
 class _Header extends StatelessWidget {
   final Map<String, dynamic> order;
-  final String status;
-  const _Header({required this.order, required this.status});
+  const _Header({required this.order});
 
   @override
   Widget build(BuildContext context) {
-    // While the pharmacist check is open the chip says so (Sprint 36, C-08)
-    final chip = checkChipLabel(status, orderCheckState(order));
-    final held = orderCheckState(order) == CheckState.held && chip != null;
+    // While the pharmacist check is open the chip says so (Sprint 36, C-08);
+    // the same label as "My orders" (Sprint 43)
+    final info = orderStatusInfo(order);
     return Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -144,13 +154,13 @@ class _Header extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: held ? AppTheme.amberBadge : AppTheme.brandTeal50,
+                color: info.background,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(chip ?? status.replaceAll('_', ' '),
+              child: Text(info.label,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600, color: held ? AppTheme.amberText : AppTheme.brandTeal700)),
+                      fontSize: 12, fontWeight: FontWeight.w600, color: info.foreground)),
             ),
           ),
         ],

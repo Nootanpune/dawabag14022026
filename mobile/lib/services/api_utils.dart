@@ -53,6 +53,9 @@ String apiErrorMessage(
   if (error is DioException) {
     // A server fault's own text is technical: a plain sentence with what to do (Sprint 26)
     final status = error.response?.statusCode;
+    // ...except a 500 the server meant for the person, with its own plain sentence (Sprint 43)
+    final serverMessage = _plainServerFault(error);
+    if (serverMessage != null) return serverMessage;
     if (status == 500 || status == 502 || status == 504) {
       return 'Something went wrong on our side. Please try again in a minute.';
     }
@@ -82,6 +85,22 @@ String apiErrorMessage(
     }
   }
   return fallback;
+}
+
+/// Code the server sends (500) when sealed health details cannot be opened on
+/// this server (Sprint 43, health data key missing or changed): GET / PUT
+/// /health-profile. Its `message` says what to do and is shown as is.
+const kHealthDataUnreadable = 'HEALTH_DATA_UNREADABLE';
+
+/// Server faults whose `message` is written for the person, not technical.
+const Set<String> _plainServerFaultCodes = {kHealthDataUnreadable};
+
+String? _plainServerFault(DioException error) {
+  final data = error.response?.data;
+  if (error.response?.statusCode != 500 || data is! Map) return null;
+  if (!_plainServerFaultCodes.contains(data['code']?.toString())) return null;
+  final msg = data['message'] ?? data['error'];
+  return msg is String && msg.trim().isNotEmpty ? msg : null;
 }
 
 /// Code the server sends (403) while a login still has the temporary password

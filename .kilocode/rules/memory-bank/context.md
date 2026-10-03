@@ -19,6 +19,8 @@ the lawyer/CA sign-off.
 - Tests: jest 86 suites / 658 (orderEdit rules, sealing, env); smoke 1–43 2157 checks (sprint43 55: test/sprint43/{fixtures,orderEdit,healthSealing}.mjs) with the API as dawabag_api; web tsc + lint + build pass; Playwright 148 passed / 4 skipped (S3 fake) incl. `orderEdit.spec.ts`, `qaSweep.spec.ts`; recorded journeys 108 steps all on screen.
 - App (mobile, NOT done): show `supply_qty` (not `quantity`) per order line and "(was N)" when `removed_qty` > 0; optional "Change order" using `POST /orders/:id/edit` when `can_edit`; list `edits[]`; refund source `order_edit`, credit-note reason `order_edit`; `GET /orders/my` `pharmacist_check` for the list label; `GET /health-profile` may answer 500 HEALTH_DATA_UNREADABLE (show the message).
 
+- App (Sprint 43): order lines show supply_qty with '(was N)'; shared status-label rule (lib/utils/order_status.dart = web statusLabel.ts); 'Change order' sheet (lower/remove only) → POST /orders/:id/edit; 'Changes you made' card; order_edit refund/credit-note labels; HEALTH_DATA_UNREADABLE message. flutter 286 passed.
+
 ## Sprint 42 — frozen sale identity per shipment, two-step sign-in for staff and partners (2026-10-03, uncommitted)
 
 - DECISIONS rows 2026-10-03 "Sale identity fixed per shipment at order placement…" and "Two-step sign-in (authenticator app)… BUILT, enforcement pending the owner's decision". Migration 37 (`37_sprint42_sale_identity_two_factor.sql`; grants for dawabag_app / dawabag_maintenance). Gap analysis #7 built; security review #16 mitigated (closed when set to required).

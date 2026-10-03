@@ -111,6 +111,8 @@ class _RefundsTab extends ConsumerWidget {
                       [
                         if (r.orderNumber != null) 'Order ${r.orderNumber}',
                         refundMethodLabel(r.method),
+                        // Sprint 43: why the refund was made (order changed, cancelled, return)
+                        if (refundSourceLabel(r.source).isNotEmpty) refundSourceLabel(r.source),
                         if (r.createdAt != null) formatDateIst(r.createdAt!),
                       ].join(' · '),
                       style: const TextStyle(fontSize: 12),

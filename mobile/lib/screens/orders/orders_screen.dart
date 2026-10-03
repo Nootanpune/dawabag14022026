@@ -1,56 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../services/api_service.dart';
+import '../../providers/orders_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../config/theme.dart';
 import '../../utils/formatters.dart';
 import '../../utils/ist.dart';
+import '../../utils/order_status.dart';
 import '../../widgets/empty_state.dart';
 
-final ordersProvider = FutureProvider<List<dynamic>>((ref) async {
-  final res = await apiService.dio.get('/orders/my?limit=20');
-  return res.data['data']['orders'] as List;
-});
-
-const _statusColors = <String, Color>{
-  'pending_payment':  Color(0xFFFAEEDA),
-  'payment_failed':   Color(0xFFFCEBEB),
-  'rx_pending':       Color(0xFFFFF3CD),
-  'rx_verified':      Color(0xFFE6F1FB),
-  'packing':          Color(0xFFEEEDFE),
-  'packed':           Color(0xFFEEEDFE),
-  'dispatched':       Color(0xFFEDFAF4),
-  'delivered':        Color(0xFFEDFAF4),
-  'cancelled':        Color(0xFFF1EFE8),
-  'returned':         Color(0xFFF1EFE8),
-};
-
-const _statusTextColors = <String, Color>{
-  'pending_payment':  Color(0xFF633806),
-  'payment_failed':   Color(0xFF791F1F),
-  'rx_pending':       Color(0xFF633806),
-  'rx_verified':      Color(0xFF0C447C),
-  'packing':          Color(0xFF3C3489),
-  'packed':           Color(0xFF3C3489),
-  'dispatched':       Color(0xFF0F5235),
-  'delivered':        Color(0xFF0F5235),
-  'cancelled':        Color(0xFF444441),
-  'returned':         Color(0xFF444441),
-};
-
-const _statusLabels = <String, String>{
-  'pending_payment':  'Awaiting payment',
-  'payment_failed':   'Payment failed',
-  'rx_pending':       'Rx verification pending',
-  'rx_verified':      'Prescription verified',
-  'packing':          'Being packed',
-  'packed':           'Packed',
-  'dispatched':       'Dispatched',
-  'delivered':        'Delivered',
-  'cancelled':        'Cancelled',
-  'returned':         'Returned',
-};
 
 class OrdersScreen extends ConsumerWidget {
   const OrdersScreen({super.key});
@@ -133,10 +91,13 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = order['status'] as String? ?? '';
-    final bgColor = _statusColors[status] ?? Colors.grey.shade100;
-    final textColor = _statusTextColors[status] ?? Colors.grey.shade600;
-    final label = _statusLabels[status] ?? status;
+    // Same label as the order page, "Pharmacist check" included (Sprint 43)
+    final info = orderStatusInfo(order);
+    final bgColor = info.background;
+    final textColor = info.foreground;
+    final label = info.label;
+    // Sprint 43: item_count counts only lines still to be supplied
+    final count = (order['item_count'] is num) ? (order['item_count'] as num).toInt() : int.tryParse('${order['item_count']}') ?? 0;
 
     return GestureDetector(
       onTap: onTap,
@@ -154,12 +115,19 @@ class _OrderCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(order['order_number'] ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
-                  child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textColor)),
+                Flexible(
+                  child: Text(order['order_number'] ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
+                    child: Text(label,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textColor)),
+                  ),
                 ),
               ],
             ),
@@ -170,7 +138,7 @@ class _OrderCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('${order['item_count']} item${(order['item_count'] ?? 1) > 1 ? 's' : ''}',
+                Text('$count item${count == 1 ? '' : 's'}',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
                 Text(formatPrice(order['total_paise'] ?? 0),
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),

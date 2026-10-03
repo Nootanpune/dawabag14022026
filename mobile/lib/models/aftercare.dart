@@ -48,6 +48,34 @@ String refundMethodLabel(String? method) {
   }
 }
 
+/// Why a refund was made, in words (Sprint 43 QA; same as the website).
+String refundSourceLabel(String? source) {
+  switch (source) {
+    case 'cancellation':
+      return 'order cancelled';
+    case 'return':
+      return 'return';
+    case 'admin':
+      return 'from Dawabag';
+    case 'order_edit':
+      return 'order changed';
+    default:
+      return (source ?? '').replaceAll('_', ' ');
+  }
+}
+
+/// Why a credit note was issued, in words (Sprint 43 QA; same as the website).
+String creditNoteReasonLabel(String? reason) {
+  switch (reason) {
+    case 'cancellation':
+      return 'order cancelled';
+    case 'order_edit':
+      return 'order changed before packing';
+    default:
+      return (reason ?? '').replaceFirst(RegExp(r'^return_'), 'return: ').replaceAll('_', ' ');
+  }
+}
+
 String refundStatusLabel(String status) {
   switch (status) {
     case 'pending':
