@@ -141,6 +141,8 @@ export interface PartnerShipment {
   written_order_ids?: string[];
   /** Sprint 44: the buyer changed the order and has not yet paid the difference — cannot be released */
   extra_payment_pending?: boolean;
+  /** Sprint 48: buyer changes so far — sent back with the decision (409 ORDER_CHANGED if it changed since) */
+  edits_count?: number;
 }
 
 /** One of the partner's registered pharmacists (Sprint 28, recorded by Dawabag's admin) */

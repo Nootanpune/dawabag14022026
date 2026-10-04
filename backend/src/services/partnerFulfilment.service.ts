@@ -28,6 +28,7 @@ export async function listPartnerShipments(vendorId: string, status?: string) {
             o.pricing_type = 'doc_hospital' AS practitioner_order,
             (SELECT COALESCE(json_agg(w.id ORDER BY w.signed_at), '[]'::json) FROM written_orders w WHERE w.order_id = o.id) AS written_order_ids,
             EXISTS (SELECT 1 FROM order_edits e WHERE e.order_id = o.id AND e.extra_status = 'awaiting_payment') AS extra_payment_pending,
+            (SELECT COUNT(*)::int FROM order_edits e WHERE e.order_id = o.id) AS edits_count,
             a.full_name AS ship_to_name, a.mobile AS ship_to_mobile, a.address_line1, a.city, a.state, a.pincode,
             json_agg(json_build_object(
               'product_name', oi.product_name, 'sku', oi.sku, 'quantity', oi.supply_qty,

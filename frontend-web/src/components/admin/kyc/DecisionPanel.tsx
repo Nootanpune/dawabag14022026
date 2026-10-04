@@ -5,11 +5,15 @@ import DrugLicenseDecisionForm from './DrugLicenseDecisionForm';
 import NmcDecisionForm from './NmcDecisionForm';
 import RejectApplicationButton from './RejectApplicationButton';
 import DecisionCard from './DecisionCard';
+import { useAuthStore } from '@/store/authStore';
 
 /** One decision form per check returned by the server. */
 export default function DecisionPanel({ application }: { application: KycApplication }) {
   const { user, checks } = application;
   const closed = user.kyc_status === 'rejected';
+  // Sprint 48: doctor registrations are decided by admins only (as in Admin → Doctor registrations)
+  const role = useAuthStore((s) => s.user?.role);
+  const canDecideRegistration = role === 'admin' || role === 'super_admin';
 
   return (
     <div className="card space-y-3">
@@ -37,6 +41,13 @@ export default function DecisionPanel({ application }: { application: KycApplica
           return <DrugLicenseDecisionForm key={key} user={user} result={c.result} />;
         }
         if (c.check === 'nmc_registration') {
+          if (!canDecideRegistration) {
+            return (
+              <DecisionCard key={key} title="Medical council registration" result={c.result}>
+                <p className="text-xs text-gray-600">An admin checks the registration and its certificate copy and records the decision.</p>
+              </DecisionCard>
+            );
+          }
           return <NmcDecisionForm key={key} user={user} result={c.result} />;
         }
         return null;

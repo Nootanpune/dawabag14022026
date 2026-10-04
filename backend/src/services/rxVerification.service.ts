@@ -77,6 +77,12 @@ async function dispenseAgainst(client: PoolClient, prescriptionId: string, order
   return lines.length;
 }
 
+/** Sprint 48: locks the order a prescription is attached to (if any) before the prescription itself. */
+async function lockOrderOfPrescription(client: PoolClient, prescriptionId: string): Promise<void> {
+  const r = (await client.query(`SELECT order_id FROM prescriptions WHERE id = $1`, [prescriptionId])).rows[0];
+  if (r?.order_id) await client.query(`SELECT 1 FROM orders WHERE id = $1 FOR UPDATE`, [r.order_id]);
+}
+
 export async function verifyPrescription(pharmacistId: string, prescriptionId: string, input: VerifyInput) {
   const r = await verifyPrescriptionTx(pharmacistId, prescriptionId, input);
   // Sprint 39: a prescription order's held payment is captured once the check has passed (C-37)
@@ -86,6 +92,9 @@ export async function verifyPrescription(pharmacistId: string, prescriptionId: s
 function verifyPrescriptionTx(pharmacistId: string, prescriptionId: string, input: VerifyInput) {
   return withTransaction(async (client) => {
     const ph = await pharmacist(client, pharmacistId);
+    // Sprint 48 (security review 41–47 #2): the order row first, as an order change does, so the
+    // review and its release cannot cross a change the buyer is making (C-08)
+    await lockOrderOfPrescription(client, prescriptionId);
     const rx = (await client.query(`SELECT * FROM prescriptions WHERE id = $1 FOR UPDATE`, [prescriptionId])).rows[0];
     if (!rx) throw new AppError('Prescription not found', 404);
     if (rx.status !== 'pending') throw new AppError(`Prescription is already ${rx.status}`, 409);
@@ -166,6 +175,7 @@ export async function applyPrescriptionToOrder(pharmacistId: string, prescriptio
 function applyPrescriptionTx(pharmacistId: string, prescriptionId: string, orderId: string) {
   return withTransaction(async (client) => {
     await pharmacist(client, pharmacistId);
+    await client.query(`SELECT 1 FROM orders WHERE id = $1 FOR UPDATE`, [orderId]);   // Sprint 48: order first
     const rx = (await client.query(
       `SELECT rx.*, o.user_id AS order_user FROM prescriptions rx, orders o WHERE rx.id = $1 AND o.id = $2`,
       [prescriptionId, orderId])).rows[0];

@@ -171,6 +171,12 @@ export async function editOrder(userId: string, orderId: string, input: EditInpu
       ? after.value - committed
       : Math.max(0, after.value - Number(money.wallet_used_paise)) - Number(money.total_paise);
     const action: MoneyAction = moneyAction({ paymentTerms: money.payment_terms, heldPayment: held, diff, creditSettled: !!money.credit_settled_at });
+    // Sprint 48 (security review 41–47 #7): a credit order whose bill is already paid cannot grow —
+    // the extra would land on a bill nobody collects (the credit used would only ever go up)
+    if (action.kind === 'credit_bill' && action.delta > 0 && money.credit_settled_at) {
+      throw new AppError('The credit bill for this order is already paid, so it cannot be made larger. Place a new order for more.',
+        409, true, 'ORDER_EDIT_CREDIT_SETTLED');
+    }
     const newTotal = money.payment_terms === 'prepaid'
       ? Math.max(0, after.value - Number(money.wallet_used_paise))
       : Number(money.total_paise) + (action.kind === 'credit_bill' ? action.delta : 0);

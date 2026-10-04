@@ -8,7 +8,7 @@ import { PoolClient } from 'pg';
 import { query } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { CheckDecision } from './rules';
-import { Checker, assertCheckable, decide } from './check.service';
+import { Checker, assertCheckable, decide, lockOrderOfShipment } from './check.service';
 import { assertPartnerRegistrationValid } from '../pharmacistRegistration/gate.service';
 import { registrationStanding } from '../pharmacistRegistration/rules';
 import { todayIST } from '../../utils/ist';
@@ -40,10 +40,11 @@ async function partnerChecker(client: PoolClient, vendorId: string, vendorPharma
 
 export function decidePartnerShipment(
   vendorId: string, userId: string, shipmentId: string,
-  input: { decision: CheckDecision; vendor_pharmacist_id: string; reason?: string },
+  input: { decision: CheckDecision; vendor_pharmacist_id: string; reason?: string; edits_seen?: number },
 ) {
   return decide(
     async (client) => {
+      await lockOrderOfShipment(client, shipmentId, vendorId);   // Sprint 48: order first, as an order change
       const s = (await client.query(
         `SELECT s.id, s.order_id, s.status, s.pharmacist_check, o.status AS order_status, o.order_number, o.user_id
          FROM order_shipments s JOIN orders o ON o.id = s.order_id
@@ -54,5 +55,5 @@ export function decidePartnerShipment(
       return s;
     },
     (client) => partnerChecker(client, vendorId, input.vendor_pharmacist_id, userId),
-    input.decision, input.reason, userId);
+    input.decision, input.reason, userId, { editsSeen: input.edits_seen });
 }

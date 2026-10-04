@@ -153,6 +153,7 @@ export async function postCheck(req: Request, res: Response, next: NextFunction)
       decision: z.enum(['release', 'hold', 'reject']),
       vendor_pharmacist_id: uuid,
       reason: z.string().trim().max(500).optional(),
+      edits_seen: z.number().int().min(0).max(10000).optional(),   // Sprint 48 (409 ORDER_CHANGED)
     }).parse(req.body);
     res.json({ success: true, data: await decidePartnerShipment(req.partner!.vendorId, req.user!.id, uuid.parse(req.params.id), input) });
   } catch (err) { next(err); }

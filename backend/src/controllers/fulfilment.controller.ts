@@ -106,6 +106,8 @@ export async function postApply(req: Request, res: Response, next: NextFunction)
 export const checkDecisionSchema = z.object({
   decision: z.enum(['release', 'hold', 'reject']),
   reason: z.string().trim().max(500).optional(),
+  // Sprint 48: how many buyer changes the check screen showed (409 ORDER_CHANGED if the order changed since)
+  edits_seen: z.number().int().min(0).max(10000).optional(),
 });
 
 export async function getOrderCheck(req: Request, res: Response, next: NextFunction) {
@@ -114,8 +116,8 @@ export async function getOrderCheck(req: Request, res: Response, next: NextFunct
 
 export async function postCheck(req: Request, res: Response, next: NextFunction) {
   try {
-    const { decision, reason } = checkDecisionSchema.parse(req.body);
-    res.json({ success: true, data: await decideOwnShipment(req.user!.id, uuid.parse(req.params.id), decision, reason) });
+    const { decision, reason, edits_seen } = checkDecisionSchema.parse(req.body);
+    res.json({ success: true, data: await decideOwnShipment(req.user!.id, uuid.parse(req.params.id), decision, reason, { editsSeen: edits_seen }) });
   } catch (err) { next(err); }
 }
 

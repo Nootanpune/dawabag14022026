@@ -36,7 +36,9 @@ router.post('/admin/reject',                  rejectApplication);
 
 router.post('/admin/verify-drug-license', adminVerifyDrugLicense);
 router.put('/admin/applications/:userId/licences', putBuyerLicences);   // Sprint 30: every licence of the buyer
-router.post('/admin/verify-nmc',          adminVerifyNMC);
+// Sprint 48 (security review 41–47 #6): doctor registrations are decided by admins only, as on
+// /practitioner-sales/practitioners/:id/registration (Sprint 44); pharmacists may look, not decide
+router.post('/admin/verify-nmc', authorize('admin', 'super_admin'), adminVerifyNMC);
 
 // Super admin only — account type upgrades
 router.post('/admin/upgrade-to-retailer',

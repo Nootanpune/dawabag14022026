@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { query, queryOne, withTransaction } from '../config/database';
 import { blacklistToken } from '../config/redis';
 import { checkOtp, otpSendLimitError, storeNewOtp, takeOtpSendSlot, TOO_MANY_WRONG_CODES } from '../services/otp/otp.service';
-import { generateTokens, issuedBeforePasswordChange, verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
+import { generateTokens, sessionEndedMessage, verifyAccessToken, verifyRefreshToken } from '../utils/jwt';
 import { sendOTP } from '../services/sms.service';
 import { smsConfigured } from '../services/notifications/channels/sms';
 
@@ -418,17 +418,16 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
     const payload = await verifyRefreshToken(refresh_token);
 
     const user = await queryOne<{ id: string; role: string; is_active: boolean; customer_type: string; kyc_status: string; mobile: string;
-      must_change_password: boolean; password_changed_at: Date | null }>(
-      `SELECT id, role, is_active, customer_type, kyc_status, mobile, must_change_password, password_changed_at
+      must_change_password: boolean; password_changed_at: Date | null; sessions_revoked_at: Date | null }>(
+      `SELECT id, role, is_active, customer_type, kyc_status, mobile, must_change_password, password_changed_at, sessions_revoked_at
        FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [payload.sub]
     );
 
     if (!user || !user.is_active) throw new AppError('Invalid token', 401);
     // A refresh token from before the last password change cannot be renewed (Sprint 34 review, C-44)
-    if (issuedBeforePasswordChange(payload.iat, user.password_changed_at)) {
-      throw new AppError('Your password was changed. Please sign in again', 401);
-    }
+    const ended = sessionEndedMessage(payload.iat, user);   // Sprint 48: also a super-admin's reset
+    if (ended) throw new AppError(ended, 401);
 
     // Sprint 42: a session without the second step is not renewed once two-step sign-in
     // applies to this login (switched on, or required by the super-admin): sign in again

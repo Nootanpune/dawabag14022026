@@ -47,7 +47,10 @@ test('before approval the buyer raises a quantity and adds a medicine, then is a
   await dialog.getByRole('button', { name: 'Remove' }).last().click();     // take the prescription medicine off again
   await expect(dialog.getByRole('heading', { name: /Prescription needed/ })).toHaveCount(0);
   await dialog.getByRole('textbox', { name: 'Search medicines to add' }).fill('paracetamol');
-  await expect(dialog.getByText('No medicine found to add.')).toBeVisible();   // already on the order: change its quantity
+  // Already on the order: not offered to add (change its quantity instead). Sprint 48: checked by the
+  // button itself, so other paracetamol products in a shared dev database (e.g. trial demo items) do not matter
+  await expect(dialog.getByRole('button', { name: 'Add E2E Paracetamol 500' })).toHaveCount(0);
+  await expect(dialog.getByText(/No medicine found to add\.|Add /).first()).toBeVisible();
   await dialog.getByRole('button', { name: 'Save changes' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(/Your order is changed\. Please pay the difference of ₹/)).toBeVisible();

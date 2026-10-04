@@ -12,6 +12,18 @@ const fakeRedis = {
   expire: jest.fn(async (k: string, s: number) => { ttls.set(k, s); return 1; }),
   ttl: jest.fn(async (k: string) => ttls.get(k) ?? -1),
   del: jest.fn(async (...ks: string[]) => ks.reduce((n, k) => n + (store.delete(k) ? 1 : 0), 0)),
+  // Sprint 48: the Redis scripts, emulated with the same steps (one call = one atomic step)
+  eval: jest.fn(async (script: string, n: number, ...args: string[]) => {
+    const keys = args.slice(0, n), argv = args.slice(n);
+    const incr = (k: string, ttl: number) => { const v = Number(store.get(k) ?? 0) + 1; store.set(k, String(v)); if (v === 1) ttls.set(k, ttl); return v; };
+    if (script.includes("'too_many'")) {
+      if (store.has(keys[0]) && store.get(keys[0]) === argv[0]) { store.delete(keys[0]); store.delete(keys[1]); return 'ok'; }
+      const v = incr(keys[1], Number(argv[1]));
+      if (v >= Number(argv[2])) { store.delete(keys[0]); store.delete(keys[1]); return 'too_many'; }
+      return 'wrong';
+    }
+    return incr(keys[0], Number(argv[0]));
+  }),
 };
 jest.mock('../../config/redis', () => ({ getRedis: () => fakeRedis }));
 
@@ -61,5 +73,20 @@ describe('one-time codes', () => {
     expect(store.has('otp_wrong:9876500001')).toBe(false);
     otp = await storeNewOtp('9876500001');
     expect(await checkOtp('9876500001', otp.slice(0, 5))).toBe('wrong');   // a different length is simply wrong
+  });
+
+  it('Sprint 48: parallel guesses are each counted — at most five tries reach the code', async () => {
+    const otp = await storeNewOtp('9876500009');
+    const wrong = Array.from({ length: 50 }, (_, i) => String(100000 + i)).filter((g) => g !== otp);
+    wrong.splice(20, 0, otp);                                          // the right code as the 21st guess
+    const results = await Promise.all(wrong.map((g) => checkOtp('9876500009', g)));
+    expect(results.slice(0, 5)).toEqual(['wrong', 'wrong', 'wrong', 'wrong', 'too_many']);
+    expect(results).not.toContain('ok');                               // the code was gone after the fifth
+  });
+
+  it('Sprint 48: something that is not a code is a wrong try too', async () => {
+    await storeNewOtp('9876500010');
+    expect(await checkOtp('9876500010', 'abc')).toBe('wrong');
+    expect(store.get('otp_wrong:9876500010')).toBe('1');
   });
 });

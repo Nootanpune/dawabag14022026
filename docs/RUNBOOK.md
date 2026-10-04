@@ -86,7 +86,9 @@ the key stable and in the secret store: a new key makes every enrolled app unrea
 people sign in with a recovery code (409 `TWO_FACTOR_KEY_CHANGED` otherwise) or a super-admin
 resets them (Admin → Two-step sign-in (all) → Reset, reason required, audited
 `two_factor_reset_by_admin`). A reset after a lost phone: confirm the person's identity by a
-call first. Audit actions: `two_factor_enrolled`, `two_factor_failed`, `two_factor_paused`,
+call first. Since Sprint 48 a reset also **ends every session the person already had** (the
+lost phone may hold one; `users.sessions_revoked_at`, migration 43): they sign in again. Wrong
+codes are counted before they are checked, so parallel guesses cannot exceed the five. Audit actions: `two_factor_enrolled`, `two_factor_failed`, `two_factor_paused`,
 `two_factor_recovery_code_used`, `two_factor_recovery_codes_renewed`, `two_factor_disabled`,
 `two_factor_reset_by_admin`, `setting_changed` (the policy).
 
@@ -509,8 +511,18 @@ and the **tax invoice is issued at that approval** (DECISIONS.md, Sprint 44 rows
 - **Second payments.** A change that raises the value waits for the buyer's payment of the
   difference (order page "Pay the difference"; Razorpay order with `notes.order_edit_id`); the
   pharmacist's release and prescription verification answer 409 `EXTRA_PAYMENT_PENDING` until
-  it is paid (or authorised, for an order with prescription medicines). Nothing times it out
-  yet (owner to decide); staff may cancel the order. Razorpay webhooks need no change.
+  it is paid (or authorised, for an order with prescription medicines). An unpaid difference
+  does **not** time out (owner decision CONFIRMED 2026-10-04); staff may cancel the order. A
+  held order payment still ends after the hold time (section 7f), which cancels the order.
+  Razorpay webhooks need no change. One change is paid by one payment: a second payment for
+  the same change (two tabs, a retry) is released or refunded at once (Sprint 48).
+- **Approvals and changes never cross (Sprint 48).** Every approval — the pharmacist check
+  (Dawabag and partners) and the prescription review — locks the order before its parcels, as
+  a change does. The check screens send back how many changes they showed: if the buyer
+  changed the order since, the approval answers 409 `ORDER_CHANGED` — reopen and check again.
+  At approval (the moment of sale) the buyer's standing is checked again: a doctor whose
+  registration lapsed or was suspended, or a buyer no longer allowed a restricted product
+  (section 7k), answers 409 `BUYER_NOT_ELIGIBLE` — hold the order or refuse it (refunded).
 - **Doctor / institution buyers** (FDA Maharashtra circular Drug/Wholesalers Memo./16/2026/1,
   r.64(2), r.65(9)(b)): Admin → *Doctor registrations* lists accounts needing attention —
   check the council's register and the uploaded certificate, then **Verify** with the
@@ -870,8 +882,15 @@ search works without typo matching; to add it later, as a superuser:
    (security review Sprints 35–40 #16: without it an SMS code alone resets an admin's password).
 10. `HEALTH_ENC_KEY` set and kept in the secret store (section 6 "Health data key").
 11. Doctor / hospital accounts: each registration verified with valid-till and the certificate
-    copy (Admin → Doctor registrations, section 7h); the lawyer / FDA's view on what counts as a
-    "signed" in-app written order recorded in DECISIONS.md (Sprint 44 row).
+    copy (Admin → Doctor registrations, section 7h). The in-app signed requisition counts as the
+    signed written order (owner decision CONFIRMED 2026-10-04, DECISIONS.md).
+12. Approved cold-chain couriers entered (Admin → Settings → "Approved cold-chain couriers";
+    DECISIONS.md 2026-10-03, Sprint 41): until then the dashboard warns
+    `COLD_CHAIN_COURIERS_NOT_SET` and refrigerated parcels may go with any courier.
+13. `PUBLIC_WEB_URL` set to the public website address (section 2, Teleconsultation) so the QR
+    on e-prescriptions and links in messages open the right site.
+14. The plain-English owner's list of everything above and the legal / policy items:
+    `docs/LAUNCH_CHECKLIST.md` (Sprint 48).
 
 ## 9. Incidents
 

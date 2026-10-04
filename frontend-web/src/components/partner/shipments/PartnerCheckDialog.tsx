@@ -27,7 +27,7 @@ export default function PartnerCheckDialog({ shipment: s, onClose }: { shipment:
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState('');
   const decide = useMutation({
-    mutationFn: (d: Decision) => decidePartnerCheck(s.id, { decision: d, vendor_pharmacist_id: who, reason: d === 'release' ? undefined : reason.trim() }),
+    mutationFn: (d: Decision) => decidePartnerCheck(s.id, { decision: d, vendor_pharmacist_id: who, reason: d === 'release' ? undefined : reason.trim(), edits_seen: s.edits_count }),
     onSuccess: (_r, d) => { toast.success(`${s.order_number} ${DONE[d]}`); onClose(); },
     onError: (err) => setError(getApiErrorMessage(err, 'Could not record the decision')),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['partner', 'shipments'] }),

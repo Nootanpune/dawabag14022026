@@ -33,8 +33,9 @@ export async function fetchOrderCheck(orderId: string): Promise<OrderCheckDetail
 }
 
 /** Release for packing, hold, or refuse to supply (refusal cancels and refunds the order, C-37). */
-export async function decideCheck(shipmentId: string, decision: CheckDecision, reason?: string) {
-  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/check`, { decision, reason });
+export async function decideCheck(shipmentId: string, decision: CheckDecision, reason?: string, editsSeen?: number) {
+  // Sprint 48: edits_seen = the buyer changes the dialog showed; the server refuses if the order changed since
+  const { data } = await api.post(`/fulfilment/shipments/${shipmentId}/check`, { decision, reason, edits_seen: editsSeen });
   return data.data as { shipment_id: string; pharmacist_check: string; refund_paise?: number };
 }
 

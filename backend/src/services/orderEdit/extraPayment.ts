@@ -32,24 +32,41 @@ export async function editPaymentTarget(userId: string, orderId: string, orderEd
   return { orderEditId: e.id, amountPaise: Number(e.extra_paise), orderNumber: e.order_number };
 }
 
-/** Is the change behind this payment still owed? Locks the change row. */
-async function stillOwed(client: PoolClient, orderEditId: string, orderId: string): Promise<{ owed: boolean; userId: string; status: string }> {
-  const e = (await client.query(`SELECT extra_status FROM order_edits WHERE id = $1 FOR UPDATE`, [orderEditId])).rows[0];
+/**
+ * Is the change behind this payment still owed by THIS payment? Locks the order first (the
+ * order the edit, a cancellation and a held capture lock first too — no deadlock), then the
+ * change row.
+ *
+ * Sprint 48 (security review 41–47 #1): a change is paid by ONE payment. The buyer can open
+ * several gateway orders for the same change (two tabs, a retry) and complete more than one;
+ * before Sprint 48 every authorisation of an 'authorised' change was accepted as owed too, so
+ * two holds were captured — and a later lowering change counted both as paid, refunding the
+ * buyer more than they overpaid (double money movement). Now an authorisation is owed only
+ * while the change is still 'awaiting_payment'; a capture is owed for an 'awaiting_payment'
+ * change, or for an 'authorised' one only when this very payment holds the authorisation.
+ * Anything else is released (held) or refunded (captured) at once (C-37).
+ */
+async function stillOwed(client: PoolClient, orderEditId: string, orderId: string, stage: 'authorise' | 'capture',
+  paymentStatus?: string): Promise<{ owed: boolean; userId: string; status: string }> {
   const o = (await client.query(`SELECT status, user_id FROM orders WHERE id = $1 FOR UPDATE`, [orderId])).rows[0];
-  return { owed: !!e && ['awaiting_payment', 'authorised'].includes(e.extra_status) && o?.status !== 'cancelled', userId: o?.user_id, status: e?.extra_status };
+  const e = (await client.query(`SELECT extra_status FROM order_edits WHERE id = $1 AND order_id = $2 FOR UPDATE`, [orderEditId, orderId])).rows[0];
+  const open = !!e && o?.status !== 'cancelled';
+  const owed = open && (e.extra_status === 'awaiting_payment'
+    || (stage === 'capture' && e.extra_status === 'authorised' && paymentStatus === 'authorized'));
+  return { owed, userId: o?.user_id, status: e?.extra_status };
 }
 
 /** Authorisation of a change's payment (held for the pharmacist's check). Returns the outcome word. */
 export async function recordEditAuthorisationTx(client: PoolClient, pay: { id: string; order_id: string; order_edit_id: string },
   gw: { id: string; method?: string }, times: { releaseDueAt: Date; gatewayExpiresAt: Date }, actor: string | null): Promise<string> {
-  const s = await stillOwed(client, pay.order_edit_id, pay.order_id);
+  const s = await stillOwed(client, pay.order_edit_id, pay.order_id, 'authorise');
   if (!s.owed) {
     await client.query(
       `UPDATE payments SET status = 'released', gateway_payment_id = $2, method = COALESCE($3, method), authorised_at = NOW(),
          released_at = NOW(), release_reason = 'The order change this paid for is no longer owed' WHERE id = $1`,
       [pay.id, gw.id, gw.method ?? null]);
     await writeAuditTx(client, { userId: s.userId, action: 'payment_authorisation_released', performedBy: actor,
-      newValue: { order_id: pay.order_id, order_edit_id: pay.order_edit_id, gateway_payment_id: gw.id, reason: 'order change no longer owed' } });
+      newValue: { order_id: pay.order_id, order_edit_id: pay.order_edit_id, gateway_payment_id: gw.id, reason: s.status === 'authorised' ? 'order change already held by another payment' : 'order change no longer owed' } });
     return 'order change no longer owed: authorisation released';
   }
   await client.query(
@@ -63,8 +80,9 @@ export async function recordEditAuthorisationTx(client: PoolClient, pay: { id: s
 }
 
 /** Capture of a change's payment (now, or after the pharmacist's check). 'refund' = take the money straight back. */
-export async function recordEditCaptureTx(client: PoolClient, pay: { order_id: string; order_edit_id: string }, gwId: string, actor: string | null): Promise<'paid' | 'refund'> {
-  const s = await stillOwed(client, pay.order_edit_id, pay.order_id);
+export async function recordEditCaptureTx(client: PoolClient, pay: { order_id: string; order_edit_id: string; status?: string }, gwId: string,
+  actor: string | null): Promise<'paid' | 'refund'> {
+  const s = await stillOwed(client, pay.order_edit_id, pay.order_id, 'capture', pay.status);
   if (!s.owed) {
     await writeAuditTx(client, { userId: s.userId, action: 'payment_after_close_refunded', performedBy: actor,
       newValue: { order_id: pay.order_id, order_edit_id: pay.order_edit_id, gateway_payment_id: gwId, reason: 'order change no longer owed' } });

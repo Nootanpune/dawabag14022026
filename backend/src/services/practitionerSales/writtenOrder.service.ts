@@ -6,10 +6,10 @@
 //       object store with its SHA-256;
 //   (b) in_app — a requisition built from the cart, signed by the registered doctor's own
 //       login: they type their name as on the council's register, tick the declaration and
-//       re-enter their password at that moment (developer's choice of "signed" — TO CONFIRM
-//       WITH THE LAWYER / FDA: an electronic signature under IT Act 2000 s.3A / Second
-//       Schedule (e.g. Aadhaar eSign) may be required instead). The exact text, the signer's
-//       registration, the time and the address are kept with the hash of the text.
+//       re-enter their password at that moment. Owner decision CONFIRMED 2026-10-04 (Sprint 48):
+//       this counts as the signed written order under r.65(9)(b); the upload stays available
+//       as an alternative. The exact text, the signer's registration, the time and the address
+//       are kept with the hash of the text.
 // Either is final once made (database trigger written_orders_final, migration 39) and is
 // attached once to the order it authorises (and, for an order change, to that change).
 import crypto from 'crypto';
@@ -19,6 +19,7 @@ import { PoolClient } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import { query, queryOne } from '../../config/database';
 import { getRedis } from '../../config/redis';
+import { takeAttempt } from '../../utils/attemptCounter';
 import { AppError } from '../../utils/AppError';
 import { writeAudit, writeAuditTx } from '../../utils/audit';
 import { validateDocument } from '../../utils/documentCheck';
@@ -95,13 +96,14 @@ export async function signRequisition(userId: string,
   const list = await requisitionItems(input.items);
   const redis = getRedis();
   const wrongKey = `wo_sign_wrong:${userId}`;
-  if (Number(await redis.get(wrongKey) ?? 0) >= SIGN_WRONG_LIMIT) {
+  // Sprint 48 (security review 41–47 #4): this try is counted BEFORE the password is checked
+  // (one Redis step), so parallel tries cannot all pass the limit; a right signature clears it
+  if (await takeAttempt(redis, wrongKey, 900) > SIGN_WRONG_LIMIT) {
     throw new AppError('Too many wrong attempts. Try signing again in 15 minutes.', 429, true, 'WRITTEN_ORDER_SIGN_PAUSED');
   }
   const u = await queryOne<{ password_hash: string }>(`SELECT password_hash FROM users WHERE id = $1 AND is_active`, [userId]);
   const passwordOk = !!u?.password_hash && await bcrypt.compare(String(input.password ?? ''), u.password_hash);
   if (!passwordOk || !typedNameMatches(input.typed_name, s.snapshot!)) {
-    await redis.multi().incr(wrongKey).expire(wrongKey, 900).exec();
     throw new AppError(passwordOk
       ? `Type your name exactly as on the medical council register (${s.snapshot!.name}) to sign.`
       : 'The password is not right. The written order was not signed.', 400, true, 'WRITTEN_ORDER_SIGNATURE_INVALID');

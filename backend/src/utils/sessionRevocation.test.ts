@@ -17,3 +17,15 @@ describe('tokens issued before a password change', () => {
     expect(issuedBeforePasswordChange(undefined, changed)).toBe(false);
   });
 });
+
+describe('Sprint 48: sessions ended by a super-admin', () => {
+  const sec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+  it('a token from before sessions_revoked_at no longer opens the account; the password message wins', () => {
+    const { sessionEndedMessage } = require('./jwt');
+    const at = '2026-10-04T10:00:05Z';
+    expect(sessionEndedMessage(sec('2026-10-04T09:00:00Z'), { sessions_revoked_at: at })).toMatch(/ended by Dawabag/);
+    expect(sessionEndedMessage(sec('2026-10-04T10:05:00Z'), { sessions_revoked_at: at })).toBeNull();
+    expect(sessionEndedMessage(sec('2026-10-04T09:00:00Z'), { password_changed_at: at, sessions_revoked_at: at })).toMatch(/password was changed/);
+    expect(sessionEndedMessage(sec('2026-10-04T09:00:00Z'), {})).toBeNull();
+  });
+});

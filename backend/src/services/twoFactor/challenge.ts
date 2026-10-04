@@ -4,6 +4,7 @@
 // no cookie until the second step succeeds. Wrong codes are counted per login.
 import crypto from 'crypto';
 import { getRedis } from '../../config/redis';
+import { takeAttempt } from '../../utils/attemptCounter';
 import { CODE_CHALLENGE_SECONDS, ENROL_CHALLENGE_SECONDS, MAX_WRONG_CODES, WRONG_CODE_WINDOW_SECONDS } from './policy';
 
 export type ChallengePurpose = 'code' | 'enrol';
@@ -44,12 +45,12 @@ export async function wrongCodes(userId: string): Promise<number> {
 }
 export const isPaused = async (userId: string) => (await wrongCodes(userId)) >= MAX_WRONG_CODES;
 
-/** Counts a wrong code; returns the count in this window. */
-export async function countWrongCode(userId: string): Promise<number> {
-  const r = getRedis();
-  const n = await r.incr(wrongKey(userId));
-  if (n === 1) await r.expire(wrongKey(userId), WRONG_CODE_WINDOW_SECONDS);
-  return n;
-}
+/**
+ * Sprint 48 (security review 41–47 #4): takes this try's number BEFORE the code is checked
+ * (INCR + window expiry in one Redis step). A try over MAX_WRONG_CODES is refused unchecked;
+ * a right code clears the count. Parallel tries can no longer all pass a "fewer than five
+ * wrong" check before any of them is counted.
+ */
+export const takeCodeAttempt = (userId: string) => takeAttempt(getRedis(), wrongKey(userId), WRONG_CODE_WINDOW_SECONDS);
 export const pauseLeftSeconds = async (userId: string) => Math.max(1, await getRedis().ttl(wrongKey(userId)));
 export const clearWrongCodes = (userId: string) => getRedis().del(wrongKey(userId));

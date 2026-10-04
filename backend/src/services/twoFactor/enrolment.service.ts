@@ -9,7 +9,7 @@ import { query, queryOne, withTransaction } from '../../config/database';
 import { AppError } from '../../utils/AppError';
 import { writeAudit, writeAuditTx } from '../../utils/audit';
 import { getSetting } from '../settings.service';
-import { clearWrongCodes, countWrongCode, FirstStep, isPaused, pauseLeftSeconds } from './challenge';
+import { clearWrongCodes, FirstStep, pauseLeftSeconds, takeCodeAttempt } from './challenge';
 import { decryptSecret, encryptSecret, generateRecoveryCodes, hashRecoveryCode, looksLikeRecoveryCode, RECOVERY_CODE_COUNT } from './keys';
 import { appliesToRole, mayDisable, MAX_WRONG_CODES, policyFrom, TWO_FACTOR_ROLES, TWO_FACTOR_SETTING, TwoFactorPolicy } from './policy';
 import { base32Encode, generateSecret, matchTotp, otpauthUri } from './totp';
@@ -31,9 +31,13 @@ async function pausedError(userId: string) {
   const s = await pauseLeftSeconds(userId);
   return new AppError(`Too many wrong codes. Please wait ${Math.ceil(s / 60)} minutes and try again.`, 429, true, PAUSED);
 }
-/** A code tried while paused is refused unchecked — and still audited as a failed attempt (C-46). */
-async function refuseWhilePaused(userId: string, ip: string | null, context: Record<string, unknown>) {
-  if (!(await isPaused(userId))) return;
+/**
+ * Sprint 48: every try takes its number first (challenge.ts takeCodeAttempt); one over the
+ * limit is refused unchecked — and still audited as a failed attempt (C-46). Returns the number.
+ */
+async function takeTry(userId: string, ip: string | null, context: Record<string, unknown>): Promise<number> {
+  const n = await takeCodeAttempt(userId);
+  if (n <= MAX_WRONG_CODES) return n;
   await writeAudit({ userId, action: 'two_factor_failed', performedBy: userId, ip, newValue: { ...context, reason: 'paused' } });
   throw await pausedError(userId);
 }
@@ -72,9 +76,8 @@ async function newRecoveryCodesTx(c: PoolClient, userId: string): Promise<string
   return codes;
 }
 
-/** A wrong code: counted per login, audited; the fifth pauses the login's second step. */
-async function wrongCode(userId: string, ip: string | null, context: Record<string, unknown>): Promise<never> {
-  const n = await countWrongCode(userId);
+/** A wrong code (already counted by takeTry as try n): audited; the fifth pauses the login's second step. */
+async function wrongCode(userId: string, ip: string | null, context: Record<string, unknown>, n: number): Promise<never> {
   await writeAudit({ userId, action: 'two_factor_failed', performedBy: userId, ip, newValue: { ...context, attempt: n } });
   if (n >= MAX_WRONG_CODES) {
     await writeAudit({ userId, action: 'two_factor_paused', performedBy: null, ip, newValue: { ...context, wrong_codes: n } });
@@ -117,7 +120,7 @@ export async function startEnrolment(userId: string) {
 
 /** Confirms enrolment with the first code from the app; returns the ten recovery codes (shown once). */
 export async function confirmEnrolment(userId: string, code: string, ip: string | null, via: FirstStep | 'signed_in'): Promise<string[]> {
-  await refuseWhilePaused(userId, ip, { stage: 'enrol', via });
+  const n = await takeTry(userId, ip, { stage: 'enrol', via });
   const out = await withTransaction(async (c) => {
     const row = (await c.query(`SELECT status, secret_enc, last_used_step FROM user_two_factor WHERE user_id = $1 FOR UPDATE`, [userId])).rows[0];
     if (!row) throw new AppError('Start setting up two-step sign-in first', 409, true, 'TWO_FACTOR_NOT_STARTED');
@@ -128,7 +131,7 @@ export async function confirmEnrolment(userId: string, code: string, ip: string 
     await writeAuditTx(c, { userId, action: 'two_factor_enrolled', performedBy: userId, ip, newValue: { via, recovery_codes: codes.length } });
     return codes;
   });
-  if (!out) return wrongCode(userId, ip, { stage: 'enrol', via });
+  if (!out) return wrongCode(userId, ip, { stage: 'enrol', via }, n);
   await clearWrongCodes(userId);
   return out;
 }
@@ -138,7 +141,7 @@ export async function confirmEnrolment(userId: string, code: string, ip: string 
 export type SecondStep = 'authenticator' | 'recovery_code';
 
 export async function checkSecondStep(userId: string, code: string, ip: string | null, context: { stage: string; via?: string }): Promise<{ method: SecondStep; recoveryCodesLeft: number }> {
-  await refuseWhilePaused(userId, ip, context);
+  const n = await takeTry(userId, ip, context);
   const input = String(code ?? '').trim();
   const res = await withTransaction(async (c) => {
     const row = (await c.query(`SELECT secret_enc, last_used_step FROM user_two_factor WHERE user_id = $1 AND status = 'active' FOR UPDATE`, [userId])).rows[0];
@@ -153,7 +156,7 @@ export async function checkSecondStep(userId: string, code: string, ip: string |
     }
     return { method, recoveryCodesLeft: left };
   });
-  if (!res) return wrongCode(userId, ip, context);
+  if (!res) return wrongCode(userId, ip, context, n);
   await clearWrongCodes(userId);
   return res;
 }
@@ -235,8 +238,11 @@ export async function resetTwoFactor(actorId: string, targetId: string, reason: 
     const r = await c.query(`DELETE FROM user_two_factor WHERE user_id = $1 RETURNING status`, [targetId]);
     await c.query(`DELETE FROM user_recovery_codes WHERE user_id = $1`, [targetId]);
     if (!r.rowCount) return false;
+    // Sprint 48 (security review 41–47 #9): the person's open sessions end too — the lost phone
+    // may still hold one, and a two-step session would otherwise be renewed for as long as it is used
+    await c.query(`UPDATE users SET sessions_revoked_at = NOW() WHERE id = $1`, [targetId]);
     await writeAuditTx(c, { userId: targetId, action: 'two_factor_reset_by_admin', performedBy: actorId, ip, notes: reason,
-      newValue: { role: target.role, was: r.rows[0].status } });
+      newValue: { role: target.role, was: r.rows[0].status, sessions_ended: true } });
     return true;
   });
   if (!removed) throw new AppError('This login has no two-step sign-in to reset', 409, true, 'TWO_FACTOR_NOT_ON');

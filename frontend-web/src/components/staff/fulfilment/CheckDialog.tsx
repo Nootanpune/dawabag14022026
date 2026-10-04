@@ -32,7 +32,7 @@ export default function CheckDialog({ item, onClose }: { item: CheckQueueItem; o
   const [error, setError] = useState('');
   const [confirmReject, setConfirmReject] = useState(false);
   const decide = useMutation({
-    mutationFn: (d: CheckDecision) => decideCheck(item.shipment_id, d, d === 'release' ? undefined : reason.trim()),
+    mutationFn: (d: CheckDecision) => decideCheck(item.shipment_id, d, d === 'release' ? undefined : reason.trim(), item.edits_count),
     onSuccess: (_r, d) => { toast.success(`${item.order_number} ${DONE[d]}`); onClose(); },
     onError: (err) => setError(getApiErrorMessage(err, 'Could not record the decision')),
     onSettled: () => queryClient.invalidateQueries({ queryKey: fulfilmentKeys.all }),

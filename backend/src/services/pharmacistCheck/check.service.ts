@@ -20,10 +20,48 @@ import { partnerRegistrationAtCheck, staffRegistrationAtCheck } from '../saleIde
 import { recordShipmentSaleIdentityTx } from '../saleIdentity/record.service';
 import { PRACTITIONER_TYPE } from '../practitionerSales/rules';
 import { writtenOrdersFor } from '../practitionerSales/writtenOrder.service';
+import { practitionerState } from '../practitionerSales/registration.service';
+import { buyerStanding } from '../buyerRestriction/standing.service';
+import { buyerMay, restrictedMessage } from '../buyerRestriction/rules';
+
+export const BUYER_NOT_ELIGIBLE = 'BUYER_NOT_ELIGIBLE';
 
 export interface Checker { userId: string; name: string; regNo: string; vendorPharmacistId?: string | null }
 
 /** A Dawabag pharmacist who may release orders: pharmacist_rx with a registration number. */
+/**
+ * Sprint 48 (security review 41–47 #2): every approval path locks the ORDER row before its
+ * shipments — the lock an order change (orderEdit/edit.service), a cancellation and a held
+ * capture take first. Before, a release locked only the shipment and could run while the buyer
+ * changed the order: it then approved (and invoiced) lines the pharmacist never saw, and a
+ * prescription review could release a parcel holding a prescription medicine the buyer had
+ * just added without a prescription (C-08, r.64(2)). Same order of locks everywhere → no deadlock.
+ */
+export async function lockOrderOfShipment(client: PoolClient, shipmentId: string, partnerId?: string): Promise<void> {
+  const r = (await client.query(
+    `SELECT order_id FROM order_shipments WHERE id = $1${partnerId ? ' AND partner_id = $2' : ''}`,
+    partnerId ? [shipmentId, partnerId] : [shipmentId])).rows[0];
+  if (r) await client.query(`SELECT 1 FROM orders WHERE id = $1 FOR UPDATE`, [r.order_id]);
+}
+
+/** How many times the buyer has changed the order (the check screens send back the number they showed). */
+export async function orderEditsCount(db: Pick<PoolClient, 'query'>, orderId: string): Promise<number> {
+  return Number((await db.query(`SELECT COUNT(*)::int AS n FROM order_edits WHERE order_id = $1`, [orderId])).rows[0]?.n ?? 0);
+}
+
+/**
+ * Sprint 48: the pharmacist approves what they looked at. When the check screen says how many
+ * changes it showed (`edits_seen`) and the buyer has changed the order since, the approval is
+ * refused (409 ORDER_CHANGED) — the pharmacist reopens the order and checks it again.
+ */
+export async function assertUnchangedSinceShown(client: PoolClient, orderId: string, editsSeen: number | undefined): Promise<void> {
+  if (editsSeen === undefined) return;
+  if ((await orderEditsCount(client, orderId)) !== editsSeen) {
+    throw new AppError('The buyer changed this order after you opened it. Reopen the order and check it again before approving.',
+      409, true, 'ORDER_CHANGED');
+  }
+}
+
 export async function dawabagPharmacist(client: PoolClient, userId: string): Promise<Checker> {
   const p = (await client.query(
     `SELECT u.role, u.pharmacist_reg_no, up.full_name FROM users u
@@ -55,7 +93,8 @@ export async function checkQueue() {
             o.id AS order_id, o.order_number, o.status AS order_status, o.payment_terms, o.patient_id,
             up.full_name AS buyer_name, u.customer_type,
             EXISTS (SELECT 1 FROM order_edits e WHERE e.order_id = o.id AND e.extra_status = 'awaiting_payment') AS extra_payment_pending,
-            (SELECT COUNT(*)::int FROM written_orders w WHERE w.order_id = o.id) AS written_orders
+            (SELECT COUNT(*)::int FROM written_orders w WHERE w.order_id = o.id) AS written_orders,
+            (SELECT COUNT(*)::int FROM order_edits e WHERE e.order_id = o.id) AS edits_count
      FROM order_shipments s
      JOIN orders o ON o.id = s.order_id
      JOIN users u ON u.id = o.user_id
@@ -90,7 +129,8 @@ export async function orderCheckDetail(orderId: string) {
   const written = await writtenOrdersFor(null, orderId);
   const extra = await queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM order_edits WHERE order_id = $1 AND extra_status = 'awaiting_payment'`, [orderId]);
   return { order: o, lines: lines.map((l) => ({ ...lineOut(l), shipment_id: l.shipment_id })), signals: abuseSignals(lines as SignalLine[]), shipments,
-    written_orders: written, extra_payment_pending: (extra?.n ?? 0) > 0 };
+    written_orders: written, extra_payment_pending: (extra?.n ?? 0) > 0,
+    edits_count: (await queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM order_edits WHERE order_id = $1`, [orderId]))?.n ?? 0 };
 }
 
 /** Sprint 42: the checker's registration as at this check — kept on the shipment, filled once (C-03, C-08). */
@@ -147,6 +187,41 @@ export async function assertReleasableTx(client: PoolClient, orderId: string) {
     throw new AppError('This doctor / institution order has no signed written order attached; it cannot be supplied (Drugs Rules 1945, r.65(9)(b)).',
       409, true, 'WRITTEN_ORDER_REQUIRED');
   }
+  await assertBuyerEligibleAtSaleTx(client, orderId);
+}
+
+/**
+ * Sprint 48 (security review 41–47 #3): since Sprint 44 the sale happens at the pharmacist's
+ * approval (the tax invoice is issued then), but the buyer's standing was checked only when the
+ * order was placed. A doctor whose registration lapsed or was suspended meanwhile, or a buyer who
+ * no longer qualifies for a product restricted to doctors / hospitals or licensed trade
+ * (Sprint 47), would still have been invoiced and supplied. Checked again here, on the day of
+ * sale: 409 BUYER_NOT_ELIGIBLE — the pharmacist holds or refuses the order (a refusal refunds it).
+ * r.65(9)(b); C-14, C-33.
+ */
+export async function assertBuyerEligibleAtSaleTx(client: PoolClient, orderId: string) {
+  const o = (await client.query(
+    `SELECT o.user_id, o.pricing_type, u.customer_type, u.kyc_status FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
+    [orderId])).rows[0];
+  if (!o) return;
+  if (o.pricing_type === PRACTITIONER_TYPE) {
+    const p = await practitionerState(client, o.user_id);
+    if (p.applies && !p.standing!.ok) {
+      throw new AppError(`This doctor / institution's registration is not valid today, so the order cannot be approved: ${p.standing!.message}`,
+        409, true, BUYER_NOT_ELIGIBLE);
+    }
+  }
+  const restricted = (await client.query(
+    `SELECT DISTINCT p.name, p.buyer_restriction FROM order_items oi JOIN order_shipments s ON s.id = oi.shipment_id
+     JOIN products p ON p.id = oi.product_id
+     WHERE oi.order_id = $1 AND oi.supply_qty > 0 AND s.status <> 'cancelled' AND p.buyer_restriction <> 'everyone'`, [orderId])).rows;
+  if (!restricted.length) return;
+  const standing = await buyerStanding(client, { id: o.user_id, customer_type: o.customer_type, kyc_status: o.kyc_status });
+  const refused = restricted.filter((r: any) => !buyerMay(r.buyer_restriction, standing));
+  if (refused.length) {
+    throw new AppError(`This buyer may no longer buy ${refused.map((r: any) => r.name).join(', ')} (${restrictedMessage(refused[0].name, refused[0].buyer_restriction, standing.kind)}). `
+      + 'Hold the order, or refuse it so the buyer is refunded.', 409, true, BUYER_NOT_ELIGIBLE);
+  }
 }
 
 /**
@@ -177,7 +252,7 @@ interface Locked { id: string; order_id: string; pharmacist_check: string; order
  */
 export async function decide(
   lock: (client: PoolClient) => Promise<Locked>, resolveChecker: (client: PoolClient) => Promise<Checker>,
-  decision: CheckDecision, reason: string | undefined, actorId: string,
+  decision: CheckDecision, reason: string | undefined, actorId: string, opts: { editsSeen?: number } = {},
 ) {
   const problem = reasonProblem(decision, reason);
   if (problem) throw new AppError(problem, 400);
@@ -212,6 +287,8 @@ export async function decide(
     if (!canDecide(s.pharmacist_check, decision)) throw new AppError(`Already ${s.pharmacist_check.replace('_', ' ')}`, 409);
     const who = await resolveChecker(client);
     if (decision === 'release') {
+      // Sprint 48: not if the buyer changed the order after the pharmacist opened it
+      await assertUnchangedSinceShown(client, s.order_id, opts.editsSeen);
       // A prescription line still waiting blocks the release too (C-08)
       await assertRxCleared(client, s.order_id, s.id);
       const [inv] = await recordRelease(client, [s.id], who, 'order_check', s.user_id, s.order_id);
@@ -235,9 +312,11 @@ export async function decide(
 }
 
 /** Dawabag's own shipment, checked by a Dawabag pharmacist. */
-export function decideOwnShipment(pharmacistId: string, shipmentId: string, decision: CheckDecision, reason?: string) {
+export function decideOwnShipment(pharmacistId: string, shipmentId: string, decision: CheckDecision, reason?: string,
+  opts: { editsSeen?: number } = {}) {
   return decide(
     async (client) => {
+      await lockOrderOfShipment(client, shipmentId);   // Sprint 48: order first, as an order change
       const s = (await client.query(
         `SELECT s.id, s.order_id, s.status, s.pharmacist_check, o.status AS order_status, o.order_number, o.user_id
          FROM order_shipments s JOIN orders o ON o.id = s.order_id
@@ -247,7 +326,7 @@ export function decideOwnShipment(pharmacistId: string, shipmentId: string, deci
       return s;
     },
     (client) => dawabagPharmacist(client, pharmacistId),
-    decision, reason, pharmacistId);
+    decision, reason, pharmacistId, opts);
 }
 
 /** Shared state checks before any decision. */

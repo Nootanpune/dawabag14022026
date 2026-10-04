@@ -2,13 +2,28 @@
 
 ## Current state (2026-10-04)
 The February Kilo Next.js prototype was replaced by the Dawabag v2 package
-(built in a Claude chat, 30 Mar 2026). Sprints 1–47 are done (Sprint 14 video calls wired on web and mobile; Sprints 44–47 uncommitted) on branch
+(built in a Claude chat, 30 Mar 2026). Sprints 1–48 are done (Sprint 14 video calls wired on web and mobile; Sprints 44–48 uncommitted) on branch
 `claude/dawabag-pharmacy-status-0h7mr3`; beta now waits mainly on owner data, keys and
 the lawyer/CA sign-off.
 
 ## Standing rules from the owner (2026-09-30)
 - Server is the single source of truth: no local storage anywhere (see DECISIONS.md).
 - Modular software: no monolithic HTML/single-file apps.
+
+## Sprint 48 — security review of Sprints 41–47, launch checklist (2026-10-04, uncommitted)
+
+- Owner answers 2026-10-04 (DECISIONS row "Owner answers recorded", CONFIRMED): in-app signed requisition = signed written order (r.65(9)(b); upload stays); unpaid "pay the difference" does NOT time out; two-step sign-in for ALL partner logins; Allied Softtech will not provide export/API → stock-feed automation is Dawabag/Nootan's own solution; MSG91+DLT in progress (owner); Razorpay test = pending owner UAT. Sprint 44 / 42 DECISIONS rows updated; writtenOrder.service comment updated.
+- Review `docs/security/review-sprint41-47.md`: 1 high, 3 medium, 5 low fixed; 6 low left/decided; 35–40 open items re-checked (#16 still waits for the owner's "required" switch). Fixes:
+  #1 HIGH orderEdit/extraPayment.ts stillOwed(stage, paymentStatus): an authorisation counts only while the change is awaiting_payment; a capture only for awaiting_payment or the payment that holds the 'authorised' change; order locked first, then the edit row (old code: two holds for one change both captured + lowering refunded 2× → buyer short-paid by the difference).
+  #2 pharmacistCheck/check.service lockOrderOfShipment (own + partner decide lock fns), rxVerification lockOrderOfPrescription + applyPrescriptionTx order lock; edits_count in checkQueue / orderCheckDetail / partner shipments; optional `edits_seen` on POST /fulfilment/shipments/:id/check and /partner/shipments/:id/check → 409 ORDER_CHANGED (assertUnchangedSinceShown); web CheckDialog / PartnerCheckDialog send it.
+  #3 assertBuyerEligibleAtSaleTx in assertReleasableTx: doctor registration standing + every restricted line vs live buyerStanding at approval → 409 BUYER_NOT_ELIGIBLE.
+  #4 utils/attemptCounter.ts (Lua INCR+EXPIRE, counted BEFORE checking): OTP check is one Redis script (CHECK_OTP_SCRIPT; non-code input = wrong try); TOTP takeCodeAttempt/takeTry (n > 5 refused unchecked, audited reason paused); written-order signature takeAttempt; OTP send counter atomic.
+  Lows fixed: #5 migration 43 `users.sessions_revoked_at` set by super-admin 2FA reset; utils/jwt sessionEndedMessage used by authenticate / optionalAuth / refresh (401 "Your session was ended by Dawabag…"); #6 POST /kyc/admin/verify-nmc admins only (KYC DecisionPanel shows pharmacists a note); #7 409 ORDER_EDIT_CREDIT_SETTLED (settled credit order cannot grow); #8 reseal.service keyset paging + conditional UPDATE (ROW()::text snapshot). Left: #9 non-guess 2FA failures count as tries (decision), #10 prescription review has lock but no edits_seen, #11 refresh rotation race (two tabs), #12 certificate swapped before verify, #13 PDF polyglot (stored as PDF), #14 xlsx 60 MB in memory (staff-only), #15 held order payment still expires though the difference does not.
+- CSV: every export already uses utils/csv toCsv (formula guard); new utils/csv.test.ts.
+- Docs: `docs/LAUNCH_CHECKLIST.md` (owner's one page, 8 groups, who + status + RUNBOOK section); RUNBOOK §2 (2FA reset ends sessions; attempts counted first), §7h (difference never times out; approvals lock the order, ORDER_CHANGED, BUYER_NOT_ELIGIBLE; one change one payment), §8 items 11–14; DECISIONS rows (owner answers, review, checklist).
+- Tests: jest otp.test.ts (eval emulation + parallel guesses), passwordReset.test.ts (eval fake), csv.test.ts, sessionRevocation.test.ts; smoke `test/sprint48.smoke.mjs` (test/sprint48/{money,auth}.mjs on the Sprint 44 fixtures; wired into test:smoke) — 19 of its checks fail on the old code, all pass now.
+- Results: backend tsc + jest 93 suites / 737 pass; smoke 1–48 2442 checks, 0 failed, API as dawabag_api (no permission errors); web tsc + lint + build pass; Playwright 159 passed / 4 skipped (S3-fake skips) — orderEdit.spec now asserts the on-order medicine has no Add button instead of an empty search (trial DEMO-PCM* items on the dev DB matched "paracetamol", the Sprint 45 note).
+- App (mobile): verify of a second payment for the same change → 409 (show message, reload); 401 "Your session was ended by Dawabag" after a 2FA reset (treat as any 401); POST /orders/:id/edit 409 ORDER_EDIT_CREDIT_SETTLED; the app has no pharmacist-check calls (edits_seen not needed); check OTP_SEND_LIMIT handling (Sprint 41 follow-up not found by name in the app).
 
 ## Sprint 47 — who may buy a product (control only), job queues per deployment (2026-10-04, uncommitted)
 

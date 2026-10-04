@@ -11,6 +11,7 @@
 //     stranger's phone, no SMS bill run up through the "Forgot password" form).
 // Codes and counters live only in Redis with an expiry (server-side; nothing on devices).
 import crypto from 'crypto';
+import { takeAttempt } from '../../utils/attemptCounter';
 import { getRedis } from '../../config/redis';
 import { AppError } from '../../utils/AppError';
 
@@ -46,8 +47,7 @@ export async function takeOtpSendSlot(mobile: string): Promise<{ ok: true } | { 
     if (fresh === null) return { ok: false, retryAfterS: Math.max(1, await r.ttl(`otp_gap:${mobile}`)) };
   }
   const key = `otp_sends:${mobile}`;
-  const n = await r.incr(key);
-  if (n === 1) await r.expire(key, 3600);
+  const n = await takeAttempt(r, key, 3600);   // Sprint 48: INCR + expiry in one step
   if (n > perHour) return { ok: false, retryAfterS: Math.max(1, await r.ttl(key)) };
   return { ok: true };
 }
@@ -63,28 +63,30 @@ export async function storeNewOtp(mobile: string): Promise<string> {
 export type OtpCheck = 'ok' | 'wrong' | 'too_many';
 
 /**
+ * Sprint 48 (security review 41–47 #4): the whole check is ONE Redis script — compare, use up
+ * the code or count the wrong try, and throw the code away at the limit. Parallel requests can
+ * no longer all read the code before any wrong try is counted (which let a guesser make far
+ * more than five tries). The comparison runs inside Redis, next to the stored value, where its
+ * timing cannot be measured from outside (network jitter is many orders larger).
+ */
+export const CHECK_OTP_SCRIPT = `local stored = redis.call('GET', KEYS[1])
+if stored and stored == ARGV[1] then
+  redis.call('DEL', KEYS[1]); redis.call('DEL', KEYS[2]); return 'ok'
+end
+local n = redis.call('INCR', KEYS[2])
+if n == 1 then redis.call('EXPIRE', KEYS[2], tonumber(ARGV[2])) end
+if n >= tonumber(ARGV[3]) then redis.call('DEL', KEYS[1]); redis.call('DEL', KEYS[2]); return 'too_many' end
+return 'wrong'`;
+
+/**
  * Checks (and on success uses up) the mobile's code. Wrong codes are counted per mobile
  * for every caller; the fifth wrong one throws the code away.
  */
 export async function checkOtp(mobile: string, otp: string): Promise<OtpCheck> {
-  const r = getRedis();
-  const key = `otp:${mobile}`, wrongKey = `otp_wrong:${mobile}`;
-  const stored = await r.get(key);
-  const a = Buffer.from(String(stored ?? '')), b = Buffer.from(String(otp));
-  const match = !!stored && a.length === b.length && crypto.timingSafeEqual(a, b);
-  if (match) {
-    // Used once: a second request with the same code finds nothing
-    const used = await r.del(key);
-    if (used === 1) { await r.del(wrongKey); return 'ok'; }
-  }
-  const wrong = await r.incr(wrongKey);
-  if (wrong === 1) await r.expire(wrongKey, WRONG_WINDOW_S);
-  if (wrong >= OTP_MAX_WRONG) {
-    await r.del(key);
-    await r.del(wrongKey);
-    return 'too_many';
-  }
-  return 'wrong';
+  // Anything that is not a code at all still counts as a wrong try (and never matches)
+  const guess = /^\d{4,8}$/.test(String(otp ?? '')) ? String(otp) : '\u0000';
+  const r = await getRedis().eval(CHECK_OTP_SCRIPT, 2, `otp:${mobile}`, `otp_wrong:${mobile}`, guess, String(WRONG_WINDOW_S), String(OTP_MAX_WRONG));
+  return (r === 'ok' || r === 'too_many' ? r : 'wrong') as OtpCheck;
 }
 
 export const TOO_MANY_WRONG_CODES = 'Too many wrong codes. Ask for a new code.';

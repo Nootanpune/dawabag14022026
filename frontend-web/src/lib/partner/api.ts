@@ -61,7 +61,7 @@ export async function fetchPartnerPharmacists(): Promise<PartnerPharmacist[]> {
 }
 
 /** Release for packing, hold, or refuse to supply — recorded against the chosen pharmacist. */
-export async function decidePartnerCheck(id: string, body: { decision: 'release' | 'hold' | 'reject'; vendor_pharmacist_id: string; reason?: string }) {
+export async function decidePartnerCheck(id: string, body: { decision: 'release' | 'hold' | 'reject'; vendor_pharmacist_id: string; reason?: string; edits_seen?: number }) {
   const { data } = await api.post(`/partner/shipments/${id}/check`, body);
   return data.data as { shipment_id: string; pharmacist_check: string };
 }

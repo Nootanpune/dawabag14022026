@@ -95,6 +95,18 @@ export async function verifyRefreshToken(token: string): Promise<TokenPayload> {
  * JWT iat is in whole seconds, so a token from the same second as the change still
  * counts; password_changed_at is written from the API's clock (password.controller).
  */
+/**
+ * Sprint 48 (security review 41–47 #9): why a token no longer opens the account, or null —
+ * issued before the last password change (Sprint 34), or before a super-admin ended the
+ * person's sessions (users.sessions_revoked_at, set when their two-step sign-in is reset).
+ */
+export function sessionEndedMessage(iat: number | undefined,
+  u: { password_changed_at?: Date | string | null; sessions_revoked_at?: Date | string | null }): string | null {
+  if (issuedBeforePasswordChange(iat, u.password_changed_at)) return 'Your password was changed. Please sign in again';
+  if (issuedBeforePasswordChange(iat, u.sessions_revoked_at)) return 'Your session was ended by Dawabag. Please sign in again';
+  return null;
+}
+
 export function issuedBeforePasswordChange(iat: number | undefined, passwordChangedAt: Date | string | null | undefined): boolean {
   if (!passwordChangedAt || typeof iat !== 'number') return false;
   const changed = new Date(passwordChangedAt).getTime();

@@ -9,6 +9,13 @@ const fakeRedis = {
   expire: jest.fn(async () => 1),
   ttl: jest.fn(async () => 60),
   del: jest.fn(async (k: string) => (redisStore.delete(k) ? 1 : 0)),
+  // Sprint 48: the OTP check is one Redis script; emulated with the same steps
+  eval: jest.fn(async (_script: string, _n: number, code: string, wrong: string, guess: string, _ttl: string, max: string) => {
+    if (redisStore.has(code) && redisStore.get(code) === guess) { redisStore.delete(code); redisStore.delete(wrong); return 'ok'; }
+    const n = Number(redisStore.get(wrong) ?? 0) + 1; redisStore.set(wrong, String(n));
+    if (n >= Number(max)) { redisStore.delete(code); redisStore.delete(wrong); return 'too_many'; }
+    return 'wrong';
+  }),
 };
 // The OTP service (Sprint 41) keeps codes and counters in Redis
 jest.mock('../config/redis', () => ({ getRedis: () => fakeRedis }));

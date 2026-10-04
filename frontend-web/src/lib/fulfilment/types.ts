@@ -36,6 +36,8 @@ export interface CheckQueueItem {
   signals: CheckSignal[];
   /** Sprint 44: the buyer still owes the difference for a change — cannot be approved yet */
   extra_payment_pending?: boolean;
+  /** Sprint 48: buyer changes so far — sent back with the decision (409 ORDER_CHANGED if it changed since) */
+  edits_count?: number;
   /** Sprint 44: signed written orders on a doctor / institution order (r.65(9)(b)) */
   written_orders?: number;
 }
