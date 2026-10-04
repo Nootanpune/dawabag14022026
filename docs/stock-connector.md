@@ -29,7 +29,13 @@ or later.
 | An API key | Starts with `dwbk_` (step 1) |
 | Internet access to the Dawabag API | Default address `https://api.trial.dawabag.com` |
 
-### Step 0 - Ask Allied Softtech to set up the scheduled export
+### Step 0 - Set up the scheduled export
+
+> **Update 4 October 2026:** Allied Softtech will not set up a scheduled export or an API.
+> Nootan sets it up itself with the free Microsoft Power Automate Desktop, which repeats the
+> normal "export the stock report" clicks every 15-30 minutes during shop hours into a fixed
+> file `STOCK.xlsx`: see **`docs/medivision-export-automation.md`**. The text below still
+> describes what the export must look like.
 
 Ask Allied to set MediVision to export the **"Stock Report Of Batch-wise Products"**
 every ~5 minutes into one folder, as Excel (`.xlsx`) or CSV. Use the same layout as the
@@ -297,7 +303,11 @@ keeps no "sent" list, no database and no files. Each run:
 
    If the newest file is not complete yet, it tries the next newer-than-server file.
    Order is still kept, because the server orders snapshots by export time.
-6. It reads the file into memory (read-only) and sends
+6. It reads the file into memory (read-only). Version 1.1.0 (Sprint 49) first compares the
+   open file's modified time and size with what step 5 checked: an export saved under a
+   fixed name and rewritten in place in that moment is not sent with the older time; the run
+   logs event 2005 ("rewritten after it was checked") and the next run sends the new file.
+   It then sends
    `POST .../stock-snapshot` as multipart, with field `file` and header
    `X-Snapshot-Taken-At` = the file's modified time as `yyyy-MM-ddTHH:mm:ss+05:30`.
    The time is converted to IST explicitly, so the PC's time-zone setting does not
@@ -400,8 +410,13 @@ at run time is written anywhere.
   * export files unchanged afterwards (hashes).
 
   The C# Credential Manager code compiled with `Add-Type`.
+* **Sprint 49 (version 1.1.0, fixed-name file rewritten in place).** All scripts parse with
+  PowerShell 7.4.6 on Linux. The new checks (a rewritten fixed-name file is chosen again;
+  a file rewritten after the checks is not read with the older time; a run losing that race
+  uploads nothing, logs 2005 and ends successfully) were run in a small script against the
+  module under PowerShell 7.4.6 on Linux, and the same cases were added to the Pester tests.
 * **Not run.**
-  * The Pester tests in `tests/` (Pester was not available here).
+  * The Pester tests in `tests/` (Pester could not be downloaded here).
   * Anything Windows-only: Credential Manager calls, Event Log, Scheduled Task, local
     account, registry, `Start-Process -Credential`, .NET Framework's `HttpClient`.
 

@@ -626,6 +626,38 @@ and the **tax invoice is issued at that approval** (DECISIONS.md, Sprint 44 rows
 - Catalogue suggestions file (§7j): an optional 16th column `buyer_restriction`
   (`everyone` / `practitioners_only` / `trade_only`); files with the 15 columns import as before.
 
+## 7l. Launch readiness page (Sprint 49)
+
+- **Admin → Launch readiness** (`/admin/launch-readiness`, admins and super-admins; dashboard
+  card "Launch readiness: X of Y ready") is the live version of `docs/LAUNCH_CHECKLIST.md`.
+  Each item shows its status (*Done*, *In progress*, *Not started*, *Not applicable on trial* /
+  *Not needed*), the evidence, who does it and a link to the screen where it is done. "Y"
+  leaves out items not applicable on this server.
+- **Computed** from the database and the API's environment on every load (nothing kept):
+  Razorpay keys and test / live mode (from the key id's prefix), webhook events in the last
+  30 days, MSG91 key + DLT templates for otp / dispatched / out for delivery / delivered /
+  order cancelled / return update, nightly backups (`job_runs` `db_backup`, §6) and the
+  record-integrity check (latest `chain_heads`), `APP_ENV` and demo data, `HEALTH_ENC_KEY` /
+  `TOTP_ENC_KEY`, the restricted database login, `PUBLIC_WEB_URL`, Shiprocket / Firebase /
+  Agora, the emergency stop, catalogue (live products, drafts waiting, drafts with
+  suggestions, product text approved), online-sale status, medicine information (approved /
+  without, imported drafts open), cold-chain couriers, pharmacist registrations (Dawabag's and
+  partners', verified and in date), two-step sign-in policy and enrolment share, doctor
+  registrations, the five policies (published, lawyer-reviewed). Secrets are reported only as
+  *set* / *not set* — never a value (C-41, C-44). Live keys, `APP_ENV=production` and backups
+  are *not applicable* on the trial.
+- **Manual** items (lawyer, CA, DLT registration, restore drill, release signing key, stock
+  feed solution, Schedule C / C1 completeness, rider logins, test orders, external
+  penetration test …) live in `launch_checklist_items` (migration 44, seeded from the
+  checklist on 4 Oct 2026). An admin presses *Update* to set status and note; each change is
+  audited (`launch_checklist_item_updated`, old → new) and the database refuses deleting an
+  item or changing anything but status and note. Some manual items show counts the software
+  can see (products marked Schedule C / C1, products with a buyer restriction, live stock
+  feeds, rider logins).
+- API: `GET /api/v1/admin/launch-readiness`, `PUT /api/v1/admin/launch-readiness/manual/:key
+  {status, note?}` (admin, super_admin; 422 for an unknown status or a note over 1000
+  characters, 404 for an unknown item).
+
 ## 7a. Development and CI
 
 - One command brings a fresh machine to a running, migrated API against the fake
@@ -756,6 +788,10 @@ server-side encryption, C-41), and an object appears only when `pg_dump` succeed
   newest backup is more than 26 hours old (skipped when backups are not configured or
   no backup container runs on that machine; `CHECK_BACKUP=0` skips it). Run it daily
   (e.g. host cron) and after every update.
+- Sprint 49: each run is also noted in the database as a `job_runs` row named `db_backup`
+  (succeeded with the object key, size and tier, or failed) — Admin → Launch readiness shows
+  the newest one (done when under 26 hours old). Noting it is best effort: it never fails the
+  backup. The backup itself stays only in the object store.
 
 **Restore.** `deploy/staging/restore.sh latest` (or an S3 key) streams the dump into a new
 database `dawabag_restore_check`, prints row counts of users, orders and products and the
@@ -890,7 +926,13 @@ search works without typo matching; to add it later, as a superuser:
 13. `PUBLIC_WEB_URL` set to the public website address (section 2, Teleconsultation) so the QR
     on e-prescriptions and links in messages open the right site.
 14. The plain-English owner's list of everything above and the legal / policy items:
-    `docs/LAUNCH_CHECKLIST.md` (Sprint 48).
+    `docs/LAUNCH_CHECKLIST.md` (Sprint 48) — live on **Admin → Launch readiness** since
+    Sprint 49 (section 7l), which computes most items from the server.
+15. Partner Nootan's stock feed: Allied will not export, so Nootan automates MediVision's own
+    stock-report export with Power Automate Desktop (`docs/medivision-export-automation.md`)
+    into a fixed `STOCK.xlsx` that the stock connector uploads (`docs/stock-connector.md`).
+    Set the partner's *Stale after* window longer than the export interval (30 minutes for a
+    15-minute export, 45 for 30).
 
 ## 9. Incidents
 

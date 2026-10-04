@@ -193,3 +193,61 @@ Describe 'A scheduled run' {
         }
     }
 }
+
+Describe 'An export saved under a fixed name and rewritten in place (Sprint 49)' {
+    # docs/medivision-export-automation.md: a Power Automate Desktop flow saves the report as
+    # STOCK.xlsx every 15-30 minutes, overwriting the previous one.
+    BeforeEach {
+        $script:dir = Join-Path $TestDrive ([guid]::NewGuid())
+        New-Item -ItemType Directory -Path $script:dir | Out-Null
+        $script:path = Join-Path $script:dir 'STOCK.xlsx'
+        Set-Content -LiteralPath $script:path -Value 'first export' -NoNewline
+        (Get-Item -LiteralPath $script:path).LastWriteTimeUtc = [datetime]::UtcNow.AddMinutes(-20)
+    }
+    It 'is chosen again after each rewrite, with the new export time' {
+        InModuleScope DawabagStockConnector -Parameters @{ Dir = $script:dir; Path = $script:path } {
+            Mock Wait-ConnectorSeconds {}
+            $cfg = ConvertTo-ConnectorConfig -Values @{ PartnerId = '00000000-0000-4000-8000-000000000000'; ExportFolder = $Dir }
+            $last = Get-WholeSecondUtc (Get-Item -LiteralPath $Path).LastWriteTimeUtc
+            (Find-ExportToSend -Config $cfg -LastTakenAtUtc $last).File | Should -BeNullOrEmpty      # already sent
+            Set-Content -LiteralPath $Path -Value 'second export, longer' -NoNewline
+            (Get-Item -LiteralPath $Path).LastWriteTimeUtc = [datetime]::UtcNow.AddMinutes(-2)
+            $pick = Find-ExportToSend -Config $cfg -LastTakenAtUtc $last
+            $pick.File.Name | Should -Be 'STOCK.xlsx'
+            $pick.TakenAtUtc | Should -BeGreaterThan $last
+        }
+    }
+    It 'is not sent with the older time when it was rewritten after it was checked' {
+        InModuleScope DawabagStockConnector -Parameters @{ Path = $script:path } {
+            $f = Get-Item -LiteralPath $Path
+            $time = $f.LastWriteTimeUtc; $len = $f.Length                 # what the checks saw
+            Set-Content -LiteralPath $Path -Value 'rewritten meanwhile, longer' -NoNewline
+            (Get-Item -LiteralPath $Path).LastWriteTimeUtc = [datetime]::UtcNow.AddMinutes(-1)
+            { Read-ExportFileBytes -File $f -ExpectedWriteTimeUtc $time -ExpectedLength $len } | Should -Throw '*rewritten after it was checked*'
+        }
+    }
+    It 'reads the bytes when nothing changed since the check' {
+        InModuleScope DawabagStockConnector -Parameters @{ Path = $script:path } {
+            $f = Get-Item -LiteralPath $Path
+            $bytes = Read-ExportFileBytes -File $f -ExpectedWriteTimeUtc $f.LastWriteTimeUtc -ExpectedLength $f.Length
+            [System.Text.Encoding]::ASCII.GetString($bytes) | Should -Be 'first export'
+        }
+    }
+    It 'a scheduled run that loses the race uploads nothing and leaves it to the next run' {
+        InModuleScope DawabagStockConnector -Parameters @{ Dir = $script:dir } {
+            $script:testCfg = ConvertTo-ConnectorConfig -Values @{ PartnerId = '00000000-0000-4000-8000-000000000000'; ExportFolder = $Dir; StableSeconds = 0 }
+            Mock Get-ConnectorConfig { $script:testCfg }
+            Mock Get-ConnectorSecret { 'dwbk_abcde12345_' + ('A' * 43) }
+            Mock Write-ConnectorLog {}
+            Mock Read-ExportFileBytes { throw (New-Object System.IO.IOException 'STOCK.xlsx was rewritten after it was checked; the new export is sent on the next run') }
+            Mock Invoke-ConnectorHttp -ParameterFilter { $Method -eq 'GET' } { @{ StatusCode = 200; NetworkError = $null; Body = 'x'; RetryAfterSeconds = $null
+                    Json = ('{"data":{"partner_id":"p","partner_name":"Demo","key":"k","stock_feed":{"mode":"live","last_taken_at":null,"stale_after_minutes":30}}}' | ConvertFrom-Json) } }
+            Mock Invoke-ConnectorHttp -ParameterFilter { $Method -eq 'POST' } { throw 'must not upload' }
+            $r = Invoke-DawabagStockSync
+            $r.Outcome | Should -Be 'NotComplete'
+            $r.Success | Should -BeTrue
+            Should -Invoke Invoke-ConnectorHttp -Times 0 -Exactly -ParameterFilter { $Method -eq 'POST' }
+            Should -Invoke Write-ConnectorLog -ParameterFilter { $EventId -eq 2005 -and $Message -like '*rewritten*' }
+        }
+    }
+}

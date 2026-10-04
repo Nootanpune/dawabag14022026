@@ -55,6 +55,7 @@ import {
   ClipboardCheck as ChecklistIcon,
   Fingerprint,
   KeySquare,
+  Rocket,
 } from 'lucide-react';
 import { MANAGER_ROLES, ADMIN_ROLES, PHARMACIST_ROLES } from '@/lib/admin/roles';
 import { FULFILMENT_QUEUE_ROLES, RIDER_ROLES } from '@/lib/fulfilment/roles';
@@ -193,6 +194,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/jobs', label: 'Jobs', icon: Timer, roles: MANAGER_ROLES },
       { href: '/admin/incidents', label: 'Security incidents', icon: Siren, roles: MANAGER_ROLES },
       { href: '/admin/settings', label: 'Settings', icon: Settings, roles: MANAGER_ROLES },
+      // Sprint 49 — the live launch checklist
+      { href: '/admin/launch-readiness', label: 'Launch readiness', icon: Rocket, roles: MANAGER_ROLES },
       // Sprint 42 — each staff login's own authenticator app
       { href: '/staff/two-factor', label: 'My two-step sign-in', icon: Fingerprint, roles: TWO_FACTOR_STAFF_ROLES },
     ],

@@ -81,6 +81,8 @@ function Invoke-DawabagStockSync {
         $result.File = $file.FullName
         $sent = Send-ExportFile -Config $config -ApiKey $key -File $file -TakenAtUtc $pick.TakenAtUtc -As live -DeadlineUtc $deadline
         $result.Outcome = $sent.Outcome; $result.Success = $sent.Success; $result.Message = $sent.Message
+        # A fixed-name export rewritten while it was being chosen is not a failure: the next run sends it (Sprint 49)
+        if ($sent.Outcome -eq 'NotComplete') { $result.Success = $true }
         return $result
     } catch {
         $result.Outcome = 'Unexpected'; $result.Message = $_.Exception.Message
@@ -94,7 +96,14 @@ function Invoke-DawabagStockSync {
 function Send-ExportFile {
     # Shared by the scheduled run and Send-DawabagStock: read, upload, log one line.
     param($Config, [string]$ApiKey, [System.IO.FileInfo]$File, [datetime]$TakenAtUtc, [ValidateSet('live', 'draft')][string]$As, [datetime]$DeadlineUtc)
-    $bytes = Read-ExportFileBytes $File
+    # Compared again once open: a fixed-name export rewritten since it was chosen is left for the next run (Sprint 49)
+    try {
+        $bytes = Read-ExportFileBytes -File $File -ExpectedWriteTimeUtc $File.LastWriteTimeUtc -ExpectedLength $File.Length
+    } catch [System.IO.IOException] {
+        $msg = "Not sent this run: $($_.Exception.Message)"
+        Write-ConnectorLog -Level Information -EventId $script:EventIds.NotComplete -Message $msg
+        return @{ Outcome = 'NotComplete'; Success = $false; Message = $msg; Json = $null }
+    }
     $when = ConvertTo-IstIsoString $TakenAtUtc
     $r = Send-DawabagExport -Config $Config -ApiKey $ApiKey -Bytes $bytes -FileName $File.Name -TakenAtUtc $TakenAtUtc -As $As -DeadlineUtc $DeadlineUtc
     $o = $r.Outcome

@@ -48,12 +48,27 @@ run_backup() {
   log "starting pg_dump of $PGDATABASE@$PGHOST to $key"
   if ! bytes="$(BACKUP_CHAIN_HEADS="$heads" s3 dump "$key" -- pg_dump --format=custom --compress=6 --no-password "$PGDATABASE")"; then
     log "BACKUP FAILED: $PGDATABASE to $key — see the lines above; no object was stored"
+    record_run failed "$started" "{\"tier\": \"$tier\"}" "pg_dump or upload failed; no object was stored"
     return 1
   fi
   log "backup ok: $key (${bytes%% *} bytes, $(( $(date +%s) - started )) s, $tier${heads:+; chain heads: ${bytes#* }})"
+  record_run succeeded "$started" "{\"key\": \"$key\", \"bytes\": ${bytes%% *}, \"tier\": \"$tier\"}"
   if [ "${BACKUP_PRUNE:-false}" = true ]; then
     s3 prune >&2 || log "WARNING: pruning old backups failed (the backup itself is stored)"
   fi
+}
+
+# Sprint 49: each run is noted in the database as a job_runs row named 'db_backup', so
+# Admin -> Launch readiness can show when the last backup succeeded (the backup itself
+# stays only in the object store). Best effort: a failure to note it never fails the
+# backup, and a database without job_runs (older) is skipped.
+record_run() {
+  local status="$1" started="$2" summary="$3" error="${4:-}"
+  q "$PGDATABASE" -v status="$status" -v started="$started" -v summary="$summary" -v error="$error" >/dev/null 2>&1 <<'SQL' \
+    || log "WARNING: could not note this backup run in the database (job_runs)"
+INSERT INTO job_runs (job_name, started_at, finished_at, status, summary, error)
+VALUES ('db_backup', to_timestamp(:'started'::bigint), now(), :'status', :'summary'::jsonb, NULLIF(:'error', ''));
+SQL
 }
 
 latest() {

@@ -1,6 +1,6 @@
 @{
     RootModule           = 'DawabagStockConnector.psm1'
-    ModuleVersion        = '1.0.0'
+    ModuleVersion        = '1.1.0'
     GUID                 = '6f0f3c2e-8a51-4c47-9d0e-3b7f2d6a1c55'
     Author               = 'Dawabag'
     CompanyName          = 'Dawabag'

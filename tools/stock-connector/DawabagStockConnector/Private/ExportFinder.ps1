@@ -104,9 +104,28 @@ function Find-ExportToSend {
 
 function Read-ExportFileBytes {
     # Reads the whole file into memory (read-only, sharing read). Nothing is written anywhere.
-    param([Parameter(Mandatory)][System.IO.FileInfo]$File)
-    $s = [System.IO.File]::Open($File.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+    # Sprint 49: an export saved under a FIXED name is rewritten in place every 15-30 minutes
+    # (for example by a Power Automate Desktop flow). When the caller passes what it checked
+    # (-ExpectedWriteTimeUtc / -ExpectedLength), the file is compared again once it is open
+    # (an open FileShare.Read handle keeps writers out while it is read): if it was rewritten
+    # since the check, nothing is sent with the older file's time - the next run sends it.
+    param(
+        [Parameter(Mandatory)][System.IO.FileInfo]$File,
+        [Nullable[datetime]]$ExpectedWriteTimeUtc = $null,
+        [long]$ExpectedLength = -1
+    )
     try {
+        $s = [System.IO.File]::Open($File.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+    } catch [System.IO.IOException] {
+        throw (New-Object System.IO.IOException ('{0} is being written again (it is open in another program); it is sent on a later run' -f $File.Name))
+    }
+    try {
+        if ($null -ne $ExpectedWriteTimeUtc -or $ExpectedLength -ge 0) {
+            $nowTime = [System.IO.File]::GetLastWriteTimeUtc($File.FullName)
+            if (($null -ne $ExpectedWriteTimeUtc -and $nowTime -ne $ExpectedWriteTimeUtc) -or ($ExpectedLength -ge 0 -and $s.Length -ne $ExpectedLength)) {
+                throw (New-Object System.IO.IOException ('{0} was rewritten after it was checked; the new export is sent on the next run' -f $File.Name))
+            }
+        }
         if ($s.Length -gt $script:MaxUploadBytes) { throw ('{0} is larger than 5 MB' -f $File.Name) }
         $buf = New-Object byte[] ([int]$s.Length)
         $read = 0

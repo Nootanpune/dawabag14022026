@@ -2,7 +2,7 @@
 # Keep every file of this module plain ASCII: Windows PowerShell 5.1 reads a .ps1
 # without a byte-order mark in the ANSI code page.
 
-$script:ConnectorVersion = '1.0.0'
+$script:ConnectorVersion = '1.1.0'
 
 # Non-secret settings live in the registry (HKLM, admins write, everyone reads).
 # Nothing else is stored by the connector: no data files, no "sent" list, no database

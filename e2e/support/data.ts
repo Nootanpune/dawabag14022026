@@ -61,6 +61,8 @@ export async function cleanup(c: Client) {
   // Keep the shared trail rows, just unlink them from the test people
   await c.query('UPDATE audit_logs SET performed_by = NULL WHERE performed_by = ANY($1)', [ids]);
   await c.query('UPDATE app_settings SET updated_by = NULL WHERE updated_by = ANY($1)', [ids]);
+  // Sprint 49: launch checklist items are never deleted; only forget who last changed them
+  await c.query('UPDATE launch_checklist_items SET updated_by = NULL WHERE updated_by = ANY($1)', [ids]).catch(() => {});
   // Partner pharmacies of the journeys ('E2E …'): vendors do not hang off a user,
   // and their invoice and credit-note series are keyed by id and prefix
   const vendors = (await c.query(`SELECT id::text, invoice_prefix FROM vendors WHERE name LIKE 'E2E %'`)).rows;

@@ -6,6 +6,7 @@ import { Loader2, Package, IndianRupee, ClipboardCheck, AlertTriangle, Users, Us
 import PageHeader from '@/components/admin/PageHeader';
 import SellingRightsWarnings from '@/components/admin/SellingRightsWarnings';
 import ConfigWarnings from '@/components/admin/ConfigWarnings';
+import LaunchReadinessCard from '@/components/admin/launchReadiness/LaunchReadinessCard';
 import { useAuthStore } from '@/store/authStore';
 import { hasRole, MANAGER_ROLES } from '@/lib/admin/roles';
 import api from '@/lib/api';
@@ -71,6 +72,8 @@ export default function AdminDashboard() {
             <SellingRightsWarnings />
             {/* Sprint 40: e.g. no SMS provider — sign-in codes cannot be sent */}
             <ConfigWarnings />
+            {/* Sprint 49: "X of Y ready" for launch, linking to the live checklist */}
+            <LaunchReadinessCard />
 
             {/* Metric cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">

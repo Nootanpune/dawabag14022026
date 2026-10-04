@@ -28,6 +28,7 @@ import { getOverview as getTwoFactorOverview, postReset as postTwoFactorReset } 
 import { getAuditChainVerify } from '../controllers/h1Register.controller';
 import { latestHeads, runChainVerify } from '../services/chainVerify/heads.service';
 import { configWarnings } from '../services/system/configWarnings';
+import { getLaunchReadiness, putManualItem } from '../controllers/launchReadiness.controller';
 
 const licenceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LICENCE_FILE_MAX_BYTES, files: 1 } });
 
@@ -181,6 +182,9 @@ router.post('/chain-heads/verify', authenticate, authorize('admin', 'super_admin
 router.get('/config-warnings', authenticate, authorize('admin', 'super_admin'), async (_req, res, next) => {
   try { res.json({ success: true, data: { warnings: await configWarnings() } }); } catch (err) { next(err); }
 });
+// Sprint 49: the live launch checklist (computed items + admin-kept manual items, audited; C-46)
+router.get('/launch-readiness', authenticate, authorize('admin', 'super_admin'), getLaunchReadiness);
+router.put('/launch-readiness/manual/:key', authenticate, authorize('admin', 'super_admin'), putManualItem);
 router.patch('/users/:userId/pharmacist', authenticate, authorize('admin', 'super_admin'), setPharmacistRegistration);
 
 export default router;

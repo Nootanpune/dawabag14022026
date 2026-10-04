@@ -1,5 +1,12 @@
 # Dawabag — launch checklist (before real customers)
 
+> **Live version: Admin → Launch readiness** (`/admin/launch-readiness`, Sprint 49). The
+> server computes most items itself (keys and settings present, counts of pharmacists,
+> products, policies, backups …) and admins record the rest (lawyer, CA, DLT, restore drill,
+> penetration test …) there, with a note; every change is audited. Use the page for the
+> current state; this file is the snapshot of 4 October 2026 and the list the page was built
+> from (RUNBOOK §7l).
+
 For the owner. Plain English; one line per job. **Who:** Owner, Lawyer, CA, Allied (Allied
 Softtech), Developer. **Status** is what is known on 4 October 2026 from `DECISIONS.md`, the
 RUNBOOK and the project notes — tick items off as they are done. Technical details for each
@@ -45,7 +52,7 @@ all of it is needed before the first real order.
 | 4.5 | `PUBLIC_WEB_URL` = the public website address, so e-prescription QR codes and links open the right site (RUNBOOK §2 "Teleconsultation", §8 item 13) | Developer | At production set-up |
 | 4.6 | Shiprocket user, webhook and pickup address; Firebase (app notifications); Agora (video calls) (RUNBOOK §2, §8 items 7–8) | Owner, Developer | Not done |
 | 4.7 | Android release signing key kept by the owner; app built for release (RUNBOOK §7b) | Owner, Developer | Pending owner |
-| 4.8 | Stock feed from partner Nootan's billing software: Allied will not provide an export or API, so Dawabag / Nootan build their own way; meanwhile the partner portal stock import and the connector's manual mode work (`docs/stock-connector.md`, RUNBOOK §2) | Owner, Developer | **Own solution needed** (Allied declined, 4 Oct 2026) |
+| 4.8 | Stock feed from partner Nootan's billing software: Allied will not provide an export or API, so Nootan automates MediVision's own stock-report export with Power Automate Desktop (`docs/medivision-export-automation.md`) and the connector uploads it (`docs/stock-connector.md`); meanwhile the partner portal stock import and the connector's manual mode work (RUNBOOK §2, §8 item 15) | Owner, Developer | **In progress** — guide written (Sprint 49); the MediVision clicks are recorded on Nootan's PC |
 
 ## 5. Data and catalogue
 
