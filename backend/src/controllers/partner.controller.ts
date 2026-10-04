@@ -62,6 +62,7 @@ export async function searchCatalogue(req: Request, res: Response, next: NextFun
               p.ptr_price_paise, p.pts_price_paise, p.institutional_price_paise, p.cold_chain,
               ${approvedImageKeySql()} AS approved_image_key,
               p.online_sale_status,   -- Sprint 39: listing is allowed, sale only once a pharmacist permits it (C-10)
+              p.buyer_restriction,    -- Sprint 47: listing is allowed; Dawabag sells it (from any seller) only to the buyers it names
               EXISTS (SELECT 1 FROM partner_products pp WHERE pp.partner_id = $2 AND pp.product_id = p.id) AS already_listed
        FROM products p
        WHERE p.is_active = TRUE AND p.deleted_at IS NULL

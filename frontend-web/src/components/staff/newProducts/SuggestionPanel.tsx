@@ -3,6 +3,7 @@ import { Lightbulb } from 'lucide-react';
 import { formatDateTimeIST } from '@/lib/dates';
 import type { Draft, DraftPatch } from '@/lib/admin/catalogueDrafts';
 import { CONFIDENCE_LABEL, SUGGESTED_FIELDS, showSuggested, type SuggestedKey } from '@/lib/admin/catalogueSuggestions';
+import { RESTRICTION_STAFF_LABELS } from '@/lib/shop/buyerRestriction';
 
 const BADGE = { high: 'bg-green-100 text-green-900', medium: 'bg-amber-100 text-amber-900', low: 'bg-red-100 text-red-900' } as const;
 
@@ -60,6 +61,12 @@ export default function SuggestionPanel({ draft, onSave, disabled }: { draft: Dr
           </div>
         ))}
       </dl>
+      {/* Sprint 47: who may buy it — decided with a reason in the approval step below, never by "Use" */}
+      {s.suggested.buyer_restriction && s.suggested.buyer_restriction !== 'everyone' && (
+        <p className="mt-1" data-testid="suggestion-buyer-restriction">
+          <strong>Who may buy:</strong> {RESTRICTION_STAFF_LABELS[s.suggested.buyer_restriction]} — choose it yourself, with a reason, when you approve.
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button type="button" className="btn-outline text-xs py-1 px-2 bg-white" disabled={disabled || count === 0} onClick={() => onSave(patch)}>
           Use the suggested values I have checked ({count})

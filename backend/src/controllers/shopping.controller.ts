@@ -3,17 +3,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { buyAgain } from '../services/shopping/buyAgain.service';
 import { cheaperOptions } from '../services/shopping/cheaperOption.service';
+import { requestStanding } from '../services/buyerRestriction/standing.service';
 
 // GET /cart/buy-again — medicines from the buyer's delivered orders not in the cart (C-10 applied)
 export async function getBuyAgain(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json({ success: true, data: { products: await buyAgain(req.user!.id, req.user!.pricing_type) } });
+    res.json({ success: true, data: { products: await buyAgain(req.user!.id, req.user!.pricing_type, await requestStanding(req)) } });
   } catch (err) { next(err); }
 }
 
 // GET /cart/cheaper-options — same medicine (generic name and strength), lower price, per cart line
 export async function getCheaperOptions(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json({ success: true, data: { options: await cheaperOptions(req.user!.id, req.user!.pricing_type) } });
+    res.json({ success: true, data: { options: await cheaperOptions(req.user!.id, req.user!.pricing_type, await requestStanding(req)) } });
   } catch (err) { next(err); }
 }

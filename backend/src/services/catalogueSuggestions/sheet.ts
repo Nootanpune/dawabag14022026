@@ -10,6 +10,7 @@ import { itemKey } from '../partnerStockImport/normalise';
 import { DOSAGE_FORMS, GST_RATES, HSN_RE, SCHEDULES } from '../catalogueDrafts/rules';
 import { categoryNameProblems, tidyHsn, tidyName } from '../catalogueLists/rules';
 import { PRODUCT_CLASSES, parseProductClass, type ProductClass } from '../productClass/rules';
+import { BUYER_RESTRICTIONS, parseRestrictionCell, type BuyerRestriction } from '../buyerRestriction/rules';
 
 export const SUGGESTION_SHEET = 'suggestions';
 /** The heading row, exactly (any order; nothing else). */
@@ -17,7 +18,11 @@ export const SUGGESTION_COLUMNS = [
   'item_name', 'pack', 'company', 'generic_name', 'strength', 'dosage_form', 'drug_schedule', 'cold_chain',
   'product_class', 'is_new_drug', 'category', 'hsn_code', 'gst_rate', 'confidence', 'note',
 ] as const;
-export type SuggestionColumn = typeof SUGGESTION_COLUMNS[number];
+/** Sprint 47: columns a file MAY have (a 15-column Sprint 46 file still imports unchanged). */
+export const OPTIONAL_SUGGESTION_COLUMNS = ['buyer_restriction'] as const;
+/** Every column the template carries: the required ones, then the optional ones. */
+export const TEMPLATE_COLUMNS = [...SUGGESTION_COLUMNS, ...OPTIONAL_SUGGESTION_COLUMNS] as const;
+export type SuggestionColumn = typeof TEMPLATE_COLUMNS[number];
 export const CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;
 export type Confidence = typeof CONFIDENCE_LEVELS[number];
 
@@ -36,9 +41,11 @@ export interface SuggestedValues {
   category?: string;
   hsn_code?: string;
   gst_rate?: number;
+  /** Sprint 47: who may buy it — a suggestion only; the pharmacist decides with a reason */
+  buyer_restriction?: BuyerRestriction;
 }
 export const SUGGESTED_KEYS = ['generic_name', 'strength', 'dosage_form', 'drug_schedule', 'cold_chain', 'product_class', 'is_new_drug',
-  'category', 'hsn_code', 'gst_rate'] as const satisfies readonly (keyof SuggestedValues)[];
+  'category', 'hsn_code', 'gst_rate', 'buyer_restriction'] as const satisfies readonly (keyof SuggestedValues)[];
 
 export interface SuggestionRow {
   /** Row number in the sheet (the heading is row 1) */
@@ -57,22 +64,24 @@ export interface SuggestionRow {
 
 export class SuggestionSheetError extends Error {}
 
-/** Checks the heading row; throws a plain message naming what is missing or extra. */
+/** Checks the heading row; throws a plain message naming what is missing or extra. An optional
+ *  column that is absent has index -1 (its cells read as blank). */
 export function columnIndex(header: string[]): Record<SuggestionColumn, number> {
   const names = header.map((h) => String(h ?? '').trim().toLowerCase());
   while (names.length && !names[names.length - 1]) names.pop();
   const missing = SUGGESTION_COLUMNS.filter((c) => !names.includes(c));
-  const extra = names.filter((n) => !(SUGGESTION_COLUMNS as readonly string[]).includes(n));
-  const twice = SUGGESTION_COLUMNS.filter((c) => names.indexOf(c) !== names.lastIndexOf(c));
+  const extra = names.filter((n) => !(TEMPLATE_COLUMNS as readonly string[]).includes(n));
+  const twice = TEMPLATE_COLUMNS.filter((c) => names.includes(c) && names.indexOf(c) !== names.lastIndexOf(c));
   if (missing.length || extra.length || twice.length) {
     const parts = [
       missing.length ? `missing ${missing.join(', ')}` : '',
       extra.length ? `not expected ${extra.map((e) => (e ? `"${e}"` : '(a column without a heading)')).join(', ')}` : '',
       twice.length ? `more than once ${twice.join(', ')}` : '',
     ].filter(Boolean);
-    throw new SuggestionSheetError(`The first row of the "${SUGGESTION_SHEET}" sheet must have exactly these columns: ${SUGGESTION_COLUMNS.join(', ')} (${parts.join('; ')})`);
+    throw new SuggestionSheetError(`The first row of the "${SUGGESTION_SHEET}" sheet must have exactly these columns: ${SUGGESTION_COLUMNS.join(', ')}`
+      + ` — and may add ${OPTIONAL_SUGGESTION_COLUMNS.join(', ')} (${parts.join('; ')})`);
   }
-  return Object.fromEntries(SUGGESTION_COLUMNS.map((c) => [c, names.indexOf(c)])) as Record<SuggestionColumn, number>;
+  return Object.fromEntries(TEMPLATE_COLUMNS.map((c) => [c, names.indexOf(c)])) as Record<SuggestionColumn, number>;
 }
 
 /**
@@ -121,7 +130,7 @@ export function parseGst(raw: string): number | undefined | 'invalid' {
   return Number.isFinite(n) && (GST_RATES as readonly number[]).includes(n) ? n : 'invalid';
 }
 
-const cellOf = (cells: string[], i: number) => String(cells[i] ?? '').trim();
+const cellOf = (cells: string[], i: number) => (i < 0 ? '' : String(cells[i] ?? '').trim());
 const orNull = (s: string) => (s ? s : null);
 
 /**
@@ -184,6 +193,11 @@ export function parseSuggestionRows(rows: string[][]): SuggestionRow[] {
     const gst = parseGst(v('gst_rate'));
     if (gst === 'invalid') problems.push(`gst_rate "${v('gst_rate')}" must be one of ${GST_RATES.join(', ')}`);
     else if (gst !== undefined) s.gst_rate = gst;
+
+    // Sprint 47 (optional column): who may buy it — shown to the pharmacist, who decides with a reason
+    const restriction = parseRestrictionCell(v('buyer_restriction'));
+    if (restriction === 'invalid') problems.push(`buyer_restriction "${v('buyer_restriction')}" is not one of: ${BUYER_RESTRICTIONS.join(', ')}`);
+    else if (restriction) s.buyer_restriction = restriction;
 
     const conf = v('confidence').toLowerCase();
     const confidence = (CONFIDENCE_LEVELS as readonly string[]).includes(conf) ? conf as Confidence : null;

@@ -23,6 +23,7 @@ import { PRACTITIONER_TYPE } from './practitionerSales/rules';
 import { assertRxSalesOpen } from './emergencyStop/state.service';
 import { attachPrescriptionTx } from './rxReuse.service';
 import { priceOrderLine } from './orderLines/pricing';
+import { buyerStanding } from './buyerRestriction/standing.service';
 import { prescriptionRequiredError } from './prescriptions/requirement.service';
 
 export const createOrderSchema = z.object({
@@ -109,6 +110,9 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
         'SELECT 1 FROM patients WHERE id = $1 AND owner_user_id = $2 AND deleted_at IS NULL', [data.patient_id, userId])).rows[0];
       if (!pat) throw new AppError('Patient not found', 404);
     }
+    // Sprint 47: who may buy each product — the buyer's standing now (verified doctor / hospital,
+    // licensed trade buyer), in this transaction; also refills placed by the job
+    const standing = await buyerStanding(client, { id: userId, customer_type: registeredType, kyc_status: buyer.kyc_status });
     let subtotalPaise = 0;
     let gstPaise      = 0;
     let discountPaise = 0;
@@ -117,8 +121,8 @@ export async function placeOrder(buyer: OrderBuyer, data: CreateOrderInput, opts
 
     for (const item of data.items) {
       // Shared with lines added before the invoice (Sprint 44): X / NDPS refused, online-sale
-      // status (C-10), the buyer type's minimum / maximum and price
-      const li = await priceOrderLine(client, item, customerType);
+      // status (C-10), who may buy it (Sprint 47, 403 BUYER_RESTRICTED), the buyer type's minimum / maximum and price
+      const li = await priceOrderLine(client, item, customerType, standing);
       if (li.needs_prescription) hasScheduleH = true;
       subtotalPaise += li.assessable_paise;
       gstPaise      += li.gst_amount_paise;

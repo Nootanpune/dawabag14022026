@@ -3,6 +3,7 @@ import { formatPrice } from '@/lib/utils';
 import { perUnitText, type Substitute } from '@/lib/shop/productPageExtras';
 import CartQuantityControl from '@/components/cart/CartQuantityControl';
 import ProductImage from '@/components/shop/ProductImage';
+import BuyerRestrictionNote from '@/components/shop/BuyerRestrictionNote';
 
 /** One substitute: maker, pack, price per unit, "Save X%", stock and Add. Never swapped automatically. */
 export default function SubstituteRow({ s }: { s: Substitute }) {
@@ -20,6 +21,7 @@ export default function SubstituteRow({ s }: { s: Substitute }) {
           )}
         </p>
         {!s.in_stock && <p className="text-xs font-medium text-red-700">Out of stock</p>}
+        <BuyerRestrictionNote product={s} className="mt-1" />
       </div>
       <div className="w-28 shrink-0 self-center">
         <CartQuantityControl product={{ ...s, drug_schedule: s.drug_schedule ?? 'OTC' }} />

@@ -104,9 +104,9 @@ describe('parseSuggestionRows', () => {
 });
 
 describe('workbook', () => {
-  it('the template has the suggestions sheet with exactly the headings, and reads back', async () => {
+  it('the template has the suggestions sheet with exactly the headings (Sprint 47: + optional buyer_restriction), and reads back', async () => {
     const rows = await readSuggestionWorkbook(await buildSuggestionTemplate());
-    expect(rows[0]).toEqual(HEAD);
+    expect(rows[0]).toEqual([...HEAD, 'buyer_restriction']);
     expect(() => parseSuggestionRows(rows)).toThrow(/no rows/);
   });
   it('reads the sheet named suggestions; refuses a workbook without one and non-xlsx files', async () => {
@@ -139,5 +139,24 @@ describe('checkAgainstLists', () => {
     expect(r.flags.map((f) => f.message).join()).toMatch(/New category "Demo Vitamins".*Alt\+C.*New HSN code 21069099/);
     expect(checkAgainstLists({ category: 'Old demo' }, lists).flags[0].message).toMatch(/no longer used/);
     expect(checkAgainstLists({ hsn_code: '30049099', gst_rate: 18 }, lists).flags[0]).toMatchObject({ field: 'gst_rate' });
+  });
+});
+
+describe('Sprint 47: optional buyer_restriction column', () => {
+  const withCol = [...HEAD, 'buyer_restriction'];
+  const rowWith = (value: string) => { const r = row(); r[withCol.length - 1] = value; return r; };
+  it('a 15-column file still works; the column is optional and may come in any position', () => {
+    expect(() => columnIndex(HEAD)).not.toThrow();
+    expect(columnIndex(HEAD).buyer_restriction).toBe(-1);
+    expect(columnIndex(['buyer_restriction', ...HEAD]).buyer_restriction).toBe(0);
+    expect(parseSuggestionRows([HEAD, row()])[0].suggested.buyer_restriction).toBeUndefined();
+  });
+  it('reads the values (any case, spaces or hyphens) as a suggestion; refuses others; twice is refused', () => {
+    expect(parseSuggestionRows([withCol, rowWith('practitioners_only')])[0].suggested.buyer_restriction).toBe('practitioners_only');
+    expect(parseSuggestionRows([withCol, rowWith('Trade only')])[0].suggested.buyer_restriction).toBe('trade_only');
+    expect(parseSuggestionRows([withCol, rowWith('everyone')])[0].suggested.buyer_restriction).toBe('everyone');
+    expect(parseSuggestionRows([withCol, rowWith('')])[0].suggested.buyer_restriction).toBeUndefined();
+    expect(parseSuggestionRows([withCol, rowWith('nurses')])[0].problems.join()).toMatch(/buyer_restriction "nurses" is not one of/);
+    expect(() => columnIndex([...withCol, 'buyer_restriction'])).toThrow(/more than once buyer_restriction/);
   });
 });

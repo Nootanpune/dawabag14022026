@@ -3,6 +3,7 @@
 // returned (C-10). Nothing is kept in the browser: React Query holds the answer in
 // memory for this page only.
 import api from '../api';
+import type { BuyerRestrictionFields } from '@/lib/shop/buyerRestriction';
 
 export const SEARCH_SORTS = ['relevance', 'price_asc', 'price_desc'] as const;
 export type SearchSort = typeof SEARCH_SORTS[number];
@@ -13,7 +14,8 @@ export const SORT_LABELS: Record<SearchSort, string> = {
   price_desc: 'Price: high to low',
 };
 
-export interface SearchProduct {
+/** Sprint 47: buyer_restriction, its label and buyer_may_buy come with every product */
+export interface SearchProduct extends BuyerRestrictionFields {
   id: string;
   name: string;
   generic_name?: string | null;

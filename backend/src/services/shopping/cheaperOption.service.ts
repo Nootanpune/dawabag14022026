@@ -9,6 +9,7 @@ import { BuyerType } from '../../utils/customerType';
 import { buyerColumns } from '../search/productSearch.service';
 import { ProductCard, SELLABLE_SQL, cardColumnsSql, toCards } from './productCards';
 import { cheapestSame, normaliseGeneric } from './sameMedicine';
+import { BuyerStanding, mayBuySql } from '../buyerRestriction/rules';
 
 export interface CheaperOption {
   /** the cart line this is cheaper than */
@@ -18,7 +19,8 @@ export interface CheaperOption {
   saving_paise: number;
 }
 
-export async function cheaperOptions(userId: string, pricingType: BuyerType): Promise<CheaperOption[]> {
+// Sprint 47: only alternatives this buyer may buy now
+export async function cheaperOptions(userId: string, pricingType: BuyerType, buyer: BuyerStanding): Promise<CheaperOption[]> {
   const { displayPrice } = buyerColumns(pricingType);
   const lines = await query<any>(
     `SELECT p.id, p.name, p.generic_name, p.drug_schedule, p.net_quantity, (${displayPrice})::int AS price_paise
@@ -31,7 +33,7 @@ export async function cheaperOptions(userId: string, pricingType: BuyerType): Pr
   const rows = await query<any>(
     `SELECT ${cardColumnsSql(pricingType)}, p.net_quantity
      FROM products p
-     WHERE ${SELLABLE_SQL}
+     WHERE ${SELLABLE_SQL} AND ${mayBuySql('p', buyer)}
        AND btrim(regexp_replace(lower(p.generic_name), '[^a-z0-9]+', ' ', 'g')) = ANY($2::text[])
        AND NOT EXISTS (SELECT 1 FROM cart_items c WHERE c.user_id = $1 AND c.product_id = p.id)
      LIMIT 500`, [userId, generics]);
@@ -45,7 +47,7 @@ export async function cheaperOptions(userId: string, pricingType: BuyerType): Pr
     if (best) picks.push({ line, best });
   }
   if (!picks.length) return [];
-  const cards = await toCards(picks.map((p) => p.best.product), pricingType);
+  const cards = await toCards(picks.map((p) => p.best.product), pricingType, buyer);
   return picks.map((p, i) => ({
     for_product_id: p.line.id,
     product: cards[i],

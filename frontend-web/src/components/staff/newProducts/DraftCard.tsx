@@ -14,6 +14,8 @@ import SuggestionPanel from './SuggestionPanel';
 import OnlineSaleFields from '@/components/staff/onlineSale/OnlineSaleFields';
 import { changeProblems, type OnlineSaleChange } from '@/lib/onlineSale/api';
 import { toISTDateString } from '@/lib/dates';
+import BuyerRestrictionFields from '@/components/staff/buyerRestriction/BuyerRestrictionFields';
+import { restrictionProblem, type RestrictionChange } from '@/lib/buyerRestriction/api';
 
 const DONE_LABEL: Record<Draft['status'], string> = {
   open: 'To complete', approved: 'Approved — in the catalogue', not_listed: 'Approved — never sold online (C-10)', rejected: 'Not listed',
@@ -41,7 +43,13 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
   const onlineSale = neverOnline ? undefined : { status: online.status, notification_ref: online.notification_ref?.trim() || null,
     notification_date: online.notification_date || null, reason: online.reason?.trim() || null,
     ...(draft.is_new_drug && online.status === 'permitted' ? { new_drug_confirmation: online.new_drug_confirmation?.trim() || null } : {}) };
-  const onApprove = () => (hasClaimWarning(draft) ? setNotesFor(true) : approve.mutate({ onlineSale }));
+  // Sprint 47: who may buy it — everyone unless the pharmacist restricts it (with a reason); an
+  // imported suggestion is only shown ("Suggested — check" + Use), never chosen for them
+  const [who, setWho] = useState<RestrictionChange>({ restriction: 'everyone', reason: '' });
+  const suggestedWho = draft.suggestion?.suggested?.buyer_restriction ?? null;
+  const whoProblem = neverOnline || who.restriction === 'everyone' ? null : restrictionProblem(who);
+  const buyerRestriction = neverOnline || who.restriction === 'everyone' ? undefined : { restriction: who.restriction, reason: who.reason.trim() };
+  const onApprove = () => (hasClaimWarning(draft) ? setNotesFor(true) : approve.mutate({ onlineSale, buyerRestriction }));
 
   return (
     <li className="card p-3 sm:p-4" aria-label={draft.name} data-testid="draft-card">
@@ -101,11 +109,18 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
                 {onlineProblem && <p className="text-amber-800 mt-1">{onlineProblem}</p>}
               </div>
             )}
+            {!neverOnline && canApprove && (
+              <div className="mt-2 p-2 rounded-lg border border-gray-200 bg-gray-50" data-testid="draft-buyer-restriction">
+                <BuyerRestrictionFields value={who} onChange={setWho} idPrefix={`d-${draft.id}`} suggested={suggestedWho}
+                  onUseSuggested={suggestedWho ? () => setWho({ ...who, restriction: suggestedWho }) : undefined} />
+                {whoProblem && <p className="text-amber-800 mt-1">{whoProblem}</p>}
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => setRejecting(true)} className="btn-outline text-xs py-1.5 px-3">Not a medicine we list</button>
             {canApprove ? (
-              <button type="button" disabled={!ready || !!onlineProblem || approve.isPending} onClick={onApprove}
+              <button type="button" disabled={!ready || !!onlineProblem || !!whoProblem || approve.isPending} onClick={onApprove}
                 className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50 inline-flex items-center gap-1">
                 {approve.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
                 {neverOnline ? 'Approve as never sold online' : 'Approve'}
@@ -129,7 +144,7 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
           <div className="flex justify-end gap-2 mt-3">
             <button type="button" onClick={() => setNotesFor(false)} className="btn-outline text-sm">Cancel</button>
             <button type="button" disabled={notes.trim().length < 20 || approve.isPending} className="btn-primary text-sm disabled:opacity-50"
-              onClick={() => approve.mutate({ notes: notes.trim(), onlineSale }, { onSuccess: () => setNotesFor(false) })}>Approve</button>
+              onClick={() => approve.mutate({ notes: notes.trim(), onlineSale, buyerRestriction }, { onSuccess: () => setNotesFor(false) })}>Approve</button>
           </div>
         </Modal>
       )}

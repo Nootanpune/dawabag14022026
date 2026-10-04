@@ -33,6 +33,9 @@ export interface AdminProductRow {
   online_sale_status?: OnlineSaleStatus;
   online_sale_ref?: string | null;
   online_sale_reason?: string | null;
+  /** Sprint 47: who may buy it (set by a pharmacist on the online-sale page) */
+  buyer_restriction?: string;
+  buyer_restriction_reason?: string | null;
   /** Sprint 40 (D6) */
   product_class?: ProductClass;
   is_new_drug?: boolean;

@@ -21,6 +21,7 @@ export async function adminListProducts(q: string | undefined, page: number, lim
             p.cold_chain, p.is_active, p.content_status, p.catalogue_state, (p.manufacturer_address IS NOT NULL) AS has_declarations,
             p.online_sale_status, p.online_sale_ref, p.online_sale_reason,   -- Sprint 39 (C-10)
             p.product_class, p.is_new_drug,                                   -- Sprint 40 (D6)
+            p.buyer_restriction, p.buyer_restriction_reason,                  -- Sprint 47: who may buy
             p.s3_image_key AS image_key,
             COALESCE((SELECT SUM(b.quantity_available - b.quantity_reserved) FROM inventory_batches b
                       WHERE b.product_id = p.id AND NOT b.is_recalled AND b.gdp_status = 'ok' AND b.expiry_date > CURRENT_DATE + 30), 0)::int AS stock_qty

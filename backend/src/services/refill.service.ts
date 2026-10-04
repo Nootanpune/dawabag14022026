@@ -13,6 +13,8 @@ import { placeOrder } from './orderPlacement.service';
 import { chargeOrderOnMandate } from './mandate.service';
 import { getSetting } from './settings.service';
 import { formatDateIST } from '../utils/ist';
+import { mayBuySql } from './buyerRestriction/rules';
+import { standingOfUser } from './buyerRestriction/standing.service';
 
 export async function createSubscription(userId: string, orderId: string, frequencyDays: number) {
   return withTransaction(async (client) => {
@@ -20,10 +22,14 @@ export async function createSubscription(userId: string, orderId: string, freque
       `SELECT id, address_id, status FROM orders WHERE id = $1 AND user_id = $2`, [orderId, userId])).rows[0];
     if (!o) throw new AppError('Order not found', 404);
     if (['cancelled', 'returned', 'payment_failed'].includes(o.status)) throw new AppError('This order cannot be repeated', 400);
+    // Sprint 47: only products this buyer may buy now (a product restricted to doctors and hospitals or
+    // to licensed trade buyers is left out; each refill order is checked again when it is placed)
+    const standing = await standingOfUser(client, userId);
     const items = (await client.query(
       `SELECT oi.product_id, SUM(oi.quantity)::int AS quantity FROM order_items oi
        JOIN products p ON p.id = oi.product_id
        WHERE oi.order_id = $1 AND p.is_active = TRUE AND p.online_sale_status = 'permitted' AND COALESCE(p.drug_schedule, '') NOT IN ('Schedule X', 'NDPS')
+         AND ${mayBuySql('p', standing)}
        GROUP BY oi.product_id`, [orderId])).rows;
     if (!items.length) throw new AppError('Nothing in this order can be refilled', 400);
     const sub = (await client.query(

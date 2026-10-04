@@ -27,6 +27,15 @@ than 32 characters, if Razorpay / S3 / MSG91 / SES keys are missing, if
 `CORS_ORIGINS` is empty or `AWS_REGION` is not `ap-south-1`. The log says exactly
 what is wrong. Generate secrets with `openssl rand -hex 48`.
 
+`QUEUE_PREFIX` (Sprint 47, optional) names this deployment's background job queues
+(notifications, e-invoices) in Redis. Every API process with the same Redis **and** prefix
+shares the queues — right for replicas of one deployment. Two different stacks on one Redis
+(e.g. a trial and a staging server, or two local test stacks) must use different prefixes,
+or one sends the other's messages with its own settings and database. Unset = `bull`
+(unchanged, so waiting jobs are kept on an upgrade); `scripts/dev-env.sh` sets
+`dawabag-api-<PORT>` per local stack and test-spawned APIs use their own. The API logs
+`Redis connected (job queues under prefix "…")` at start-up.
+
 `APP_ENV` names the deployment: set **`APP_ENV=production`** on the real production
 servers — the API then also refuses `ALLOW_MISSING_INTEGRATIONS`, `S3_ENDPOINT`,
 `DEMO_SEED`, `TRIAL_DEMO_PASSWORD` and `DEMO_PAYMENTS` outright. Unset (or `staging`) keeps the staging
@@ -573,6 +582,37 @@ and the **tax invoice is issued at that approval** (DECISIONS.md, Sprint 44 rows
 - Re-importing adds a new suggestion only while the draft is open and only if something
   changed; earlier suggestions are kept (table `catalogue_draft_suggestions`, immutable).
 - Audit: `catalogue_suggestions_imported` (who, partner, file name + SHA-256, counts, draft ids).
+
+## 7k. Who may buy a product (Sprint 47)
+
+- Each product has **Who may buy**: *Everyone* (default — every existing and new product),
+  *Doctors and hospitals only* (`practitioners_only`: doctor / institution accounts whose
+  medical council registration Dawabag verified and is in date, Sprint 44; the signed written
+  order is still needed on every order, Drugs Rules r.65(9)(b)), or *Licensed trade buyers
+  only* (`trade_only`: approved retailer / wholesaler accounts whose checked drug licences are
+  all in date, Sprint 30 / 32 — and verified doctors / hospitals). **Which products are
+  restricted is the owner's decision** (DECISIONS 2026-10-04); nothing is restricted until a
+  pharmacist sets it.
+- Set it: *Staff → Online-sale status* → column *Who may buy* → *Change* (pharmacists with a
+  valid registration only; a reason of at least 10 characters), or in *New products to
+  complete* when approving (*Who may buy*; a suggestion from the catalogue suggestions file is
+  shown as "Suggested — check" with *Use*, never chosen for you). Admins see the badge, the
+  history and Admin → Products, but cannot change it. API: `PUT /buyer-restriction/products/:id
+  {restriction, reason}` (pharmacist_rx), `GET /buyer-restriction/products` and
+  `…/:id/log` (pharmacists, admins).
+- What buyers see: the product stays in search and on its page for everyone, with the label
+  "Supplied only to doctors and hospitals" / "Supplied only to licensed trade buyers"; buyers
+  who may not buy it get no *Add to cart*. The server refuses it on every path with **403
+  `BUYER_RESTRICTED`** and a plain message: cart add / raise (lowering or removing a line is
+  allowed), checkout preview and order placement (Dawabag's stock and partners' alike), lines
+  added before the invoice (Sprint 44 order changes), new refills (left out) and due refill
+  orders (refill fails with the reason, buyer told). "Buy again" and "Cheaper option" only
+  offer products the buyer may buy. The emergency stop (Sprint 38) is independent.
+- Records: every change is in `product_buyer_restriction_log` (who, when, old → new, reason;
+  append-only, the database refuses edits and a change without who / why) and audited
+  (`product_buyer_restriction_set`). Migration 42.
+- Catalogue suggestions file (§7j): an optional 16th column `buyer_restriction`
+  (`everyone` / `practitioners_only` / `trade_only`); files with the 15 columns import as before.
 
 ## 7a. Development and CI
 

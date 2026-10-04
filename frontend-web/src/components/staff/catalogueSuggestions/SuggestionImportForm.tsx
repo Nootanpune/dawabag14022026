@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiErrors';
 import { normaliseBlobError } from '@/lib/download';
 import {
-  SUGGESTION_COLUMNS, downloadSuggestionsTemplate, fetchSuggestionFormat, suggestionKeys, suggestionsFileError,
+  OPTIONAL_SUGGESTION_COLUMNS, SUGGESTION_COLUMNS, downloadSuggestionsTemplate, fetchSuggestionFormat, suggestionKeys, suggestionsFileError,
 } from '@/lib/admin/catalogueSuggestions';
 import PartnerSelect from '@/components/staff/medicineInfo/imports/PartnerSelect';
 
@@ -41,7 +41,8 @@ export default function SuggestionImportForm({ pending, onImport }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="text-gray-600 max-w-2xl">
           One row per partner item, on a sheet named <code>suggestions</code> with the columns{' '}
-          <code className="break-words">{SUGGESTION_COLUMNS.join(', ')}</code>. A row is used only for the chosen partner&apos;s item that
+          <code className="break-words">{SUGGESTION_COLUMNS.join(', ')}</code>, and optionally{' '}
+          <code>{OPTIONAL_SUGGESTION_COLUMNS.join(', ')}</code> (everyone, practitioners_only or trade_only — a suggestion only). A row is used only for the chosen partner&apos;s item that
           is linked to a <strong>draft</strong> product; live products are never changed.
         </p>
         <button type="button" onClick={template} disabled={downloading} className="btn-outline text-xs py-1.5 px-3 inline-flex items-center gap-1">

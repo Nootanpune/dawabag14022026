@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { AppError } from '../utils/AppError';
 import { importSuggestions } from '../services/catalogueSuggestions/import.service';
 import { ALLOWED_VALUES, MAX_SUGGESTION_FILE_BYTES, buildSuggestionTemplate } from '../services/catalogueSuggestions/workbook';
-import { SUGGESTION_COLUMNS } from '../services/catalogueSuggestions/sheet';
+import { OPTIONAL_SUGGESTION_COLUMNS, SUGGESTION_COLUMNS } from '../services/catalogueSuggestions/sheet';
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -41,5 +41,5 @@ export async function getSuggestionsTemplate(_req: Request, res: Response, next:
 
 // GET /catalogue-suggestions/format — the columns and the values each one accepts
 export async function getSuggestionsFormat(_req: Request, res: Response, next: NextFunction) {
-  try { res.json({ success: true, data: { sheet: 'suggestions', columns: SUGGESTION_COLUMNS, allowed: ALLOWED_VALUES } }); } catch (err) { next(err); }
+  try { res.json({ success: true, data: { sheet: 'suggestions', columns: SUGGESTION_COLUMNS, optional_columns: OPTIONAL_SUGGESTION_COLUMNS, allowed: ALLOWED_VALUES } }); } catch (err) { next(err); }
 }

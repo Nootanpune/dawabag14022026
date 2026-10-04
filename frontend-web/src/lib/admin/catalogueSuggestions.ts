@@ -22,11 +22,15 @@ export interface SuggestionFlag { field: 'category' | 'hsn_code' | 'gst_rate'; m
 export type SuggestedValues = Partial<Pick<Required<DraftPatch>, 'generic_name' | 'strength' | 'dosage_form' | 'drug_schedule' | 'cold_chain'
   | 'product_class' | 'is_new_drug' | 'category' | 'hsn_code' | 'gst_rate'>>;
 export type SuggestedKey = keyof SuggestedValues;
+/** Sprint 47: the suggestion may also say who may buy it (optional column) — shown at approval, never saved by "Use" */
+export type SuggestedWithRestriction = SuggestedValues & { buyer_restriction?: 'everyone' | 'practitioners_only' | 'trade_only' };
+/** Columns a file MAY add (Sprint 47); a 15-column file still imports. */
+export const OPTIONAL_SUGGESTION_COLUMNS = ['buyer_restriction'] as const;
 
 /** The newest imported suggestion of an open draft (GET /catalogue-drafts). */
 export interface DraftSuggestion {
   id: string;
-  suggested: SuggestedValues;
+  suggested: SuggestedWithRestriction;
   flags: SuggestionFlag[];
   confidence: Confidence;
   note: string | null;

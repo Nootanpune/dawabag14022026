@@ -2,6 +2,7 @@
 // partner requests (admin) and the pharmacist's "New products to complete" queue.
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { restrictionChange } from './buyerRestriction.controller';
 import { PRODUCT_CLASSES } from '../services/productClass/rules';
 import { createDraftsFromRequests, MAX_DRAFT_BATCH } from '../services/catalogueDrafts/create.service';
 import { bulkSetDrafts, draftOptions, getDraft, listDrafts, saveDraft, saveDraftDescription } from '../services/catalogueDrafts/queue.service';
@@ -111,7 +112,7 @@ export async function postBulkSet(req: Request, res: Response, next: NextFunctio
 
 export async function postApproveDraft(req: Request, res: Response, next: NextFunction) {
   try {
-    const { notes, online_sale } = z.object({
+    const { notes, online_sale, buyer_restriction } = z.object({
       notes: z.string().trim().max(1000).optional(),
       // Sprint 39: the online-sale status step of the completion form (without it the product stays 'restricted')
       online_sale: z.object({
@@ -121,8 +122,10 @@ export async function postApproveDraft(req: Request, res: Response, next: NextFu
         reason: z.string().trim().max(1000).nullable().optional(),
         new_drug_confirmation: z.string().trim().max(1000).nullable().optional(),   // Sprint 40
       }).optional(),
+      // Sprint 47: who may buy it (left out = everyone); a restriction needs the pharmacist's reason
+      buyer_restriction: restrictionChange.optional(),
     }).parse(req.body ?? {});
-    res.json({ success: true, data: await approveDraft(uuid.parse(req.params.productId), req.user!.id, notes, online_sale) });
+    res.json({ success: true, data: await approveDraft(uuid.parse(req.params.productId), req.user!.id, notes, online_sale, buyer_restriction) });
   } catch (err) { next(err); }
 }
 

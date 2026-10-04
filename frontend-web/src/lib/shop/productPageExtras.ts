@@ -2,8 +2,9 @@
 // Read from the server on every visit; the PIN typed on the page lives only in
 // component state (never in browser storage).
 import api from '../api';
+import type { BuyerRestrictionFields } from './buyerRestriction';
 
-export interface Substitute {
+export interface Substitute extends BuyerRestrictionFields {
   id: string;
   name: string;
   generic_name: string | null;

@@ -12,9 +12,11 @@ import { BuyerType } from '../../utils/customerType';
 import { buyerColumns } from '../search/productSearch.service';
 import { SELLABLE_SQL, cardColumnsSql, toCards } from './productCards';
 import { normaliseGeneric } from './sameMedicine';
+import type { BuyerStanding } from '../buyerRestriction/rules';
 import { SUBSTITUTE_NOTE, pricePerUnit, rankSubstitutes, unitLabel } from './substitutes';
 
-export async function substitutesFor(productId: string, pricingType: BuyerType, limit?: number) {
+// Sprint 47: restricted substitutes are listed with their label; buyer_may_buy says whether this buyer may add one
+export async function substitutesFor(productId: string, pricingType: BuyerType, buyer: BuyerStanding, limit?: number) {
   const { displayPrice } = buyerColumns(pricingType);
   const current = await queryOne<any>(
     `SELECT p.id, p.name, p.generic_name, p.drug_schedule, p.net_quantity, (${displayPrice})::int AS price_paise
@@ -41,7 +43,7 @@ export async function substitutesFor(productId: string, pricingType: BuyerType, 
     rows.map((r) => ({ ...r, price_paise: Number(r.display_price_paise), in_stock: Number(r.stock_qty) > 0 })),
   );
   const shown = limit ? ranked.slice(0, limit) : ranked;
-  const cards = await toCards(shown.map((s) => s.product), pricingType);
+  const cards = await toCards(shown.map((s) => s.product), pricingType, buyer);
   return {
     ...base,
     total: ranked.length,

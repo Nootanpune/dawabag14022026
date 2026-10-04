@@ -12,6 +12,8 @@ import { COPY_FIELDS, contentQueue, copyFlags, reviewContent } from '../services
 import { withImageUrls } from '../services/productImage.service';
 import { parseSearchSort, searchCatalogue } from '../services/search/productSearch.service';
 import { didYouMean } from '../services/search/didYouMean';
+import { requestStanding } from '../services/buyerRestriction/standing.service';
+import { restrictionLabel } from '../services/buyerRestriction/rules';
 import { registerFromProductForm } from '../services/catalogueLists/lists.service';
 import { SCHEDULES } from '../services/catalogueDrafts/rules';
 
@@ -46,6 +48,7 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
     const { products, total } = await searchCatalogue({
       q, category, schedule, pricingType: req.user?.pricing_type ?? 'customer', limit, offset,
       sort: parseSearchSort(req.query.sort),   // optional; relevance by default (Sprint 25)
+      buyer: await requestStanding(req),       // Sprint 47: restricted products listed with a label
     });
 
     res.json({
@@ -55,6 +58,8 @@ export async function searchProducts(req: Request, res: Response, next: NextFunc
         products: (await withImageUrls(products, 'approved_image_key')).map((p: any) => ({
           ...p,
           in_stock: parseInt(p.stock_qty) > 0,
+          // Sprint 47: "Supplied only to doctors and hospitals" / "… licensed trade buyers"; no Add when false
+          buyer_restriction_label: restrictionLabel(p.buyer_restriction),
           discount_pct: Math.round(
             ((p.mrp_paise - p.offer_price_paise) / p.mrp_paise) * 100
           ),
@@ -88,7 +93,7 @@ export async function getSearchSuggestions(req: Request, res: Response, next: Ne
 export async function getProductDetail(req: Request, res: Response, next: NextFunction) {
   try {
     const productId = z.string().uuid().parse(req.params.productId);
-    res.json({ success: true, data: await productDetail(productId, req.user?.pricing_type ?? 'customer') });
+    res.json({ success: true, data: await productDetail(productId, req.user?.pricing_type ?? 'customer', await requestStanding(req)) });
   } catch (error) {
     next(error);
   }

@@ -30,8 +30,9 @@ export async function runSuggestions() {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(r.buf);
   const head = wb.getWorksheet('suggestions')?.getRow(1).values.slice(1);
+  // Sprint 47: the template also carries the OPTIONAL buyer_restriction column (15-column files still import, below)
   check('Download template: an xlsx with the suggestions sheet and exactly the headings', r.status === 200 && /spreadsheetml/.test(r.type)
-    && JSON.stringify(head) === JSON.stringify(HEAD), head);
+    && JSON.stringify(head) === JSON.stringify([...HEAD, 'buyer_restriction']), head);
   r = await call('GET', '/catalogue-suggestions/template', { token: t.admin, raw: true });
   check('… for admins too', r.status === 200);
   r = await call('GET', '/catalogue-suggestions/format', { token: t.admin });

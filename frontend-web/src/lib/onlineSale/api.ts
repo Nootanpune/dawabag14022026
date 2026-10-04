@@ -28,6 +28,9 @@ export interface OnlineSaleRow {
   product_class?: string;
   is_new_drug?: boolean;
   new_drug_confirmation?: string | null;
+  /** Sprint 47: who may buy it (everyone / practitioners_only / trade_only) */
+  buyer_restriction?: string;
+  buyer_restriction_reason?: string | null;
 }
 
 export interface OnlineSaleChange {

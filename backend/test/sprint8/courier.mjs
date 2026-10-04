@@ -33,7 +33,7 @@ export async function runCourier(ctx, a) {
   r = await call('POST', `/fulfilment/shipments/${a.shipmentId}/dispatch`, { token: t.packer, body: { seal_number: 'SEAL-S8-1' } });
   let s = await ship(a.shipmentId);
   check('dispatch uses the booked courier and AWB', r.status === 200 && s.status === 'dispatched' && s.awb_number === awb && s.courier_provider === 'shiprocket', { r: r.json, s });
-  const dsms = await waitFor(`SELECT status, provider_ref FROM notification_deliveries WHERE user_id = $1 AND type = 'dispatched' AND channel = 'sms'`, [ids.buyer]);
+  const dsms = await waitFor(`SELECT status, provider_ref, detail FROM notification_deliveries WHERE user_id = $1 AND type = 'dispatched' AND channel = 'sms'`, [ids.buyer]);
   check('dispatch SMS sent through the registered DLT template', dsms[0]?.status === 'sent' && /^msg91-req/.test(dsms[0].provider_ref || ''), dsms);
   const flow = calls('/api/v5/flow/').map((x) => JSON.parse(x.body));
   const d = flow.find((f) => f.template_id === 'TPL-S8-DISPATCH');
@@ -61,7 +61,9 @@ export async function runCourier(ctx, a) {
   check('out for delivery recorded', r.json.status === 'out_for_delivery', r.json);
   r = await hook(ofd);
   check('a repeated scan is ignored', r.json.duplicate === true, r.json);
-  const ofdSms = await waitFor(`SELECT status FROM notification_deliveries WHERE user_id = $1 AND type = 'out_for_delivery' AND channel = 'sms'`, [ids.buyer]);
+  // Sprint 47: the row's detail is printed on failure. The old flake ('failed', "fetch failed") was a
+  // second API on the same Redis taking this job from the shared queue — fixed by QUEUE_PREFIX (config/queues.ts)
+  const ofdSms = await waitFor(`SELECT status, detail FROM notification_deliveries WHERE user_id = $1 AND type = 'out_for_delivery' AND channel = 'sms'`, [ids.buyer]);
   check('buyer told the parcel is out for delivery', ofdSms[0]?.status === 'sent', ofdSms);
   r = await hook({ awb, current_status: 'DELIVERED', current_timestamp: ts(3) });
   s = await ship(a.shipmentId);

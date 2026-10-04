@@ -36,6 +36,8 @@ export interface CatalogueProduct {
   institutional_price_paise: number | null;
   cold_chain: boolean;
   already_listed: boolean;
+  /** Sprint 47: Dawabag sells it (from any seller) only to these buyers */
+  buyer_restriction?: string;
 }
 
 export interface NewListing {

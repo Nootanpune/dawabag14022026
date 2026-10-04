@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { cannotOrderOnline } from '@/lib/search/api';
 import { useCartQuantity, type QtyProduct } from '@/hooks/useCartQuantity';
 import QuantityStepper from './QuantityStepper';
+import { restrictedForViewer } from '@/lib/shop/buyerRestriction';
 
 interface Props {
   product: QtyProduct;
@@ -26,6 +27,17 @@ export default function CartQuantityControl({ product, variant = 'card', classNa
           className={compact ? '' : 'w-full justify-between'} />
         {quantity >= limits.max && !compact && <p className="text-xs text-gray-600 mt-1">{limits.maxMessage}</p>}
       </div>
+    );
+  }
+  // Sprint 47: a product this buyer may not buy (doctors and hospitals only / licensed trade buyers
+  // only) has no Add — the server refuses it anyway (403 BUYER_RESTRICTED)
+  if (restrictedForViewer(product)) {
+    if (compact) return null;
+    return (
+      <p className={cn('w-full text-center text-xs font-medium text-amber-900 bg-amber-50 border border-amber-200 rounded-lg py-2 px-2', className)}
+        data-testid="buyer-restricted">
+        {product.buyer_restriction_label ?? 'Not available to your account'}
+      </p>
     );
   }
   if (compact) {

@@ -12,12 +12,13 @@ import { saleKindFor } from './stock/sellingRights';
 import { imageUrlFor } from './productImage.service';
 import { qtyLimits } from './cart.service';
 import { COLD_CHAIN_NOTE, expiryMonthLabel } from './productPage/deliveryEstimate';
+import { BuyerStanding, restrictionFields } from './buyerRestriction/rules';
 
 const PUBLIC_FIELDS = ['id', 'name', 'generic_name', 'sku', 'category', 'drug_schedule', 'hsn_code', 'gst_rate',
   'marketed_by', 'composition', 'storage_instructions', 'cold_chain', 'mrp_paise', 's3_image_key',
   'net_quantity', 'manufacturer_name', 'manufacturer_address', 'country_of_origin', 'max_qty_per_order'];
 
-export async function productDetail(productId: string, pricingType: BuyerType) {
+export async function productDetail(productId: string, pricingType: BuyerType, buyer: BuyerStanding) {
   const key = `product:${productId}`;
   let row: any = await cacheGet(key);
   if (!row) {
@@ -62,5 +63,7 @@ export async function productDetail(productId: string, pricingType: BuyerType) {
     min_order_qty: qtyLimits(pricingType, row).min,
     max_order_qty: qtyLimits(pricingType, row).max,
     cannot_order_online: ['NDPS', 'Schedule X'].includes(row.drug_schedule),
+    // Sprint 47: who may buy it — shown to everyone with the label; no Add when buyer_may_buy is false
+    ...restrictionFields(row.buyer_restriction, buyer),
   };
 }

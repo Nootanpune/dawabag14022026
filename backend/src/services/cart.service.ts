@@ -13,6 +13,8 @@ import { saleKindFor } from './stock/sellingRights';
 import { approvedImageKeySql, imageUrlFor } from './productImage.service';
 import { getRxPause, pausedError } from './emergencyStop/state.service';
 import { PAUSED_LINE_ISSUE, customerMessage, isPausedLine } from './emergencyStop/rules';
+import { BUYER_RESTRICTED, buyerMay, restrictedMessage, restrictionLabel } from './buyerRestriction/rules';
+import type { Standing } from './buyerRestriction/standing.service';
 
 const BLOCKED_SCHEDULES = ['Schedule X', 'NDPS'];
 
@@ -34,6 +36,9 @@ export interface CartLine {
   available: boolean;           // sellable and in stock for this quantity
   issue: string | null;         // why not, in buyer-readable words
   requires_prescription: boolean;
+  /** Sprint 47: who may buy it ('everyone' unless a pharmacist restricted it) and the buyer label */
+  buyer_restriction: string;
+  buyer_restriction_label: string | null;
 }
 
 // Quantity limits per buyer type — same columns order.controller enforces (also the product page)
@@ -48,7 +53,7 @@ async function productRows(productIds: string[], pricingType: BuyerType) {
   return query<any>(
     `SELECT p.id, p.name, p.sku, p.drug_schedule, p.cold_chain, p.s3_image_key,
             ${approvedImageKeySql()} AS approved_image_key,
-            p.is_active, p.deleted_at, p.online_sale_status, p.mrp_paise, p.offer_price_paise,
+            p.is_active, p.deleted_at, p.online_sale_status, p.buyer_restriction, p.mrp_paise, p.offer_price_paise,
             COALESCE(p.ptr_price_paise, p.offer_price_paise) AS ptr_price_paise,
             COALESCE(p.pts_price_paise, p.offer_price_paise) AS pts_price_paise,
             COALESCE(p.institutional_price_paise, p.offer_price_paise) AS institutional_price_paise,
@@ -63,7 +68,7 @@ async function productRows(productIds: string[], pricingType: BuyerType) {
   );
 }
 
-export async function getCart(userId: string, pricingType: BuyerType) {
+export async function getCart(userId: string, pricingType: BuyerType, standing: Standing) {
   const rows = await query<{ product_id: string; quantity: number }>(
     'SELECT product_id, quantity FROM cart_items WHERE user_id = $1 ORDER BY added_at',
     [userId]
@@ -81,6 +86,8 @@ export async function getCart(userId: string, pricingType: BuyerType) {
     let issue: string | null = null;
     if (!p.is_active || p.deleted_at || BLOCKED_SCHEDULES.includes(p.drug_schedule)) issue = 'No longer available';
     else if (p.online_sale_status !== 'permitted') issue = 'Not available for online sale';   // Sprint 39 (C-10)
+    // Sprint 47: restricted after it was added, or the buyer's registration / licence lapsed
+    else if (!buyerMay(p.buyer_restriction, standing)) issue = restrictionLabel(p.buyer_restriction);
     else if (p.stock_qty < r.quantity) issue = p.stock_qty > 0 ? `Only ${p.stock_qty} in stock` : 'Out of stock';
     else if (r.quantity < min) issue = `Minimum order is ${min}`;
     else if (r.quantity > max) issue = `Maximum per order is ${max}`;
@@ -92,6 +99,7 @@ export async function getCart(userId: string, pricingType: BuyerType) {
       line_subtotal_paise: unit * r.quantity, min_qty: min, max_qty: max,
       stock_qty: p.stock_qty, available: issue === null, issue,
       requires_prescription: requiresPrescription(pricingType, p.drug_schedule),
+      buyer_restriction: p.buyer_restriction, buyer_restriction_label: restrictionLabel(p.buyer_restriction),
     };
   });
 
@@ -127,7 +135,8 @@ export async function getCart(userId: string, pricingType: BuyerType) {
 }
 
 // Sets an absolute quantity; 0 removes the line.
-export async function setCartItem(userId: string, productId: string, quantity: number, pricingType: BuyerType = 'customer'): Promise<void> {
+export async function setCartItem(userId: string, productId: string, quantity: number, pricingType: BuyerType,
+  standing: Standing): Promise<void> {
   if (quantity === 0) {
     await query('DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2', [userId, productId]);
     return;
@@ -137,6 +146,12 @@ export async function setCartItem(userId: string, productId: string, quantity: n
   if (BLOCKED_SCHEDULES.includes(p.drug_schedule)) throw new AppError(`${p.name} cannot be ordered online`, 403);
   // Sprint 39: only products allowed for online sale (C-10)
   if (p.online_sale_status !== 'permitted') throw new AppError(notOnlineMessage(p.name, p.online_sale_status), 403, true, 'NOT_FOR_ONLINE_SALE');
+  // Sprint 47: who may buy it (doctors and hospitals only / licensed trade buyers only); lowering
+  // or removing a line already in the cart stays possible
+  if (!buyerMay(p.buyer_restriction, standing)) {
+    const had = await queryOne<{ quantity: number }>('SELECT quantity FROM cart_items WHERE user_id = $1 AND product_id = $2', [userId, productId]);
+    if (!had || quantity > had.quantity) throw new AppError(restrictedMessage(p.name, p.buyer_restriction, standing.kind), 403, true, BUYER_RESTRICTED);
+  }
   // Emergency stop (Sprint 38): no new or larger prescription-medicine lines; lowering or removing is fine
   const rxPause = await getRxPause();
   if (isPausedLine(rxPause, pricingType, p.drug_schedule)) {
@@ -159,9 +174,9 @@ export async function setCartItem(userId: string, productId: string, quantity: n
 
 // Applying a coupon validates it against the current cart first, so the buyer
 // sees the reason at once; removing (null) always succeeds.
-export async function setCartCoupon(userId: string, code: string | null, pricingType: BuyerType): Promise<void> {
+export async function setCartCoupon(userId: string, code: string | null, pricingType: BuyerType, standing: Standing): Promise<void> {
   if (code) {
-    const cart = await getCart(userId, pricingType);
+    const cart = await getCart(userId, pricingType, standing);
     await evaluateCoupon(pool, code, cart.items.filter((i) => i.available));
   }
   await query(

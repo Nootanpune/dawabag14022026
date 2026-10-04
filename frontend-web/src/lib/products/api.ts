@@ -2,8 +2,9 @@
 // buyer's own price, the pre-packed goods declarations (C-17) and product
 // copy only after a pharmacist approved it (C-19).
 import api from '../api';
+import type { BuyerRestrictionFields } from '@/lib/shop/buyerRestriction';
 
-export interface ProductDetail {
+export interface ProductDetail extends BuyerRestrictionFields {
   id: string;
   name: string;
   generic_name: string | null;

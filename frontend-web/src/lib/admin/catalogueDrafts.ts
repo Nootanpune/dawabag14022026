@@ -148,9 +148,11 @@ export async function bulkSetDrafts(productIds: string[], set: Partial<Record<Bu
 }
 
 /** Sprint 39: online_sale = the status step of the form (without it the approved product is not sold online yet) */
-export async function approveDraft(id: string, notes?: string, onlineSale?: OnlineSaleChange) {
-  const { data } = await api.post(`/catalogue-drafts/${id}/approve`, { ...(notes ? { notes } : {}), ...(onlineSale ? { online_sale: onlineSale } : {}) });
-  return data.data as { id: string; status: 'approved' | 'not_listed'; sellable: boolean; online_sale_status?: string; requests: number };
+/** Sprint 47: `buyerRestriction` — who may buy it, with the pharmacist's reason (left out = everyone). */
+export async function approveDraft(id: string, notes?: string, onlineSale?: OnlineSaleChange, buyerRestriction?: { restriction: string; reason: string }) {
+  const { data } = await api.post(`/catalogue-drafts/${id}/approve`, { ...(notes ? { notes } : {}), ...(onlineSale ? { online_sale: onlineSale } : {}),
+    ...(buyerRestriction && buyerRestriction.restriction !== 'everyone' ? { buyer_restriction: buyerRestriction } : {}) });
+  return data.data as { id: string; status: 'approved' | 'not_listed'; sellable: boolean; online_sale_status?: string; buyer_restriction?: string; requests: number };
 }
 
 export async function rejectDraft(id: string, reason: string) {

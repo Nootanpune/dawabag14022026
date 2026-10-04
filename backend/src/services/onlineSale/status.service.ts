@@ -89,6 +89,7 @@ export async function listOnlineStatus(f: ListFilter) {
   return query<any>(
     `SELECT p.id, p.name, p.sku, p.drug_schedule, p.is_active, p.catalogue_state, p.online_sale_status, p.online_sale_ref,
             p.product_class, p.is_new_drug, p.new_drug_confirmation,
+            p.buyer_restriction, p.buyer_restriction_reason, p.buyer_restriction_set_at,   -- Sprint 47: who may buy
             to_char(p.online_sale_ref_date, 'YYYY-MM-DD') AS online_sale_ref_date, p.online_sale_reason, p.online_sale_set_at,
             up.full_name AS online_sale_set_by_name
      FROM products p LEFT JOIN user_profiles up ON up.user_id = p.online_sale_set_by

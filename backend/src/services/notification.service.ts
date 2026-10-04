@@ -3,6 +3,7 @@
 // notifications/channels/*; sending and the delivery log: notifications/dispatcher.ts.
 import Bull from 'bull';
 import { logger } from '../config/logger';
+import { queueOptions } from '../config/queues';
 import { dispatchNotification } from './notifications/dispatcher';
 import { NotificationPayload } from './notifications/templates';
 import { sendDltSms } from './notifications/channels/sms';
@@ -14,8 +15,10 @@ let notificationQueue: Bull.Queue | null = null;
 
 export function getNotificationQueue(): Bull.Queue {
   if (!notificationQueue) {
+    // Scoped to this deployment (QUEUE_PREFIX, config/queues.ts): another API stack on the
+    // same Redis must not take these jobs and send them with its own settings (Sprint 47)
     notificationQueue = new Bull('notifications', {
-      redis: process.env.REDIS_URL || 'redis://localhost:6379',
+      ...queueOptions(),
       defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 2000 }, removeOnComplete: 100, removeOnFail: 50 },
     });
     notificationQueue.process(async (job) => { await dispatchNotification(job.data); });

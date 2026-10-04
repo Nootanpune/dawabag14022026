@@ -4,6 +4,7 @@
 // type; stock is the most one seller can supply (own batches or one partner);
 // the pack photo only once the pharmacist approved it (C-19, by the caller).
 import { onlineSellableSql } from '../onlineSale/rules';
+import { BuyerStanding, NO_STANDING, mayBuySql } from '../buyerRestriction/rules';
 import crypto from 'crypto';
 import { pool } from '../../config/database';
 import { sellableStockSql } from '../stock/partnerStock';
@@ -22,6 +23,9 @@ export interface CatalogueSearch {
   offset: number;
   /** relevance (default) or by the buyer's own price; ties keep the relevance order */
   sort?: SearchSort;
+  /** Sprint 47: who the viewer is for restricted products — they are listed for everyone with
+   *  a label, and `buyer_may_buy` says whether this viewer may add them (guests: no) */
+  buyer?: BuyerStanding;
 }
 
 export const SEARCH_SORTS = ['relevance', 'price_asc', 'price_desc'] as const;
@@ -136,6 +140,7 @@ async function run(db: Db, s: CatalogueSearch, text: SearchText | null, fuzzy: b
             (${minQty}) AS min_order_qty,
             (${maxQty}) AS max_order_qty,
             COALESCE(p.reorder_level_qty, 0) AS reorder_level_qty,
+            p.buyer_restriction, ${mayBuySql('p', s.buyer ?? NO_STANDING)} AS buyer_may_buy,
             -- the most one seller can supply: Dawabag's batches or one partner's own ledger
             ${text ? 'pg.stock_qty' : stockQty} AS stock_qty,
             pg.total_count

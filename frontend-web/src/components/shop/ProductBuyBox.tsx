@@ -6,6 +6,8 @@ import type { ProductDetail } from '@/lib/products/api';
 import { formatPrice } from '@/lib/utils';
 import { useCartQuantity } from '@/hooks/useCartQuantity';
 import QuantityStepper from '@/components/cart/QuantityStepper';
+import { restrictedForViewer } from '@/lib/shop/buyerRestriction';
+import BuyerRestrictionNote from './BuyerRestrictionNote';
 
 /** Product page: choose how many, then Add; once in the cart, − qty + and "Go to cart". */
 export default function ProductBuyBox({ p }: { p: ProductDetail }) {
@@ -15,11 +17,15 @@ export default function ProductBuyBox({ p }: { p: ProductDetail }) {
   const qty = Math.min(Math.max(chosen, limits.min), limits.max);
 
   if (p.cannot_order_online) return <p className="text-sm text-red-700 mt-3">This medicine cannot be ordered online.</p>;
+  // Sprint 47: who may buy it — the label and who it is for; no Add for a buyer who may not (server-decided)
+  const note = <BuyerRestrictionNote product={p} detail className="mt-3" />;
+  if (restrictedForViewer(p) && !quantity) return note;
   if (!p.in_stock && !quantity) return <p className="text-sm font-medium text-red-700 mt-3">Out of stock right now. Please check again later.</p>;
 
   if (quantity > 0) {
     return (
       <div className="mt-3 space-y-2">
+        {note}
         <p className="text-sm font-medium text-green-800 flex items-center gap-1"><Check className="w-4 h-4" aria-hidden="true" /> In your cart</p>
         <div className="flex flex-wrap items-center gap-3">
           <QuantityStepper name={p.name} quantity={quantity} min={limits.min} max={limits.max} busy={busy}
@@ -33,6 +39,7 @@ export default function ProductBuyBox({ p }: { p: ProductDetail }) {
 
   return (
     <div className="mt-3 space-y-2">
+      {note}
       <div className="flex flex-wrap items-center gap-3">
         <div role="group" aria-label="Choose quantity" className="inline-flex items-center rounded-lg border border-gray-300 bg-white">
           <button type="button" onClick={() => setChosen(qty - 1)} disabled={qty <= limits.min}

@@ -5,8 +5,10 @@ import { formatPrice } from '@/lib/utils';
 import { scheduleBadge } from '@/lib/drugSchedule';
 import ProductImage from './ProductImage';
 import CartQuantityControl from '@/components/cart/CartQuantityControl';
+import type { BuyerRestrictionFields } from '@/lib/shop/buyerRestriction';
+import BuyerRestrictionNote from './BuyerRestrictionNote';
 
-export interface Product {
+export interface Product extends BuyerRestrictionFields {
   id: string; name: string; generic_name?: string | null; sku: string;
   marketed_by?: string; drug_schedule: string; mrp_paise: number;
   offer_price_paise: number; discount_pct: number; in_stock: boolean;
@@ -70,6 +72,9 @@ export default function ProductCard({ product }: Props) {
             </span>
           )}
         </div>
+
+        {/* Sprint 47: who may buy it — the label for every viewer (no Add below when this buyer may not) */}
+        <BuyerRestrictionNote product={product} className="mb-3" />
 
         {/* Price — always the server's buyer-specific display price */}
         <div className="flex items-center gap-2 mb-3">

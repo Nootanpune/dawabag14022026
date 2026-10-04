@@ -6,10 +6,12 @@
 import { query } from '../../config/database';
 import { BuyerType } from '../../utils/customerType';
 import { ProductCard, SELLABLE_SQL, cardColumnsSql, toCards } from './productCards';
+import { BuyerStanding, mayBuySql } from '../buyerRestriction/rules';
 
 export const BUY_AGAIN_LIMIT = 8;
 
-export async function buyAgain(userId: string, pricingType: BuyerType, limit = BUY_AGAIN_LIMIT): Promise<ProductCard[]> {
+// Sprint 47: only products this buyer may buy now (a suggestion to add)
+export async function buyAgain(userId: string, pricingType: BuyerType, buyer: BuyerStanding, limit = BUY_AGAIN_LIMIT): Promise<ProductCard[]> {
   const rows = await query<any>(
     `WITH bought AS (
        SELECT oi.product_id, MAX(COALESCE(o.delivered_at, o.created_at)) AS last_at
@@ -19,11 +21,11 @@ export async function buyAgain(userId: string, pricingType: BuyerType, limit = B
      )
      SELECT ${cardColumnsSql(pricingType)}
      FROM bought JOIN products p ON p.id = bought.product_id
-     WHERE ${SELLABLE_SQL}
+     WHERE ${SELLABLE_SQL} AND ${mayBuySql('p', buyer)}
        AND NOT EXISTS (SELECT 1 FROM cart_items c WHERE c.user_id = $1 AND c.product_id = p.id)
      ORDER BY bought.last_at DESC, p.name
      LIMIT $2`,
     [userId, limit],
   );
-  return toCards(rows, pricingType);
+  return toCards(rows, pricingType, buyer);
 }

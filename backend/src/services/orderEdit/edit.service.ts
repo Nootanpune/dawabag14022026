@@ -21,6 +21,7 @@ import { repriceShipmentsTx } from '../shipment.service';
 import { assertQuantity, pricedLine, sellableProduct, SellableProduct } from '../orderLines/pricing';
 import { PRACTITIONER_TYPE } from '../practitionerSales/rules';
 import { assertMaySellToPractitioner } from '../practitionerSales/registration.service';
+import { buyerStanding, type Standing } from '../buyerRestriction/standing.service';
 import { attachWrittenOrderTx } from '../practitionerSales/writtenOrder.service';
 import { queueNotification } from '../notification.service';
 import {
@@ -77,8 +78,11 @@ export async function editOrder(userId: string, orderId: string, input: EditInpu
     const buyerType = (o.pricing_type || effectiveCustomerType(o.customer_type, o.kyc_status)) as BuyerType;
     const lines = await orderLinesTx(client, orderId);
     const products = new Map<string, SellableProduct>();
+    // Sprint 47: more of a medicine or a new one only if this buyer may buy it now (403 BUYER_RESTRICTED)
+    let standing: Standing | null = null;
     const productOf = async (id: string) => {
-      if (!products.has(id)) products.set(id, await sellableProduct(client, id, buyerType));
+      standing ??= await buyerStanding(client, { id: userId, customer_type: o.customer_type, kyc_status: o.kyc_status });
+      if (!products.has(id)) products.set(id, await sellableProduct(client, id, buyerType, standing));
       return products.get(id)!;
     };
     // Minimum per line: the trade buyer type's minimum (Sprint 43), otherwise 1

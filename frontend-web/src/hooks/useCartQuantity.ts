@@ -8,8 +8,10 @@ import { CART_QUERY_KEY, fetchCart, putCartItem, type CartView } from '@/lib/car
 import { cannotOrderOnline } from '@/lib/search/api';
 import { quantityLimits, type QtyLimits } from '@/lib/shop/quantity';
 import { useCart } from './useCart';
+import type { BuyerRestrictionFields } from '@/lib/shop/buyerRestriction';
 
-export interface QtyProduct {
+/** Sprint 47: with who may buy it (buyer_may_buy false → no Add) */
+export interface QtyProduct extends BuyerRestrictionFields {
   id: string;
   name: string;
   drug_schedule: string;

@@ -39,6 +39,8 @@ export default function TypeaheadOption({ id, product, active, onOpen, onHover }
         <span className="flex items-center gap-2 mt-0.5">
           <span className="text-sm font-semibold text-brand-700">{formatPrice(product.display_price_paise)}</span>
           {!product.in_stock && <span className="text-xs font-medium text-red-700">Out of stock</span>}
+          {/* Sprint 47: who may buy it */}
+          {product.buyer_restriction_label && <span className="text-xs font-medium text-amber-800">{product.buyer_restriction_label}</span>}
         </span>
       </span>
       {/* Pointer shortcut; keyboard users press Enter to open the product page, or use the results page */}

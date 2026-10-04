@@ -9,6 +9,8 @@ import { NEVER_ONLINE_SCHEDULES, ONLINE_SALE_LABELS, fetchOnlineSale, onlineSale
 import OnlineSaleBadge from './OnlineSaleBadge';
 import ChangeDialog from './ChangeDialog';
 import HistoryDialog from './HistoryDialog';
+import BuyerRestrictionBadge from '@/components/staff/buyerRestriction/BuyerRestrictionBadge';
+import BuyerRestrictionDialog from '@/components/staff/buyerRestriction/BuyerRestrictionDialog';
 
 const TABS: (OnlineSaleStatus | '')[] = ['restricted', 'permitted', 'prohibited', ''];
 
@@ -22,7 +24,7 @@ export default function OnlineSalePanel() {
   const [tab, setTab] = useState<OnlineSaleStatus | ''>('restricted');
   const [q, setQ] = useState('');
   const [chosen, setChosen] = useState<Set<string>>(new Set());
-  const [dialog, setDialog] = useState<{ kind: 'change'; rows: OnlineSaleRow[] } | { kind: 'log'; row: OnlineSaleRow } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'change'; rows: OnlineSaleRow[] } | { kind: 'log' | 'who'; row: OnlineSaleRow } | null>(null);
   // A link from the product list opens the screen on that product (?q=SKU)
   useEffect(() => {
     const v = new URLSearchParams(window.location.search).get('q');
@@ -63,7 +65,7 @@ export default function OnlineSalePanel() {
               <tr className="text-left text-xs text-gray-500 border-b">
                 <th className="py-2 pr-2"><span className="sr-only">Choose</span></th>
                 <th className="py-2 pr-2">Product</th><th className="py-2 pr-2">Schedule</th><th className="py-2 pr-2">Online sale</th>
-                <th className="py-2 pr-2">Reference / reason</th><th className="py-2 pr-2">Set</th><th className="py-2" />
+                <th className="py-2 pr-2">Who may buy</th><th className="py-2 pr-2">Reference / reason</th><th className="py-2 pr-2">Set</th><th className="py-2" />
               </tr>
             </thead>
             <tbody>
@@ -76,6 +78,12 @@ export default function OnlineSalePanel() {
                       {r.product_class === 'device' ? ' · medical device' : ''}{r.is_new_drug ? ' · new drug' : ''}</p></td>
                     <td className="py-2 pr-2 text-xs">{r.drug_schedule}</td>
                     <td className="py-2 pr-2"><OnlineSaleBadge status={r.online_sale_status} /></td>
+                    {/* Sprint 47: who may buy it — a pharmacist changes it with a reason; admins see it */}
+                    <td className="py-2 pr-2">
+                      <BuyerRestrictionBadge value={r.buyer_restriction} />
+                      <button type="button" className="block text-xs underline text-brand-700 mt-0.5" onClick={() => setDialog({ kind: 'who', row: r })}
+                        aria-label={`Who may buy ${r.name}`}>{canAllow ? 'Change' : 'History'}</button>
+                    </td>
                     <td className="py-2 pr-2 text-xs text-gray-700 max-w-xs">
                       {r.online_sale_ref && <p>{r.online_sale_ref}{r.online_sale_ref_date ? ` (${r.online_sale_ref_date})` : ''}</p>}
                       {r.online_sale_reason && <p className="text-gray-500">{r.online_sale_reason}</p>}
@@ -95,6 +103,7 @@ export default function OnlineSalePanel() {
       )}
       {dialog?.kind === 'change' && <ChangeDialog products={dialog.rows} canAllow={canAllow} onClose={() => { setDialog(null); setChosen(new Set()); }} />}
       {dialog?.kind === 'log' && <HistoryDialog product={dialog.row} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'who' && <BuyerRestrictionDialog product={dialog.row} canChange={canAllow} onClose={() => setDialog(null)} />}
     </div>
   );
 }

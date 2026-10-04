@@ -19,6 +19,8 @@ import { lockOpenDraft } from './queue.service';
 import { approvalProblems, NEVER_ONLINE } from './rules';
 import { setOnlineStatusTx } from '../onlineSale/status.service';
 import type { StatusInput } from '../onlineSale/rules';
+import { setBuyerRestrictionTx } from '../buyerRestriction/status.service';
+import type { RestrictionInput } from '../buyerRestriction/rules';
 
 const DEFAULT_NOTE = 'New product completed from a partner request and approved in "New products to complete"';
 
@@ -28,7 +30,10 @@ const DECIDED = ['name', 'generic_name', 'composition', 'strength', 'dosage_form
 
 // Sprint 39: the approved product is 'restricted' (not sold online) until a pharmacist sets its
 // online-sale status — done in the same form (onlineSale) so approval is not a dead end (C-10)
-export async function approveDraft(productId: string, pharmacistId: string, notes?: string, onlineSale?: StatusInput) {
+// Sprint 47: "Who may buy" in the same form — a restriction to doctors and hospitals or to
+// licensed trade buyers, with the pharmacist's reason (left out = everyone, the default)
+export async function approveDraft(productId: string, pharmacistId: string, notes?: string, onlineSale?: StatusInput,
+  buyerRestriction?: RestrictionInput) {
   const result = await withTransaction(async (c) => {
     const p = await lockOpenDraft(c, productId);
     const problems = approvalProblems(p, p.cold_chain_decided);
@@ -71,9 +76,14 @@ export async function approveDraft(productId: string, pharmacistId: string, note
        WHERE product_id = $1 AND status = 'drafted'`, [productId, pharmacistId]);
     await writeAuditTx(c, { userId: null, action: 'catalogue_draft_approved', performedBy: pharmacistId,
       newValue: { product_id: productId, ...decided, requests_linked: linked.rowCount }, notes: note });
+    if (buyerRestriction && buyerRestriction.restriction !== 'everyone') {
+      await setBuyerRestrictionTx(c, { id: pharmacistId, role: 'pharmacist_rx' }, productId, buyerRestriction);
+    }
     if (onlineSale) await setOnlineStatusTx(c, { id: pharmacistId, role: 'pharmacist_rx' }, [productId], onlineSale);
-    const online = (await c.query(`SELECT online_sale_status FROM products WHERE id = $1`, [productId])).rows[0].online_sale_status as string;
-    return { id: productId, status: 'approved' as const, sellable: online === 'permitted', online_sale_status: online, requests: linked.rowCount ?? 0 };
+    const after = (await c.query(`SELECT online_sale_status, buyer_restriction FROM products WHERE id = $1`, [productId])).rows[0];
+    const online = after.online_sale_status as string;
+    return { id: productId, status: 'approved' as const, sellable: online === 'permitted', online_sale_status: online,
+      buyer_restriction: after.buyer_restriction as string, requests: linked.rowCount ?? 0 };
   });
   await cacheDel(`product:${productId}`);
   await cacheDel('categories');

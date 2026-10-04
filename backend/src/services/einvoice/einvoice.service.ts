@@ -5,6 +5,7 @@
 // dispatch waits for the IRN, because the invoice in the pack must carry it.
 // Partners register their own invoices. Corrections are made by credit note.
 import Bull from 'bull';
+import { queueOptions } from '../../config/queues';
 import { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '../../config/database';
 import { logger } from '../../config/logger';
@@ -71,7 +72,7 @@ let queue: Bull.Queue | null = null;
 function getQueue() {
   if (!queue) {
     queue = new Bull('einvoice', {
-      redis: process.env.REDIS_URL || 'redis://localhost:6379',
+      ...queueOptions(),   // this deployment's queues only (QUEUE_PREFIX, Sprint 47)
       defaultJobOptions: { attempts: 6, backoff: { type: 'exponential', delay: 30_000 }, removeOnComplete: 100, removeOnFail: 100 },
     });
     // A job may run before the creating transaction commits: "not found yet" retries

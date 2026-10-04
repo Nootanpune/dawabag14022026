@@ -15,6 +15,10 @@ export DATABASE_URL="${DATABASE_URL:-postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST
 # dev-up.sh and the suites' extra APIs connect as DB_APP_LOGIN (RUNBOOK §6)
 export DB_APP_LOGIN="${DB_APP_LOGIN:-dawabag_api}" DB_APP_PASSWORD="${DB_APP_PASSWORD:-dawabag_api_dev_only_0000}"
 export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
+# Sprint 47: this stack's own job queues on the shared Redis. Without it, a second API on the
+# same Redis (another local stack, e2e, a test-spawned API) takes this API's notification jobs
+# and sends them with its own provider settings (the Sprint 8 "out for delivery" flake).
+export QUEUE_PREFIX="${QUEUE_PREFIX:-dawabag-api-$PORT}"
 export API_URL="${API_URL:-http://localhost:$PORT}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:3000}"
 export AWS_REGION="${AWS_REGION:-ap-south-1}" AWS_EC2_METADATA_DISABLED=true

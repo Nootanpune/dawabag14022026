@@ -66,6 +66,8 @@ import reminderRoutes from './routes/reminders.routes';
 import healthProfileRoutes from './routes/healthProfile.routes';
 import salesStatusRoutes from './routes/salesStatus.routes';
 import onlineSaleRoutes from './routes/onlineSale.routes';
+import buyerRestrictionRoutes from './routes/buyerRestriction.routes';
+import { queuePrefix } from './config/queues';
 import pharmacistRegistrationRoutes from './routes/pharmacistRegistration.routes';
 import provenanceRoutes from './routes/provenance.routes';
 import gdpRoutes from './routes/gdp.routes';
@@ -233,6 +235,7 @@ app.use(`${api}/reminders`, reminderRoutes);            // Sprint 33: "My medici
 app.use(`${api}/health-profile`, healthProfileRoutes);  // Sprint 33: health profile (consent, C-41)
 app.use(`${api}/sales-status`, salesStatusRoutes);      // Sprint 38: emergency stop state (public)
 app.use(`${api}/online-sale`, onlineSaleRoutes);        // Sprint 39: online-sale status per product (C-10)
+app.use(`${api}/buyer-restriction`, buyerRestrictionRoutes);   // Sprint 47: who may buy a product (r.65(9)(b), C-14, C-46)
 app.use(`${api}/pharmacist-registrations`, pharmacistRegistrationRoutes);   // Sprint 39: registration validity (C-03)
 app.use(`${api}/partner-provenance`, provenanceRoutes);  // Sprint 39: who supplied a partner batch (C-02)
 app.use(`${api}/gdp`, gdpRoutes);                        // Sprint 40: GDP records per batch, excursion holds (C-25)
@@ -270,7 +273,7 @@ async function bootstrap() {
     }
 
     await connectRedis();
-    logger.info('Redis connected');
+    logger.info(`Redis connected (job queues under prefix "${queuePrefix()}")`);
 
     // Sprint 43: health details still in plain columns (or under an older key) are sealed now (C-41)
     await sealHealthAtRest().catch((e) => logger.error(`Sealing health details failed: ${e?.message || e}`));

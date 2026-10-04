@@ -4,6 +4,7 @@ import { formatPrice } from '@/lib/utils';
 import { scheduleBadge } from '@/lib/drugSchedule';
 import { teleListShort } from '@/lib/telemedicine/labels';
 import OnlineSaleBadge from '@/components/staff/onlineSale/OnlineSaleBadge';
+import BuyerRestrictionBadge from '@/components/staff/buyerRestriction/BuyerRestrictionBadge';
 import { PRODUCT_CLASS_LABELS } from '@/lib/productClass';
 
 export default function ProductTable({ products }: { products: AdminProductRow[] }) {
@@ -43,6 +44,10 @@ export default function ProductTable({ products }: { products: AdminProductRow[]
               <td className="px-4 py-2.5 text-xs">{teleListShort(p.telemedicine_list)}</td>
               <td className="px-4 py-2.5 text-xs" title={p.online_sale_ref ?? p.online_sale_reason ?? undefined}>
                 <Link href={`/staff/online-sale?q=${encodeURIComponent(p.sku)}`} className="hover:underline"><OnlineSaleBadge status={p.online_sale_status} /></Link>
+                {/* Sprint 47: who may buy it, when restricted (changed by a pharmacist on the online-sale page) */}
+                {p.buyer_restriction && p.buyer_restriction !== 'everyone' && (
+                  <span className="block mt-0.5" title={p.buyer_restriction_reason ?? undefined}><BuyerRestrictionBadge value={p.buyer_restriction} /></span>
+                )}
               </td>
               <td className="px-4 py-2.5 text-right">{formatPrice(Number(p.mrp_paise))}</td>
               <td className="px-4 py-2.5 text-right">{formatPrice(Number(p.offer_price_paise))}</td>

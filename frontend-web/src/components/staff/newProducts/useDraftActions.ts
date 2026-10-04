@@ -20,7 +20,8 @@ export function useDraftActions(draftId: string) {
     onError: (e) => toast.error(getApiErrorMessage(e, 'Could not save')),
   });
   const approve = useMutation({
-    mutationFn: ({ notes, onlineSale }: { notes?: string; onlineSale?: OnlineSaleChange }) => approveDraft(draftId, notes, onlineSale),
+    mutationFn: ({ notes, onlineSale, buyerRestriction }: { notes?: string; onlineSale?: OnlineSaleChange; buyerRestriction?: { restriction: string; reason: string } }) =>
+      approveDraft(draftId, notes, onlineSale, buyerRestriction),
     onSuccess: (r) => {
       toast.success(r.status === 'not_listed' ? 'Approved as never sold online (C-10)'
         : r.sellable ? 'Approved: in the catalogue and allowed online' : 'Approved: in the catalogue, not allowed online yet');

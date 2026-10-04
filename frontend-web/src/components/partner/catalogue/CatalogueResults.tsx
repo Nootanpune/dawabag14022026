@@ -2,6 +2,7 @@
 import type { CatalogueProduct } from '@/lib/partner/types';
 import { formatPrice } from '@/lib/utils';
 import { scheduleBadge } from '@/lib/drugSchedule';
+import { RESTRICTION_STAFF_LABELS, type BuyerRestriction } from '@/lib/shop/buyerRestriction';
 
 export default function CatalogueResults({
   products,
@@ -30,6 +31,12 @@ export default function CatalogueResults({
                 <p className="text-xs text-gray-400">
                   {p.generic_name ?? ''} · {p.sku}
                   {p.cold_chain && <span className="badge-cold ml-2">Cold chain</span>}
+                  {/* Sprint 47: who Dawabag sells it to — listing is still allowed */}
+                  {p.buyer_restriction && p.buyer_restriction !== 'everyone' && (
+                    <span className="ml-2 text-xs font-medium rounded-full px-2 py-0.5 bg-amber-100 text-amber-900">
+                      {RESTRICTION_STAFF_LABELS[p.buyer_restriction as BuyerRestriction] ?? p.buyer_restriction}
+                    </span>
+                  )}
                 </p>
               </td>
               <td className="px-4 py-2.5 text-xs">{scheduleBadge(p.drug_schedule) ?? '—'}</td>

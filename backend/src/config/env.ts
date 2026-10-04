@@ -8,6 +8,7 @@
 // refused unless APP_ENV=trial, and APP_ENV=production refuses it outright. The demo
 // payment (DEMO_PAYMENTS, payments/paymentMode.ts) likewise exists only with APP_ENV=trial.
 import { z } from 'zod';
+import { queuePrefixProblem } from './queues';
 
 export const APP_ENVS = ['development', 'test', 'staging', 'trial', 'production'] as const;
 export type AppEnv = typeof APP_ENVS[number];
@@ -130,5 +131,8 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
     if (production && env.ALLOW_MISSING_INTEGRATIONS !== 'true') errors.push(msg);
     else warnings.push(msg);
   }
+  // Sprint 47: the deployment's own job queues on a shared Redis (config/queues.ts)
+  const qp = queuePrefixProblem(env);
+  if (qp) errors.push(qp);
   return { errors, warnings };
 }
