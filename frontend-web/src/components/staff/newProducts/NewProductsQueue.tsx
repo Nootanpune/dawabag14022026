@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
 import { draftKeys, fetchDraftOptions, fetchDrafts, type DraftFilters } from '@/lib/admin/catalogueDrafts';
@@ -18,9 +19,9 @@ const TABS = [
 ] as const;
 
 /** Sprint 29: draft products made from partner requests, completed and approved one row at a time. */
-export default function NewProductsQueue() {
+export default function NewProductsQueue({ suggested = false }: { suggested?: boolean }) {
   const role = useAuthStore((s) => s.user?.role);
-  const [filters, setFilters] = useState<DraftFilters>({ status: 'open', company: '', needs_schedule: false, cold_chain: '', q: '', page: 1 });
+  const [filters, setFilters] = useState<DraftFilters>({ status: 'open', company: '', needs_schedule: false, cold_chain: '', q: '', suggested, page: 1 });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const list = useQuery({ queryKey: draftKeys.list(filters), queryFn: () => fetchDrafts(filters), placeholderData: keepPreviousData });
   const options = useQuery({ queryKey: draftKeys.options, queryFn: fetchDraftOptions, staleTime: 300_000 });
@@ -52,6 +53,16 @@ export default function NewProductsQueue() {
         </div>
       )}
       <div className="mb-3"><QuickCreateHint /></div>
+      {/* Sprint 46: drafts with an imported suggestion — still one product at a time, each approved by a pharmacist (C-10, C-19) */}
+      {list.data?.with_suggestions && (list.data.with_suggestions.high + list.data.with_suggestions.medium + list.data.with_suggestions.low) > 0 && (
+        <p className="text-sm text-gray-700 mb-3" data-testid="suggestion-counts">
+          With suggestions: {list.data.with_suggestions.high} high, {list.data.with_suggestions.medium} medium, {list.data.with_suggestions.low} low confidence.{' '}
+          {!filters.suggested && filters.status === 'open' && (
+            <button type="button" className="underline text-brand-700" onClick={() => change({ suggested: true })}>Go through them, high confidence first</button>
+          )}
+          {' '}<Link href="/staff/catalogue-suggestions" className="underline text-brand-700">Import suggestions</Link>
+        </p>
+      )}
       <StatusTabs tabs={TABS} value={filters.status} onChange={(status) => change({ status })} />
       <DraftFiltersBar filters={filters} companies={list.data?.companies ?? []} onChange={change} />
       {filters.status === 'open' && drafts.length > 0 && (

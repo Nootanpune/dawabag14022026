@@ -103,6 +103,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/staff/medicine-info-imports', label: 'Import medicine information drafts', icon: FileSpreadsheet, roles: PHARMACIST_ROLES },
       // Sprint 29 — draft products from partner requests, completed and approved by the pharmacist
       { href: '/staff/new-products', label: 'New products to complete', icon: ListPlus, roles: PHARMACIST_ROLES },
+      // Sprint 46 — suggested details for one partner's draft products: shown to the pharmacist, never a decision (C-19)
+      { href: '/staff/catalogue-suggestions', label: 'Import catalogue suggestions', icon: FileSpreadsheet, roles: PHARMACIST_ROLES },
       // Sprint 39 — online-sale status per product: a pharmacist allows (dated reference); pharmacists / admins stop (C-10)
       { href: '/staff/online-sale', label: 'Online-sale status', icon: Globe, roles: PHARMACIST_ROLES },
       // Sprint 32 — rename / correct / switch off categories and HSN codes (admins; pharmacists read-only)

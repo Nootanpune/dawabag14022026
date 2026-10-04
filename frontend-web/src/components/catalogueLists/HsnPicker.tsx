@@ -13,13 +13,15 @@ import { useHsnList } from './useCatalogueLists';
  * otherwise offered to add. The product's GST is never changed: a differing usual
  * rate only shows a note (unless the page shows its own warning: showGstNote=false).
  */
-export default function HsnPicker({ id, value, onChange, disabled, productGst, suggested, showGstNote = true, hint, label = 'HSN code' }: {
+export default function HsnPicker({ id, value, onChange, disabled, productGst, suggested, suggestedText = 'File says', showGstNote = true, hint, label = 'HSN code' }: {
   id: string;
   value: string | null;
   onChange: (code: string | null) => void;
   disabled?: boolean;
   productGst?: number | string | null;
   suggested?: { code: string; gst_rate: number | null } | null;
+  /** Words before the suggested code (Sprint 46: an imported suggestion, not the partner's file) */
+  suggestedText?: ReactNode;
   showGstNote?: boolean;
   hint?: ReactNode;
   label?: string;
@@ -50,7 +52,7 @@ export default function HsnPicker({ id, value, onChange, disabled, productGst, s
         onAddTyped={(t) => setDialog(/^[\d\s.]+$/.test(t) ? { code: tidyHsn(t) } : {})}
         addLabel={(t) => `+ Add a new HSN code${/^[\d\s.]+$/.test(t) ? ` ${tidyHsn(t)}` : ''}`}
         hint={suggested && suggested.code !== value ? (
-          <>File says {suggested.code}{' '}
+          <>{suggestedText} {suggested.code}{' '}
             <button type="button" className="underline" onClick={useSuggested} disabled={disabled}>
               {suggestedListed ? 'use it' : 'add it to the list and use it'}
             </button></>

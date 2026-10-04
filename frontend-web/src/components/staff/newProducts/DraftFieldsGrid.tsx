@@ -5,6 +5,8 @@ import HsnPicker from '@/components/catalogueLists/HsnPicker';
 import { DraftSelect, DraftText } from './DraftInputs';
 import ScheduleCField from '@/components/catalogue/ScheduleCField';
 import ProductClassFields from '@/components/catalogue/ProductClassFields';
+import SuggestedNote from './SuggestedNote';
+import { PRODUCT_CLASS_LABELS } from '@/lib/productClass';
 
 const RX_TEXT: Record<string, string> = {
   needed: 'Prescription needed for patients (C-08)',
@@ -12,7 +14,11 @@ const RX_TEXT: Record<string, string> = {
   'never sold online': 'Never sold online (C-10)',
 };
 
-/** The details a person must decide for one draft. Schedule and clinical details are per product only. */
+/**
+ * The details a person must decide for one draft. Schedule and clinical details are per product only.
+ * Sprint 46: an imported suggestion pre-fills empty fields, marked "Suggested — check against the pack";
+ * nothing suggested is saved until the person presses "Use" or changes the field (C-19, C-25).
+ */
 export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
   draft: Draft;
   options: DraftOptions | undefined;
@@ -28,6 +34,15 @@ export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
     onSave(v === 'yes' && !draft.storage_instructions ? { cold_chain: true, storage_instructions: COLD_CHAIN_STORAGE } : { cold_chain: v === 'yes' });
   };
   const common = { disabled };
+  // Sprint 46: the imported suggestion (shown only while the draft is open)
+  const sg = draft.suggestion?.suggested ?? {};
+  const flagFor = (field: string) => draft.suggestion?.flags.find((f) => f.field === field)?.message;
+  const classDiffers = (sg.product_class !== undefined && sg.product_class !== draft.product_class)
+    || (sg.is_new_drug !== undefined && sg.is_new_drug !== !!draft.is_new_drug);
+  const suggestedClass = {
+    product_class: sg.product_class ?? draft.product_class ?? 'drug',
+    is_new_drug: sg.is_new_drug ?? !!draft.is_new_drug,
+  };
 
   return (
     <div className="space-y-3">
@@ -36,17 +51,20 @@ export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
         <DraftSelect id={id('schedule')} label="Drug schedule" value={draft.drug_schedule ?? ''} {...common}
           options={(options?.schedules ?? []).map((s) => ({ value: s, label: s }))}
           hint={draft.requires_prescription ? RX_TEXT[draft.requires_prescription] : 'Decides whether a prescription is needed'}
-          onSave={(v) => onSave({ drug_schedule: v || null })} />
-        <DraftText id={id('generic')} label="Generic name" value={draft.generic_name} {...common} onSave={(v) => onSave({ generic_name: v })} />
+          suggested={sg.drug_schedule ?? undefined} onSave={(v) => onSave({ drug_schedule: v || null })} />
+        <DraftText id={id('generic')} label="Generic name" value={draft.generic_name} {...common} suggested={sg.generic_name}
+          onSave={(v) => onSave({ generic_name: v })} />
         {!neverOnline && (
           <>
             <DraftText id={id('strength')} label="Strength" value={draft.strength} placeholder="e.g. 650 mg" maxLength={100} {...common}
-              hint='Write "none" if it has none' onSave={(v) => onSave({ strength: v })} />
-            <DraftSelect id={id('form')} label="Dosage form" value={draft.dosage_form ?? ''} {...common}
+              hint='Write "none" if it has none' suggested={sg.strength} onSave={(v) => onSave({ strength: v })} />
+            <DraftSelect id={id('form')} label="Dosage form" value={draft.dosage_form ?? ''} {...common} suggested={sg.dosage_form ?? undefined}
               options={(options?.dosage_forms ?? []).map((s) => ({ value: s, label: s }))} onSave={(v) => onSave({ dosage_form: v || null })} />
             <DraftText id={id('composition')} label="Composition (optional)" value={draft.composition} {...common} className="sm:col-span-2"
               onSave={(v) => onSave({ composition: v })} />
+            {/* C-25: a suggested cold chain is pre-selected but counts only once the person presses Use or chooses */}
             <DraftSelect id={id('cold')} label="Cold chain (2–8 °C)" value={cold} {...common}
+              suggested={sg.cold_chain === undefined ? undefined : sg.cold_chain ? 'yes' : 'no'}
               options={[{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes, 2–8 °C' }]} onSave={setCold} />
             <DraftText id={id('storage')} label="Storage instructions" value={draft.storage_instructions} {...common}
               onSave={(v) => onSave({ storage_instructions: v })} />
@@ -56,6 +74,10 @@ export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
             <div className="sm:col-span-2">
               <ProductClassFields idPrefix={id('class')} productClass={draft.product_class ?? 'drug'} isNewDrug={!!draft.is_new_drug} disabled={disabled}
                 onChange={(c) => onSave(c)} />
+              {classDiffers && (
+                <SuggestedNote disabled={disabled} onUse={() => onSave(suggestedClass)}
+                  text={`${PRODUCT_CLASS_LABELS[suggestedClass.product_class]}${suggestedClass.is_new_drug ? ', new drug' : ', not a new drug'}`} />
+              )}
             </div>
           </>
         )}
@@ -71,14 +93,21 @@ export default function DraftFieldsGrid({ draft, options, onSave, disabled }: {
             <legend className="text-xs font-semibold text-gray-700 mb-1">Product and tax</legend>
             <DraftText id={id('name')} label="Product name" value={draft.name} {...common} className="sm:col-span-2"
               onSave={(v) => { if (v) onSave({ name: v }); }} />
-            <CategoryPicker id={id('category')} value={draft.category} {...common} onChange={(v) => onSave({ category: v })} />
+            <CategoryPicker id={id('category')} value={draft.category} {...common} onChange={(v) => onSave({ category: v })}
+              hint={sg.category && sg.category !== draft.category ? (
+                <SuggestedNote text={sg.category} disabled={disabled}
+                  onUse={flagFor('category') ? undefined : () => onSave({ category: sg.category ?? null })} extra={flagFor('category')} />
+              ) : undefined} />
             <DraftText id={id('pack')} label="Pack (net quantity)" value={draft.net_quantity} maxLength={50} {...common}
               onSave={(v) => onSave({ net_quantity: v })} />
             {/* The GST note for a differing HSN rate is in the card's warnings (server) */}
             <HsnPicker id={id('hsn')} value={draft.hsn_code} {...common} productGst={draft.gst_rate} showGstNote={false}
-              suggested={draft.from_file.hsn_code && !draft.hsn_code ? { code: draft.from_file.hsn_code, gst_rate: draft.from_file.gst_rate } : null}
+              suggestedText={sg.hsn_code ? <strong className="text-amber-900">Suggested — check against the pack:</strong> : undefined}
+              suggested={sg.hsn_code && !draft.hsn_code ? { code: sg.hsn_code, gst_rate: sg.gst_rate ?? null }
+                : draft.from_file.hsn_code && !draft.hsn_code ? { code: draft.from_file.hsn_code, gst_rate: draft.from_file.gst_rate } : null}
               hint="4, 6 or 8 digits" onChange={(v) => onSave({ hsn_code: v })} />
             <DraftSelect id={id('gst')} label="GST rate" value={draft.gst_rate == null ? '' : String(draft.gst_rate)} {...common}
+              suggested={sg.gst_rate == null ? undefined : String(sg.gst_rate)}
               options={(options?.gst_rates ?? []).map((g) => ({ value: String(g), label: `${g}%` }))}
               onSave={(v) => onSave({ gst_rate: v === '' ? null : Number(v) })} />
           </fieldset>

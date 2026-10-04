@@ -1,7 +1,7 @@
 'use client';
 import type { DraftFilters, DraftList } from '@/lib/admin/catalogueDrafts';
 
-/** Filters: company, needs a schedule, cold chain, name. */
+/** Filters: company, needs a schedule, cold chain, name; Sprint 46: drafts with suggestions (high confidence first). */
 export default function DraftFiltersBar({ filters, companies, onChange }: {
   filters: DraftFilters;
   companies: DraftList['companies'];
@@ -33,6 +33,10 @@ export default function DraftFiltersBar({ filters, companies, onChange }: {
       <label className="inline-flex items-center gap-2 text-sm text-gray-700 pb-2">
         <input type="checkbox" checked={filters.needs_schedule} onChange={(e) => onChange({ needs_schedule: e.target.checked })} className="w-4 h-4" />
         Needs schedule
+      </label>
+      <label className="inline-flex items-center gap-2 text-sm text-gray-700 pb-2">
+        <input type="checkbox" checked={!!filters.suggested} onChange={(e) => onChange({ suggested: e.target.checked })} className="w-4 h-4" />
+        With suggestions (high confidence first)
       </label>
     </div>
   );

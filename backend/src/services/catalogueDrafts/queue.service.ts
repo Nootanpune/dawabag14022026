@@ -28,15 +28,29 @@ const COLUMNS = `p.id, p.sku, p.name, p.generic_name, p.composition, p.strength,
   p.hsn_code, p.gst_rate, p.category, p.description, p.storage_instructions, p.net_quantity, p.marketed_by,
   p.manufacturer_name, p.manufacturer_address, p.country_of_origin, p.mrp_paise, p.catalogue_state, p.content_status,
   d.from_file, d.cold_chain_decided, d.status, d.created_at, d.updated_at, d.decided_at, d.decision_note,
-  up.full_name AS decided_by_name, h.gst_rate AS hsn_gst_rate, h.description AS hsn_description`;
+  up.full_name AS decided_by_name, h.gst_rate AS hsn_gst_rate, h.description AS hsn_description, sg.suggestion, sg.suggestion_confidence`;
+// Sprint 46: the newest imported suggestion of the draft (catalogue_draft_suggestions) — shown, never decided
 const FROM = `FROM catalogue_drafts d JOIN products p ON p.id = d.product_id LEFT JOIN user_profiles up ON up.user_id = d.decided_by
-  LEFT JOIN hsn_codes h ON h.code = p.hsn_code`;
+  LEFT JOIN hsn_codes h ON h.code = p.hsn_code
+  LEFT JOIN LATERAL (
+    SELECT jsonb_build_object('id', s.id, 'suggested', s.suggested, 'flags', s.flags, 'confidence', s.confidence, 'note', s.note,
+             'item_name', s.item_name, 'pack', s.pack, 'company', s.company, 'partner_name', sv.name,
+             'imported_by_name', su.full_name, 'imported_at', s.imported_at, 'file_name', s.file_name) AS suggestion,
+           s.confidence AS suggestion_confidence
+      FROM catalogue_draft_suggestions s LEFT JOIN vendors sv ON sv.id = s.partner_id LEFT JOIN user_profiles su ON su.user_id = s.imported_by
+     WHERE s.product_id = d.product_id ORDER BY s.imported_at DESC, s.id DESC LIMIT 1) sg ON TRUE`;
+/** Sprint 46: drafts with suggestions, high confidence first */
+const CONFIDENCE_ORDER = `CASE sg.suggestion_confidence WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 3 END`;
 
-function view(r: any) {
+function view(raw: any) {
+  const r = { ...raw };
+  delete r.suggestion_confidence;   // only for ordering
   const fields = { ...r, gst_rate: r.gst_rate === null ? null : Number(r.gst_rate) };
   const open = r.status === 'open';
   return {
     ...fields,
+    // Sprint 46: the imported suggestion is shown only while the draft is open (a pharmacist decides, C-19)
+    suggestion: open ? (r.suggestion ?? null) : null,
     requires_prescription: prescriptionFor(r.drug_schedule),
     problems: open ? approvalProblems(fields, r.cold_chain_decided) : [],
     warnings: open ? draftWarnings(fields) : [],
@@ -51,6 +65,8 @@ export interface DraftFilters {
   needs_schedule?: boolean;
   cold_chain?: 'yes' | 'no' | 'undecided';
   q?: string;
+  /** Sprint 46: only drafts with an imported suggestion, high confidence first */
+  suggested?: boolean;
   page: number;
   limit: number;
 }
@@ -66,11 +82,13 @@ export async function listDrafts(f: DraftFilters) {
   if (f.cold_chain === 'yes') where.push('d.cold_chain_decided AND p.cold_chain');
   if (f.cold_chain === 'no') where.push('d.cold_chain_decided AND NOT p.cold_chain');
   if (f.cold_chain === 'undecided') where.push('NOT d.cold_chain_decided');
+  if (f.suggested) where.push('sg.suggestion IS NOT NULL');
   if (f.q) { const k = add(`%${f.q}%`); where.push(`(p.name ILIKE ${k} OR p.generic_name ILIKE ${k} OR d.from_file->>'item_name' ILIKE ${k})`); }
   const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const [rows, total, progress, companies] = await Promise.all([
+  const order = f.suggested ? `${CONFIDENCE_ORDER}, p.name, p.id` : `d.from_file->>'company' NULLS LAST, p.name, p.id`;
+  const [rows, total, progress, companies, suggested] = await Promise.all([
     query<any>(`SELECT ${COLUMNS} ${FROM} ${w}
-                ORDER BY d.from_file->>'company' NULLS LAST, p.name, p.id
+                ORDER BY ${order}
                 LIMIT ${add(f.limit)} OFFSET ${add((f.page - 1) * f.limit)}`, params),
     queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n ${FROM} ${w}`, params.slice(0, params.length - 2)),
     queryOne<{ done: number; total: number }>(
@@ -78,10 +96,15 @@ export async function listDrafts(f: DraftFilters) {
     query<{ company: string; n: number }>(
       `SELECT from_file->>'company' AS company, COUNT(*)::int AS n FROM catalogue_drafts
        WHERE status = 'open' AND from_file->>'company' IS NOT NULL GROUP BY 1 ORDER BY 1`),
+    query<{ confidence: string; n: number }>(
+      `SELECT sg.suggestion_confidence AS confidence, COUNT(*)::int AS n ${FROM}
+        WHERE d.status = 'open' AND sg.suggestion IS NOT NULL GROUP BY 1`),
   ]);
   return {
     drafts: rows.map(view), total: total?.n ?? 0, page: f.page, limit: f.limit,
     progress: { done: progress?.done ?? 0, total: progress?.total ?? 0 }, companies,
+    // Sprint 46: open drafts with an imported suggestion, by confidence
+    with_suggestions: Object.fromEntries(['high', 'medium', 'low'].map((c) => [c, suggested.find((x) => x.confidence === c)?.n ?? 0])),
   };
 }
 

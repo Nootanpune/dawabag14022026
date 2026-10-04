@@ -5,6 +5,7 @@
 import api from '../api';
 import type { OnlineSaleChange } from '../onlineSale/api';
 import type { ProductClass } from '../productClass';
+import type { Confidence, DraftSuggestion } from './catalogueSuggestions';
 
 export interface FromFileEntry {
   request_id: string;
@@ -58,6 +59,8 @@ export interface Draft {
   problems: string[];
   warnings: string[];
   suggested_description: string | null;
+  /** Sprint 46: the newest imported suggestion while the draft is open — shown, never a decision */
+  suggestion: DraftSuggestion | null;
 }
 
 export interface DraftList {
@@ -67,6 +70,8 @@ export interface DraftList {
   limit: number;
   progress: { done: number; total: number };
   companies: { company: string; n: number }[];
+  /** Sprint 46: open drafts with a suggestion, by confidence */
+  with_suggestions?: Record<Confidence, number>;
 }
 
 export interface DraftFilters {
@@ -75,6 +80,8 @@ export interface DraftFilters {
   needs_schedule: boolean;
   cold_chain: '' | 'yes' | 'no' | 'undecided';
   q: string;
+  /** Sprint 46: only drafts with a suggestion, high confidence first */
+  suggested?: boolean;
   page: number;
 }
 
@@ -114,6 +121,7 @@ export async function fetchDrafts(f: DraftFilters): Promise<DraftList> {
   if (f.needs_schedule) params.needs_schedule = 'true';
   if (f.cold_chain) params.cold_chain = f.cold_chain;
   if (f.q.trim()) params.q = f.q.trim();
+  if (f.suggested) params.suggested = 'true';
   const { data } = await api.get('/catalogue-drafts', { params });
   return data.data;
 }

@@ -57,7 +57,7 @@ export interface ImportOptions { replaceDrafts: boolean }
 const OUTCOMES: RowOutcome[] = ['created', 'replaced', 'unchanged', 'already_has_information', 'not_in_catalogue', 'invalid'];
 
 /** The partner the drafts are for (a marketplace partner). */
-async function partnerOf(partnerId: string) {
+export async function partnerOf(partnerId: string) {
   const v = await queryOne<{ id: string; name: string }>(
     `SELECT id, name FROM vendors WHERE id = $1 AND vendor_type IN ('marketplace_partner', 'both')`, [partnerId]);
   if (!v) throw new AppError('Partner not found', 404);

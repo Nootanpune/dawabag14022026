@@ -534,6 +534,46 @@ and the **tax invoice is issued at that approval** (DECISIONS.md, Sprint 44 rows
   Tick "replace unapproved drafts only" to overwrite open drafts with the file's words.
 - Audit: `product_info_drafts_imported` (who, partner, file name + SHA-256, counts; no text).
 
+## 7j. Catalogue suggestions for draft products (Sprint 46)
+
+- Order of work for a partner's new products (e.g. Nootan): (1) the partner's stock file is
+  uploaded and its unknown items become requests; (2) an admin uses *Create drafts* on those
+  requests (Admin → Partner stock files → Requests); (3) suggestions for the drafts are
+  imported here; (4) a pharmacist completes and approves each product on *New products to
+  complete*.
+- Staff → *Import catalogue suggestions* (`/staff/catalogue-suggestions`, admins and
+  pharmacists). Choose the partner, upload an .xlsx (≤ 10 MB, ≤ 5,000 rows) with a sheet
+  named `suggestions` whose first row is exactly `item_name, pack, company, generic_name,
+  strength, dosage_form, drug_schedule, cold_chain, product_class, is_new_drug, category,
+  hsn_code, gst_rate, confidence, note` (any order). *Download template* gives the empty
+  workbook with a `how_to` sheet; *Accepted values* on the page lists what each column takes
+  (from `GET /api/v1/catalogue-suggestions/format`). The file is read in memory and not kept.
+- Accepted values: drug_schedule `OTC, Non-scheduled, Schedule G, Schedule H, Schedule H1,
+  Schedule X, NDPS` (also H, H1, G, X); Schedule C / C1 is a separate yes/no the pharmacist
+  ticks (a "C/C1" schedule cell is refused with that explanation). dosage_form `Tablet,
+  Capsule, Syrup, Suspension, Drops, Injection, Ointment, Cream, Gel, Lotion, Solution,
+  Powder, Sachet, Inhaler, Spray, Soap, Device, Other`; product_class `drug, device, cosmetic,
+  ayush, general`; gst_rate `0, 5, 12, 18, 28`; cold_chain / is_new_drug `yes` / `no`;
+  hsn_code 4, 6 or 8 digits; confidence `high, medium, low` (required). A blank cell = no
+  suggestion for that field. A category or HSN code not in the lists is kept and flagged
+  ("create with Alt+C if right"); a bad schedule / class / form / GST / yes-no value makes
+  the row invalid.
+- Matching is the partner's own item links (as the stock import and Sprint 45). Only an item
+  linked to a DRAFT product takes a suggestion. A live product is reported "Already in
+  catalogue" and never changed. Unmatched rows are "No draft yet" (CSV); when the partner has
+  open requests for some of them, an admin sees *Create drafts for the N matched requests,
+  then import again* on the result.
+- A suggestion is never written into the product. The pharmacist's form shows it as
+  "Suggested — check against the pack" with the confidence and note, pre-fills empty fields,
+  and saves a value only when the pharmacist presses *Use* (per field or *Use the suggested
+  values I have checked*) or types their own; cold chain is always chosen explicitly (C-25).
+  *New products to complete → With suggestions (high confidence first)* (or
+  `/staff/new-products?suggested=1`) goes through them; each product is still approved
+  one at a time by a pharmacist (no bulk approve, C-10 / C-19).
+- Re-importing adds a new suggestion only while the draft is open and only if something
+  changed; earlier suggestions are kept (table `catalogue_draft_suggestions`, immutable).
+- Audit: `catalogue_suggestions_imported` (who, partner, file name + SHA-256, counts, draft ids).
+
 ## 7a. Development and CI
 
 - One command brings a fresh machine to a running, migrated API against the fake

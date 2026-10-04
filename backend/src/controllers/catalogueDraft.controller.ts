@@ -35,6 +35,7 @@ const listQuery = z.object({
   needs_schedule: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
   cold_chain: z.enum(['yes', 'no', 'undecided']).optional(),
   q: z.string().trim().max(100).optional(),
+  suggested: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),   // Sprint 46
   page: z.coerce.number().int().min(1).max(10_000).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });

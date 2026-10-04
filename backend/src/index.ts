@@ -51,6 +51,7 @@ import returnRoutes from './routes/return.routes';
 import complianceRoutes from './routes/compliance.routes';
 import catalogueRoutes from './routes/catalogue.routes';
 import catalogueDraftRoutes from './routes/catalogueDraft.routes';
+import catalogueSuggestionRoutes from './routes/catalogueSuggestion.routes';
 import catalogueListRoutes from './routes/catalogueLists.routes';
 import accountsRoutes from './routes/accounts.routes';
 import purchasingRoutes from './routes/purchasing.routes';
@@ -140,6 +141,7 @@ const UPLOAD_PATHS = [
   '/api/v1/prescriptions/upload', '/api/v1/catalogue/import', '/api/v1/kyc/documents', '/api/v1/written-orders/upload',
   /^\/api\/v1\/partner\/stock-imports\/?$/,   // the file itself, not the steps after it
   /^\/api\/v1\/medicines\/info-imports\/?$/,   // Sprint 45: medicine-information drafts workbook
+  /^\/api\/v1\/catalogue-suggestions\/imports\/?$/,   // Sprint 46: catalogue suggestions workbook
   /^\/api\/v1\/partner-feed\//,               // Sprint 36: the billing software's key path (per address; per key in the route)
   /^\/api\/v1\/(users\/me|partner)\/licences\/[^/]+\/document$/,
   /^\/api\/v1\/admin\/party-licences\/[^/]+\/document$/,
@@ -218,6 +220,7 @@ app.use(`${api}/returns`, returnRoutes);
 app.use(`${api}/compliance`, complianceRoutes);
 app.use(`${api}/catalogue`, catalogueRoutes);
 app.use(`${api}/catalogue-drafts`, catalogueDraftRoutes);   // Sprint 29: new products to complete
+app.use(`${api}/catalogue-suggestions`, catalogueSuggestionRoutes);   // Sprint 46: suggestions for draft products
 app.use(`${api}/catalogue-lists`, catalogueListRoutes);     // Sprint 31: categories and HSN codes
 app.use(`${api}/accounts`, accountsRoutes);
 app.use(`${api}/purchasing`, purchasingRoutes);

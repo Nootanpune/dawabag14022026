@@ -10,6 +10,7 @@ import FromFilePanel from './FromFilePanel';
 import DraftFieldsGrid from './DraftFieldsGrid';
 import { useDraftActions } from './useDraftActions';
 import BuyerDescription from './BuyerDescription';
+import SuggestionPanel from './SuggestionPanel';
 import OnlineSaleFields from '@/components/staff/onlineSale/OnlineSaleFields';
 import { changeProblems, type OnlineSaleChange } from '@/lib/onlineSale/api';
 import { toISTDateString } from '@/lib/dates';
@@ -65,6 +66,8 @@ export default function DraftCard({ draft, options, canApprove, selected, onSele
           No description yet — add one
         </button>
       )}
+
+      {open && <SuggestionPanel draft={draft} onSave={(p) => save.mutate(p)} disabled={save.isPending} />}
 
       <div className="grid gap-3 md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
         <FromFilePanel draft={draft} />
