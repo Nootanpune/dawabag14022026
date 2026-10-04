@@ -79,6 +79,8 @@ class CartNotifier extends StateNotifier<CartState> {
         if (isRxSalesPaused(e)) load();
         // Sprint 39: 403 NOT_FOR_ONLINE_SALE (C-10) — a line already in the cart then shows why
         if (isNotForOnlineSale(e) && state.view.items.isNotEmpty) load();
+        // Sprint 47: 403 BUYER_RESTRICTED — who may buy it changed; a line already in the cart then shows why
+        if (isBuyerRestricted(e) && state.view.items.isNotEmpty) load();
       }
       return message;
     }

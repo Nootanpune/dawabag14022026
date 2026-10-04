@@ -6,6 +6,7 @@ import '../../services/api_service.dart';
 import '../../utils/drug_schedule.dart';
 import '../../widgets/error_retry_view.dart';
 import '../../widgets/product_image.dart';
+import '../../widgets/shop/buyer_restriction_note.dart';
 import '../../widgets/trade_price_banner.dart';
 import '../../providers/product_page_providers.dart';
 import 'widgets/product_not_online_view.dart';
@@ -84,6 +85,8 @@ class _Body extends StatelessWidget {
                 schedule: product['drug_schedule']?.toString() ?? 'OTC',
                 coldChain: product['cold_chain'] == true,
               ),
+              // Sprint 47: who may buy it, and (for a buyer who may not) that it cannot be added
+              BuyerRestrictionNote(product: product, detail: true, margin: const EdgeInsets.only(top: 12)),
               const SizedBox(height: 16),
               // Sprint 34: lapsed drug licence → retail prices, and why (C-14)
               const TradePriceBanner(margin: EdgeInsets.only(bottom: 12)),

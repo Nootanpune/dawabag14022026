@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../providers/cart_actions.dart';
 import '../../../providers/cart_provider.dart';
+import '../../../utils/buyer_restriction.dart';
 import '../../../utils/drug_schedule.dart';
 import '../../../utils/formatters.dart';
 import '../../../widgets/cart_quantity_control.dart';
@@ -33,13 +34,23 @@ class _ProductBuyBarState extends ConsumerState<ProductBuyBar> {
     final id = p['id']?.toString() ?? '';
     final cannotOrder = p['cannot_order_online'] == true || isNeverOnline(p['drug_schedule']?.toString());
     final inStock = p['in_stock'] == true;
+    // Sprint 47: the server says this buyer may not buy it (missing field = allowed)
+    final restricted = buyerMayNotBuy(p);
     final inCart = ref.watch(cartProvider.select((s) => s.view.lineFor(id)?.quantity ?? 0));
     final busy = ref.watch(cartProvider.select((s) => s.isUpdating));
     final qty = (_chosen ?? _min).clamp(_min, _max);
     final price = (p['price_paise'] as num?)?.toInt() ?? (p['offer_price_paise'] as num?)?.toInt() ?? 0;
 
     Widget body;
-    if (cannotOrder || !inStock) {
+    if (restricted && inCart == 0 && !cannotOrder) {
+      // No Add: the label instead (the page body explains who may buy it)
+      body = ElevatedButton(
+        key: const ValueKey('buy-bar-restricted'),
+        onPressed: null,
+        child: Text(buyerRestrictionLabel(p) ?? 'Not available to your account',
+            maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+      );
+    } else if (cannotOrder || !inStock) {
       body = ElevatedButton(onPressed: null, child: Text(cannotOrder ? 'Not available online' : 'Out of stock'));
     } else if (inCart > 0) {
       body = Row(children: [
@@ -83,7 +94,7 @@ class _ProductBuyBarState extends ConsumerState<ProductBuyBar> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           body,
-          if (inCart == 0 && inStock && !cannotOrder)
+          if (inCart == 0 && inStock && !cannotOrder && !restricted)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text('Up to $_max per order', style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../models/product_page_extras.dart';
 import '../../../utils/formatters.dart';
 import '../../../widgets/cart_quantity_control.dart';
+import '../../../widgets/shop/buyer_restriction_note.dart';
 
 /// One substitute: maker, pack, price per unit, "Save X%", stock and Add.
 /// Nothing is ever swapped automatically.
@@ -43,6 +44,8 @@ class SubstituteTile extends StatelessWidget {
                         ),
                     ],
                   ),
+                  // Sprint 47: who may buy it (no Add for a buyer who may not)
+                  BuyerRestrictionNote(product: s.raw, margin: const EdgeInsets.only(top: 4)),
                 ],
               ),
             ),

@@ -7,6 +7,7 @@ import '../../../utils/formatters.dart';
 import '../../../widgets/cart_quantity_control.dart';
 import '../../../widgets/product_image.dart';
 import '../../../widgets/schedule_badge.dart';
+import '../../../widgets/shop/buyer_restriction_note.dart';
 
 /// One search result: thumbnail, name, generic name, price and Add.
 class SearchResultTile extends ConsumerWidget {
@@ -49,6 +50,9 @@ class SearchResultTile extends ConsumerWidget {
                       const SizedBox(width: 8),
                       ScheduleBadge(product['drug_schedule']?.toString()),
                     ]),
+                    // Sprint 47: "Supplied only to doctors and hospitals" — Add is hidden
+                    // for a buyer who may not buy it (server's buyer_may_buy)
+                    BuyerRestrictionNote(product: product, margin: const EdgeInsets.only(top: 4)),
                   ],
                 ),
               ),

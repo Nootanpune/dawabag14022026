@@ -5,6 +5,7 @@ import '../../utils/formatters.dart';
 import '../cart_quantity_control.dart';
 import '../product_image.dart';
 import '../schedule_badge.dart';
+import '../shop/buyer_restriction_note.dart';
 
 /// One suggestion in the home search dropdown: name, generic name, Rx /
 /// Non-scheduled badge, the buyer's price, stock, and Add that becomes − qty +
@@ -56,6 +57,8 @@ class TypeaheadOption extends StatelessWidget {
                       Text('Out of stock', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red.shade700)),
                     ],
                   ]),
+                  // Sprint 47: who may buy it (no Add for a buyer who may not)
+                  BuyerRestrictionNote(product: product, margin: const EdgeInsets.only(top: 2)),
                 ],
               ),
             ),

@@ -20,6 +20,10 @@ class CartLine {
   final bool available;
   final String? issue;
   final bool requiresPrescription;
+  /// Sprint 47: who may buy it (everyone | practitioners_only | trade_only;
+  /// null from an older server) and the label buyers see (null for everyone).
+  final String? buyerRestriction;
+  final String? buyerRestrictionLabel;
 
   const CartLine({
     required this.productId,
@@ -39,6 +43,8 @@ class CartLine {
     this.available = true,
     this.issue,
     this.requiresPrescription = false,
+    this.buyerRestriction,
+    this.buyerRestrictionLabel,
   });
 
   factory CartLine.fromJson(Map<String, dynamic> j) => CartLine(
@@ -59,11 +65,21 @@ class CartLine {
         available: j['available'] != false,
         issue: j['issue']?.toString(),
         requiresPrescription: j['requires_prescription'] == true,
+        buyerRestriction: j['buyer_restriction']?.toString(),
+        buyerRestrictionLabel: (j['buyer_restriction_label'] is String &&
+                (j['buyer_restriction_label'] as String).trim().isNotEmpty)
+            ? (j['buyer_restriction_label'] as String).trim()
+            : null,
       );
 
   /// Sprint 39 (C-10): a pharmacist has not allowed this product for online
   /// sale (the server's line issue). It blocks checkout until removed.
   bool get notForOnlineSale => issue == kNotForOnlineSaleIssue;
+
+  /// Sprint 47: this buyer may not buy it — the server's line `issue` is then
+  /// the restriction label ("Supplied only to doctors and hospitals"). It
+  /// blocks checkout until removed, and cannot be raised.
+  bool get buyerRestricted => buyerRestrictionLabel != null && issue == buyerRestrictionLabel;
 
   /// Whether the + button may be offered (the server still has the final say).
   bool get canIncrease {
@@ -167,11 +183,16 @@ class CartView {
   /// Sprint 39 (C-10): lines a pharmacist has not allowed for online sale.
   List<CartLine> get notForSaleItems => items.where((l) => l.notForOnlineSale).toList();
 
+  /// Sprint 47: lines this buyer may not buy (doctors and hospitals only /
+  /// licensed trade buyers only).
+  List<CartLine> get restrictedItems => items.where((l) => l.buyerRestricted).toList();
+
   /// Lines that hold checkout until they are removed: paused prescription lines
-  /// (Sprint 38) and products not sold online (Sprint 39), each line once.
+  /// (Sprint 38), products not sold online (Sprint 39) and products this buyer
+  /// may not buy (Sprint 47), each line once.
   List<CartLine> get blockedItems {
     final seen = <String>{};
-    return [...pausedItems, ...notForSaleItems].where((l) => seen.add(l.productId)).toList();
+    return [...pausedItems, ...notForSaleItems, ...restrictedItems].where((l) => seen.add(l.productId)).toList();
   }
 
   bool get hasBlockedItems => blockedItems.isNotEmpty;
@@ -180,11 +201,13 @@ class CartView {
   String get checkoutBlockedMessage {
     final blocked = blockedItems;
     if (blocked.isEmpty) return '';
-    if (notForSaleItems.isEmpty) return pausedCheckoutMessage;
+    if (notForSaleItems.isEmpty && restrictedItems.isEmpty) return pausedCheckoutMessage;
     final off = notForSaleItems.map((l) => l.name).toList();
     final reasons = [
       if (hasPausedItems && rxSalesPaused != null) rxSalesPaused!,
-      '${off.join(', ')} ${off.length == 1 ? 'is' : 'are'} not available for online sale.',
+      if (off.isNotEmpty) '${off.join(', ')} ${off.length == 1 ? 'is' : 'are'} not available for online sale.',
+      // Sprint 47: the server's label, e.g. "Testinj 1 vial: supplied only to doctors and hospitals."
+      for (final l in restrictedItems) '${l.name}: ${_lowerFirst(l.buyerRestrictionLabel!)}.',
     ];
     return '${reasons.join(' ')} Please remove ${blocked.map((l) => l.name).join(', ')} from your cart to order the rest.';
   }
@@ -227,6 +250,8 @@ class CartView {
 /// The server's cart line issue for a product not allowed for online sale
 /// (backend cart.service, Sprint 39).
 const kNotForOnlineSaleIssue = 'Not available for online sale';
+
+String _lowerFirst(String s) => s.isEmpty ? s : '${s[0].toLowerCase()}${s.substring(1)}';
 
 int _int(Object? v) {
   if (v is int) return v;

@@ -177,6 +177,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       if (isRxSalesPaused(e)) _refreshRxPause();
       // Sprint 39: a product switched off for online sale meanwhile (C-10) — the cart shows which
       if (isNotForOnlineSale(e)) ref.read(cartProvider.notifier).load();
+      // Sprint 47: 403 BUYER_RESTRICTED (preview / place order) — the cart shows which line, and why
+      if (isBuyerRestricted(e)) ref.read(cartProvider.notifier).load();
       _showError(ApiService.errorMessage(e, fallback: fallback));
     } finally {
       if (mounted) setState(() => _isLoading = false);

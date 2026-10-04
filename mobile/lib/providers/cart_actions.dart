@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/theme.dart';
+import '../utils/buyer_restriction.dart';
 import '../utils/drug_schedule.dart';
 import 'auth_provider.dart';
 import 'cart_provider.dart';
@@ -25,6 +26,11 @@ Future<bool> addProductToCart(
       content: Text('This medicine cannot be ordered online'),
       backgroundColor: Colors.red,
     ));
+    return false;
+  }
+  // Sprint 47: the server says this buyer may not buy it — its label, no request
+  if (buyerMayNotBuy(product)) {
+    messenger.showSnackBar(cartErrorSnackBar(buyerRestrictionLabel(product) ?? 'This product is not available to your account'));
     return false;
   }
   if (!(product['in_stock'] as bool? ?? false)) {

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../models/order_edit.dart';
 import '../../../../providers/typeahead_provider.dart';
+import '../../../../utils/buyer_restriction.dart';
 import '../../../../utils/formatters.dart';
 
 /// "Add a medicine" (Sprint 44): the app's own product search (GET
@@ -97,6 +98,9 @@ class _Result extends StatelessWidget {
     final name = product['name']?.toString() ?? '';
     final inStock = product['in_stock'] == true;
     final rx = kRxSchedules.contains(product['drug_schedule']?.toString());
+    // Sprint 47: a product this buyer may not buy — its label, no Add (the server refuses it too)
+    final restricted = buyerMayNotBuy(product);
+    final label = buyerRestrictionLabel(product);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(children: [
@@ -107,11 +111,17 @@ class _Result extends StatelessWidget {
               '${formatPrice(EditAddition(product, 1).unitPaise)}${rx ? ' · prescription needed' : ''}${inStock ? '' : ' · out of stock'}',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
+            if (label != null)
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: restricted ? const Color(0xFF78350F) : const Color(0xFF0C4A6E))),
           ]),
         ),
         OutlinedButton.icon(
           key: ValueKey('edit-add-${product['id']}'),
-          onPressed: inStock ? onAdd : null,
+          onPressed: inStock && !restricted ? onAdd : null,
           icon: const Icon(Icons.add, size: 16),
           label: Text('Add', semanticsLabel: 'Add $name'),
         ),

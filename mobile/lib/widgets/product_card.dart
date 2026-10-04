@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../utils/formatters.dart';
 import 'product_image.dart';
+import '../utils/buyer_restriction.dart';
 import '../utils/drug_schedule.dart';
+import 'shop/buyer_restriction_note.dart';
 
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
@@ -19,6 +21,10 @@ class ProductCard extends StatelessWidget {
     final inStock = product['in_stock'] as bool? ?? false;
     final discountPct = product['discount_pct'] as int? ?? 0;
     final isH = isRxSchedule(schedule);   // Non-scheduled / OTC: plain badge (Sprint 31)
+    // Sprint 47: who may buy it. A buyer who may not sees the label in place of Add;
+    // one who may sees it as a one-line note above the price.
+    final restrictionLabel = buyerRestrictionLabel(product);
+    final restricted = buyerMayNotBuy(product);
 
     return GestureDetector(
       onTap: onTap,
@@ -66,6 +72,14 @@ class ProductCard extends StatelessWidget {
                     )),
                   ),
                   const SizedBox(height: 6),
+                  if (restrictionLabel != null && !restricted) ...[
+                    Text(restrictionLabel,
+                        key: const ValueKey('buyer-restriction-line'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF0C4A6E))),
+                    const SizedBox(height: 4),
+                  ],
 
                   // Price
                   Wrap(
@@ -82,7 +96,9 @@ class ProductCard extends StatelessWidget {
                   const SizedBox(height: 8),
 
                   // Add button (or − qty + once in the cart)
-                  if (cartControl != null) cartControl! else SizedBox(
+                  if (cartControl != null) cartControl!
+                  else if (restricted) BuyerRestrictedLabel(label: restrictionLabel ?? 'Not available to your account', height: 32)
+                  else SizedBox(
                     width: double.infinity,
                     height: 32,
                     child: ElevatedButton(

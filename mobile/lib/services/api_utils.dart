@@ -178,3 +178,13 @@ bool isWrittenOrderProblem(Object error) => (apiErrorCode(error) ?? '').startsWi
 
 /// True when the server refused because the registration does not allow sales now.
 bool isPractitionerRegistrationInvalid(Object error) => apiErrorCode(error) == kPractitionerRegistrationInvalid;
+
+/// Code the server sends (403) for a product this buyer may not buy (Sprint 47:
+/// doctors and hospitals only / licensed trade buyers only): PUT
+/// /cart/items/:id, POST /orders, /orders/preview and /orders/:id/edit. The
+/// envelope's `message` is a plain sentence for the buyer and is shown as is.
+const kBuyerRestricted = 'BUYER_RESTRICTED';
+
+/// True when the server refused a product this buyer may not buy.
+bool isBuyerRestricted(Object error) =>
+    error is DioException && error.response?.statusCode == 403 && apiErrorCode(error) == kBuyerRestricted;

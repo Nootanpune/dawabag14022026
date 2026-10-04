@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/cart_actions.dart';
 import '../providers/cart_provider.dart';
+import '../utils/buyer_restriction.dart';
 import 'quantity_stepper.dart';
+import 'shop/buyer_restriction_note.dart';
 
 /// "Add" until the medicine is in the server cart, then − qty + (Sprint 26).
 /// The cart is the server's; this only shows its quantity and changes it.
@@ -19,6 +21,8 @@ class CartQuantityControl extends ConsumerWidget {
     final busy = ref.watch(cartProvider.select((s) => s.isUpdating));
     final inStock = product['in_stock'] as bool? ?? false;
     final name = product['name']?.toString() ?? 'this medicine';
+    // Sprint 47: the server says this buyer may not buy it (missing field = allowed)
+    final restricted = buyerMayNotBuy(product);
 
     if (line != null && line.quantity > 0) {
       return Column(
@@ -29,7 +33,7 @@ class CartQuantityControl extends ConsumerWidget {
             name: name,
             quantity: line.quantity,
             min: line.minQty < 1 ? 1 : line.minQty,
-            canIncrease: line.canIncrease,
+            canIncrease: line.canIncrease && !restricted,
             busy: busy,
             compact: compact,
             onDecrease: () => changeCartQuantity(context, ref, id,
@@ -46,6 +50,13 @@ class CartQuantityControl extends ConsumerWidget {
             ),
         ],
       );
+    }
+    // Sprint 47: no Add for a product this buyer may not buy (doctors and hospitals
+    // only / licensed trade buyers only) — the label instead; the server refuses
+    // it anyway (403 BUYER_RESTRICTED). Compact rows show the label in the row.
+    if (restricted) {
+      if (compact) return const SizedBox.shrink();
+      return BuyerRestrictedLabel(label: buyerRestrictionLabel(product) ?? 'Not available to your account', height: 32);
     }
     if (!inStock) {
       return Text('Out of stock', style: TextStyle(fontSize: 12, color: Colors.grey.shade600));
