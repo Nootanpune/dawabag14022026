@@ -23,11 +23,14 @@
 // BACKUP_AWS_ACCESS_KEY_ID / BACKUP_AWS_SECRET_ACCESS_KEY (else the normal AWS
 // credential chain), BACKUP_PREFIX (default "backups/"), BACKUP_SSE (AES256 default,
 // aws:kms with BACKUP_KMS_KEY_ID, or none for a store that rejects the header),
-// BACKUP_PART_MB (multipart part size, default 64; S3 needs at least 5).
+// BACKUP_PART_MB (multipart part size, default 64; S3 needs at least 5), BACKUP_ENC_KEY
+// (Sprint 50: client-side AES-256-GCM before upload, crypt.mjs; BACKUP_ENC_KEY_PREVIOUS
+// for reading backups made before a key rotation).
 // Exit codes: 0 ok, 1 failure, 2 usage, 3 backup storage not configured, 4 no backup found.
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
+import { encryptStream, keysFromEnv, openBackupStream } from './crypt.mjs';
 import {
   AbortMultipartUploadCommand, CompleteMultipartUploadCommand, CreateBucketCommand, CreateMultipartUploadCommand,
   DeleteObjectCommand, HeadBucketCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command,
@@ -83,7 +86,14 @@ async function dump(key, cmd) {
   // object's metadata (audit head, number of H1 registers, SHA-256 of the full list) and, in
   // full, into <key>.heads.json beside it — a copy of the heads outside the database (C-09, C-46)
   const heads = chainHeads();
-  const meta = { ContentType: 'application/octet-stream', Metadata: { source: 'dawabag-staging-backup', ...(heads?.metadata ?? {}) }, ...encryption() };
+  // Sprint 50: with BACKUP_ENC_KEY the bytes are encrypted here, before they leave the server
+  const { current: encKey } = keysFromEnv();
+  const source = encKey ? child.stdout.pipe(encryptStream(encKey)) : child.stdout;
+  // Bytes pg_dump wrote (an encrypted object always has its header and tag, even when empty)
+  let plainBytes = 0;
+  if (encKey) child.stdout.on('data', (c) => { plainBytes += c.length; });
+  const clientEnc = encKey ? { 'client-encryption': 'aes-256-gcm', 'client-key-id': encKey.id.toString('hex') } : {};
+  const meta = { ContentType: 'application/octet-stream', Metadata: { source: 'dawabag-staging-backup', ...clientEnc, ...(heads?.metadata ?? {}) }, ...encryption() };
   let uploadId, total = 0, buffered = [], size = 0;
   const parts = [];
   const sendPart = async (body) => {
@@ -93,13 +103,13 @@ async function dump(key, cmd) {
     parts.push({ ETag, PartNumber });
   };
   try {
-    for await (const chunk of child.stdout) {
+    for await (const chunk of source) {
       buffered.push(chunk); size += chunk.length; total += chunk.length;
       if (size >= partSize) { const body = Buffer.concat(buffered); buffered = []; size = 0; await sendPart(body); }
     }
     const code = await exited;
     if (code !== 0) throw new Error(`${cmd[0]} exited with ${code}; nothing was stored`);
-    if (total === 0) throw new Error(`${cmd[0]} produced no output; nothing was stored`);
+    if ((encKey ? plainBytes : total) === 0) throw new Error(`${cmd[0]} produced no output; nothing was stored`);
     const rest = Buffer.concat(buffered);
     if (!uploadId) {
       await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: rest, ...meta }));
@@ -173,7 +183,10 @@ async function heads(key) {
 async function get(key) {
   if (!key) fail('usage: get <key>', 2);
   const out = await client().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-  await pipeline(out.Body, process.stdout);
+  // Sprint 50: an encrypted backup (crypt.mjs) is decrypted and authenticated on the way out
+  const { all } = keysFromEnv();
+  const plainNote = () => { if (all.length) process.stderr.write(`s3: note — ${key} is not client-side encrypted (made before BACKUP_ENC_KEY was set)\n`); };
+  await pipeline(out.Body, openBackupStream(all, plainNote), process.stdout);
 }
 
 async function* list(p) {

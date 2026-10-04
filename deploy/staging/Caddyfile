@@ -11,6 +11,9 @@
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
+		# Sprint 50: browser features neither the shop nor the API uses are switched off
+		# (camera and microphone stay allowed for the site itself: video consultations, C-23)
+		Permissions-Policy "geolocation=(), usb=(), serial=(), bluetooth=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()"
 		-Server
 	}
 	# Access logs never carry an e-prescription check code (it opens the prescription);
@@ -41,6 +44,14 @@
 		max_size 12MB
 	}
 	reverse_proxy api:4000
+}
+
+# Sprint 50: names that only send visitors to the website (production: the bare domain,
+# REDIRECT_DOMAINS=dawabag.com → https://www.dawabag.com), with their own certificates.
+# Without it the name is a harmless plain-HTTP placeholder nothing points at.
+{$REDIRECT_DOMAINS} {
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	redir https://{$WEB_DOMAIN}{uri} permanent
 }
 
 # The server's own object store (trial: compose profile objectstore). Browsers reach it

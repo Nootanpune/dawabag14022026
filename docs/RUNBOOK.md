@@ -19,6 +19,12 @@ the Compliance Rulebook (C-xx).
 Standing rules: nothing is stored on app servers, browsers or phones (logs go to
 stdout); all data stays in India (ap-south-1, C-44).
 
+**Single-server production (Sprint 50):** until volumes justify RDS and a load balancer, production
+can run the staging stack on one server in India with the override in `deploy/production/` —
+documents on S3 Mumbai, encrypted backups in Hyderabad, deploys from the GitHub workflow
+*Deploy production*. Owner's guide and technical runbook: **[docs/PRODUCTION.md](PRODUCTION.md)**
+(section 7m below).
+
 ## 2. Configuration
 
 Copy `backend/.env.example` and fill every key. In `NODE_ENV=production` the API
@@ -46,7 +52,10 @@ trial offers a labelled **demo payment** (`GET /payments/options` → `mode: dem
 marked paid through the same capture code as Razorpay (payments.gateway = `demo`, ids
 `demo_order_…`/`demo_pay_…`, audit `demo_payment_*` with `demo: true`), and refunds of demo
 payments are settled at once without a gateway. `DEMO_PAYMENTS=false` turns it off; the
-API refuses `DEMO_PAYMENTS` anywhere but `APP_ENV=trial`, and the routes answer 404 there. `S3_PUBLIC_ENDPOINT` (with
+API refuses `DEMO_PAYMENTS` anywhere but `APP_ENV=trial`, and the routes answer 404 there.
+**Sprint 50:** with `APP_ENV=production` the API also refuses Razorpay **test** keys (`rzp_test_…`)
+unless `PAYMENTS_TEST_MODE=true` — a declared dry-run day, which in turn refuses live keys
+(docs/PRODUCTION.md A7, A11); remove the flag before launch. `S3_PUBLIC_ENDPOINT` (with
 `S3_ENDPOINT` only) is the https address of a self-hosted store that browsers use;
 signed links are made for it while the API itself talks to `S3_ENDPOINT`.
 
@@ -237,7 +246,10 @@ starting unless `RUN_MIGRATIONS=false`. By hand: `npm run build && npm run db:mi
   request in CloudWatch.
 - Database: RDS automated backups with point-in-time recovery; keep monthly snapshots
   for **8 years** (GST books 72 months, C-34). Test a restore every quarter. (Staging: nightly backups to the object store and
-  `restore.sh`, section 7c.)
+  `restore.sh`, section 7c. Single-server production, Sprint 50: the same backups, **encrypted on the
+  server before upload** with `BACKUP_ENC_KEY` (AES-256-GCM, `deploy/staging/backup/crypt.mjs`;
+  rotate with `BACKUP_ENC_KEY_PREVIOUS`) into a separate bucket in ap-south-2, one more before every
+  deploy — docs/PRODUCTION.md B4. Losing the key loses the backups made with it.)
 - Statutory records are final in the database: the H1 register, credit notes, audit
   and consent logs, the prescription dispense ledger, verified prescriptions cannot be
   updated or deleted; invoice amounts cannot change.
@@ -395,6 +407,13 @@ Sprint 39 jobs: **payment_hold_watch** (every 15 min) and **pharmacist_registrat
 
 Sprint 40 jobs: **chain_verify** (daily 02:20; section 6) and **self_inspection_watch**
 (daily 08:10; section 7g).
+
+Sprint 50 job: **ops_watch** (hourly at :40) reads the Launch-readiness facts and **fails** — so
+admins get one `job_failed` alert, and no other until it has succeeded once — when the newest
+database backup (`job_runs` `db_backup`) is over 26 hours old or its last attempt failed, or
+`chain_verify` has not run for 48 hours. Backups are expected with `APP_ENV=production` (after 26
+hours of uptime) and wherever one has ever been noted; a broken chain is alerted by
+`chain_verify` itself. docs/PRODUCTION.md B6 (with the outside uptime monitor).
 
 ## 7g. GDP, recall drills and self-inspections (Sprint 40)
 
@@ -657,6 +676,30 @@ and the **tax invoice is issued at that approval** (DECISIONS.md, Sprint 44 rows
 - API: `GET /api/v1/admin/launch-readiness`, `PUT /api/v1/admin/launch-readiness/manual/:key
   {status, note?}` (admin, super_admin; 422 for an unknown status or a note over 1000
   characters, 404 for an unknown item).
+
+## 7m. Production on one server (Sprint 50)
+
+- Guide: **[docs/PRODUCTION.md](PRODUCTION.md)** — hosting choice, server preparation
+  (`deploy/production/bootstrap-server.sh`), secrets (`make-production-env.sh` →
+  GitHub environment secret `PRODUCTION_ENV` + the owner's password manager; checked by
+  `check-env.sh`), DNS at the registrar without touching e-mail records, first deploy,
+  Razorpay live, MSG91, Play Store, no trial data, cut-over, rollback, routine checks.
+- Stack: `docker compose -f deploy/staging/compose.yml -f deploy/production/compose.production.yml
+  --env-file deploy/production/production.env` with `STACK_ENV_FILE` pointing at the same file —
+  always through `deploy/production/prod.sh` (which also sets `STACK_COMPOSE_OVERRIDE` so
+  `restore.sh` and `check.sh` use the production stack). `APP_ENV=production` is forced; images are
+  tagged with the release; there is no seed, unseed or reset.
+- Deploy: Actions → **Deploy production** (manual only; environment `production` with a required
+  reviewer; CI must have passed for the commit; backup before migrating; migrations in a one-off
+  container while the previous API serves). Rollback = the same workflow with the previous tag;
+  a database restore only with written approval (`prod.sh restore-live`, section 6).
+- First super-admin: `prod.sh first-admin <mobile>` (refused once one exists; audited
+  `first_super_admin_set`).
+- Monitoring: job `ops_watch` (section 7) and `.github/workflows/production-monitor.yml`
+  (repository variables `PRODUCTION_WEB_DOMAIN`, `PRODUCTION_API_DOMAIN`, optional
+  `PRODUCTION_ALERT_ASSIGNEE`; opens / closes an issue labelled `production-alert`).
+- CI job `production-kit` checks the kit without a server: shellcheck, `test-kit.sh` (settings
+  checker and compose override with dummy values) and the backup-encryption tests.
 
 ## 7a. Development and CI
 
@@ -933,6 +976,10 @@ search works without typo matching; to add it later, as a superuser:
     into a fixed `STOCK.xlsx` that the stock connector uploads (`docs/stock-connector.md`).
     Set the partner's *Stale after* window longer than the export interval (30 minutes for a
     15-minute export, 45 for 30).
+16. Production server per docs/PRODUCTION.md (Sprint 50): GitHub environment `production` with a
+    required reviewer, `PRODUCTION_ENV` in it and in the owner's password manager, DNS with the
+    e-mail records untouched, offsite encrypted backups in ap-south-2, the monitor variables set and
+    an `ops_watch` alert drill done (Launch readiness 4.10–4.13).
 
 ## 9. Incidents
 

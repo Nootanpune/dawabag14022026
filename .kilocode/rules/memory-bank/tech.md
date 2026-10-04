@@ -47,3 +47,10 @@ No MSG91 key → SMS is skipped with a warning (OTP is in Redis at `otp:<mobile>
   next>postcss ^8.5.28); backend without nodemailer (SES SendEmailCommand), uuid 11 forced via overrides;
   npm audit 0 on both. CI jobs: backend, web, mobile (flutter analyze/test), images (docker build + /ready).
   Migration 18: indexes for hot child lookups and batch-key expressions.
+- Sprint 50: deployments — `deploy/staging/compose.yml` is the one stack (staging, trial with profile
+  `objectstore`, production with the override `deploy/production/compose.production.yml` through
+  `deploy/production/prod.sh`). Production settings: `PRODUCTION_ENV` GitHub environment secret
+  (`make-production-env.sh`, checked by `check-env.sh`); deploy `.github/workflows/deploy-production.yml`
+  (manual, environment `production`, CI must be green); monitor `production-monitor.yml`; backups
+  client-side encrypted (`BACKUP_ENC_KEY`, `deploy/staging/backup/crypt.mjs`, `npm test` there).
+  `PAYMENTS_TEST_MODE` (production refuses rzp_test_ keys without it). Guide: `docs/PRODUCTION.md`.

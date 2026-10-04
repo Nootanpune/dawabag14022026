@@ -1,0 +1,313 @@
+# Deploys Dawabag PRODUCTION (docs/PRODUCTION.md): the staging stack with the production
+# override (deploy/production) on one Ubuntu server in an Indian region, reached by SSH as the
+# `dawabag` user that deploy/production/bootstrap-server.sh created.
+#
+#   Actions → "Deploy production" → Run workflow → the tag / commit to deploy
+#
+# Manual only — never on push. Runs in the GitHub Environment "production": in Settings →
+# Environments → production, add yourself as a REQUIRED REVIEWER so every deploy waits for
+# your approval, and keep the secrets there (environment secrets, not repository secrets):
+#   PRODUCTION_ENV            the server's whole settings file (make-production-env.sh)
+#   PRODUCTION_SSH_HOST       the server's address
+#   PRODUCTION_SSH_KEY        the deploy key (bootstrap-server.sh prints it once)
+#   PRODUCTION_SSH_KNOWN_HOSTS the server's host keys (bootstrap-server.sh prints them; REQUIRED)
+#   PRODUCTION_SSH_USER       optional, default dawabag
+# The Android release bundle uses the same upload-key secrets as CI (RUNBOOK §7b).
+#
+# Order: CI must have passed for that exact commit → settings checked → code copied → images
+# built (the live site keeps serving) → database backup → migrations → API, website, backups,
+# Caddy → checks on the server and from outside. A failure stops there and prints the logs.
+# Rollback: run this workflow again with the previous tag (docs/PRODUCTION.md "Rollback").
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag, branch or commit to deploy (empty = the head of the branch chosen above). CI must have passed for it.
+        type: string
+        default: ''
+      allow_unmerged:
+        description: Allow a commit that is not on the default branch (emergency fixes only)
+        type: boolean
+        default: false
+      build_aab:
+        description: Also build the signed Android release bundle (AAB) for Google Play, pointed at this API
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Never two deploys at once; a newer one waits its turn (never cancels a running deploy)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    # No secrets here: which commit, and did CI pass for it?
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 1
+      - name: The commit to deploy
+        id: commit
+        run: |
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Deploying $sha ($(git log -1 --format='%s' | cut -c1-100))"
+      - name: CI passed for this commit, and it is on the default branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.commit.outputs.sha }}
+          ALLOW_UNMERGED: ${{ inputs.allow_unmerged }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          # Completed runs of .github/workflows/ci.yml for exactly this commit
+          runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&per_page=50" \
+            --jq '[.workflow_runs[] | {status, conclusion, html_url}]')"
+          ok="$(jq '[.[] | select(.status == "completed" and .conclusion == "success")] | length' <<<"$runs")"
+          if [ "$ok" -lt 1 ]; then
+            pending="$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")"
+            if [ "$pending" -gt 0 ]; then echo "::error::CI is still running for $SHA — wait until it is green, then run this again"
+            else echo "::error::CI has not passed for $SHA (no successful CI run). Fix CI first; production deploys only green commits."; fi
+            jq -r '.[] | "  \(.status) \(.conclusion // "-") \(.html_url)"' <<<"$runs"
+            exit 1
+          fi
+          echo "CI passed for $SHA: $(jq -r '[.[] | select(.conclusion == "success")][0].html_url' <<<"$runs")"
+          # On the default branch (merged), unless the operator ticked the emergency box
+          status="$(gh api "repos/$GITHUB_REPOSITORY/compare/$DEFAULT_BRANCH...$SHA" --jq .status)"
+          case "$status" in
+            identical|behind) echo "$SHA is on $DEFAULT_BRANCH" ;;
+            *)
+              if [ "$ALLOW_UNMERGED" = true ]; then echo "::warning::$SHA is not on $DEFAULT_BRANCH ($status) — deploying anyway (allow_unmerged). Merge it afterwards."
+              else echo "::error::$SHA is not on $DEFAULT_BRANCH ($status). Merge it first, or tick allow_unmerged for an emergency fix."; exit 1; fi ;;
+          esac
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    environment:
+      name: production
+      url: ${{ steps.names.outputs.web_url }}
+    env:
+      SHA: ${{ needs.verify.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+
+      - name: Check the production settings (names only, never values)
+        id: names
+        env:
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          missing=""
+          for s in PRODUCTION_ENV PRODUCTION_SSH_HOST PRODUCTION_SSH_KEY PRODUCTION_SSH_KNOWN_HOSTS; do [ -n "${!s}" ] || missing="$missing $s"; done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing environment secrets in Settings → Environments → production:$missing (docs/PRODUCTION.md)"; exit 1
+          fi
+          # Same rules as the API's own start-up check plus the server-level ones (line format,
+          # required keys, APP_ENV=production, no test keys / demo flags / change-me, encryption keys …)
+          printf '%s\n' "$PRODUCTION_ENV" | deploy/production/check-env.sh -
+          val() { printf '%s\n' "$PRODUCTION_ENV" | tr -d '\r' | sed -n "s/^$1=//p" | tail -1; }
+          # Public names only (not secret) for the later steps
+          {
+            echo "WEB_DOMAIN=$(val WEB_DOMAIN)"
+            echo "API_DOMAIN=$(val API_DOMAIN)"
+            echo "APEX_DOMAIN=$(val APEX_DOMAIN)"
+          } >> "$GITHUB_ENV"
+          echo "web_url=https://$(val WEB_DOMAIN)" >> "$GITHUB_OUTPUT"
+
+      - name: SSH access (temporary; the host key must match)
+        env:
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+          PRODUCTION_SSH_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          SSH_DIR="$RUNNER_TEMP/production-ssh"
+          echo "SSH_DIR=$SSH_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$SSH_DIR"
+          printf '%s\n' "$PRODUCTION_SSH_KEY" | tr -d '\r' > "$SSH_DIR/key"
+          printf '%s\n' "$PRODUCTION_SSH_KNOWN_HOSTS" | tr -d '\r' > "$SSH_DIR/known_hosts"
+          # One connection reused by every step (ControlMaster): fewer logins, no rate limits
+          cat > "$SSH_DIR/config" <<EOF
+          Host production
+            HostName $PRODUCTION_SSH_HOST
+            User ${PRODUCTION_SSH_USER:-dawabag}
+            IdentityFile $SSH_DIR/key
+            IdentitiesOnly yes
+            UserKnownHostsFile $SSH_DIR/known_hosts
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ServerAliveInterval 30
+            ConnectTimeout 20
+            ControlMaster auto
+            ControlPath $SSH_DIR/cm-%C
+            ControlPersist 30m
+          EOF
+          ssh -F "$SSH_DIR/config" production 'docker compose version && uptime'
+
+      - name: Copy release ${{ needs.verify.outputs.sha }} to the server
+        run: |
+          # The server's settings file is written below; never deleted or overwritten by the copy
+          rsync -az --delete -e "ssh -F $SSH_DIR/config" \
+            --filter='P deploy/production/production.env' --filter='P deploy/staging/staging.env' \
+            --exclude=.git/ --exclude=node_modules/ --exclude=.next/ --exclude=dist/ --exclude=build/ --exclude=.dart_tool/ \
+            --exclude=journeys-out/ --exclude=/e2e/ --exclude=/mobile/ --exclude=playwright-report/ --exclude=test-results/ --exclude='*.log' \
+            --exclude=deploy/production/production.env --exclude=deploy/staging/staging.env --exclude=backend/.env --exclude=dump.rdb \
+            ./ production:dawabag/
+
+      - name: Write the server's settings (never printed)
+        env:
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+        run: |
+          # The release goes in as the last line: images are tagged with it (compose.production.yml)
+          { printf '%s\n' "$PRODUCTION_ENV" | tr -d '\r' | grep -v '^DAWABAG_RELEASE='; echo "DAWABAG_RELEASE=${SHA:0:12}"; } \
+            | ssh -F "$SSH_DIR/config" production 'umask 077 && cat > dawabag/deploy/production/production.env.new && mv dawabag/deploy/production/production.env.new dawabag/deploy/production/production.env'
+
+      - name: Build the images (the live site keeps serving)
+        run: ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh build'
+
+      - name: Database backup before migrating
+        # Its key is in the log ("backup ok: <key>"): restore it only if a migration broke data
+        run: ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh pre-backup'
+
+      - name: Migrations, then the API, website, backups and Caddy
+        run: ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh up'
+
+      - name: Wait until the site answers over HTTPS
+        run: ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh ready'
+
+      - name: First backup (only when the store has none yet)
+        run: ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh first-backup'
+
+      - name: Checks on the server (HTTPS, headers, CORS, closed ports, backup age, restricted DB login)
+        run: |
+          ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh check'
+          ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh dblogin'
+
+      - name: Checks from outside (DNS, certificates, the firewall)
+        env:
+          CHECK_BACKUP: '0'
+          REDIRECT_DOMAIN: ${{ env.APEX_DOMAIN }}
+        run: deploy/staging/check.sh
+
+      - name: Tidy old releases (keeps the current and two previous for rollback)
+        run: ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh tidy; bash dawabag/deploy/production/prod.sh release'
+
+      - name: Summary
+        run: |
+          {
+            echo "## Dawabag production: release ${SHA:0:12} is live"
+            echo ""
+            echo "| | Address |"
+            echo "| --- | --- |"
+            echo "| Website | https://$WEB_DOMAIN |"
+            echo "| API | https://$API_DOMAIN |"
+            echo "| Razorpay webhook URL | https://$API_DOMAIN/api/v1/payments/webhook |"
+            echo ""
+            echo "Next: Admin → Launch readiness, and the daily checks in docs/PRODUCTION.md."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: On failure — logs and what to do
+        if: failure()
+        run: |
+          ssh -F "$SSH_DIR/config" production 'bash dawabag/deploy/production/prod.sh status; bash dawabag/deploy/production/prod.sh release; bash dawabag/deploy/production/prod.sh logs migrate api web caddy backup' || true
+          {
+            echo "## Production deploy of ${SHA:0:12} FAILED"
+            echo ""
+            echo "- Failed at *build* or *backup*: nothing was changed; the previous release is still serving."
+            echo "- Failed at *migrations*: the previous API is still serving; read the migrate log above."
+            echo "- Failed after that: run this workflow again with the **previous tag** (docs/PRODUCTION.md \"Rollback\")."
+            echo "- Restore the pre-deploy backup ONLY if a migration damaged data (RUNBOOK §6 \"Restore drill\", written approval, incident entry)."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the SSH key
+        if: always()
+        run: |
+          ssh -F "$SSH_DIR/config" -O exit production 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/production-ssh"
+
+  android:
+    # Signed release bundle for Google Play pointed at the production API — only when asked and
+    # only when the upload key is configured (same secrets and steps as CI's mobile job, RUNBOOK §7b)
+    needs: [verify, deploy]
+    if: inputs.build_aab
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+      - name: Release signing configured?
+        id: signing
+        env:
+          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+          PRODUCTION_ENV: ${{ secrets.PRODUCTION_ENV }}
+        run: |
+          api="$(printf '%s\n' "$PRODUCTION_ENV" | tr -d '\r' | sed -n 's/^API_DOMAIN=//p' | tail -1)"
+          [ -n "$api" ] || { echo "::error::PRODUCTION_ENV has no API_DOMAIN"; exit 1; }
+          # The app adds /api/v1 itself (mobile/lib/services/api_service.dart)
+          echo "PRODUCTION_API_URL=https://$api" >> "$GITHUB_ENV"
+          if [ "$HAS_KEYSTORE" != true ]; then
+            echo "::warning::No Android upload key in the secrets (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD); release bundle not built (RUNBOOK §7b)"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-java@v4
+        if: steps.signing.outputs.enabled == 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        if: steps.signing.outputs.enabled == 'true'
+        with:
+          channel: stable
+          cache: true
+      - name: Build signed release bundle
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          flutter pub get
+          # The keystore exists only in the runner's temp dir, only for this step
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/dawabag-upload.jks"
+          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          # Play needs a higher version code for every upload: minutes since 1970 always grows
+          # and is above CI's run-number codes (docs/PRODUCTION.md "Play Store")
+          code=$(( $(date +%s) / 60 ))
+          echo "Version code $code"
+          flutter build appbundle --release --build-number="$code" --dart-define=API_URL="$PRODUCTION_API_URL"
+      - uses: actions/upload-artifact@v4
+        if: steps.signing.outputs.enabled == 'true'
+        with:
+          name: dawabag-production-aab
+          path: mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+          if-no-files-found: error

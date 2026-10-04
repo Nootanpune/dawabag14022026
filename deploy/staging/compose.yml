@@ -7,8 +7,12 @@
 # Point DNS for WEB_DOMAIN and API_DOMAIN at the server first. Only ports 80 and 443
 # are open; the database and Redis are reachable only inside this stack. The API runs
 # in production mode; the one-shot `migrate` service applies pending migrations first, as
-# the database owner, and the API then connects as its own restricted login (Sprint 41). Production itself is the
-# AWS set-up in docs/RUNBOOK.md (RDS, ElastiCache, S3); this file is for staging.
+# the database owner, and the API then connects as its own restricted login (Sprint 41).
+#
+# Production on one server (Sprint 50, docs/PRODUCTION.md) runs THIS file with the thin override
+# deploy/production/compose.production.yml and its own settings file (STACK_ENV_FILE, set by
+# deploy/production/prod.sh): APP_ENV=production, release-tagged images, a different project
+# name; the services themselves are the same.
 #
 # Trial server without AWS (deploy/trial/TRIAL.md): add `--profile objectstore` to run
 # the server's own S3-compatible object store (MinIO) — its data lives in the named
@@ -58,7 +62,8 @@ services:
       dockerfile: backend/Dockerfile
     restart: "no"
     command: ["node", "dist/db/migrate.js"]
-    env_file: staging.env
+    # The settings file: staging.env here; production points STACK_ENV_FILE at its own (prod.sh)
+    env_file: ${STACK_ENV_FILE:-staging.env}
     environment:
       NODE_ENV: production
       DB_HOST: postgres
@@ -79,7 +84,7 @@ services:
       context: ../..
       dockerfile: backend/Dockerfile
     restart: unless-stopped
-    env_file: staging.env
+    env_file: ${STACK_ENV_FILE:-staging.env}
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -133,7 +138,9 @@ services:
       PGDATABASE: dawabag
       PGUSER: dawabag_user
       PGPASSWORD: ${DB_PASSWORD}
-      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      # Sprint 50: the backup bucket may live in another (Indian) region than the documents,
+      # e.g. ap-south-2 Hyderabad for offsite copies (docs/PRODUCTION.md "Backups")
+      AWS_REGION: ${BACKUP_AWS_REGION:-${AWS_REGION:-ap-south-1}}
       # Bucket and keys: BACKUP_* when set, else the API's own S3 settings
       BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
@@ -148,6 +155,10 @@ services:
       BACKUP_KMS_KEY_ID: ${BACKUP_KMS_KEY_ID:-}
       BACKUP_AT: ${BACKUP_AT:-02:30}
       BACKUP_PRUNE: ${BACKUP_PRUNE:-false}
+      # Sprint 50: client-side AES-256-GCM before upload (backup/crypt.mjs); required on production.
+      # Losing it loses every backup made with it — keep it in the owner's password manager.
+      BACKUP_ENC_KEY: ${BACKUP_ENC_KEY:-}
+      BACKUP_ENC_KEY_PREVIOUS: ${BACKUP_ENC_KEY_PREVIOUS:-}
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -205,6 +216,9 @@ services:
       # Public address of the objectstore profile's store (signed links only); the
       # default is a harmless plain-HTTP name nothing points at, so the site block parses
       FILES_DOMAIN: ${FILES_DOMAIN:-http://files.localhost}
+      # Sprint 50: names that only redirect to the website (production: the bare domain, e.g.
+      # dawabag.com → www); the default is a harmless plain-HTTP name nothing points at
+      REDIRECT_DOMAINS: ${REDIRECT_DOMAINS:-http://redirect.localhost}
       ACME_EMAIL: ${ACME_EMAIL:-}
       CADDY_GLOBAL_OPTIONS: ${CADDY_GLOBAL_OPTIONS:-}
     volumes:

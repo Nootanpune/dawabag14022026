@@ -45,7 +45,7 @@ all of it is needed before the first real order.
 
 | # | What has to be done | Who | Status |
 | --- | --- | --- | --- |
-| 4.1 | Production server set up (not the trial server), backups to the object store and a restore drill done (RUNBOOK §6, §7c) | Developer, Owner | Not started — only the trial server exists |
+| 4.1 | Production server set up (not the trial server), backups to the object store and a restore drill done (RUNBOOK §6, §7c; step by step in `docs/PRODUCTION.md`) | Developer, Owner | Not started — only the trial server exists; deployment kit ready (Sprint 50) |
 | 4.2 | `APP_ENV=production`, no demo data or demo logins (RUNBOOK §2, §8 item 0) | Developer | At production set-up |
 | 4.3 | `HEALTH_ENC_KEY` (health details) and `TOTP_ENC_KEY` (two-step sign-in) generated once and kept safely in the secret store — losing them makes data unreadable (RUNBOOK §6 "Health data key", §2 "Two-step sign-in", §8 items 9–10) | Developer, Owner | Not done for production (the API refuses to start without them) |
 | 4.4 | The API's own restricted database login and password (`DB_APP_PASSWORD`) (RUNBOOK §6) | Developer | At production set-up |
@@ -53,6 +53,10 @@ all of it is needed before the first real order.
 | 4.6 | Shiprocket user, webhook and pickup address; Firebase (app notifications); Agora (video calls) (RUNBOOK §2, §8 items 7–8) | Owner, Developer | Not done |
 | 4.7 | Android release signing key kept by the owner; app built for release (RUNBOOK §7b) | Owner, Developer | Pending owner |
 | 4.8 | Stock feed from partner Nootan's billing software: Allied will not provide an export or API, so Nootan automates MediVision's own stock-report export with Power Automate Desktop (`docs/medivision-export-automation.md`) and the connector uploads it (`docs/stock-connector.md`); meanwhile the partner portal stock import and the connector's manual mode work (RUNBOOK §2, §8 item 15) | Owner, Developer | **In progress** — guide written (Sprint 49); the MediVision clicks are recorded on Nootan's PC |
+| 4.10 | Production server prepared (`deploy/production/bootstrap-server.sh`), GitHub environment "production" with you as required reviewer, `PRODUCTION_ENV` and the SSH secrets stored there, first deploy done (`docs/PRODUCTION.md` A3–A6) | Developer, Owner | Not started — waiting for the hosting choice (recommendation: AWS Mumbai, DECISIONS 2026-10-04) |
+| 4.11 | DNS at BigRock: website, API (and CAA) records added; existing e-mail records (MX, SPF, DKIM, DMARC) untouched and e-mail tested afterwards (`docs/PRODUCTION.md` A5) | Owner | Not started |
+| 4.12 | Offsite backups: separate bucket in Hyderabad (ap-south-2) with retention rules, backup-only keys, encryption on; `BACKUP_ENC_KEY` kept in your password manager (`docs/PRODUCTION.md` B3, B4) | Developer, Owner | Not started |
+| 4.13 | Alerts tested: the production monitor opens a GitHub issue when the site is down; admins received an `ops_watch` alert in a drill; optional UptimeRobot / Better Stack (`docs/PRODUCTION.md` B6) | Developer, Owner | Not started |
 
 ## 5. Data and catalogue
 

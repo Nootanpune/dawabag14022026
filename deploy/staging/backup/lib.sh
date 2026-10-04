@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared by backup.sh and ../restore.sh (sourced, not run).
 # Database connection: the libpq variables PGHOST, PGPORT, PGUSER, PGPASSWORD,
 # PGDATABASE (the compose service sets them), or DATABASE_URL (a development machine:

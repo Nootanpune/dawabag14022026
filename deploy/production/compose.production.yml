@@ -1,0 +1,72 @@
+# Dawabag PRODUCTION on one server (Sprint 50; docs/PRODUCTION.md). A thin override of the
+# staging stack — the services, the migrate-then-API order, the restricted database login,
+# the backups and Caddy are exactly deploy/staging/compose.yml; only what production must
+# differ in is here. Never run it by hand without the wrapper:
+#
+#   deploy/production/prod.sh up        (the deploy workflow calls it)
+#
+# which runs   docker compose -f deploy/staging/compose.yml -f deploy/production/compose.production.yml
+#                --env-file deploy/production/production.env …
+# with STACK_ENV_FILE pointing the API at the same production.env.
+#
+# Differences from staging / the trial:
+#   • APP_ENV=production is forced here (the env file cannot say otherwise): the API refuses
+#     demo data, demo payments, trial passwords, a self-hosted object store, missing
+#     integrations, Razorpay test keys (unless PAYMENTS_TEST_MODE=true on a dry-run day),
+#     missing TOTP_ENC_KEY / HEALTH_ENC_KEY and a database login that is not restricted.
+#   • its own project name (volumes dawabag-production_*), so nothing is shared with a staging
+#     or trial stack by accident; images are tagged with the release (commit) being deployed,
+#     so the previous release's images stay on the server for a quick rollback.
+#   • QUEUE_PREFIX is required (its own job queues; Sprint 47).
+#   • no objectstore profile: documents go to AWS S3 in ap-south-1 (C-44); backups go to a
+#     separate bucket (normally ap-south-2), encrypted on this server first (BACKUP_ENC_KEY).
+name: dawabag-production
+
+x-release: &release ${DAWABAG_RELEASE:-manual}
+
+# The API and migrate containers load the whole production.env (env_file); the backup service's
+# own keys are blanked for them, so a compromised API cannot read or write the backups.
+x-no-backup-secrets: &no-backup-secrets
+  BACKUP_ENC_KEY: ""
+  BACKUP_ENC_KEY_PREVIOUS: ""
+  BACKUP_AWS_ACCESS_KEY_ID: ""
+  BACKUP_AWS_SECRET_ACCESS_KEY: ""
+
+services:
+  migrate:
+    image: dawabag-production-api:${DAWABAG_RELEASE:-manual}
+    environment:
+      <<: *no-backup-secrets
+      APP_ENV: production
+      # The demo seed is refused by the script itself unless APP_ENV=trial; never here (§8 item 0)
+      DEMO_SEED: ""
+    labels:
+      dawabag.release: *release
+
+  api:
+    image: dawabag-production-api:${DAWABAG_RELEASE:-manual}
+    environment:
+      <<: *no-backup-secrets
+      APP_ENV: production
+      QUEUE_PREFIX: ${QUEUE_PREFIX:?set QUEUE_PREFIX in production.env (e.g. dawabag-production)}
+    labels:
+      dawabag.release: *release
+
+  web:
+    image: dawabag-production-web:${DAWABAG_RELEASE:-manual}
+    labels:
+      dawabag.release: *release
+
+  backup:
+    image: dawabag-production-backup:${DAWABAG_RELEASE:-manual}
+    environment:
+      # Production refuses to back up without client-side encryption (check-env.sh too)
+      BACKUP_ENC_KEY: ${BACKUP_ENC_KEY:?set BACKUP_ENC_KEY in production.env (make-production-env.sh)}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:?set BACKUP_S3_BUCKET in production.env (a separate bucket for backups)}
+    labels:
+      dawabag.release: *release
+
+  caddy:
+    environment:
+      # The bare domain (e.g. dawabag.com) redirects to WEB_DOMAIN (e.g. www.dawabag.com)
+      REDIRECT_DOMAINS: ${APEX_DOMAIN:-http://redirect.localhost}

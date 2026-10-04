@@ -27,6 +27,7 @@ coverage/
 # redis snapshots from local runs
 *.rdb
 deploy/staging/staging.env
+deploy/production/production.env
 
 # Browser test output
 e2e/test-results/

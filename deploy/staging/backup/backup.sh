@@ -20,6 +20,7 @@
 # logs it, retries once after BACKUP_RETRY_MINUTES, and carries on the next night);
 # deploy/staging/check.sh fails when the newest backup is older than 26 hours.
 set -uo pipefail
+# shellcheck source-path=SCRIPTDIR source=lib.sh
 . "$(dirname "$0")/lib.sh"
 LOG_TAG=backup
 PREFIX="${BACKUP_PREFIX:-backups/}"

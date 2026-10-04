@@ -30,6 +30,11 @@ check "database port not exposed" "$(closed 5432 && echo ok)" "port 5432 answers
 check "Redis port not exposed" "$(closed 6379 && echo ok)" "port 6379 answers"
 xfo=$(c -D - -o /dev/null "$WEB/" | tr -d '\r' | grep -i '^x-frame-options')
 check "website cannot be framed by other sites" "$(echo "$xfo" | grep -qi deny && echo ok)" "${xfo:-missing}"
+# Sprint 50 (production): the bare domain sends visitors to the website over HTTPS
+if [ -n "${REDIRECT_DOMAIN:-}" ]; then
+  loc=$(c -o /dev/null -w '%{redirect_url}' "https://$REDIRECT_DOMAIN/")
+  check "$REDIRECT_DOMAIN redirects to the website" "$([[ "$loc" == "$WEB/"* ]] && echo ok)" "${loc:-no redirect}"
+fi
 
 # Newest database backup in the object store is under 26 hours old (nightly backup, C-34).
 # Asked through the stack's own backup container, so it runs on the staging server itself;
@@ -37,9 +42,13 @@ check "website cannot be framed by other sites" "$(echo "$xfo" | grep -qi deny &
 # CHECK_BACKUP=0 skips it; BACKUP_LATEST_CMD replaces how the newest backup is found.
 if [ "${CHECK_BACKUP:-auto}" != 0 ]; then
   here="$(cd "$(dirname "$0")" && pwd)"
-  dc=(docker compose -f "$here/compose.yml" --env-file "$here/staging.env")
+  # Production (Sprint 50): deploy/production/prod.sh sets STACK_ENV_FILE and STACK_COMPOSE_OVERRIDE
+  env_file="${STACK_ENV_FILE:-$here/staging.env}"
+  dc=(docker compose -f "$here/compose.yml")
+  [ -n "${STACK_COMPOSE_OVERRIDE:-}" ] && dc+=(-f "$STACK_COMPOSE_OVERRIDE")
+  dc+=(--env-file "$env_file")
   if [ -n "${BACKUP_LATEST_CMD:-}" ]; then latest_cmd=(bash -c "$BACKUP_LATEST_CMD")
-  elif [ -f "$here/staging.env" ] && [ -n "$("${dc[@]}" ps -q backup 2>/dev/null)" ]; then
+  elif [ -f "$env_file" ] && [ -n "$("${dc[@]}" ps -q backup 2>/dev/null)" ]; then
     latest_cmd=("${dc[@]}" exec -T backup /app/backup/backup.sh latest)
   else latest_cmd=(); fi
   if [ ${#latest_cmd[@]} = 0 ]; then echo "  skip latest backup age — no backup container on this machine"

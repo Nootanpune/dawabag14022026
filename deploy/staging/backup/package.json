@@ -3,7 +3,12 @@
   "private": true,
   "description": "Streams staging database dumps to and from the object store (deploy/staging/backup)",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1144.0"
   }

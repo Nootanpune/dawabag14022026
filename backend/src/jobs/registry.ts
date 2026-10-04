@@ -16,6 +16,7 @@ import { runRxHoldWatch } from '../services/payments/rxHold/hold.service';
 import { runPharmacistRegistrationAlerts } from '../services/pharmacistRegistration/alerts.service';
 import { runChainVerify } from '../services/chainVerify/heads.service';
 import { runSelfInspectionWatch } from '../services/selfInspection/alerts.service';
+import { runOpsWatch } from '../services/opsWatch/opsWatch';
 
 export interface JobDefinition {
   name: string;
@@ -33,6 +34,12 @@ export const JOBS: JobDefinition[] = [
       const r = await runChainVerify({ source: 'job' });
       return { ok: r.ok, chains: r.chains, broken: r.broken };
     },
+  },
+  {
+    name: 'ops_watch',
+    description: 'Fail (so admins get one alert) when the newest database backup is over 26 hours old or failed, or the nightly record-integrity check has not run for 48 hours (Sprint 50, C-34, C-43)',
+    cron: '40 * * * *',                      // hourly at :40
+    run: () => runOpsWatch(),
   },
   {
     name: 'self_inspection_watch',

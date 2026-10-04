@@ -268,3 +268,6 @@ signed links only, SSE with `OBJECTSTORE_KMS_KEY`), `APP_ENV=trial` (checked in
 seed `backend/src/scripts/demoSeed.ts` (`--remove` takes it out again), server helper
 `deploy/trial/trial.sh` and the workflow `.github/workflows/deploy-trial.yml`.
 RUNBOOK section 7e.
+
+**Going live for real** is a different server, set up from scratch — nothing is copied from this
+trial: see [docs/PRODUCTION.md](../../docs/PRODUCTION.md).

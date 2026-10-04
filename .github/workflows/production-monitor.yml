@@ -1,0 +1,96 @@
+# Production uptime watch (Sprint 50; docs/PRODUCTION.md "Monitoring") — no outside service,
+# no secret: every 10 minutes GitHub checks the public addresses from outside. When the API's
+# /ready, the website or the certificate fails, it opens ONE issue labelled production-alert
+# (GitHub e-mails the assignee and everyone watching the repository); when all is well again
+# it comments and closes it. Inside the server, the hourly job `ops_watch` alerts admins about
+# old or failed backups and a stopped integrity check (email + push; RUNBOOK §7).
+#
+# Switch on: repository VARIABLES (Settings → Secrets and variables → Actions → Variables)
+#   PRODUCTION_WEB_DOMAIN   e.g. www.<your domain>
+#   PRODUCTION_API_DOMAIN   e.g. api.<your domain>
+#   PRODUCTION_ALERT_ASSIGNEE  optional: the GitHub username to assign (and e-mail)
+# Without them every run just says "not configured" and stops. Scheduled workflows run only
+# from the default branch, and GitHub pauses them after 60 days without repository activity.
+name: Production monitor
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WEB_DOMAIN: ${{ vars.PRODUCTION_WEB_DOMAIN }}
+      API_DOMAIN: ${{ vars.PRODUCTION_API_DOMAIN }}
+      ASSIGNEE: ${{ vars.PRODUCTION_ALERT_ASSIGNEE }}
+      GH_TOKEN: ${{ github.token }}
+      LABEL: production-alert
+    steps:
+      - name: Check the public site from outside
+        id: probe
+        run: |
+          if [ -z "$WEB_DOMAIN" ] || [ -z "$API_DOMAIN" ]; then
+            echo "::notice::Production monitor not configured (repository variables PRODUCTION_WEB_DOMAIN / PRODUCTION_API_DOMAIN)"
+            echo "configured=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          problems=()
+          # Three tries 20 s apart, so a restart during a deploy is not an outage
+          probe() {
+            local url="$1" want="$2" code=""
+            for _ in 1 2 3; do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || true)"
+              [ "$code" = "$want" ] && return 0
+              sleep 20
+            done
+            problems+=("$url answered ${code:-nothing} (expected $want)")
+          }
+          probe "https://$API_DOMAIN/ready" 200
+          probe "https://$WEB_DOMAIN/" 200
+          # Certificates renew themselves 30 days before expiry; under 14 days means renewal is failing
+          for host in "$WEB_DOMAIN" "$API_DOMAIN"; do
+            end="$(echo | openssl s_client -servername "$host" -connect "$host:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)"
+            if [ -z "$end" ]; then problems+=("no TLS certificate could be read from $host"); continue; fi
+            days=$(( ( $(date -d "$end" +%s) - $(date +%s) ) / 86400 ))
+            [ "$days" -ge 14 ] || problems+=("the certificate of $host expires in $days day(s) ($end) — Caddy's renewal is failing")
+          done
+          if [ ${#problems[@]} -gt 0 ]; then
+            printf '%s\n' "${problems[@]}" | tee "$RUNNER_TEMP/problems.txt"
+            echo "down=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "All well: https://$API_DOMAIN/ready, https://$WEB_DOMAIN/, certificates"
+            echo "down=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or close the alert issue
+        if: steps.probe.outputs.configured == 'true'
+        env:
+          DOWN: ${{ steps.probe.outputs.down }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          open="$(gh api "repos/$GITHUB_REPOSITORY/issues?state=open&labels=$LABEL&per_page=1" --jq '.[0].number // empty')"
+          now="$(date -u '+%F %H:%M UTC') ($(TZ=Asia/Kolkata date '+%H:%M IST'))"
+          if [ "$DOWN" = true ]; then
+            if [ -n "$open" ]; then echo "Alert issue #$open is already open"; exit 0; fi
+            gh api "repos/$GITHUB_REPOSITORY/labels" -f name="$LABEL" -f color=d73a4a -f description="Production is down or degraded (production-monitor.yml)" >/dev/null 2>&1 || true
+            body="$(printf 'Detected %s by the production monitor ([run](%s)):\n\n' "$now" "$RUN_URL"; sed 's/^/- /' "$RUNNER_TEMP/problems.txt"; printf '\nWhat to do: docs/PRODUCTION.md "When the site is down". This issue closes itself when the checks pass again.\n')"
+            args=(-f title="Production alert: the site is down or degraded" -f body="$body" -f "labels[]=$LABEL")
+            [ -z "$ASSIGNEE" ] || args+=(-f "assignees[]=$ASSIGNEE")
+            gh api "repos/$GITHUB_REPOSITORY/issues" "${args[@]}" --jq '"Opened alert issue #\(.number)"'
+            exit 1
+          elif [ -n "$open" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/issues/$open/comments" -f body="Recovered: all checks pass again at $now ([run]($RUN_URL))." >/dev/null
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/$open" -f state=closed -f state_reason=completed >/dev/null
+            echo "Closed alert issue #$open"
+          fi

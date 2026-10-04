@@ -103,6 +103,20 @@ describe('checkEnv', () => {
       }
       expect(checkEnv({ ...trial, DEMO_PAYMENTS: 'yes' } as any).errors.join(' ')).toMatch(/true or false/);
     });
+    // Sprint 50 — production deployment kit: live keys on production, test keys only on a declared dry run
+    it('real production refuses Razorpay test keys unless PAYMENTS_TEST_MODE=true, and the flag refuses live keys', () => {
+      const real = { ...prod, APP_ENV: 'production' };
+      expect(checkEnv({ ...real, RAZORPAY_KEY_ID: 'rzp_test_1' } as any).errors.join(' ')).toMatch(/must use Razorpay live keys/);
+      const dry = checkEnv({ ...real, RAZORPAY_KEY_ID: 'rzp_test_1', PAYMENTS_TEST_MODE: 'true' } as any);
+      expect(dry.errors).toEqual([]);
+      expect(dry.warnings.join(' ')).toMatch(/PAYMENTS_TEST_MODE=true: Razorpay TEST keys/);
+      expect(checkEnv({ ...real, PAYMENTS_TEST_MODE: 'true' } as any).errors.join(' ')).toMatch(/must not be used with Razorpay live keys/);
+      expect(checkEnv({ ...real, PAYMENTS_TEST_MODE: 'false' } as any).errors).toEqual([]);
+      expect(checkEnv({ ...real, PAYMENTS_TEST_MODE: 'yes' } as any).errors.join(' ')).toMatch(/PAYMENTS_TEST_MODE must be true or false/);
+      // Staging rules (APP_ENV unset) and the trial are unchanged: test keys stay allowed there
+      expect(checkEnv({ ...prod, RAZORPAY_KEY_ID: 'rzp_test_1' } as any).errors).toEqual([]);
+      expect(checkEnv({ ...trial, PAYMENTS_TEST_MODE: 'true' } as any).warnings.join(' ')).toMatch(/only has an effect with APP_ENV=production/);
+    });
     it('refuses an unknown APP_ENV', () => {
       expect(checkEnv({ ...prod, APP_ENV: 'demo' } as any).errors.join(' ')).toMatch(/APP_ENV must be one of/);
     });

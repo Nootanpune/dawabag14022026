@@ -214,6 +214,29 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  production-kit:
+    # Sprint 50: the production deployment kit checked without a server or any secret —
+    # shell scripts linted, the settings checker accepts a generated file with dummy values and
+    # refuses every unsafe change, the production compose override resolves, and the backups'
+    # client-side encryption round-trips through the S3 fake. Nothing is deployed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Shell scripts (shellcheck; new production scripts at every level, older ones at warning)
+        run: |
+          shellcheck --version | head -2
+          shellcheck -x deploy/production/*.sh
+          shellcheck -S warning -x deploy/staging/*.sh deploy/staging/backup/*.sh deploy/trial/*.sh
+      - name: Production settings checker and compose override (dummy values only)
+        run: deploy/production/test-kit.sh
+      - name: Backup encryption (client-side AES-256-GCM, restore round trip)
+        working-directory: deploy/staging/backup
+        run: npm ci --no-audit --no-fund && npm test
+
   staging:
     # The staging stack exactly as a server runs it (deploy/staging): both images built,
     # migrations on an empty database, Caddy with its own CA in front, checked over HTTPS

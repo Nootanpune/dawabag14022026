@@ -22,11 +22,16 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 
 if [ -z "${DATABASE_URL:-}${PGHOST:-}" ]; then
-  # On the server: hand over to the backup container, with a terminal when we have one
+  # On the server: hand over to the backup container, with a terminal when we have one.
+  # Production (Sprint 50) runs the same stack with its own settings file and override:
+  # deploy/production/prod.sh sets STACK_ENV_FILE and STACK_COMPOSE_OVERRIDE before calling this.
   tty=-T; [ -t 0 ] && [ -t 1 ] && tty=
-  exec docker compose -f "$HERE/compose.yml" --env-file "$HERE/staging.env" exec $tty backup /app/restore.sh "$@"
+  dc=(docker compose -f "$HERE/compose.yml")
+  [ -n "${STACK_COMPOSE_OVERRIDE:-}" ] && dc+=(-f "$STACK_COMPOSE_OVERRIDE")
+  exec "${dc[@]}" --env-file "${STACK_ENV_FILE:-$HERE/staging.env}" exec $tty backup /app/restore.sh "$@"
 fi
 
+# shellcheck source-path=SCRIPTDIR source=backup/lib.sh
 . "$HERE/backup/lib.sh"
 LOG_TAG=restore
 KEY="" KEEP=false INTO_LIVE=false

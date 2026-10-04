@@ -51,6 +51,22 @@ export function checkEnv(env: NodeJS.ProcessEnv = process.env): EnvCheck {
   const realProduction = production && appEnv === 'production';
   const trial = appEnv === 'trial';
   if (realProduction && env.ALLOW_MISSING_INTEGRATIONS === 'true') errors.push('ALLOW_MISSING_INTEGRATIONS must not be set when APP_ENV=production');
+  // Sprint 50: real production takes real money — Razorpay LIVE keys only (rzp_live_…). Test keys
+  // (rzp_test_…) only for a declared dry-run day with PAYMENTS_TEST_MODE=true, which in turn
+  // refuses live keys so the flag can never sit next to real payments by mistake (C-37).
+  const paymentsTestMode = env.PAYMENTS_TEST_MODE;
+  if (paymentsTestMode != null && paymentsTestMode !== '' && !['true', 'false'].includes(paymentsTestMode)) errors.push('PAYMENTS_TEST_MODE must be true or false');
+  if (realProduction) {
+    const keyId = String(env.RAZORPAY_KEY_ID ?? '');
+    if (paymentsTestMode === 'true') {
+      if (/^rzp_live_/.test(keyId)) errors.push('PAYMENTS_TEST_MODE=true must not be used with Razorpay live keys (remove the flag to take real payments)');
+      else warnings.push('PAYMENTS_TEST_MODE=true: Razorpay TEST keys on production — no real money moves (dry run only; remove before launch)');
+    } else if (/^rzp_test_/.test(keyId)) {
+      errors.push('APP_ENV=production must use Razorpay live keys (rzp_live_…); test keys only with PAYMENTS_TEST_MODE=true for a dry run');
+    }
+  } else if (paymentsTestMode === 'true') {
+    warnings.push('PAYMENTS_TEST_MODE only has an effect with APP_ENV=production');
+  }
   if (trial) {
     // A trial is a closed demo: placeholder licences (C-04) and demo stock, so it must
     // never take real money — Razorpay test keys only (rzp_test_…)
